@@ -196,3 +196,65 @@ describe('GitHub token passthrough', () => {
     expect(other.ok).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+
+describe('GitHub credential selection', () => {
+  beforeEach(() => {
+    delete process.env.GITHUB_POLL_TOKEN;
+    delete process.env.AUTH_PROVIDER;
+  });
+
+  it('prefers the acting user’s own token for reads', async () => {
+    const { githubReadToken } = await import('@/lib/github/credential');
+    process.env.GITHUB_POLL_TOKEN = 'gho_shared';
+    expect(githubReadToken({ githubToken: 'gho_mine' })).toBe('gho_mine');
+  });
+
+  it('falls back to the shared token for READS when the session has none (OIDC)', async () => {
+    const { githubReadToken } = await import('@/lib/github/credential');
+    process.env.GITHUB_POLL_TOKEN = 'gho_shared';
+    expect(githubReadToken({ githubToken: null })).toBe('gho_shared');
+  });
+
+  it('returns null for reads when nothing is configured', async () => {
+    const { githubReadToken } = await import('@/lib/github/credential');
+    expect(githubReadToken({ githubToken: null })).toBeNull();
+    expect(githubReadToken(null)).toBeNull();
+  });
+
+  it('NEVER falls back to the shared token for writes — that would misattribute', async () => {
+    const { githubWriteToken } = await import('@/lib/github/credential');
+    process.env.GITHUB_POLL_TOKEN = 'gho_shared';
+    expect(githubWriteToken({ githubToken: null })).toBeNull();
+    expect(githubWriteToken({ githubToken: 'gho_mine' })).toBe('gho_mine');
+  });
+
+  it('explains the missing credential differently per provider', async () => {
+    const { writeCredentialHint } = await import('@/lib/github/credential');
+    process.env.AUTH_PROVIDER = 'oidc';
+    process.env.OIDC_ISSUER = 'https://id.example.test';
+    expect(writeCredentialHint()).toContain('Dex');
+
+    process.env.AUTH_PROVIDER = 'github';
+    expect(writeCredentialHint()).toContain('signed-in session');
+  });
+});
+
+describe('GitHub client with no credential', () => {
+  it('returns empty rather than calling GitHub unauthenticated', async () => {
+    const { listTeamMembers, listOpenPullRequests, clearGitHubCaches } = await import(
+      '@/lib/github/client'
+    );
+    clearGitHubCaches();
+    let called = 0;
+    const spy = (() => {
+      called++;
+      return Promise.resolve(new Response('[]', { status: 200 }));
+    }) as unknown as Fetcher;
+
+    expect(await listTeamMembers('', spy)).toEqual([]);
+    expect(await listOpenPullRequests('', spy)).toEqual([]);
+    expect(called).toBe(0);
+  });
+});

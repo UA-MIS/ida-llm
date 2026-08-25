@@ -86,6 +86,8 @@ export async function listTeamMembers(
   token: string,
   fetchImpl: Fetcher = fetch,
 ): Promise<TeamMember[]> {
+  // No credential: return empty rather than calling GitHub unauthenticated.
+  if (!token) return [];
   const key = config.teamLabel;
   const cached = membersCache.get(key);
   if (cached) return cached;
@@ -118,6 +120,7 @@ export async function listOpenPullRequests(
   token: string,
   fetchImpl: Fetcher = fetch,
 ): Promise<PullRequestSummary[]> {
+  if (!token) return [];
   const out: PullRequestSummary[] = [];
   for (const repo of config.githubRepos) {
     const res = await fetchImpl(

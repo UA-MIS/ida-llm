@@ -239,6 +239,22 @@ Failure policy on the GitHub path: a provable denial revokes; an inconclusive
 lookup (5xx, network) keeps the session, because a GitHub outage must not sign
 out the whole team.
 
+### ⚠️ What Dex sign-in means for GitHub features
+
+Under OIDC the board never receives a GitHub token — that is the point, since a
+team no longer registers a GitHub OAuth app. The GitHub-touching features
+therefore split:
+
+| Feature | Under Dex OIDC |
+|---|---|
+| Assignee picker, PR picker, reading a PR to link it, on-view reconciliation | Work **if `GITHUB_POLL_TOKEN` is set** (a read-only PAT or GitHub App token). Without it they degrade to empty lists with an explanatory note. |
+| **Creating a branch** ("Start work"), **posting the PR backlink comment** | Do **not** work, and deliberately do not fall back to the shared token — a branch attributed to a bot instead of the student defeats the purpose. The UI explains why. |
+
+So: **set `GITHUB_POLL_TOKEN`** for a Dex-based deployment, and accept that
+branch creation needs either `AUTH_PROVIDER=github` or a future GitHub App
+integration. Everything else — items, board, sprints, dependencies, the Ready
+queue, the API — is unaffected.
+
 ### API authentication
 
 Two credentials, same authorization rule — full detail in [`docs/api.md`](docs/api.md):

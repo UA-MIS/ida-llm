@@ -1,4 +1,5 @@
 import { config } from '@/lib/env';
+import { writeCredentialHint } from './credential';
 import { createBranch, GitHubError } from './client';
 import { renderBranchName, type WorkItem } from '@/lib/domain/workitem';
 import { setItemBranch } from '@/lib/domain/queries';
@@ -30,11 +31,9 @@ export async function startWork(
     return { status: 'disabled', message: 'Automatic branch creation is disabled (AUTO_BRANCH=false).' };
   }
   if (!githubToken) {
-    return {
-      status: 'failed',
-      message:
-        'Branch creation uses your GitHub sign-in, so it is only available in the web UI — an API token cannot push refs on your behalf.',
-    };
+    // Deliberately does NOT fall back to a shared token: a branch created by a
+    // bot instead of the student defeats the point of creating it from the item.
+    return { status: 'failed', message: writeCredentialHint() };
   }
 
   const repo = repoOverride ?? item.branchRepo ?? config.primaryRepo;

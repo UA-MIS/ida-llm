@@ -12,6 +12,7 @@ import { parsePrReference } from '@/lib/github/prs';
 import { fetchPullRequest } from '@/lib/github/client';
 import { syncBacklinkComment } from '@/lib/sync/backlink';
 import { config } from '@/lib/env';
+import { githubReadToken, githubWriteToken, writeCredentialHint } from '@/lib/github/credential';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,16 +47,17 @@ export const POST = withApi(async ({ request, params, principal }) => {
     );
   }
 
-  // Reading a PR needs a GitHub credential, which only a signed-in user has.
-  if (!principal.githubToken) {
+  // Reading the PR is a read, so the shared token is an acceptable fallback.
+  const readToken = githubReadToken(principal);
+  if (!readToken) {
     return apiError(
       'github_credential_required',
-      'Linking a pull request reads it from GitHub, so it requires a signed-in session rather than an API token.',
+      'Linking a pull request reads it from GitHub, and no GitHub credential is available. Sign in with a GitHub-backed session, or set GITHUB_POLL_TOKEN.',
       400,
     );
   }
 
-  const pr = await fetchPullRequest(ref.repoFullName, ref.prNumber, principal.githubToken);
+  const pr = await fetchPullRequest(ref.repoFullName, ref.prNumber, readToken);
   if (!pr) {
     return apiError(
       'pr_not_found',
@@ -83,16 +85,24 @@ export const POST = withApi(async ({ request, params, principal }) => {
   );
   await recordPrLinkActivity(id, actor, pr.number, pr.repoFullName);
 
-  // Backlink is a courtesy: never fail the link because the comment failed.
+  // The backlink comment WRITES as a person, so it never uses the shared token
+  // — and it is a courtesy either way: it must never fail the link.
   const fresh = (await getWorkItem(id)) ?? item;
   const backlink = await syncBacklinkComment(
     fresh,
     pr.repoFullName,
     pr.number,
-    principal.githubToken,
+    githubWriteToken(principal),
   );
 
-  return ok({ link, item: fresh, backlink }, 201);
+  return ok(
+    {
+      link,
+      item: fresh,
+      backlink: backlink.ok ? backlink : { ...backlink, hint: writeCredentialHint() },
+    },
+    201,
+  );
 });
 
 /** DELETE /api/v1/items/{id}/links?linkId=N */

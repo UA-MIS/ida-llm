@@ -5,6 +5,7 @@ import { serverNow } from '@/lib/clock';
 import { listSprints, listWorkItems } from '@/lib/domain/queries';
 import { getCurrentSprint, readinessMap } from '@/lib/domain/deps-queries';
 import { listTeamMembers } from '@/lib/github/client';
+import { githubReadToken } from '@/lib/github/credential';
 import { Shell } from '@/components/Shell';
 import { Board } from '@/components/Board';
 
@@ -13,11 +14,12 @@ export const dynamic = 'force-dynamic';
 export default async function BoardPage() {
   const session = await requireSession('/board');
   await ensureSchema();
+  const ghToken = githubReadToken({ githubToken: session.token || null });
 
   const [items, sprints, members, current, readiness] = await Promise.all([
     listWorkItems(),
     listSprints(),
-    listTeamMembers(session.token),
+    listTeamMembers(ghToken ?? ''),
     getCurrentSprint(),
     readinessMap(),
   ]);

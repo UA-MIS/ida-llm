@@ -10,6 +10,7 @@ import {
   listSprints,
 } from '@/lib/domain/queries';
 import { listOpenPullRequests, listTeamMembers } from '@/lib/github/client';
+import { githubReadToken } from '@/lib/github/credential';
 import { extractWorkItemRefs } from '@/lib/github/prs';
 import { reconcileItem } from '@/lib/sync/poller';
 import { renderMarkdown } from '@/lib/markdown';
@@ -25,6 +26,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
 
   const session = await requireSession(`/items/${rawId}`);
   await ensureSchema();
+  const ghToken = githubReadToken({ githubToken: session.token || null });
 
   const existing = await getWorkItem(id);
   if (!existing) notFound();
@@ -32,7 +34,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   // On-view reconciliation: without webhooks configured this is what keeps the
   // item current. It self-throttles, so opening the page repeatedly is cheap.
   if (!config.webhooksEnabled) {
-    await reconcileItem(existing, session.token).catch(() => undefined);
+    await reconcileItem(existing, ghToken).catch(() => undefined);
   }
 
   const item = (await getWorkItem(id)) ?? existing;
@@ -42,8 +44,8 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
     listActivity(id),
     listAttachments(id),
     listSprints(),
-    listTeamMembers(session.token),
-    listOpenPullRequests(session.token),
+    listTeamMembers(ghToken ?? ''),
+    listOpenPullRequests(ghToken ?? ''),
   ]);
 
   return (
