@@ -339,3 +339,62 @@ jobs:
           #    above recognises and skips — no bump loop, and unlike [skip ci] a
           #    later tag on this commit still triggers normally.
           git push origin HEAD:main
+
+  # ── THE TAG RUNG ────────────────────────────────────────────────────────────
+  # bump-staging — what makes `git tag vX.Y.Z` actually REACH staging.
+  #
+  # ⚠ THIS JOB'S ABSENCE WAS A LIVE BUG, not a hypothetical. promotion.yaml has
+  # always declared `staging.trigger: "tag:v*"`, the README has always documented
+  # "push tag vX.Y.Z -> staging", and resolve-image.sh's header has always said the
+  # tag build produces the image "that BOTH staging and prod overlays pin". All
+  # true about the IMAGE — and none of it wired to the OVERLAY. A tag build pushed
+  # `:X.Y.Z` to Harbor and then stopped: `bump-dev` is gated on `refs/heads/main`
+  # so it skipped, `bump-preview` is pull_request-only, `seed-initial-envs.sh` is a
+  # no-op past the sentinel, and `promote.sh` writes prod. Nothing wrote staging.
+  #
+  # Staging therefore sat frozen at whatever tag the FIRST-DEPLOY seed left there,
+  # and the docs described a rung that did not exist. Worse, it was not a benign
+  # gap: promote.sh promotes "whatever tag is live in <from>'s overlay", so
+  # promoting staging->prod would have copied that stale seed tag into PROD —
+  # silently rolling production back to a pre-port image (and, for a component
+  # added after the seed, to an image tag that was never built at all → prod
+  # ImagePullBackOff). Live-confirmed on 2026-08-25 while cutting v0.1.0.
+  #
+  # promotion-writers.test.sh now fails CI if any promotion.yaml env loses its
+  # writer again, so this class cannot regress into documentation fiction.
+  #
+  # Mirrors bump-dev exactly, with two deliberate differences:
+  #   - gated on `refs/tags/v*` instead of `refs/heads/main`
+  #   - it does NOT call seed-initial-envs.sh (that is a first-main-build concern)
+  # It checks out `main` — not the tag — because the overlay commit must land on the
+  # branch ArgoCD tracks; the TAG names the image, `main` carries the manifest.
+  bump-staging:
+    needs: [resolve, build-and-push]
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && needs.resolve.outputs.PUSH == 'true' }}
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    container:
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.resolve.outputs.TAG }}
+      GIT_AUTHOR_NAME: ua-mis-ci
+      GIT_AUTHOR_EMAIL: ci@capstone.uamishub.com
+      GIT_COMMITTER_NAME: ua-mis-ci
+      GIT_COMMITTER_EMAIL: ci@capstone.uamishub.com
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Point staging at the tag just built
+        run: |
+          set -eu
+          COMMIT=1 bash .devops/ci/bump-image.sh staging "${TAG}"
+          # Authored by GIT_AUTHOR_EMAIL, which `resolve`'s if: guard skips for BRANCH
+          # pushes — so this commit lands on main without starting a build loop, while
+          # a later `git tag` on that same commit still triggers normally.
+          git push origin HEAD:main

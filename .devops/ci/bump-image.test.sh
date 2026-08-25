@@ -122,5 +122,28 @@ else
   echo "NOTE: git not available — skipping COMMIT=1 commit-message assertion"
 fi
 
+# 6) DETERMINISM: the write must produce byte-identical output whether or not yq is
+# installed. The script used to prefer `yq -i`, which reserialises the document (blank
+# lines stripped, inline flow-maps reflowed) — so CI (no yq) emitted a 3-line diff while
+# a dev box with yq reformatted the whole overlay. Same script, same inputs, two
+# different commits, and spurious conflicts when two operators bumped the same file.
+# Live-confirmed 2026-08-25. The write is now sed unconditionally; this locks that in.
+if command -v yq >/dev/null 2>&1; then
+  R6a="$(make_repo)"; R6b="$(make_repo)"
+  K6a="${R6a}/.devops/chart/overlays/dev/kustomization.yaml"
+  K6b="${R6b}/.devops/chart/overlays/dev/kustomization.yaml"
+  bash "${R6a}/.devops/ci/bump-image.sh" dev "1.2.3" >/dev/null 2>&1              # yq on PATH
+  PATH="${NOYQ_DIR}" bash "${R6b}/.devops/ci/bump-image.sh" dev "1.2.3" >/dev/null 2>&1  # yq hidden
+  if diff -q "${K6a}" "${K6b}" >/dev/null 2>&1; then
+    PASS=$((PASS+1))
+  else
+    FAIL=$((FAIL+1))
+    echo "FAIL [determinism]: yq-present and yq-absent runs produced different files"
+    diff -u "${K6b}" "${K6a}" | head -20
+  fi
+else
+  echo "NOTE: yq not installed — determinism test needs both paths; skipping"
+fi
+
 echo "== FINAL: $PASS passed, $FAIL failed =="
 [ "${FAIL}" -eq 0 ]
