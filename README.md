@@ -436,9 +436,16 @@ it matters.
    cross product, dedupe it against what is already measured or in flight, and
    enqueue the rest — a sweep enqueues, runners execute. `ida-sweep
    judge-calibration` finds the subjective samples that carry no score, logs
-   `judge not yet available -- skipped N candidates` and exits 0; the single
-   wiring point is `_load_retroactive_grader`, and it is the only edit gap 2
-   needs to make here.
+   `judge not yet available -- skipped N candidates` and exits 0.
+
+   Two pieces are deferred **with** the judge rather than ahead of it, so they
+   land agreeing by construction: the retroactive wiring at
+   `_load_retroactive_grader`, and the live-scoring wiring
+   (`IDA_JUDGE_MODEL_KEY` → Worker → `run_task(judge=…)`). The blocker is not a
+   signature but the semantics — what a *failed* grading writes decides whether
+   this sweep's candidate query converges or re-nominates the same samples every
+   night at judge cost. See the OPEN CONTRACT note on
+   `list_ungraded_subjective_results`.
 
    Two things stay true of every sweep: **idempotent**, and **exit non-zero on
    failure** — a CronJob that exits 0 after failing looks successful forever. A
