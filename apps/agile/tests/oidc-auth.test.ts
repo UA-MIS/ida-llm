@@ -223,21 +223,40 @@ describe('GitHub credential selection', () => {
     expect(githubReadToken(null)).toBeNull();
   });
 
-  it('NEVER falls back to the shared token for writes — that would misattribute', async () => {
-    const { githubWriteToken } = await import('@/lib/github/credential');
-    process.env.GITHUB_POLL_TOKEN = 'gho_shared';
-    expect(githubWriteToken({ githubToken: null })).toBeNull();
-    expect(githubWriteToken({ githubToken: 'gho_mine' })).toBe('gho_mine');
+  it('prefers the user for writes, but falls back to the app credential', async () => {
+    const { githubActionCredential } = await import('@/lib/github/credential');
+    process.env.GITHUB_POLL_TOKEN = 'gho_app';
+
+    expect(githubActionCredential({ githubToken: 'gho_mine' })).toEqual({
+      token: 'gho_mine',
+      source: 'user',
+    });
+    // A Dex user has no token of their own; the feature still works.
+    expect(githubActionCredential({ githubToken: null })).toEqual({
+      token: 'gho_app',
+      source: 'app',
+    });
   });
 
-  it('explains the missing credential differently per provider', async () => {
-    const { writeCredentialHint } = await import('@/lib/github/credential');
+  it('reports "none" for writes when nothing at all is configured', async () => {
+    const { githubActionCredential } = await import('@/lib/github/credential');
+    expect(githubActionCredential({ githubToken: null })).toEqual({ token: null, source: 'none' });
+  });
+
+  it('marks app-credential actions in history so attribution stays truthful', async () => {
+    const { attributionNote } = await import('@/lib/github/credential');
+    expect(attributionNote('user')).toBeUndefined();
+    expect(attributionNote('app')).toContain('board');
+  });
+
+  it('names the variable an owner must set when no credential exists', async () => {
+    const { missingCredentialMessage } = await import('@/lib/github/credential');
     process.env.AUTH_PROVIDER = 'oidc';
     process.env.OIDC_ISSUER = 'https://id.example.test';
-    expect(writeCredentialHint()).toContain('Dex');
-
-    process.env.AUTH_PROVIDER = 'github';
-    expect(writeCredentialHint()).toContain('signed-in session');
+    const msg = missingCredentialMessage('Creating a branch');
+    expect(msg).toContain('GITHUB_POLL_TOKEN');
+    expect(msg).toContain('Dex');
+    expect(msg).toContain('Creating a branch');
   });
 });
 

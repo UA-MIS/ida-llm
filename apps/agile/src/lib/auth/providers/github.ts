@@ -105,6 +105,9 @@ export class GitHubProvider implements AuthProvider {
     login: string;
     githubToken: string | null;
   }): Promise<'ok' | 'denied' | 'unknown'> {
+    // A GitHub-provider session always has a token; if one is somehow missing
+    // there is nothing to check with, so report "cannot tell" rather than
+    // revoking a session that may be perfectly valid.
     if (!identity.githubToken) return 'unknown';
     return (await isStillOnTeam(identity.login, identity.githubToken)) ? 'ok' : 'denied';
   }

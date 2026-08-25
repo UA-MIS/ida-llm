@@ -12,7 +12,7 @@ import { parsePrReference } from '@/lib/github/prs';
 import { fetchPullRequest } from '@/lib/github/client';
 import { syncBacklinkComment } from '@/lib/sync/backlink';
 import { config } from '@/lib/env';
-import { githubReadToken, githubWriteToken, writeCredentialHint } from '@/lib/github/credential';
+import { githubActionCredential, githubReadToken } from '@/lib/github/credential';
 
 export const dynamic = 'force-dynamic';
 
@@ -92,17 +92,10 @@ export const POST = withApi(async ({ request, params, principal }) => {
     fresh,
     pr.repoFullName,
     pr.number,
-    githubWriteToken(principal),
+    githubActionCredential(principal),
   );
 
-  return ok(
-    {
-      link,
-      item: fresh,
-      backlink: backlink.ok ? backlink : { ...backlink, hint: writeCredentialHint() },
-    },
-    201,
-  );
+  return ok({ link, item: fresh, backlink }, 201);
 });
 
 /** DELETE /api/v1/items/{id}/links?linkId=N */

@@ -12,6 +12,7 @@ import { extractWorkItemRefs } from '@/lib/github/prs';
 import type { WorkItem } from '@/lib/domain/workitem';
 import { decideProgression, progressionPath, type ProgressionTrigger } from './progression';
 import { syncBacklinkComment } from './backlink';
+import type { GitHubCredential } from '@/lib/github/credential';
 
 /**
  * Applies git activity to the board.
@@ -144,7 +145,7 @@ export interface PrPayload {
 
 export async function handlePullRequest(
   pr: PrPayload,
-  githubToken: string | null = null,
+  credential: GitHubCredential | null = null,
 ): Promise<SyncOutcome> {
   const outcome = empty();
   if (!config.isKnownRepo(pr.repoFullName)) return outcome;
@@ -209,7 +210,9 @@ export async function handlePullRequest(
 
     // Backlink comment reflects the item's state AFTER any transition.
     const fresh = await getWorkItem(item.id);
-    if (fresh) await syncBacklinkComment(fresh, pr.repoFullName, pr.number, githubToken);
+    // No user in context on the webhook path; syncBacklinkComment falls back
+    // to the app credential and reports if none is configured.
+    if (fresh) await syncBacklinkComment(fresh, pr.repoFullName, pr.number, credential);
   }
 
   return outcome;

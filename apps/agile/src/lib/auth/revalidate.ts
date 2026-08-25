@@ -1,6 +1,5 @@
-import { config } from '@/lib/env';
 import { checkTeamMembership } from './team';
-import { hasRequiredGroup } from './providers/oidc';
+import { authProvider } from './providers';
 import type { Fetcher } from './github-oauth';
 import type { SessionPayload } from './session';
 
@@ -61,13 +60,23 @@ export async function isStillOnTeam(
   return decision.allowed;
 }
 
-/** Provider-aware entry point used by the route guards. */
+/**
+ * Provider-aware entry point used by every route guard.
+ *
+ * Delegates to the provider that issued the session rather than reimplementing
+ * the rule here, so there is exactly one place per provider that decides
+ * whether a session still qualifies. `unknown` keeps the session — it means
+ * "could not tell", which must never revoke access on its own.
+ */
 export async function sessionStillValid(
   session: Pick<SessionPayload, 'login' | 'token' | 'groups' | 'provider'>,
-  opts: { now?: number; fetchImpl?: Fetcher } = {},
+  _opts: { now?: number; fetchImpl?: Fetcher } = {},
 ): Promise<boolean> {
-  if (session.provider === 'oidc') {
-    return hasRequiredGroup(session.groups, config.requiredGroup);
-  }
-  return isStillOnTeam(session.login, session.token, opts);
+  const provider = authProvider(session.provider);
+  const verdict = await provider.revalidate({
+    login: session.login,
+    groups: session.groups,
+    githubToken: session.token || null,
+  });
+  return verdict !== 'denied';
 }
