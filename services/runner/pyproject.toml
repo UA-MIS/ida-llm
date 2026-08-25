@@ -14,7 +14,7 @@ dependencies = [
     # The runner serves /metrics on :9100 for the ServiceMonitor -- and
     # ida_llm_runner_queue_depth is the HPA's scaling metric, so this is
     # load-bearing, not observability garnish.
-    "prometheus-client~=0.21",
+    "prometheus-client~=0.26.0",
 ]
 
 [project.scripts]
