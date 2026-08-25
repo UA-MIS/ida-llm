@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-from tests.conftest import SUBJECTIVE_TASK, VERIFIABLE_TASK
 
 from ida_api.deps import AppContext
 from ida_core.contracts import (
@@ -21,32 +20,126 @@ from ida_core.db import session_scope
 from ida_core.ids import new_result_id, new_run_id
 from ida_core.repositories import create_run, insert_results
 
+VERIFIABLE_TASK = "demo/arithmetic-quiz-check"
+SUBJECTIVE_TASK = "demo/essay-feedback"
+
+
+class DeadQueue:
+    """A queue whose every liveness answer is an outage."""
+
+    def enqueue(self, message): ...
+    def dequeue(self, timeout_s=5):
+        return None
+
+    def depth(self):
+        return 0
+
+    def ping(self):
+        raise ConnectionError("redis is gone")
+
 
 class TestHealth:
-    def test_reports_each_dependency(self, client: TestClient) -> None:
-        body = client.get("/health").json()
-        assert body["status"] == "ok"
-        assert body["checks"] == {"database": True, "queue": True}
+    """The /healthz + /readyz split is a DEPLOYMENT CONTRACT.
 
-    def test_degraded_when_a_dependency_is_down(self, context: AppContext) -> None:
+    The chart probes /healthz for liveness (20s/20s) and /readyz for readiness
+    (5s/10s). If liveness ever starts checking a dependency, a brief database
+    blip restarts every replica instead of merely removing them from the
+    Service -- a small outage becomes a large one. These tests are what stops
+    that from being a one-line change nobody notices.
+    """
+
+    def test_readyz_reports_each_dependency(self, client: TestClient) -> None:
+        response = client.get("/readyz")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "ok"
+        assert body["checks"] == {"database": True, "queue": True, "artifacts": True}
+
+    def test_health_is_readyz_body_at_200(self, client: TestClient) -> None:
+        assert client.get("/health").json() == client.get("/readyz").json()
+
+    def test_healthz_is_ok_and_checks_nothing(self, client: TestClient) -> None:
+        response = client.get("/healthz")
+        assert response.status_code == 200
+        assert response.json()["status"] == "ok"
+        assert response.json()["checks"] == {}
+
+    def test_healthz_never_touches_a_dependency(self, context: AppContext) -> None:
+        """THE guard the README advertises.
+
+        Every dependency is replaced with one that raises on contact, and
+        liveness must still answer 200. If someone adds a `SELECT 1` to
+        /healthz, this is the test that fails.
+        """
         from ida_api.app import create_app
 
-        class DeadQueue:
-            def enqueue(self, message): ...
-            def dequeue(self, timeout_s=5):
-                return None
+        class Exploding:
+            def __getattr__(self, name):
+                def _boom(*args, **kwargs):
+                    raise AssertionError(
+                        f"/healthz touched a dependency ({name}); liveness must not"
+                    )
 
-            def depth(self):
-                return 0
+                return _boom
 
-            def ping(self):
-                raise ConnectionError("redis is gone")
+        context.queue = Exploding()
+        context.artifact_store = Exploding()
+        context.session_factory = Exploding()
+
+        response = TestClient(create_app(context)).get("/healthz")
+        assert response.status_code == 200
+        assert response.json()["status"] == "ok"
+
+    def test_readyz_returns_503_when_a_dependency_is_down(self, context: AppContext) -> None:
+        """503, not 200-with-a-sad-body.
+
+        The chart's readinessProbe reads the STATUS CODE. Returning 200 while
+        degraded would leave a pod with a dead database in the Service, serving
+        500s to real traffic.
+        """
+        from ida_api.app import create_app
 
         context.queue = DeadQueue()
-        body = TestClient(create_app(context)).get("/health").json()
+        response = TestClient(create_app(context)).get("/readyz")
+        assert response.status_code == 503
+        body = response.json()
         assert body["status"] == "degraded"
         assert body["checks"]["queue"] is False
         assert body["checks"]["database"] is True
+
+    def test_every_check_runs_even_when_an_earlier_one_fails(self, context: AppContext) -> None:
+        """A report that stops at the first failure hides the second.
+
+        "The queue is down" and "the queue AND the object store are down" are
+        different incidents, and the probe body is often the only evidence
+        anyone has at 2am.
+        """
+        from ida_api.app import create_app
+
+        class DeadStore:
+            def ensure_bucket(self):
+                raise OSError("minio is gone")
+
+        context.queue = DeadQueue()
+        context.artifact_store = DeadStore()
+        body = TestClient(create_app(context)).get("/readyz").json()
+        assert body["checks"] == {"database": True, "queue": False, "artifacts": False}
+
+    def test_metrics_is_exposed_for_the_servicemonitor(self, client: TestClient) -> None:
+        response = client.get("/metrics")
+        assert response.status_code == 200
+        assert "text/plain" in response.headers["content-type"]
+
+    def test_requests_are_counted_by_route_template_not_raw_path(self, client: TestClient) -> None:
+        """Unbounded label cardinality takes Prometheus down, not the app.
+
+        A benchmark platform mints run ids without limit, so labelling by raw
+        path would mint a time series per run.
+        """
+        client.get("/runs/run_does_not_exist")
+        body = client.get("/metrics").text
+        assert 'route="/runs/{run_id}"' in body
+        assert "run_does_not_exist" not in body
 
 
 class TestModelsEndpoint:
@@ -106,9 +199,7 @@ class TestTasksEndpoint:
         assert task["scorable"] is False
         assert "judge" in task["unscorable_reason"]
 
-    def test_get_one_task_returns_the_spec_with_targets_redacted(
-        self, client: TestClient
-    ) -> None:
+    def test_get_one_task_returns_the_spec_with_targets_redacted(self, client: TestClient) -> None:
         """A10: the answer key must not be published on an unauthenticated read."""
         body = client.get(f"/tasks/{VERIFIABLE_TASK}").json()
         assert body["targets_redacted"] is True
@@ -153,9 +244,7 @@ class TestTasksEndpoint:
 
 
 class TestEnqueue:
-    def test_creates_one_queued_run_per_pair(
-        self, client: TestClient, context: AppContext
-    ) -> None:
+    def test_creates_one_queued_run_per_pair(self, client: TestClient, context: AppContext) -> None:
         response = client.post(
             "/runs",
             json={
@@ -379,14 +468,10 @@ class TestRunDetail:
 
 
 class TestTranscriptEndpoint:
-    def test_serves_an_archived_transcript(
-        self, client: TestClient, context: AppContext
-    ) -> None:
+    def test_serves_an_archived_transcript(self, client: TestClient, context: AppContext) -> None:
         from ida_core.artifacts import sample_key
 
-        context.artifact_store.put_json(
-            sample_key("run_abc", "add-simple"), {"completion": "42"}
-        )
+        context.artifact_store.put_json(sample_key("run_abc", "add-simple"), {"completion": "42"})
         body = client.get("/runs/run_abc/results/add-simple/transcript").json()
         assert body == {"completion": "42"}
 

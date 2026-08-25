@@ -521,9 +521,7 @@ class TaskSpec(BaseModel):
                 )
             targets = [s.id for s in self.samples if s.target is not None]
             if targets:
-                raise ValueError(
-                    f"subjective task {self.id!r} must not carry targets: {targets}"
-                )
+                raise ValueError(f"subjective task {self.id!r} must not carry targets: {targets}")
         sample_ids = [s.id for s in self.samples]
         dupes = {i for i in sample_ids if sample_ids.count(i) > 1}
         if dupes:

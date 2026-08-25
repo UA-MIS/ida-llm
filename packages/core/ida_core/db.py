@@ -41,6 +41,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
+from ida_core.config import normalize_database_url
+
 
 def utcnow() -> datetime:
     """Timezone-aware "now".  Never use naive datetimes in this codebase."""
@@ -187,9 +189,16 @@ Index("ix_runs_task_model", RunRow.task_id, RunRow.model_key)
 def make_engine(database_url: str, *, echo: bool = False):
     """Build an engine with the settings both services should use.
 
-    ``pool_pre_ping`` matters in k8s: CloudNativePG failover kills connections
-    and we would otherwise serve a stale-socket 500 on the first request after.
+    ``pool_pre_ping`` matters in k8s: a database failover kills connections and
+    we would otherwise serve a stale-socket 500 on the first request after.
+
+    This is the SINGLE funnel for engine creation, which is why the DSN scheme is
+    normalised here and nowhere else -- see
+    :func:`ida_core.config.normalize_database_url` for the incident that makes it
+    load-bearing. (``migrations/env.py`` is the one caller that does not come
+    through here; it calls ``Settings.sqlalchemy_url()``, the same helper.)
     """
+    database_url = normalize_database_url(database_url)
     kwargs: dict = {"echo": echo, "future": True, "pool_pre_ping": True}
     if database_url.startswith("sqlite"):
         # SQLite has no real pool; pre-ping is meaningless and check_same_thread

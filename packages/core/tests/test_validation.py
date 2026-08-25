@@ -63,16 +63,12 @@ class TestSchemaEnforcesTheTaxonomy:
 
     def test_verifiable_with_judge_scorer_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            validate_task_document(
-                _verifiable_doc(scorer={"kind": "llm_judge", "rubric_id": "r"})
-            )
+            validate_task_document(_verifiable_doc(scorer={"kind": "llm_judge", "rubric_id": "r"}))
 
     def test_verifiable_with_rubric_rejected(self) -> None:
         with pytest.raises(ValidationError):
             validate_task_document(
-                _verifiable_doc(
-                    rubric={"id": "r", "criteria": [{"name": "c", "description": "d"}]}
-                )
+                _verifiable_doc(rubric={"id": "r", "criteria": [{"name": "c", "description": "d"}]})
             )
 
     def test_subjective_without_rubric_rejected(self) -> None:

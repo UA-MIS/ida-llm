@@ -16,7 +16,7 @@ import os
 
 import httpx
 import pytest
-from conftest import (
+from _tracer_assertions import (
     SUBJECTIVE_TASK,
     TERMINAL_STATUSES,
     VERIFIABLE_TASK,

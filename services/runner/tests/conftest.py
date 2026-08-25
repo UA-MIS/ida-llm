@@ -2,6 +2,17 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# CI runs ONE `pytest` from the repo root with `--import-mode=importlib`, which
+# (unlike the legacy `prepend` mode) puts NOTHING on sys.path. Without this line
+# `from _runner_helpers import ...` resolves only when pytest happens to be
+# invoked from this service's directory -- i.e. it passes locally and fails in
+# CI. conftest.py is imported before any test module, so here is the one place
+# it can be fixed once.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 import pytest
 
 from ida_core.artifacts import LocalArtifactStore
@@ -11,9 +22,6 @@ from ida_core.queue import InMemoryQueue
 from ida_core.registry import load_registry
 from ida_harness.client import OpenAICompatibleClient
 from ida_harness.tasks import TaskCatalog
-
-VERIFIABLE_TASK = "demo/arithmetic-quiz-check"
-SUBJECTIVE_TASK = "demo/essay-feedback"
 
 
 @pytest.fixture

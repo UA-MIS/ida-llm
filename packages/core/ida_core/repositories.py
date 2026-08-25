@@ -211,9 +211,7 @@ def result_row_to_record(row: ResultRow) -> ResultRecord:
         score=score,
         scorable=row.scorable,
         cached=row.cached,
-        usage=TokenUsage(
-            prompt_tokens=row.prompt_tokens, completion_tokens=row.completion_tokens
-        ),
+        usage=TokenUsage(prompt_tokens=row.prompt_tokens, completion_tokens=row.completion_tokens),
         cost_usd=row.cost_usd,
         latency_ms=row.latency_ms,
         transcript_uri=row.transcript_uri,

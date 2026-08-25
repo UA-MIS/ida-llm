@@ -12,19 +12,24 @@ import time
 
 import httpx
 import pytest
-from tests.conftest import SUBJECTIVE_TASK, VERIFIABLE_TASK
+from _runner_helpers import (
+    SUBJECTIVE_TASK,
+    VERIFIABLE_TASK,
+)
+from _runner_helpers import (
+    job_message as _message,
+)
+from _runner_helpers import (
+    seed_run as _seed_run,
+)
 
 from ida_core.artifacts import eval_log_key, sample_key
 from ida_core.contracts import (
-    RunJobMessage,
-    RunRecord,
     RunStatus,
     SamplingParams,
 )
-from ida_core.db import session_scope, utcnow
-from ida_core.ids import new_run_id
+from ida_core.db import session_scope
 from ida_core.repositories import (
-    create_run,
     get_run,
     list_results_for_run,
     result_row_to_record,
@@ -32,33 +37,6 @@ from ida_core.repositories import (
 )
 from ida_harness.client import OpenAICompatibleClient
 from ida_runner.worker import Worker, execute_job
-
-
-def _seed_run(session_factory, task_id: str = VERIFIABLE_TASK, **overrides) -> str:
-    run_id = new_run_id()
-    base = {
-        "id": run_id,
-        "status": RunStatus.QUEUED,
-        "task_id": task_id,
-        "model_key": "mock",
-        "harness_version": "0.1.0",
-        "task_git_sha": "e" * 40,
-    }
-    base.update(overrides)
-    with session_scope(session_factory) as session:
-        create_run(session, RunRecord(**base))
-    return run_id
-
-
-def _message(run_id: str, task_id: str = VERIFIABLE_TASK, **overrides) -> RunJobMessage:
-    base = {
-        "run_id": run_id,
-        "task_id": task_id,
-        "model_key": "mock",
-        "enqueued_at": utcnow(),
-    }
-    base.update(overrides)
-    return RunJobMessage(**base)
 
 
 def _execute(message, *, session_factory, registry, catalog, artifact_store, **kwargs):

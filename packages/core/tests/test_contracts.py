@@ -72,9 +72,7 @@ class TestTaskTaxonomy:
             TaskSpec.model_validate(doc)
 
     def test_verifiable_task_with_rubric_is_rejected(self) -> None:
-        doc = _verifiable_task(
-            rubric={"id": "r1", "criteria": [{"name": "c", "description": "d"}]}
-        )
+        doc = _verifiable_task(rubric={"id": "r1", "criteria": [{"name": "c", "description": "d"}]})
         with pytest.raises(ValidationError, match="must not carry a rubric"):
             TaskSpec.model_validate(doc)
 

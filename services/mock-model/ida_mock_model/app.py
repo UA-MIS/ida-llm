@@ -94,9 +94,7 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=503, detail="mock: injected transient failure")
 
         if request.stream:
-            raise HTTPException(
-                status_code=400, detail="mock-model does not implement streaming"
-            )
+            raise HTTPException(status_code=400, detail="mock-model does not implement streaming")
 
         if state.latency_ms > 0:
             time.sleep(state.latency_ms / 1000.0)

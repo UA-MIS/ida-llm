@@ -14,9 +14,7 @@ from ida_core.queue import RUN_QUEUE_KEY, InMemoryQueue, RunQueue
 
 
 def _message(run_id: str = "run_1") -> RunJobMessage:
-    return RunJobMessage(
-        run_id=run_id, task_id="demo/t", model_key="mock", enqueued_at=utcnow()
-    )
+    return RunJobMessage(run_id=run_id, task_id="demo/t", model_key="mock", enqueued_at=utcnow())
 
 
 class TestWireFormat:
@@ -51,9 +49,7 @@ class TestWireFormat:
 
     def test_attempt_is_one_based(self) -> None:
         with pytest.raises(ValidationError):
-            RunJobMessage(
-                run_id="r", task_id="t", model_key="m", enqueued_at=utcnow(), attempt=0
-            )
+            RunJobMessage(run_id="r", task_id="t", model_key="m", enqueued_at=utcnow(), attempt=0)
 
 
 class TestInMemoryQueue:

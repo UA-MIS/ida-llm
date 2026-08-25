@@ -228,9 +228,7 @@ class TestNumericMatchNormalisationSafety:
         ],
         ids=["default", "last-line", "lowercase", "strip-collapse", "combined"],
     )
-    def test_a_correct_answer_always_scores_one(
-        self, answer: str, rules: Normalisation
-    ) -> None:
+    def test_a_correct_answer_always_scores_one(self, answer: str, rules: Normalisation) -> None:
         """The invariant the asymmetry broke: completion == target must pass,
         under every normalisation combination a task may legally configure."""
         scorer = build_scorer(ScorerSpec(kind=ScorerKind.NUMERIC_MATCH, normalisation=rules))
@@ -305,9 +303,7 @@ class TestScoreContract:
     """B6 — `passed` is now optional, because graded scorers make no binary claim."""
 
     def test_programmatic_scorers_still_set_passed(self) -> None:
-        assert (
-            build_scorer(ScorerSpec(kind=ScorerKind.EXACT_MATCH)).score("a", "a").passed is True
-        )
+        assert build_scorer(ScorerSpec(kind=ScorerKind.EXACT_MATCH)).score("a", "a").passed is True
 
     def test_passed_may_be_none(self) -> None:
         """A rubric-weighted 0.62 is not a pass or a fail; forcing one invents a cutoff."""

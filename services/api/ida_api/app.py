@@ -2,7 +2,10 @@
 
 Route map
 ---------
-``GET  /health``            liveness + dependency checks
+``GET  /healthz``           LIVENESS. Touches nothing. Always 200.
+``GET  /readyz``            READINESS. Checks every dependency; 503 if any fails.
+``GET  /health``            alias of /readyz's body at 200 (compose + tracer)
+``GET  /metrics``           Prometheus exposition (ServiceMonitor ida-llm-api)
 ``GET  /models``            the model registry (secrets stripped)
 ``GET  /tasks``             the task catalog, with scorability
 ``GET  /tasks/{task_id}``   one full task spec
@@ -19,9 +22,11 @@ that is about *evaluating* belongs in the harness, not here.
 from __future__ import annotations
 
 import logging
+import time
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from sqlalchemy import text
 
 from ida_api import __version__
@@ -62,6 +67,18 @@ log = logging.getLogger(__name__)
 MAX_PAGE_SIZE = 200
 """Hard cap on ``GET /runs?limit=``.  Prevents an accidental full-table scan."""
 
+REQUESTS = Counter(
+    "ida_llm_api_requests_total",
+    "API requests, by method, matched route template and status code.",
+    ["method", "route", "status"],
+)
+
+REQUEST_SECONDS = Histogram(
+    "ida_llm_api_request_duration_seconds",
+    "API request latency, by matched route template.",
+    ["method", "route"],
+)
+
 
 def create_app(context: AppContext | None = None) -> FastAPI:
     """Build the API.
@@ -83,6 +100,32 @@ def create_app(context: AppContext | None = None) -> FastAPI:
     app.state.context = context or build_context()
     app.state.settings = app.state.context.settings
 
+    @app.middleware("http")
+    async def _record_request_metrics(request: Request, call_next):
+        """Count and time every request.
+
+        ⚠ LABELLED BY ROUTE TEMPLATE (`/runs/{run_id}`), NEVER BY RAW PATH.
+        Raw paths mint one time series per run id, and a benchmark platform
+        creates run ids without limit -- that is unbounded cardinality, and it
+        takes Prometheus down rather than the app.
+
+        The template is only known AFTER routing, so it is read off
+        `request.scope["route"]` on the way out. A request that matched no route
+        is labelled `<unmatched>` for the same reason: 404-scanning traffic must
+        not be able to create series either.
+        """
+        started = time.perf_counter()
+        response = await call_next(request)
+        route = request.scope.get("route")
+        template = getattr(route, "path", None) or "<unmatched>"
+        REQUEST_SECONDS.labels(method=request.method, route=template).observe(
+            time.perf_counter() - started
+        )
+        REQUESTS.labels(
+            method=request.method, route=template, status=str(response.status_code)
+        ).inc()
+        return response
+
     # TODO-PLACEHOLDER(cors-origins): restrict to the platform ingress hostnames
     # once the dev/staging/prod domains are assigned. Open during skeleton dev
     # so the Next.js dev server on :3000 can call the API on :8000.
@@ -95,21 +138,70 @@ def create_app(context: AppContext | None = None) -> FastAPI:
     )
 
     # ------------------------------------------------------------- health --
+    #
+    # THE SPLIT IS A DEPLOYMENT CONTRACT, NOT AN APP DETAIL.
+    #
+    # /healthz is LIVENESS and MUST NOT TOUCH A DEPENDENCY. A liveness probe
+    # that checks the database turns a brief Postgres blip into a rolling
+    # restart of every replica -- that is how a small outage becomes a large
+    # one. TestHealth::test_healthz_never_touches_a_dependency fails if this
+    # endpoint ever grows a dependency check.
+    #
+    # /readyz is READINESS and DOES check, and returns 503 when anything is
+    # down, so a pod that cannot reach its database is pulled from the Service
+    # and left running -- diagnosable, not restarted.
+    #
+    # See the probes on `ida-llm-api` in .devops/chart/base/deployments.yaml.
 
-    @app.get("/health", response_model=HealthResponse, tags=["ops"])
-    def health(ctx: AppContext = Depends(get_context)) -> HealthResponse:
-        """Readiness probe: reports each dependency separately.
+    @app.get("/healthz", response_model=HealthResponse, tags=["ops"])
+    def healthz() -> HealthResponse:
+        """Liveness. No dependencies, no I/O, no `ctx`. Always 200."""
+        return HealthResponse(status="ok", version=__version__, checks={})
 
-        Returns 200 with ``status="degraded"`` rather than 503 when a
-        dependency is down, so the probe response body is still readable in
-        ``kubectl describe``. The k8s readinessProbe checks the body, not just
-        the code -- see the probes on `ida-llm-api` in .devops/chart/base/deployments.yaml.
-        """
-        checks = {"database": _check_database(ctx), "queue": _check_queue(ctx)}
-        return HealthResponse(
+    def _readiness() -> tuple[HealthResponse, dict[str, bool]]:
+        ctx: AppContext = app.state.context
+        # EVERY check runs even when an earlier one fails: a response that stops
+        # at the first failure hides the second, and "the database is down" plus
+        # "so is redis" is a different incident from either alone.
+        checks = {
+            "database": _check_database(ctx),
+            "queue": _check_queue(ctx),
+            "artifacts": _check_artifacts(ctx),
+        }
+        body = HealthResponse(
             status="ok" if all(checks.values()) else "degraded",
             version=__version__,
             checks=checks,
+        )
+        return body, checks
+
+    @app.get("/readyz", response_model=HealthResponse, tags=["ops"])
+    def readyz(response: Response) -> HealthResponse:
+        """Readiness. Each dependency reported separately; 503 if any is down."""
+        body, checks = _readiness()
+        if not all(checks.values()):
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return body
+
+    @app.get("/health", response_model=HealthResponse, tags=["ops"])
+    def health() -> HealthResponse:
+        """/readyz's body, ALWAYS at 200.
+
+        Kept because the compose healthcheck and both tracer modes read
+        ``status`` from the body rather than the status code, and because a
+        200-with-detail is the more useful thing to curl while debugging.
+        Neither probe points here.
+        """
+        return _readiness()[0]
+
+    # ------------------------------------------------------------ metrics --
+
+    @app.get("/metrics", tags=["ops"], include_in_schema=False)
+    def metrics() -> Response:
+        """Prometheus exposition. Scraped by ServiceMonitor `ida-llm-api`."""
+        return Response(
+            content=generate_latest(),
+            media_type=CONTENT_TYPE_LATEST,
         )
 
     # ------------------------------------------------------------ registry --
@@ -117,9 +209,7 @@ def create_app(context: AppContext | None = None) -> FastAPI:
     @app.get("/models", response_model=list[ModelSummary], tags=["registry"])
     def list_models(
         ctx: AppContext = Depends(get_context),
-        include_disabled: bool = Query(
-            False, description="Include entries with enabled: false"
-        ),
+        include_disabled: bool = Query(False, description="Include entries with enabled: false"),
     ) -> list[ModelSummary]:
         """The parsed ``models.yaml``, with API keys and key values never exposed."""
         entries = ctx.registry.models
@@ -220,13 +310,9 @@ def create_app(context: AppContext | None = None) -> FastAPI:
             try:
                 entry = ctx.registry.get(model_key)
             except KeyError:
-                raise HTTPException(
-                    status.HTTP_404_NOT_FOUND, f"no model {model_key!r}"
-                ) from None
+                raise HTTPException(status.HTTP_404_NOT_FOUND, f"no model {model_key!r}") from None
             if not entry.enabled:
-                raise HTTPException(
-                    status.HTTP_409_CONFLICT, f"model {model_key!r} is disabled"
-                )
+                raise HTTPException(status.HTTP_409_CONFLICT, f"model {model_key!r} is disabled")
 
         now = utcnow()
         # One sweep id for the whole cross product (B9). Without it, "show me
@@ -337,9 +423,7 @@ def create_app(context: AppContext | None = None) -> FastAPI:
             return RunDetail(run=run_row_to_record(row), results=results)
 
     @app.get("/runs/{run_id}/results/{sample_id}/transcript", tags=["runs"])
-    def get_transcript(
-        run_id: str, sample_id: str, ctx: AppContext = Depends(get_context)
-    ) -> dict:
+    def get_transcript(run_id: str, sample_id: str, ctx: AppContext = Depends(get_context)) -> dict:
         """Fetch an archived transcript from object storage.
 
         The API resolves the object key from the *path convention*, not from a
@@ -368,6 +452,21 @@ def _check_database(ctx: AppContext) -> bool:
         return True
     except Exception:
         log.exception("database health check failed")
+        return False
+
+
+def _check_artifacts(ctx: AppContext) -> bool:
+    """Can we reach the object store at all?
+
+    ``ensure_bucket`` is idempotent and is the cheapest call that actually
+    round-trips to MinIO -- a readiness check that only inspected local state
+    would report Ready while every transcript write was failing.
+    """
+    try:
+        ctx.artifact_store.ensure_bucket()
+        return True
+    except Exception:
+        log.exception("artifact store health check failed")
         return False
 
 

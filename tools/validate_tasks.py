@@ -38,9 +38,7 @@ def _check_models(path: Path) -> list[str]:
         registry = ModelRegistry.model_validate(document)
     except (ValidationError, ValueError) as exc:
         return [str(exc)]
-    print(
-        f"{OK}  {path}  ({len(registry.models)} model(s), enabled: {registry.enabled_keys()})"
-    )
+    print(f"{OK}  {path}  ({len(registry.models)} model(s), enabled: {registry.enabled_keys()})")
     return []
 
 

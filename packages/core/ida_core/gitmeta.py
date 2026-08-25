@@ -54,7 +54,14 @@ def current_git_sha(cwd: Path | str | None = None) -> str | None:
 
     try:
         proc = subprocess.run(
-            ["git", "rev-parse", "--verify", "HEAD"],
+            # S607 (partial executable path) is accepted DELIBERATELY. Pinning
+            # /usr/bin/git would break on any image or platform that puts it
+            # elsewhere, and the threat S607 guards against -- a planted `git`
+            # earlier on PATH -- is not reachable here: this runs only in dev
+            # checkouts and the CI container, never in the runtime image (which
+            # has no .git, so the IDA_GIT_SHA branch above returns first).
+            # S603 likewise: the argv is a fixed literal with no user input.
+            ["git", "rev-parse", "--verify", "HEAD"],  # noqa: S607
             cwd=str(cwd) if cwd else None,
             capture_output=True,
             text=True,

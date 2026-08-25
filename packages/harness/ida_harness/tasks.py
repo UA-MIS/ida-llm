@@ -35,9 +35,7 @@ def load_task_file(path: Path | str) -> TaskSpec:
     except Exception as exc:
         raise TaskLoadError(f"{path}: could not parse YAML: {exc}") from exc
     if not isinstance(document, dict):
-        raise TaskLoadError(
-            f"{path}: top level must be a mapping, got {type(document).__name__}"
-        )
+        raise TaskLoadError(f"{path}: top level must be a mapping, got {type(document).__name__}")
     try:
         validate_task_document(document, path)
     except ValidationError as exc:
@@ -70,9 +68,7 @@ class TaskCatalog:
         for path in discover_task_files(tasks_dir):
             spec = load_task_file(path)
             if spec.id in tasks:
-                raise TaskLoadError(
-                    f"duplicate task id {spec.id!r}: {sources[spec.id]} and {path}"
-                )
+                raise TaskLoadError(f"duplicate task id {spec.id!r}: {sources[spec.id]} and {path}")
             tasks[spec.id] = spec
             sources[spec.id] = path
         return cls(tasks, sources)

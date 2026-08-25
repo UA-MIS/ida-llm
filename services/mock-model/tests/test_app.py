@@ -55,8 +55,7 @@ class TestChatCompletions:
         first = client.post("/v1/chat/completions", json=_request("hello")).json()
         second = client.post("/v1/chat/completions", json=_request("hello")).json()
         assert (
-            first["choices"][0]["message"]["content"]
-            == second["choices"][0]["message"]["content"]
+            first["choices"][0]["message"]["content"] == second["choices"][0]["message"]["content"]
         )
 
     def test_uses_the_last_user_message(self, client: TestClient) -> None:
@@ -101,15 +100,11 @@ class TestFailureInjection:
         """Deterministic, not random: a retry test must not be a coin flip."""
         monkeypatch.setenv("MOCK_FAIL_EVERY", "2")
         client = TestClient(create_app())
-        codes = [
-            client.post("/v1/chat/completions", json=_request()).status_code for _ in range(4)
-        ]
+        codes = [client.post("/v1/chat/completions", json=_request()).status_code for _ in range(4)]
         assert codes == [200, 503, 200, 503]
 
     def test_disabled_by_default(self, client: TestClient) -> None:
-        codes = [
-            client.post("/v1/chat/completions", json=_request()).status_code for _ in range(5)
-        ]
+        codes = [client.post("/v1/chat/completions", json=_request()).status_code for _ in range(5)]
         assert codes == [200] * 5
 
 
@@ -174,7 +169,5 @@ class TestInProcessTransport:
         transport = make_transport()
         payload = {"model": "m", "messages": [{"role": "user", "content": "2 + 2"}]}
         for _ in range(3):
-            with httpx.Client(
-                base_url="http://mock-model:8000/v1", transport=transport
-            ) as client:
+            with httpx.Client(base_url="http://mock-model:8000/v1", transport=transport) as client:
                 assert client.post("/chat/completions", json=payload).status_code == 200

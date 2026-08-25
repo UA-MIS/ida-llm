@@ -17,12 +17,15 @@ from sqlalchemy import inspect
 
 from ida_core.db import Base, create_all, make_engine
 
-CORE_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[3]
+"""The repo root. Migrations live at `migrations/` with `alembic.ini` beside it --
+NOT inside packages/core -- because the CI `migrations` job, Dockerfile.python and
+the api's `migrate` initContainer all point there."""
 
 
 def _alembic_config(database_url: str) -> Config:
-    config = Config(str(CORE_ROOT / "alembic.ini"))
-    config.set_main_option("script_location", str(CORE_ROOT / "ida_core" / "migrations"))
+    config = Config(str(REPO_ROOT / "alembic.ini"))
+    config.set_main_option("script_location", str(REPO_ROOT / "migrations"))
     config.set_main_option("sqlalchemy.url", database_url)
     return config
 
@@ -139,9 +142,7 @@ class TestTheGuardItselfIsNotVacuous:
         narrow = self._describe_table(
             tmp_path, "narrow.db", self._id(), sa.Column("value", sa.String(64))
         )
-        wide = self._describe_table(
-            tmp_path, "wide.db", self._id(), sa.Column("value", sa.Text())
-        )
+        wide = self._describe_table(tmp_path, "wide.db", self._id(), sa.Column("value", sa.Text()))
         assert narrow["drift"]["columns"]["value"] == ("VARCHAR(64)", True)
         assert wide["drift"]["columns"]["value"] == ("TEXT", True)
         assert narrow != wide, "String(64) -> Text must be visible to the guard"
@@ -183,9 +184,7 @@ class TestTheGuardItselfIsNotVacuous:
         """The guard must not be so sensitive that it fires on nothing."""
         assert self._describe_table(
             tmp_path, "a.db", self._id(), sa.Column("value", sa.String(64))
-        ) == self._describe_table(
-            tmp_path, "b.db", self._id(), sa.Column("value", sa.String(64))
-        )
+        ) == self._describe_table(tmp_path, "b.db", self._id(), sa.Column("value", sa.String(64)))
 
 
 class TestPartialDowngrade:
@@ -235,9 +234,7 @@ class TestPartialDowngrade:
         assert after["runs"]["columns"]["status"] == ("VARCHAR(16)", False)
         assert after["results"]["columns"]["serving_config"] == ("JSON", False)
 
-    def test_the_unique_index_reverts_to_two_columns(
-        self, migrated_engine, monkeypatch
-    ) -> None:
+    def test_the_unique_index_reverts_to_two_columns(self, migrated_engine, monkeypatch) -> None:
         """0002 widened it to (run, sample, repeat); the downgrade must undo that,
         or a re-upgrade would try to create an index that already exists."""
         from alembic.command import downgrade

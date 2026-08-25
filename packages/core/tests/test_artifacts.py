@@ -24,8 +24,7 @@ class TestKeyConvention:
 
     def test_repeat_key_literal(self) -> None:
         assert (
-            sample_key("run_abc", "add-simple", 1)
-            == "runs/run_abc/transcripts/add-simple/r1.json"
+            sample_key("run_abc", "add-simple", 1) == "runs/run_abc/transcripts/add-simple/r1.json"
         )
 
     def test_eval_log_key_literal(self) -> None:
@@ -141,9 +140,7 @@ class TestRepeatKeysCannotCollide:
     def test_repeat_zero_is_unchanged(self) -> None:
         """Existing objects must keep resolving; this convention is documented
         as stable and there are already transcripts written under it."""
-        assert sample_key("run_abc", "add-simple") == (
-            "runs/run_abc/transcripts/add-simple.json"
-        )
+        assert sample_key("run_abc", "add-simple") == ("runs/run_abc/transcripts/add-simple.json")
         assert sample_key("run_abc", "add-simple", 0) == sample_key("run_abc", "add-simple")
 
     def test_repeats_still_live_under_the_run_prefix(self) -> None:
@@ -180,9 +177,7 @@ class TestLocalStoreHandlesRepeats:
         assert store.get_json(sample_key("run_x", "s1", 1)) == {"repeat": 1}
         assert store.get_json(sample_key("run_x", "s1", 2)) == {"repeat": 2}
 
-    def test_the_previously_colliding_pair_now_round_trips_independently(
-        self, tmp_path
-    ) -> None:
+    def test_the_previously_colliding_pair_now_round_trips_independently(self, tmp_path) -> None:
         """End to end: write both, read both, neither clobbered the other."""
         store = LocalArtifactStore(tmp_path)
         store.ensure_bucket()
@@ -190,6 +185,4 @@ class TestLocalStoreHandlesRepeats:
         store.put_json(sample_key("run_x", "s1.r2", 0), {"which": "sample-named-s1.r2"})
 
         assert store.get_json(sample_key("run_x", "s1", 2)) == {"which": "repeat-2-of-s1"}
-        assert store.get_json(sample_key("run_x", "s1.r2", 0)) == {
-            "which": "sample-named-s1.r2"
-        }
+        assert store.get_json(sample_key("run_x", "s1.r2", 0)) == {"which": "sample-named-s1.r2"}

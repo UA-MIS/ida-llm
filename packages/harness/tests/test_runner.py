@@ -61,46 +61,34 @@ def _correct_answers(request: httpx.Request) -> httpx.Response:
 class TestHappyPath:
     def test_one_result_per_sample(self, verifiable_task, model_entry) -> None:
         with _client(model_entry, _correct_answers) as client:
-            log = run_task(
-                task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
         assert len(log.results) == len(verifiable_task.samples)
         assert [r.sample_id for r in log.results] == ["a", "b"]
 
     def test_all_correct_gives_mean_one(self, verifiable_task, model_entry) -> None:
         with _client(model_entry, _correct_answers) as client:
-            log = run_task(
-                task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
         assert log.mean_score == 1.0
         assert all(r.score is not None and r.score.passed for r in log.results)
 
     def test_wrong_answers_give_mean_zero(self, verifiable_task, model_entry) -> None:
         """The scorer must actually be able to fail, or a passing score means nothing."""
         with _client(model_entry, lambda r: httpx.Response(200, json=_body("999"))) as client:
-            log = run_task(
-                task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
         assert log.mean_score == 0.0
 
     def test_status_and_timestamps(self, verifiable_task, model_entry) -> None:
         with _client(model_entry, _correct_answers) as client:
-            log = run_task(
-                task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
         assert log.status is RunStatus.SUCCEEDED
         assert log.finished_at >= log.started_at
         assert log.error is None
 
-    def test_token_and_cost_accounting_flows_through(
-        self, verifiable_task, model_entry
-    ) -> None:
+    def test_token_and_cost_accounting_flows_through(self, verifiable_task, model_entry) -> None:
         model_entry.cost.input_usd_per_mtok = 1_000_000.0  # $1 per input token
         model_entry.cost.output_usd_per_mtok = 0.0
         with _client(model_entry, _correct_answers) as client:
-            log = run_task(
-                task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
         assert log.total_usage.prompt_tokens == 20
         assert log.total_usage.completion_tokens == 4
         assert sum(r.cost_usd for r in log.results) == pytest.approx(20.0)
@@ -127,9 +115,7 @@ class TestServingConfigStamping:
 
     def test_stamped_on_every_result(self, verifiable_task, model_entry) -> None:
         with _client(model_entry, _correct_answers) as client:
-            log = run_task(
-                task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
         assert all(r.serving_config == log.serving_config for r in log.results)
         assert log.serving_config.model_id == "mock-echo-1"
 
@@ -172,9 +158,7 @@ class TestServingConfigStamping:
 
 
 class TestFailureContainment:
-    def test_one_failing_sample_does_not_fail_the_run(
-        self, verifiable_task, model_entry
-    ) -> None:
+    def test_one_failing_sample_does_not_fail_the_run(self, verifiable_task, model_entry) -> None:
         model_entry.max_retries = 0
         calls = {"n": 0}
 
@@ -185,9 +169,7 @@ class TestFailureContainment:
             return httpx.Response(200, json=_body("100"))
 
         with _client(model_entry, handler) as client:
-            log = run_task(
-                task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
 
         assert log.status is RunStatus.PARTIAL, (
             "one failure out of two is neither a success nor a total failure"
@@ -212,18 +194,14 @@ class TestFailureContainment:
             return httpx.Response(200, json=_body("100"))
 
         with _client(model_entry, handler) as client:
-            log = run_task(
-                task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
         assert log.mean_score == 1.0
 
     def test_permanent_error_also_degrades_only_one_sample(
         self, verifiable_task, model_entry
     ) -> None:
         with _client(model_entry, lambda r: httpx.Response(401, text="bad key")) as client:
-            log = run_task(
-                task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
         assert len(log.results) == 2
         assert all(r.error is not None for r in log.results)
         assert log.mean_score is None
@@ -249,9 +227,7 @@ class TestSubjectiveTasks:
     def test_are_run_but_not_scored(self, subjective_task, model_entry) -> None:
         handler = lambda r: httpx.Response(200, json=_body("Some feedback."))  # noqa: E731
         with _client(model_entry, handler) as client:
-            log = run_task(
-                task=subjective_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            log = run_task(task=subjective_task, entry=model_entry, run_id=RUN_ID, client=client)
         assert len(log.results) == 1
         result = log.results[0]
         assert result.scorable is False
@@ -411,9 +387,7 @@ class TestCaching:
         )
         assert all(r.latency_ms == 0.0 for r in hit.results)
 
-    def test_a_hit_still_retains_token_usage(
-        self, verifiable_task, model_entry, tmp_path
-    ) -> None:
+    def test_a_hit_still_retains_token_usage(self, verifiable_task, model_entry, tmp_path) -> None:
         """Usage is a property of the exchange, not of who paid: keep it."""
         _miss, hit, _store, _calls = self._run_twice(
             verifiable_task, model_entry, tmp_path, InMemoryCache()
@@ -508,9 +482,7 @@ class TestHonestRunStatus:
         self, verifiable_task, model_entry
     ) -> None:
         with _client(model_entry, self._all_fail(model_entry)) as client:
-            log = run_task(
-                task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
         assert log.status is RunStatus.FAILED
         assert log.error_count == len(verifiable_task.samples)
         assert log.scored_count == 0
@@ -518,9 +490,7 @@ class TestHonestRunStatus:
 
     def test_a_failed_run_says_why(self, verifiable_task, model_entry) -> None:
         with _client(model_entry, self._all_fail(model_entry)) as client:
-            log = run_task(
-                task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
         assert log.error is not None
         assert "2/2 samples failed" in log.error
         assert "TransientModelError" in log.error
@@ -528,16 +498,12 @@ class TestHonestRunStatus:
     def test_identical_errors_are_summarised_once(self, verifiable_task, model_entry) -> None:
         """500 samples against one dead endpoint is one problem, not 500."""
         with _client(model_entry, self._all_fail(model_entry)) as client:
-            log = run_task(
-                task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
         assert log.error.count("TransientModelError") == 1
 
     def test_no_errors_is_succeeded(self, verifiable_task, model_entry) -> None:
         with _client(model_entry, _correct_answers) as client:
-            log = run_task(
-                task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
         assert log.status is RunStatus.SUCCEEDED
         assert log.error_count == 0
         assert log.error is None
@@ -548,9 +514,7 @@ class TestHonestRunStatus:
         """The distinction B1 turned on: not-yet-scorable is NOT a failure."""
         handler = lambda r: httpx.Response(200, json=_body("feedback"))  # noqa: E731
         with _client(model_entry, handler) as client:
-            log = run_task(
-                task=subjective_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            log = run_task(task=subjective_task, entry=model_entry, run_id=RUN_ID, client=client)
         assert log.status is RunStatus.SUCCEEDED
         assert log.error_count == 0
         assert log.scored_count == 0
@@ -569,9 +533,7 @@ class TestHonestRunStatus:
                 task=subjective_task, entry=model_entry, run_id=RUN_ID, client=client
             )
         with _client(model_entry, self._all_fail(model_entry)) as client:
-            broken = run_task(
-                task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            broken = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
 
         assert subjective.mean_score is broken.mean_score is None
         assert (subjective.status, broken.status) == (RunStatus.SUCCEEDED, RunStatus.FAILED)
@@ -734,9 +696,7 @@ class TestProvenanceFields:
 
     def test_repeat_index_defaults_to_zero(self, verifiable_task, model_entry) -> None:
         with _client(model_entry, _correct_answers) as client:
-            log = run_task(
-                task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client
-            )
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
         assert all(r.repeat_index == 0 for r in log.results)
 
     def test_sweep_id_is_carried_onto_the_eval_log(self, verifiable_task, model_entry) -> None:

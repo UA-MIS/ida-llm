@@ -173,9 +173,7 @@ def run_task(
                 except (ScoringError, ValueError) as exc:
                     # A malformed task sample must not discard the paid-for
                     # completions of its siblings (A8). Degrade this one.
-                    log.warning(
-                        "run %s sample %s could not be scored: %s", run_id, sample.id, exc
-                    )
+                    log.warning("run %s sample %s could not be scored: %s", run_id, sample.id, exc)
                     record.error = f"{type(exc).__name__}: {exc}"
 
             transcript = SampleTranscript(
@@ -202,9 +200,7 @@ def run_task(
                     # The completion is bought and scored; only the evidence
                     # pointer is missing. Losing the result too would throw away
                     # real money because object storage blinked (A5).
-                    log.exception(
-                        "run %s sample %s: transcript archival failed", run_id, sample.id
-                    )
+                    log.exception("run %s sample %s: transcript archival failed", run_id, sample.id)
                     record.archive_error = f"{type(exc).__name__}: {exc}"
 
             results.append(record)

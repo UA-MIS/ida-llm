@@ -97,9 +97,7 @@ class ExactMatchScorer:
 
     def score(self, completion: str, target: str | None) -> Score:
         if target is None:
-            raise ScoringError(
-                "exact_match requires a target; task validation should prevent this"
-            )
+            raise ScoringError("exact_match requires a target; task validation should prevent this")
         got = normalise(completion, self._rules)
         want = normalise(target, self._rules)
         passed = got == want
@@ -151,8 +149,7 @@ class NumericMatchScorer:
         want = extract_number(want_text)
         if want is None:
             raise ScoringError(
-                f"numeric_match target {target!r} contains no number "
-                f"(normalised to {want_text!r})"
+                f"numeric_match target {target!r} contains no number (normalised to {want_text!r})"
             )
 
         if got is None:

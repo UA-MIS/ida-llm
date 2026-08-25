@@ -11,7 +11,8 @@ from __future__ import annotations
 import threading
 import time
 
-from tests.test_worker import _message, _seed_run
+from _runner_helpers import job_message as _message
+from _runner_helpers import seed_run as _seed_run
 
 from ida_core.contracts import RunStatus
 from ida_core.db import session_scope

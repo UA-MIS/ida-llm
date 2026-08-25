@@ -114,9 +114,7 @@ class TestResponseParsing:
         assert result.latency_ms >= 0
         assert result.raw == OK_BODY
 
-    def test_missing_usage_yields_honest_zeros_not_estimates(
-        self, model_entry: ModelEntry
-    ) -> None:
+    def test_missing_usage_yields_honest_zeros_not_estimates(self, model_entry: ModelEntry) -> None:
         body = {"choices": [{"message": {"content": "hi"}}]}
         with _client(model_entry, lambda r: httpx.Response(200, json=body)) as client:
             result = client.complete(MESSAGES, SAMPLING)
@@ -128,9 +126,7 @@ class TestResponseParsing:
             assert client.complete(MESSAGES, SAMPLING).content == ""
 
     @pytest.mark.parametrize("body", [{}, {"choices": []}, {"choices": [{}]}, {"choices": 5}])
-    def test_unexpected_shapes_are_permanent_errors(
-        self, model_entry: ModelEntry, body
-    ) -> None:
+    def test_unexpected_shapes_are_permanent_errors(self, model_entry: ModelEntry, body) -> None:
         with (
             _client(model_entry, lambda r: httpx.Response(200, json=body)) as client,
             pytest.raises(PermanentModelError, match="unexpected body shape"),
@@ -174,9 +170,7 @@ class TestErrorClassification:
             client.complete(MESSAGES, SAMPLING)
         assert exc.value.status_code == status
 
-    def test_rate_limit_is_transient_but_auth_failure_is_not(
-        self, model_entry: ModelEntry
-    ) -> None:
+    def test_rate_limit_is_transient_but_auth_failure_is_not(self, model_entry: ModelEntry) -> None:
         """The one classification everyone gets wrong: 429 retry, 401 never."""
         assert 429 in TRANSIENT_STATUS_CODES
         assert 401 not in TRANSIENT_STATUS_CODES
@@ -256,9 +250,7 @@ class TestRetryPolicy:
             client.complete(MESSAGES, SAMPLING)
         assert calls["n"] == 1
 
-    def test_sleeps_between_attempts_with_growing_ceiling(
-        self, model_entry: ModelEntry
-    ) -> None:
+    def test_sleeps_between_attempts_with_growing_ceiling(self, model_entry: ModelEntry) -> None:
         model_entry.max_retries = 3
         slept: list[float] = []
         client = OpenAICompatibleClient(

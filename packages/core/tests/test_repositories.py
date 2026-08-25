@@ -99,9 +99,7 @@ class TestRunRoundTrip:
         with session_scope(session_factory) as session, pytest.raises(KeyError):
             mark_run_running(session, "run_nope", serving_config)
 
-    def test_finish_run_writes_rollup(
-        self, session_factory, serving_config: ServingConfig
-    ) -> None:
+    def test_finish_run_writes_rollup(self, session_factory, serving_config: ServingConfig) -> None:
         record = _run()
         with session_scope(session_factory) as session:
             create_run(session, record)
@@ -208,9 +206,7 @@ class TestResults:
         run = _run()
         with session_scope(session_factory) as session:
             create_run(session, run)
-            insert_results(
-                session, [_result(run.id, serving_config, score=None, scorable=False)]
-            )
+            insert_results(session, [_result(run.id, serving_config, score=None, scorable=False)])
         with session_scope(session_factory) as session:
             restored = result_row_to_record(list_results_for_run(session, run.id)[0])
         assert restored.score is None

@@ -135,7 +135,11 @@ class OpenAICompatibleClient:
                     break
                 self._sleep(backoff_delay(attempt, jitter=self._jitter))
 
-        assert last_error is not None  # loop always sets it before breaking
+        # An invariant, not input validation: every path out of the loop above
+        # assigns last_error first. S101 warns because `python -O` strips
+        # asserts -- which is fine here, since stripping it leaves
+        # `raise last_error` raising the same value it would have anyway.
+        assert last_error is not None  # noqa: S101
         raise last_error
 
     def _build_payload(self, messages: list[ChatMessage], sampling: SamplingParams) -> dict:
@@ -165,9 +169,7 @@ class OpenAICompatibleClient:
         except httpx.TimeoutException as exc:
             raise TransientModelError(f"timeout calling {self.entry.key}: {exc}") from exc
         except httpx.TransportError as exc:
-            raise TransientModelError(
-                f"transport error calling {self.entry.key}: {exc}"
-            ) from exc
+            raise TransientModelError(f"transport error calling {self.entry.key}: {exc}") from exc
         latency_ms = (time.perf_counter() - started) * 1000.0
 
         if response.status_code >= 400:
