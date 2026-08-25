@@ -291,6 +291,74 @@ later regrade can retry it. `--dry-run` answers *"what would this change"*, **no
 
 ---
 
+## The row-level predicate contract
+
+**For anything that selects work in SQL — the judge-calibration sweep above all.**
+Pinned by `TestTheRowLevelPredicateContract`, which materialises every state
+through `insert_results` and queries a real table, so this section and the code
+cannot drift apart silently.
+
+A subjective sample is in exactly one of four states, and they partition the
+table:
+
+| class | SQL | meaning |
+|---|---|---|
+| **never judged** | `score_value IS NULL AND transcript_uri IS NOT NULL AND judge_transcript_uri IS NULL AND judge_prompt_tokens = 0` | nobody has tried. **The nomination class.** |
+| **judge failed** | `score_value IS NULL AND transcript_uri IS NOT NULL AND (judge_transcript_uri IS NOT NULL OR judge_prompt_tokens > 0)` | a judge was asked and could not answer. **Retryable — and a caller must bound its retries.** |
+| **ungradable** | `transcript_uri IS NULL` | the model call died; no completion exists. Never nominate: it can never succeed. |
+| **graded** | `score_value IS NOT NULL` | done. |
+
+Python equivalents, on the same columns for the same reason:
+`ida_harness.regrade.is_never_judged` / `is_judge_failure` / `is_ungradable`.
+
+### Two traps, both reproduced
+
+**⚠ `scorable` does not answer the question.** It records whether a judge was
+*configured* when the sample ran, not whether the sample still needs grading. So
+`scorable IS FALSE AND score_value IS NULL` is wrong in **both** directions at
+once:
+
+- it **over-selects** — it also matches a sample whose retroactive grading
+  already failed (re-nominated nightly, re-fails nightly, re-bills nightly: a
+  standoff whose only symptom is the invoice) and a sample with no completion at
+  all (nominated forever, can never succeed);
+- it **under-selects** — a sample whose *online* grading failed carries
+  `scorable = TRUE`, so it is never re-nominated. Silent, permanent non-retry,
+  arriving the moment the runner service is wired.
+
+**⚠ `judge_serving_config IS NULL` matches nothing, ever.** SQLAlchemy's `JSON`
+column stores Python `None` as the JSON literal `'null'`, not SQL `NULL`. The
+ORM reads the same row back as `None`, so Python and SQL disagree about it and
+neither complains. It is the first marker a reader reaches for and it is a trap;
+the predicates above deliberately use `judge_prompt_tokens` and
+`judge_transcript_uri`, which are genuinely nullable/numeric. (Property of the
+pre-existing 0002 column, not of the judge work — making `IS NULL` work would
+mean `none_as_null=True` and a backfill, and is not done here.)
+
+### Bounding retries
+
+The **judge failed** class is retryable *by design* — that is the whole point of
+E3 — which means an unbounded retrier is a money pump against a judge that stays
+down. What the schema gives you today is **detection, not a counter**:
+
+- `judge_prompt_tokens` / `judge_transcript_uri` say *that* an attempt happened;
+- `judge_cost_usd` is the **last attempt's** spend, not a running total, so it
+  cannot serve as an attempt count.
+
+So a sweep must bound itself — a nomination ledger, a cap per `(run_id,
+sample_id)`, or a cooling-off window keyed on `results.created_at`. If a
+persisted attempt count would be better, `results.judge_attempts INTEGER NOT NULL
+DEFAULT 0` is a small additive migration; it is deliberately **not** added here,
+because how retries are bounded belongs to the sweep that does the retrying.
+
+> **Not persisted yet.** `regrade_run` returns records and does not write to
+> Postgres (see the note under *Retroactive grading*), so the *retroactive*
+> failure state currently exists only in the archived eval log. The **online**
+> failure state is persisted today. Both are covered by the predicates above, so
+> a sweep written against them stays correct once the write-back lands.
+
+---
+
 ## Calibration
 
 The record shape a validation study needs already exists — no extra machinery

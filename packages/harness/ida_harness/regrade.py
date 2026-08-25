@@ -259,6 +259,46 @@ def regrade_run(
     return report
 
 
+# --------------------------------------------------------------------------
+# The four-way partition: what state is an ungraded sample actually in?
+# --------------------------------------------------------------------------
+#
+# Every ResultRecord is in exactly one of these, and a caller that needs to pick
+# work -- a regrade, or a nightly calibration sweep -- has to tell them apart.
+# `scorable` alone CANNOT: it answers "was a judge configured when this ran",
+# which is a different question from "does this still need grading".
+#
+# The SQL equivalents are in `docs/llm-judge.md` and pinned by
+# `TestTheRowLevelPredicateContract`, because the sweep selects in SQL and these
+# two definitions drifting apart is what a nightly bill is made of.
+
+
+def is_ungradable(record: ResultRecord) -> bool:
+    """No completion exists, so no judge can ever grade this.
+
+    The model call died before anything was archived.  Nominating this costs no
+    judge money -- :func:`regrade_run` skips it before calling -- but it is
+    permanent, so a sweep that keeps selecting it is doing nothing forever.
+    """
+    return not record.transcript_uri
+
+
+def is_never_judged(record: ResultRecord) -> bool:
+    """A completion nobody has tried to grade yet.  **The nomination class.**
+
+    Note what is NOT used: ``scorable``.  A run with a judge configured records
+    ``scorable=True`` even for a sample whose grading then failed, and a run
+    without one records ``scorable=False`` even for a sample whose model call
+    died.  Neither answers this question.
+    """
+    return (
+        record.score is None
+        and bool(record.transcript_uri)
+        and not record.judge_transcript_uri
+        and record.judge_usage.prompt_tokens == 0
+    )
+
+
 def is_judge_failure(record: ResultRecord) -> bool:
     """True when the COMPLETION is sound and only the GRADE failed.
 
@@ -280,16 +320,28 @@ def is_judge_failure(record: ResultRecord) -> bool:
     judge outage **permanently** unrecoverable, which is the exact outcome this
     module was written to prevent.
 
-    The distinction is structural, not a string match: a judge failure has a
-    stamped ``judge_serving_config`` (the runner records who was asked even when
-    the answer was unusable) and an archived ``transcript_uri`` (the completion
-    was bought, scored or not).  A dead *candidate* call has neither -- it never
+    The distinction is structural, not a string match: a judge failure has an
+    archived ``transcript_uri`` (the completion was bought, scored or not) and
+    **evidence that a judge was actually asked** -- tokens it consumed, or the
+    transcript of what it said.  A dead *candidate* call has neither: it never
     reaches the judge and never produces a transcript.
+
+    ⚠ ``judge_serving_config is not None`` is the obvious test and is a **trap
+    at the SQL layer**, so it is deliberately not used here either -- see
+    :func:`is_never_judged` and the predicate contract in ``docs/llm-judge.md``.
+    Keeping the Python and SQL definitions on the same columns is the only way
+    they stay in agreement.
+
+    **This is the retry class, and a caller that retries it must bound itself.**
+    A judge that is down stays down; a sweep that re-nominates this every night
+    and a grader that fails every night is a standoff that spends money forever.
+    ``judge_cost_usd`` is the LAST attempt's spend, not a running total, so it
+    cannot be used as an attempt counter.
     """
     return (
         record.score is None
-        and record.judge_serving_config is not None
         and bool(record.transcript_uri)
+        and (bool(record.judge_transcript_uri) or record.judge_usage.prompt_tokens > 0)
     )
 
 
@@ -300,12 +352,16 @@ def _skip_reason(record: ResultRecord) -> str | None:
             "already scored -- regrading would overwrite a verdict with one from a "
             "possibly different judge"
         )
-    if not record.transcript_uri:
+    if is_ungradable(record):
         # Checked before `error`, because it is the reason a failed model call is
         # ungradable: there is no completion, not merely a flag saying so.
         return "no archived transcript, so the completion is gone"
-    if is_judge_failure(record):
-        return None  # the grade failed, not the sample -- this is what we retry
+    if is_judge_failure(record) or is_never_judged(record):
+        # Either nobody has tried, or the judge tried and could not. Both are
+        # gradable now; the second is the one a caller must bound its retries on.
+        if record.error is not None and not is_judge_failure(record):
+            return "the sample errored when it ran, and the failure was not the judge's"
+        return None
     if record.error is not None:
         return "the sample errored when it ran, and the failure was not the judge's"
     if record.scorable:

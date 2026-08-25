@@ -672,3 +672,226 @@ class TestDryRunChangesNothing:
             real = regrade_run(run_id=RUN_ID, store=store, judge=judge, task=anchored_task)
         assert real.graded == ["s1", "s2"]
         assert load_eval_log(store, RUN_ID).mean_score == pytest.approx(1.0)
+
+
+# --------------------------------------------------------------------------
+# The row-level predicate contract (for the judge-calibration sweep, PR #13)
+# --------------------------------------------------------------------------
+
+NEVER_JUDGED_SQL = (
+    "score_value IS NULL AND transcript_uri IS NOT NULL "
+    "AND judge_transcript_uri IS NULL AND judge_prompt_tokens = 0"
+)
+JUDGE_FAILED_SQL = (
+    "score_value IS NULL AND transcript_uri IS NOT NULL "
+    "AND (judge_transcript_uri IS NOT NULL OR judge_prompt_tokens > 0)"
+)
+UNGRADABLE_SQL = "transcript_uri IS NULL"
+GRADED_SQL = "score_value IS NOT NULL"
+
+
+class TestTheRowLevelPredicateContract:
+    """What a nightly sweep may SELECT, pinned against a real ``results`` table.
+
+    The judge-calibration sweep picks its candidates in SQL, while
+    :mod:`ida_harness.regrade` decides what it will actually grade in Python. If
+    those two disagree the failure is not a crash -- it is a **standoff**: the
+    sweep nominates a sample every night, the grader declines or fails every
+    night, and the only visible symptom is a bill.
+
+    So the contract is asserted here by materialising every state a subjective
+    sample can be in through :func:`insert_results`, and querying it.
+    """
+
+    @pytest.fixture
+    def rows(self, anchored_task, model_entry, judge_entry, tmp_path):
+        """One row per reachable state, in a real table, built by real runs."""
+        from ida_core.contracts import RunRecord, RunStatus
+        from ida_core.db import Base, make_engine, make_session_factory, session_scope
+        from ida_core.repositories import create_run, insert_results
+
+        ok = _judging()
+        garbage = lambda _r: httpx.Response(200, json=_body("not json"))  # noqa: E731
+        answer = lambda _r: httpx.Response(  # noqa: E731
+            200, json=_body("Your thesis needs sharpening.")
+        )
+        dead = lambda _r: httpx.Response(500)  # noqa: E731
+
+        def one_run(name, run_id, candidate_h, judge_h, use_judge, regrade_h=None):
+            store = LocalArtifactStore(tmp_path / name)
+            store.ensure_bucket()
+            judge = _judge(judge_entry, judge_h) if use_judge else None
+            with _client(model_entry, candidate_h) as client:
+                log = run_task(
+                    task=anchored_task,
+                    entry=model_entry,
+                    run_id=run_id,
+                    client=client,
+                    judge=judge,
+                    artifact_store=store,
+                )
+            if judge is not None:
+                judge.close()
+            if regrade_h is None:
+                return log.results[0]
+            with _judge(judge_entry, regrade_h) as rj:
+                report = regrade_run(run_id=run_id, store=store, judge=rj, task=anchored_task)
+            return report.eval_log.results[0]
+
+        states = {
+            "never judged": one_run("a", "run_pa000000000000000000000", answer, ok, False),
+            "judge failed online": one_run(
+                "b", "run_pb000000000000000000000", answer, garbage, True
+            ),
+            "judge failed regrading": one_run(
+                "c", "run_pc000000000000000000000", answer, ok, False, regrade_h=garbage
+            ),
+            "graded regrading": one_run(
+                "d", "run_pd000000000000000000000", answer, ok, False, regrade_h=ok
+            ),
+            "graded online": one_run("e", "run_pe000000000000000000000", answer, ok, True),
+            "candidate died": one_run("f", "run_pf000000000000000000000", dead, ok, False),
+        }
+
+        engine = make_engine("sqlite+pysqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        factory = make_session_factory(engine)
+        with session_scope(factory) as session:
+            for record in states.values():
+                create_run(
+                    session,
+                    RunRecord(
+                        id=record.run_id,
+                        status=RunStatus.SUCCEEDED,
+                        task_id=record.task_id,
+                        model_key=record.model_key,
+                        harness_version="0.1.0",
+                    ),
+                )
+            insert_results(session, list(states.values()))
+
+        def select(where: str) -> set[str]:
+            from sqlalchemy import text
+
+            by_id = {r.id: name for name, r in states.items()}
+            with session_scope(factory) as session:
+                found = session.execute(
+                    text(f"SELECT id FROM results WHERE {where}")  # noqa: S608 - fixed literals
+                ).scalars()
+                return {by_id[i] for i in found}
+
+        return states, select
+
+    def test_every_state_is_reachable(self, rows) -> None:
+        """Guards the guard: six states, six rows, all built by real runs."""
+        states, _select = rows
+        assert len(states) == 6
+
+    def test_judge_serving_config_IS_NULL_is_a_trap(self, rows) -> None:
+        """⚠ THE OBVIOUS MARKER DOES NOT WORK, AND FAILS SILENTLY.
+
+        SQLAlchemy's ``JSON`` column stores Python ``None`` as the JSON literal
+        ``'null'``, not as SQL ``NULL``. So ``judge_serving_config IS NULL``
+        matches **nothing**, ever -- including rows no judge has touched. Read
+        back through the ORM the same column is ``None``, so Python and SQL
+        disagree about the identical row and neither says so.
+
+        This is a property of the pre-existing 0002 column, not of the judge
+        work; it is pinned here because it is exactly the marker a reader
+        reaches for first.
+        """
+        _states, select = rows
+        assert select("judge_serving_config IS NULL") == set()
+        assert select("judge_serving_config IS NOT NULL") == {
+            "never judged",
+            "judge failed online",
+            "judge failed regrading",
+            "graded regrading",
+            "graded online",
+            "candidate died",
+        }
+
+    def test_the_naive_sweep_predicate_selects_three_different_things(self, rows) -> None:
+        """``scorable IS FALSE AND score_value IS NULL`` conflates the class you
+        want with a standoff and with a nomination that can never succeed."""
+        _states, select = rows
+        assert select("scorable = 0 AND score_value IS NULL") == {
+            "never judged",  # wanted
+            "judge failed regrading",  # the standoff: re-nominated, re-fails, re-bills
+            "candidate died",  # can never succeed; no completion exists
+        }
+
+    def test_the_naive_predicate_also_MISSES_an_online_judge_failure(self, rows) -> None:
+        """The opposite error, and the quieter one: a sample whose online
+        grading failed carries ``scorable=TRUE``, so it is never re-nominated at
+        all. Silent permanent non-retry, once the runner service is wired."""
+        _states, select = rows
+        assert "judge failed online" not in select("scorable = 0 AND score_value IS NULL")
+
+    def test_scorable_does_not_answer_the_question_being_asked(self, rows) -> None:
+        """``scorable`` records whether a judge was CONFIGURED, not whether this
+        sample still needs grading -- which is why no predicate below uses it."""
+        _states, select = rows
+        assert select("scorable = 1") == {
+            "judge failed online",
+            "graded regrading",
+            "graded online",
+        }
+
+    def test_the_four_classes_partition_every_row(self, rows) -> None:
+        """Mutually exclusive and exhaustive -- so a sweep can reason about them
+        without a fifth 'and otherwise?' case."""
+        _states, select = rows
+        classes = {
+            "never judged": select(NEVER_JUDGED_SQL),
+            "judge failed": select(JUDGE_FAILED_SQL),
+            "ungradable": select(UNGRADABLE_SQL),
+            "graded": select(GRADED_SQL),
+        }
+        union: set[str] = set()
+        for name, members in classes.items():
+            assert not (union & members), f"{name} overlaps an earlier class"
+            union |= members
+        assert union == set(_states)
+
+    def test_the_nomination_class_is_exactly_what_has_never_been_tried(self, rows) -> None:
+        _states, select = rows
+        assert select(NEVER_JUDGED_SQL) == {"never judged"}
+
+    def test_the_retry_class_catches_a_failure_from_EITHER_path(self, rows) -> None:
+        """Online and retroactive grading record a failure differently -- one
+        sets ``error``, one does not -- and both must land here."""
+        _states, select = rows
+        assert select(JUDGE_FAILED_SQL) == {"judge failed online", "judge failed regrading"}
+
+    def test_the_ungradable_class_is_the_one_with_no_completion(self, rows) -> None:
+        _states, select = rows
+        assert select(UNGRADABLE_SQL) == {"candidate died"}
+
+    def test_the_python_predicates_agree_with_the_sql_row_for_row(self, rows) -> None:
+        """The whole point. If these drift, the sweep and the grader disagree
+        about the same row and the symptom is a bill, not a failure."""
+        from ida_harness.regrade import is_judge_failure, is_never_judged, is_ungradable
+
+        states, select = rows
+        for label, sql, python in [
+            ("never judged", NEVER_JUDGED_SQL, is_never_judged),
+            ("judge failed", JUDGE_FAILED_SQL, is_judge_failure),
+            ("ungradable", UNGRADABLE_SQL, is_ungradable),
+        ]:
+            from_sql = select(sql)
+            from_python = {name for name, record in states.items() if python(record)}
+            assert from_sql == from_python, f"{label}: SQL {from_sql} vs Python {from_python}"
+
+    def test_regrade_grades_exactly_the_two_classes_it_should(
+        self, rows, anchored_task, judge_entry
+    ) -> None:
+        """Closing the loop: what the sweep may nominate is what the grader will
+        actually act on."""
+        from ida_harness.regrade import _skip_reason, is_judge_failure, is_never_judged
+
+        states, _select = rows
+        for name, record in states.items():
+            actionable = _skip_reason(record) is None
+            expected = is_never_judged(record) or is_judge_failure(record)
+            assert actionable == expected, name
