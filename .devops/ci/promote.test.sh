@@ -62,7 +62,12 @@ images:
     newName: harbor.example.com/team-sample/myapp-backend
     newTag: 1.1.0
 YAML
-  ( cd "${root}" && git init -q && git config user.email t@t && git config user.name t && git add -A && git commit -qm init )
+  # git is optional here — guard it so a git-less container doesn't spray
+  # "git: command not found" across every make_repo() call (only the [uncommitted]
+  # and [commit] assertions below actually depend on git being present).
+  if command -v git >/dev/null 2>&1; then
+    ( cd "${root}" && git init -q && git config user.email t@t && git config user.name t && git add -A && git commit -qm init )
+  fi
   printf '%s' "${root}"
 }
 
@@ -139,7 +144,9 @@ images:
     newName: harbor.example.com/team-sample/myapp-backend
     newTag: v0.9.0
 YAML
-  ( cd "${root}" && git init -q && git config user.email t@t && git config user.name t && git add -A && git commit -qm init )
+  if command -v git >/dev/null 2>&1; then
+    ( cd "${root}" && git init -q && git config user.email t@t && git config user.name t && git add -A && git commit -qm init )
+  fi
   printf '%s' "${root}"
 }
 
@@ -153,26 +160,34 @@ assert_eq "prod new count"      "$(count_tag '1.2.3' "${PK1}")" "2"
 assert_eq "prod old count"      "$(count_tag '1.1.0' "${PK1}")" "0"
 
 # 2) no COMMIT=1 -> the write happens but nothing is committed (dry-write, matches bump-image.sh).
-DIRTY="$(git -C "${R1}" status --porcelain)"
-case "${DIRTY}" in
-  *"overlays/prod/kustomization.yaml"*) PASS=$((PASS+1)) ;;
-  *) FAIL=$((FAIL+1)); echo "FAIL [uncommitted]: expected a dirty prod overlay, got: '${DIRTY}'" ;;
-esac
+if command -v git >/dev/null 2>&1; then
+  DIRTY="$(git -C "${R1}" status --porcelain)"
+  case "${DIRTY}" in
+    *"overlays/prod/kustomization.yaml"*) PASS=$((PASS+1)) ;;
+    *) FAIL=$((FAIL+1)); echo "FAIL [uncommitted]: expected a dirty prod overlay, got: '${DIRTY}'" ;;
+  esac
+else
+  echo "NOTE: git not available — skipping uncommitted-dirty-status assertion"
+fi
 
 # 3) COMMIT=1 promotes AND commits (the GitOps signal) -- FIX-18/D-030: must NOT carry
 # `[skip ci]` (permanently suppresses any future tag push on this commit too; see
 # bump-image.sh's header comment).
-R2="$(make_repo)"
-COMMIT=1 bash "${R2}/.devops/ci/promote.sh" staging prod >/tmp/promote.log 2>&1; RC=$?
-assert_eq "commit rc" "${RC}" "0"
-LAST="$(git -C "${R2}" log -1 --pretty=%s 2>/dev/null)"
-case "${LAST}" in
-  *"[skip ci]"*) FAIL=$((FAIL+1)); echo "FAIL [commit]: commit subject must NOT carry [skip ci] (FIX-18): '${LAST}'" ;;
-  "ci: bump prod images to 1.2.3") PASS=$((PASS+1)) ;;
-  *) FAIL=$((FAIL+1)); echo "FAIL [commit]: unexpected commit subject: '${LAST}'" ;;
-esac
-PK2="${R2}/.devops/chart/overlays/prod/kustomization.yaml"
-assert_eq "committed prod tag count" "$(count_tag '1.2.3' "${PK2}")" "2"
+if command -v git >/dev/null 2>&1; then
+  R2="$(make_repo)"
+  COMMIT=1 bash "${R2}/.devops/ci/promote.sh" staging prod >/tmp/promote.log 2>&1; RC=$?
+  assert_eq "commit rc" "${RC}" "0"
+  LAST="$(git -C "${R2}" log -1 --pretty=%s 2>/dev/null)"
+  case "${LAST}" in
+    *"[skip ci]"*) FAIL=$((FAIL+1)); echo "FAIL [commit]: commit subject must NOT carry [skip ci] (FIX-18): '${LAST}'" ;;
+    "ci: bump prod images to 1.2.3") PASS=$((PASS+1)) ;;
+    *) FAIL=$((FAIL+1)); echo "FAIL [commit]: unexpected commit subject: '${LAST}'" ;;
+  esac
+  PK2="${R2}/.devops/chart/overlays/prod/kustomization.yaml"
+  assert_eq "committed prod tag count" "$(count_tag '1.2.3' "${PK2}")" "2"
+else
+  echo "NOTE: git not available — skipping COMMIT=1 commit-message and committed-tag assertions"
+fi
 
 # 4) from == to is refused (guard against a no-op / self-promote mistake).
 R3="$(make_repo)"
