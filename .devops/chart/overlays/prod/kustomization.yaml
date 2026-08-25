@@ -27,10 +27,10 @@ labels:
 images:
   - name: ida-llm-frontend
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-frontend
-    newTag: "v0.0.0"
+    newTag: "be4e3d9"
   - name: ida-llm-python-app
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-python-app
-    newTag: "v0.0.0"
+    newTag: "be4e3d9"
 
 # No `patches:`. Every prod value lives in base, where it is read by anyone
 # reviewing the chart rather than reconstructed from a diff. Hosts, replicas,
