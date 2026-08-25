@@ -53,7 +53,12 @@ export function Shell({
             <Link className="btn btn-sm btn-ghost" href="/tokens" aria-current={active === 'tokens' ? 'page' : undefined}>
               Tokens
             </Link>
-            <a className="btn btn-sm btn-ghost" href="/api/auth/logout">Sign out</a>
+            {/* A form, not a link: logout is POST-only so that an <img> cannot
+                trigger it. `display: contents` keeps the button in this flex
+                row exactly where the anchor sat. */}
+            <form action="/api/auth/logout" method="post" style={{ display: 'contents' }}>
+              <button className="btn btn-sm btn-ghost" type="submit">Sign out</button>
+            </form>
           </div>
         </header>
         <main className="content">{children}</main>
