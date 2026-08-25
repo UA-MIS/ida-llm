@@ -29,13 +29,13 @@ labels:
 images:
   - name: ida-llm-frontend
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-frontend
-    newTag: "be4e3d9"
+    newTag: "4aa72ea"
   - name: ida-llm-python-app
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-python-app
-    newTag: "be4e3d9"
+    newTag: "4aa72ea"
   - name: ida-llm-agile
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-agile
-    newTag: "be4e3d9"
+    newTag: "4aa72ea"
 
 # No `patches:`. Every prod value lives in base, where it is read by anyone
 # reviewing the chart rather than reconstructed from a diff. Hosts, replicas,
