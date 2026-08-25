@@ -576,7 +576,7 @@ def _enqueueing_sweep(
             session,
             statuses=IN_FLIGHT_STATUSES,
             model_keys=dedupe_model_scope,
-            created_after=None,
+            created_after=in_flight_cutoff,
         )
     candidates = apply_dedupe(candidates, seen=seen, force=ctx.settings.sweep_force, report=report)
 
