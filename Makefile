@@ -226,6 +226,18 @@ migration: ## Autogenerate a migration: make migration m="add foo"
 	@test -n "$(m)" || (echo 'usage: make migration m="describe the change"' && exit 1)
 	$(PY_ABS) -m alembic revision --autogenerate -m "$(m)"
 
+# -------------------------------------------------------- diagrams ----
+
+.PHONY: diagrams
+diagrams: ## Re-render the README's mermaid diagrams to apps/agile/public/*.svg (needs npx)
+	@# README.md is the source: the diagrams are authored there as ```mermaid
+	@# fences and the SVGs are build output for the sprint board, which cannot
+	@# run mermaid. The renderer asserts 0 <foreignObject> in what it writes --
+	@# mermaid's DEFAULT emits label text inside foreignObject, which a browser
+	@# does not render when an SVG is loaded through <img src>, so the natural
+	@# config produces a diagram whose every label is invisible on the board.
+	$(RUN) tools/render_diagrams.py
+
 # ------------------------------------------------------------- k8s ----
 
 .PHONY: k8s-render

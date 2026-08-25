@@ -87,50 +87,105 @@ cd frontend && npm ci && npm run dev
 
 ## Architecture
 
+A run is a message. The api validates it, writes the `queued` rows and pushes
+to Redis; a runner claims it, drives the harness against one model endpoint,
+and writes results back. Nothing else calls a model, and nothing else scores.
+
+**Dashed means built but not switched on today** — the judge, the cloud
+registry entries and Sparks are all code that ships and configuration that
+does not.
+
+```mermaid
+flowchart TB
+  browser(["browser"])
+
+  subgraph ns["namespace ida-llm — only the two Ingresses below are public"]
+    fe["frontend :3000 · Next.js 15<br/>run list → run detail → transcript"]
+    api["api :8000 · FastAPI<br/>registry · catalog · enqueue · reads<br/>never calls a model, never scores"]
+    crons["3 nightly sweep CronJobs<br/>rebenchmark 02:00 · model-sweep 03:30<br/>judge-calibration 05:00"]
+    redis[("redis · ida:queue:runs<br/>per-consumer processing list · dead-letter")]
+    runner["runner ×2–4 HPA · same image as api, different argv<br/>worker loop + ida_harness in-process · solver → scorer<br/>reaper in every replica: expired heartbeat → re-queue"]
+    judge["LLM-as-judge · one call per criterion<br/>a harness code path, not a service"]
+    factory{{"client chosen by serving_stack<br/>the one place a provider is named"}}
+    mock["mock-model · deterministic<br/>the only model dev and CI can reach"]
+    pg[("postgres 17 · runs · results<br/>+ the board's agile schema")]
+    minio[("MinIO · transcripts, judge<br/>transcripts, eval logs")]
+    agile["agile sprint board :8080 · Next.js 16<br/>PROD ONLY · its own Ingress and host"]
+  end
+
+  cloud["cloud APIs · staging + prod<br/>Anthropic — native Messages client<br/>OpenAI — OpenAI-compatible client<br/>clients ship; registry entries still commented out"]
+  sparks["campus vLLM “Sparks”<br/>wired through settings, enabled: false"]
+
+  browser -->|"https · Ingress ida-llm"| fe
+  browser -->|"https · Ingress ida-llm-agile"| agile
+  fe -->|"HTTP — server-side only"| api
+  api -->|RPUSH| redis
+  crons -->|enqueue| redis
+  api <--> pg
+  redis -->|"BLMOVE claim → LREM ack<br/>3 tries → dead-letter"| runner
+  runner -->|"INSERT results"| pg
+  runner -->|archive| minio
+  runner -.-> judge
+  runner --> factory
+  factory --> mock
+  factory -.->|"reachable — egress allows :443 out"| cloud
+  factory -.->|"deferred — no egress route to campus"| sparks
+  agile --> pg
+  agile --> minio
+  cloud ~~~ sparks
+
+  classDef off stroke:#8a8a8a,stroke-dasharray:5 4,fill:#f2f2f2,color:#333
+  class judge,cloud,sparks off
 ```
-                    ┌───────────────┐
-   browser ────────▶│   frontend    │  Next.js 15 (App Router, TypeScript)
-                    │   :3000       │  run list → run detail → transcript
-                    └───────┬───────┘
-                            │ HTTP — SERVER-SIDE ONLY (the api has no Ingress)
-                    ┌───────▼───────┐
-                    │      api      │  FastAPI. Registry, catalog, enqueue, reads.
-                    │     :8000     │  Never calls a model. Never scores.
-                    └───┬───────┬───┘
-            RPUSH       │       │      SELECT
-      ┌─────────────────▼─┐   ┌─▼──────────────────┐
-      │      redis        │   │     postgres       │  PG17, per-env tenant claim
-      │  ida:queue:runs   │   │  runs · results    │
-      └─────────┬─────────┘   └─▲──────────────────┘
-          BLPOP │               │ INSERT
-      ┌─────────▼─────────┐     │
-      │      runner       │─────┘   Same image as api, different entrypoint (D-5).
-      │  (HPA: 2–4)       │         Serves /metrics on :9100 for the HPA.
-      └─────────┬─────────┘
-                │ ida_harness
-      ┌─────────▼─────────┐     ┌────────────────────┐
-      │  client, selected │────▶│  mock-model :8000  │  deterministic, no key, no GPU
-      │  by serving_stack │     ├────────────────────┤
-      │  in models.yaml   │────▶│  OpenAI            │  chat/completions
-      │  (D-1)            │     ├────────────────────┤
-      │                   │────▶│  Anthropic         │  Messages API
-      │  Adding a model   │     ├────────────────────┤
-      │  is a YAML edit.  │────▶│  campus vLLM       │  ("Sparks" — deferred, see infra/)
-      └─────────┬─────────┘     └────────────────────┘
-                │                docs/model-clients.md
-                │ transcripts + eval logs
-      ┌─────────▼─────────┐
-      │  object store     │  runs/<run_id>/transcripts/<sample_id>.json
-      │  run-artifacts    │  runs/<run_id>/transcripts/<sample_id>/r<n>.json
-      │  (in-ns MinIO)    │  runs/<run_id>/eval-log.json
-      └───────────────────┘
+
+### How work reaches production
+
+The board is the queue: an item is pickable only once its dependencies are
+satisfied, `Start work` cuts the branch, and a merged pull request walks the
+item to `Resolved` over a signature-verified webhook. `Closed` stays manual —
+merging says the work is done, a human says it is accepted. Nothing between
+`main` and prod rebuilds: staging and prod run the same image bytes.
+
+```mermaid
+flowchart TB
+  ready["Ready queue — GET /api/v1/ready<br/>state New · unassigned · every dependency satisfied"]
+  start["Start work — POST /api/v1/items/:id/start-work<br/>409 blocked_by_dependencies until each blocker is Resolved or Closed"]
+  work["item → Active, and the branch is cut<br/>story/28-board-update-and-view-bugs · commits reference AB#28"]
+  pr["pull request opened — item New → Active"]
+
+  subgraph gates["six CI gates, on pull_request only · mock models throughout, so no pull request can spend provider credits"]
+    g1["python<br/>ruff · pytest · e2e"]
+    g2["frontend<br/>lint · typecheck · build"]
+    g3["agile<br/>lint · typecheck<br/>test · build"]
+    g4["task-schema<br/>tasks + JSON Schema"]
+    g5["migrations<br/>up · down · up"]
+    g6["chart<br/>render every overlay<br/>+ deploy invariants"]
+  end
+
+  review["review"]
+  merge["merge to main → build-and-push (Kaniko)<br/>three images, one shared tag"]
+  resolved["item → Resolved<br/>GitHub webhook, signature-verified"]
+  closed["Closed — a human accepts the work<br/>deliberately never automated"]
+  dev["dev deploys itself<br/>ci: bump dev images to (tag)<br/>mock models, always"]
+  tag["git tag vX.Y.Z → staging<br/>one immutable image · real models"]
+  prod["promote-to-prod — a human clicks<br/>a tag copy, never a rebuild<br/>prod runs the bytes staging ran"]
+
+  ready --> start --> work --> pr
+  pr --> g1 & g2 & g3 & g4 & g5 & g6 --> review
+  review --> merge
+  merge --> resolved -.->|"a human accepts"| closed
+  merge --> dev
+  merge --> tag --> prod
+
+  classDef human stroke:#8a6d3b,stroke-width:2px,fill:#fdf3e3,color:#333
+  class review,prod,closed human
 ```
 
 ### Why it is shaped like this
 
 | Decision | Consequence you can see in the code |
 |---|---|
-| **D-1** — every model is an OpenAI-compatible endpoint | Exactly one HTTP client (`ida_harness/client.py`), zero `if provider == ...`. Adding a model is a `models.yaml` edit. |
+| **D-1** — every model is an OpenAI-compatible endpoint | Held until Anthropic. Benchmarking through its compatibility shim would record numbers from a surface we did not choose and cannot version, so `anthropic_compat` selects a second client (`ida_harness/anthropic_client.py`) that speaks the Messages API natively. **Two** wire formats now, picked by a lookup table on `serving_stack` — still zero `if provider == ...`, and adding a model is still a `models.yaml` edit. |
 | **D-1** — results must be reproducible | `ServingConfig` is copied **by value** onto every result row, alongside the task git SHA. Editing the registry tomorrow cannot rewrite yesterday's results. |
 | **D-4** — custom harness | `packages/harness` is ours. We studied Inspect AI's *concepts* (task/solver/scorer split, structured eval logs, sample-level caching) and import nothing from it. |
 | **D-5** — no auth service | One dependency-injected placeholder, `ida_api/auth.py`. Platform SSO/OIDC replaces its body and nothing else. |
@@ -371,7 +426,9 @@ the exact change and the three ways to get it wrong.
 
 ## Deploying
 
-You mostly don't — pushing to `main` is the deploy.
+You mostly don't — pushing to `main` is the deploy. The whole path, from the
+Ready queue to prod, is drawn under
+[How work reaches production](#how-work-reaches-production).
 
 | you do | what happens |
 |---|---|
@@ -416,22 +473,10 @@ commit to a design system before there is a design.
 These are **not** oversights. Each is documented at the point in the code where
 it matters.
 
-1. **The queue has no ack/retry.** `BLPOP` removes a message before the runner
-   has done anything with it. A runner pod that dies mid-run loses the message
-   and the run stays `running` forever. The fix is a reliable-queue pattern
-   (`BLMOVE` + a reaper) or Redis Streams with consumer groups.
-   `RunJobMessage.attempt` exists so that change stays additive.
-   → `packages/core/ida_core/queue.py`
-
-   *Not* to be confused with poison-message handling, which **is** implemented:
-   an undecodable payload is dead-lettered to `ida:queue:runs:dead` and skipped,
-   and the worker loop survives it. That is the path a `schema_version` bump
-   takes while old replicas are still rolling.
-
-2. **No LLM judge.** Subjective tasks run and archive transcripts but are not
+1. **No LLM judge.** Subjective tasks run and archive transcripts but are not
    scored. → `packages/harness/ida_harness/scoring.py::LLMJudgeScorer`
 
-3. **`judge-calibration` is a shell; the other two sweeps are implemented.**
+2. **`judge-calibration` is a shell; the other two sweeps are implemented.**
    `ida-sweep rebenchmark` and `ida-sweep model-sweep` plan a `(task, model)`
    cross product, dedupe it against what is already measured or in flight, and
    enqueue the rest — a sweep enqueues, runners execute. `ida-sweep
@@ -459,35 +504,32 @@ it matters.
    caps still apply.
    → `services/runner/ida_runner/sweeps.py`
 
-4. **No auth.** `auth_mode: disabled` yields an anonymous principal. Any other
+3. **No auth.** `auth_mode: disabled` yields an anonymous principal. Any other
    value returns 501 rather than silently allowing traffic.
    → `services/api/ida_api/auth.py`
 
-5. **No recommendation engine.** Half of D-3 is not built. The data model
+4. **No recommendation engine.** Half of D-3 is not built. The data model
    supports it — `results` carries the score, the serving config, the task
    content hash and the evidence pointer that a recommendation would cite, and
    `error_count` so an outage is never read as "no data for this model".
 
-6. **No stale-run reaper.** A run claimed by a runner that then dies stays
-   `running`. Related to gap 1.
-
-7. **No cache backend ships.** `NullCache` is the default and the tracer bullet
+5. **No cache backend ships.** `NullCache` is the default and the tracer bullet
    uses it, so every run genuinely exercises the HTTP path. The *semantics* are
    implemented and tested: a hit archives the real prompt, reports `cached:
    true`, and bills nothing. A Redis- or MinIO-backed store drops in behind the
    `CompletionCache` protocol.
    → `packages/harness/ida_harness/cache.py`
 
-8. **Repeated sampling is contract-ready but not emitted.** `repeat_index`
+6. **Repeated sampling is contract-ready but not emitted.** `repeat_index`
    exists on the record, in the unique index and in the artifact key, so
    self-consistency / pass@k needs no migration — but the runner always emits
    `0`. → `packages/core/ida_core/contracts.py`
 
-9. **The LLM-judge fields are reserved, not populated.**
+7. **The LLM-judge fields are reserved, not populated.**
    `judge_serving_config` and `Score.criteria` exist with `None`/`[]` defaults
    so the judge story is additive; nothing writes them yet.
 
-10. **No browser tests.** Frontend coverage is typecheck + lint + build. The
+8. **No browser tests.** Frontend coverage is typecheck + lint + build. The
     classification logic the UI depends on is asserted through its *inputs* in
     the tracer bullet. A headless browser in CI is a maintenance cost this
     project has not earned.
