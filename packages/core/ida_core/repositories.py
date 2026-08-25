@@ -8,6 +8,7 @@ remember to honour.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy import func, select
@@ -343,5 +344,96 @@ def list_results_for_run(session: Session, run_id: str) -> list[ResultRow]:
         select(ResultRow)
         .where(ResultRow.run_id == run_id)
         .order_by(ResultRow.sample_id.asc(), ResultRow.repeat_index.asc())
+    )
+    return list(session.scalars(stmt))
+
+
+# ---------------------------------------------------------------- sweeps ----
+# Read-only helpers the scheduled sweeps (ida_runner.sweeps) plan against. They
+# live here, not in the runner, because they are contracts <-> rows mapping and
+# this module is the only place that is allowed to be.
+
+
+def existing_run_keys(
+    session: Session,
+    *,
+    statuses: Sequence[RunStatus],
+    model_keys: Sequence[str] | None = None,
+) -> set[tuple[str, str, str | None]]:
+    """``(task_id, model_key, task_content_sha)`` for every run in ``statuses``.
+
+    The dedupe index a sweep plans against.  ``task_content_sha`` is part of the
+    key on purpose (B8): editing a task changes its content sha, which makes the
+    old measurement stale and the pair legitimately re-runnable.  Comparing on
+    ``(task_id, model_key)`` alone would mean a task could be rewritten and never
+    re-measured, and the dashboard would keep showing the previous version's
+    numbers under the new task's name.
+
+    ``None`` shas are returned as-is rather than dropped.  A row whose sha is
+    NULL predates content hashing; it will simply never match a candidate (whose
+    sha is non-NULL), so such a pair is re-run once and thereafter deduped
+    normally.  Silently treating NULL as "matches anything" would suppress the
+    re-measurement that backfills it.
+
+    A single ``SELECT DISTINCT`` rather than a query per candidate: a sweep asks
+    this once and then does set membership in Python, so planning is one round
+    trip regardless of how far the registry x catalog cross product grows.
+    """
+    if not statuses:
+        return set()
+    stmt = select(RunRow.task_id, RunRow.model_key, RunRow.task_content_sha).where(
+        RunRow.status.in_([s.value for s in statuses])
+    )
+    if model_keys is not None:
+        if not model_keys:
+            return set()
+        stmt = stmt.where(RunRow.model_key.in_(list(model_keys)))
+    return {
+        (task_id, model_key, sha) for task_id, model_key, sha in session.execute(stmt.distinct())
+    }
+
+
+def models_with_any_run(
+    session: Session,
+    *,
+    statuses: Sequence[RunStatus],
+) -> set[str]:
+    """Model keys that have at least one run in ``statuses``.
+
+    What ``ida-sweep model-sweep`` diffs the registry against: a model absent
+    from this set has never been measured (or never successfully), which is the
+    definition of "new" that sweep acts on.  Deliberately not "has a run for
+    every current task" -- that is the nightly rebenchmark's job, and conflating
+    the two would make the cheap targeted sweep re-enqueue the whole suite.
+    """
+    if not statuses:
+        return set()
+    stmt = select(RunRow.model_key).where(RunRow.status.in_([s.value for s in statuses])).distinct()
+    return set(session.scalars(stmt))
+
+
+def list_ungraded_subjective_results(session: Session, *, limit: int = 500) -> list[ResultRow]:
+    """Subjective samples that carry no score yet, oldest first.
+
+    ``scorable=False`` is the harness's marker for a sample from a
+    ``subjective`` task, written because no programmatic scorer can touch it
+    (see ``ida_harness.runner``).  ``score_value IS NULL`` is the second half of
+    the predicate rather than a redundancy: once the LLM judge grades a sample
+    retroactively it writes a score onto exactly these rows, and a candidate
+    query that ignored the score would keep re-grading everything it had already
+    graded -- every night, at full provider cost.
+
+    Oldest first so a bounded pass makes progress through the backlog instead of
+    re-examining the same head of it.  Bounded by ``limit`` for the same reason
+    :func:`list_stale_running_runs` is: one pass must not become an unbounded
+    transaction.  A caller that hits the bound should say so in its log line
+    rather than let a truncated pass read as "that was all".
+    """
+    stmt = (
+        select(ResultRow)
+        .where(ResultRow.scorable.is_(False))
+        
+        .order_by(ResultRow.created_at.asc(), ResultRow.id.asc())
+        .limit(limit)
     )
     return list(session.scalars(stmt))
