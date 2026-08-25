@@ -39,6 +39,38 @@ WHAT IS EMITTED, AND WHY EACH ONE
                                  malformed payload (it dead-letters), so any
                                  value here means an implementation broke its
                                  contract. Worth alerting on.
+``ida_llm_runner_job_retries_total``
+                                 Jobs handed back for another attempt. A steady
+                                 low rate is the durability machinery working; a
+                                 SPIKE is a dependency failing under everyone.
+``ida_llm_runner_dead_lettered_total``
+                                 Jobs that exhausted their attempts. Every one is
+                                 a run a human should look at -- this is the
+                                 metric that says work was given up on, so it is
+                                 the one worth paging nobody but alerting someone.
+``ida_llm_runner_recovered_claims_total``
+                                 Claims taken back from runners that died. Non-zero
+                                 means pods are being lost; the jobs survived,
+                                 which is the whole point, but the pods did not.
+``ida_llm_runner_zombie_runs_total``
+                                 Runs closed out by the age backstop -- stuck
+                                 `running` with no claim anywhere. Should be rare;
+                                 a rising count means claim records are being lost
+                                 (Redis eviction?), not just pods.
+``ida_llm_runner_duplicate_deliveries_total``
+                                 Re-deliveries of an ALREADY-FINISHED run -- a
+                                 runner committed its results and died before
+                                 acking. Small and non-zero is at-least-once
+                                 working; the job was not re-run, so the results
+                                 were not duplicated.
+``ida_llm_runner_ack_failures_total``
+                                 Acks that raised. Each one is a finished job that
+                                 will be re-delivered and re-run: wasteful, not
+                                 lost. Non-zero means Redis is unhealthy.
+``ida_llm_runner_reaper_failures_total``
+                                 Recovery passes that raised. Housekeeping failing
+                                 is survivable, but a persistently failing reaper
+                                 means crashed runners' jobs are NOT coming back.
 """
 
 from __future__ import annotations
@@ -65,6 +97,42 @@ JOBS = Counter(
 DEQUEUE_FAILURES = Counter(
     "ida_llm_runner_dequeue_failures_total",
     "Queue reads that raised. Non-zero means a RunQueue broke its no-raise contract.",
+)
+
+RETRIES = Counter(
+    "ida_llm_runner_job_retries_total",
+    "Run jobs returned to the queue for another attempt.",
+)
+
+DEAD_LETTERED = Counter(
+    "ida_llm_runner_dead_lettered_total",
+    "Run jobs parked after exhausting their attempts. Each one was given up on.",
+)
+
+RECOVERED_CLAIMS = Counter(
+    "ida_llm_runner_recovered_claims_total",
+    "Claims recovered from runners whose heartbeat lapsed.",
+)
+
+ZOMBIE_RUNS = Counter(
+    "ida_llm_runner_zombie_runs_total",
+    "Runs closed out as failed because nothing was claiming them any more.",
+)
+
+DUPLICATE_DELIVERIES = Counter(
+    "ida_llm_runner_duplicate_deliveries_total",
+    "Messages re-delivered for a run that had already finished. Expected to be "
+    "small and non-zero: it is at-least-once delivery working as designed.",
+)
+
+ACK_FAILURES = Counter(
+    "ida_llm_runner_ack_failures_total",
+    "Acks that raised. Each one means a finished job will be re-delivered.",
+)
+
+REAPER_FAILURES = Counter(
+    "ida_llm_runner_reaper_failures_total",
+    "Recovery passes that raised. Persistent non-zero means crashed jobs are stuck.",
 )
 
 
