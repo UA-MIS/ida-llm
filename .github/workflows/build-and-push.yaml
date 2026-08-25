@@ -11,19 +11,25 @@
 # tag; staging→prod is a tag copy performed by promote-to-prod.yaml, never a
 # rebuild. See .devops/promotion.yaml.
 #
-# ── PRs ARE NOT TRIGGERED HERE, AND THAT IS CURRENT-STATE, NOT PERMANENT ─────
-# ci.yml owns pull_request validation. A PR does not publish an image because
-# previews are disabled for this tenant (a pull-<sha> image would have no
-# namespace to deploy into and would just put untrusted PR-built content in the
-# team's Harbor project). When the platform's preview blockers close, add
-# `pull_request:` to the trigger list and resolve-image.sh already maps it to
-# `preview` / `pull-<sha>` with no other change here.
+# ── PULL REQUESTS BUILD A PREVIEW IMAGE ──────────────────────────────────────
+# ci.yml still owns pull_request VALIDATION (five gates). This workflow builds
+# and publishes the per-PR image and pins the preview overlay to it.
+#
+# SECURITY, stated plainly: this builds and pushes UNTRUSTED PULL-REQUEST CODE.
+# The blast radius is bounded by (a) the harbor-push robot, scoped to THIS team's
+# own Harbor project, no other project and no delete; (b) the `pull-<sha>` tag
+# namespace being DISJOINT from dev's git-describe and prod's semver tags, so a
+# PR can never overwrite an image any real environment runs; and (c) the image
+# only ever landing in the fenced ida-llm-pr-<n> namespace — whose quota,
+# LimitRange and NetworkPolicies come from a PLATFORM-project Application the
+# pull request cannot edit, and which has NO route to the team's database.
 name: build-and-push
 
 on:
   push:
     branches: [main]     # -> dev, tag = git-describe
     tags: ["v*"]         # -> the ONE immutable :X.Y.Z image staging and prod share
+  pull_request:          # -> preview, tag = pull-<sha>
 
 permissions:
   contents: read
@@ -208,6 +214,61 @@ jobs:
           CONTEXT: ${{ matrix.context }}
           DOCKERFILE: ${{ matrix.dockerfile }}
           DOCKER_CONFIG_DIR: ${{ env.DOCKER_CONFIG_DIR }}
+
+  # ── PREVIEW: pin the overlay to the image just built, and arm the label ─────
+  # ⚠ WHY A COMMIT IS NEEDED AT ALL. The preview ApplicationSet renders the
+  # tenant chart AT THE PR'S head_sha. The image tag is `pull-<sha>`, derived
+  # FROM that sha — so the manifest at a given commit cannot name the image built
+  # from that same commit. Writing the tag back as a follow-up commit resolves the
+  # circularity: head_sha advances to a commit whose ONLY difference is the tag
+  # line, and it pins the image built from the commit immediately before it.
+  #
+  # The loop is prevented by the SAME guard `resolve` already uses: this commit is
+  # authored by ci@capstone.uamishub.com, which that job's `if:` skips. Note it
+  # deliberately does NOT use `[skip ci]` — that is commit-level, so it would also
+  # suppress a later tag push pointing at the same commit.
+  bump-preview:
+    needs: [resolve, build-and-push]
+    if: ${{ github.event_name == 'pull_request' && needs.resolve.outputs.PUSH == 'true' }}
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    container:
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      TAG: ${{ needs.resolve.outputs.TAG }}
+      GIT_AUTHOR_NAME: ua-mis-ci
+      GIT_AUTHOR_EMAIL: ci@capstone.uamishub.com
+      GIT_COMMITTER_NAME: ua-mis-ci
+      GIT_COMMITTER_EMAIL: ci@capstone.uamishub.com
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout the PR head branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          # The PR's own branch, NOT the merge ref -- this job pushes back to it.
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Pin the preview overlay to the image just built
+        run: |
+          set -eu
+          COMMIT=1 bash .devops/ci/bump-image.sh preview "${TAG}"
+          # No-op when the tag is already pinned (a re-run, or a push that only
+          # touched files outside the build context).
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}" || {
+            echo "nothing to push (overlay already pinned at ${TAG})"; }
+
+      - name: Arm the preview label
+        # THE LIFECYCLE GATE. Both preview ApplicationSets -- the tenant's app and
+        # the platform's fence -- require this label, so adding it is what CREATES
+        # the environment and losing it is what destroys it. The cohort-gc
+        # preview-ttl CronJob strips it at 12h, which prunes the App AND its fence
+        # together; re-running CI is the only revival path, which is this step.
+        run: gh pr edit "${{ github.event.pull_request.number }}" --add-label preview || true
 
   bump-dev:
     needs: [resolve, build-and-push]

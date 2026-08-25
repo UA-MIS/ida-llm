@@ -256,11 +256,17 @@ if runner:
           f"runner's metrics container port is named 'http' so the netpol admits the scrape (got {sorted(names)})")
 
 hpas = by_kind.get("HorizontalPodAutoscaler", [])
-check(len(hpas) == 1 and hpas[0]["spec"]["scaleTargetRef"]["name"] == "ida-llm-runner",
-      "exactly one HPA, targeting the runner")
-if hpas:
-    check(hpas[0]["spec"]["minReplicas"] == 2 and hpas[0]["spec"]["maxReplicas"] == 4,
-          "HPA bounds are 2-4 (the spec's stated runner range)")
+if env == "preview":
+    # Its minReplicas of 2 would OVERRIDE the replicas:1 patch and run two
+    # runners in every open PR's namespace, against a quota sized for one of
+    # everything. A preview is a review aid; there is nothing to autoscale.
+    check(not hpas, f"preview: the HPA is removed (got {[h['metadata']['name'] for h in hpas]})")
+else:
+    check(len(hpas) == 1 and hpas[0]["spec"]["scaleTargetRef"]["name"] == "ida-llm-runner",
+          "exactly one HPA, targeting the runner")
+    if hpas:
+        check(hpas[0]["spec"]["minReplicas"] == 2 and hpas[0]["spec"]["maxReplicas"] == 4,
+              "HPA bounds are 2-4 (the spec's stated runner range)")
 
 pdbs = by_kind.get("PodDisruptionBudget", [])
 for pdb in pdbs:

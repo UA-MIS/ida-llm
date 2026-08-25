@@ -23,14 +23,29 @@ namespace: ida-llm-pr-1
 
 resources:
   - ../../base
-  # ⚠ preview ships its OWN SecretStore + eso-tenant SA — unlike dev/staging/prod,
-  # where the Composition creates them. It has to: a per-PR namespace is created
-  # by ArgoCD, not by Crossplane, so nothing else puts them there. (This is also
-  # exactly why preview is blocked today: the SA exists but the Vault role does
-  # not bind its namespace.)
-  - secretstore.yaml
-  - app-secret.externalsecret.yaml
-  - database.externalsecret.yaml
+  # ⚠ NO SecretStore AND NO ExternalSecrets HERE, deliberately — unlike
+  # dev/staging/prod. A preview's secrets (harbor-pull, ida-llm-secret,
+  # ida-llm-db) are created by the PLATFORM-project guardrails Application
+  # (platform-infra: applicationsets/ida-llm-preview-guardrails.yaml), not by
+  # this chart.
+  #
+  # Two reasons, and both are the point rather than a convenience:
+  #
+  #  1. The per-tenant `vault-tenant` store CANNOT work in a per-PR namespace.
+  #     It authenticates as the `eso-tenant` SA against the Vault k8s-auth role
+  #     `tenant-ida-llm`, whose bound_service_account_namespaces is an EXACT LIST
+  #     — the three env namespaces plus the literal `ida-llm-preview`. Not a glob,
+  #     and provider-vault exposes no namespace-selector field, so `ida-llm-pr-7`
+  #     can never be added declaratively.
+  #  2. The platform's cluster-scoped store CAN reach any path under
+  #     `secret/data/tenants/*`. That is precisely why a TENANT-owned manifest
+  #     must not reference it: this repo could then point it at another team's
+  #     subtree. Keeping those objects in platform-infra means the path is fixed
+  #     by the platform.
+  #
+  # The upshot for a reviewer: a preview gets a throwaway in-namespace Postgres
+  # and MOCK provider keys from a separate Vault path — it cannot touch the
+  # team's database or spend real credits.
 
 labels:
   - pairs:
@@ -51,7 +66,18 @@ images:
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-agile
     newTag: preview
 
+# ⚠ THE HPA IS REMOVED IN PREVIEWS, not just scaled down. Its minReplicas is 2,
+# which would OVERRIDE the replicas:1 patch below and run two runners in every
+# open PR's namespace — against a quota deliberately sized for one of everything.
+# A preview is a review aid; there is nothing to autoscale.
 patches:
+  - target: { group: autoscaling, version: v2, kind: HorizontalPodAutoscaler, name: ida-llm-runner }
+    patch: |-
+      $patch: delete
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: ida-llm-runner
   # ── agile: PROD ONLY ──────────────────────────────────────────────────────
   # The sprint board is ONE always-on instance for the team, not a
   # three-environment app: it runs a background GitHub poller, so a second live
