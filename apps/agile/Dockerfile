@@ -47,6 +47,9 @@ COPY --from=builder --chown=65532:65532 /app/.next/static ./.next/static
 COPY --from=builder --chown=65532:65532 /app/src/lib/db/migrations ./src/lib/db/migrations
 # The in-app API reference reads this at request time.
 COPY --from=builder --chown=65532:65532 /app/docs ./docs
+# `output: 'standalone'` does NOT bundle public/ -- it is served from disk at
+# runtime, so it has to be copied explicitly or every static asset 404s.
+COPY --from=builder --chown=65532:65532 /app/public ./public
 
 USER 65532:65532
 EXPOSE 8080
