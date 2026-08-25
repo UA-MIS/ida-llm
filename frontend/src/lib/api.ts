@@ -1,29 +1,31 @@
 /**
  * The single place the frontend talks to the API.
  *
- * Two base URLs, deliberately:
+ * ONE BASE URL, AND IT IS SERVER-SIDE ONLY. That is not a simplification of a
+ * richer design -- it is the only design this deployment permits:
  *
- * - `API_BASE_URL` — used by React Server Components. In the cluster that is
- *   the in-namespace Service DNS name (`http://api:8000`), which is not
- *   resolvable from a browser.
- * - `NEXT_PUBLIC_API_BASE_URL` — used by client components. This is the public
- *   ingress hostname and is inlined into the browser bundle at build time.
+ * - The api has NO INGRESS in any environment (`.devops/components.yaml` gives
+ *   the python-app `path: ""`). A browser cannot reach it. Ever.
+ * - `NEXT_PUBLIC_*` is inlined into the client bundle at BUILD time, but ONE
+ *   frontend image is built and then promoted byte-identically through dev,
+ *   staging and prod. A per-environment public API URL is therefore structurally
+ *   impossible here, not merely discouraged.
  *
- * Collapsing these into one variable is the classic Next.js-in-k8s bug: it
- * works locally, where both happen to be `localhost`, and breaks on deploy.
+ * So every call runs server-side, against the in-namespace Service name the
+ * platform supplies as `API_URL` (`http://ida-llm-api`, no port -- the Service
+ * listens on :80). Anything the browser needs goes through a same-origin route
+ * handler that proxies here; see src/app/api/runs/[runId]/results/... .
+ *
+ * `API_BASE_URL` is accepted as a fallback for older local .env files.
  */
 
 import type { RunDetail, RunListResponse, SampleTranscript } from "./types";
 
-const SERVER_BASE = process.env.API_BASE_URL ?? "http://localhost:8000";
-const BROWSER_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-
-/** True inside a React Server Component / route handler. */
-const isServer = typeof window === "undefined";
+const SERVER_BASE =
+  process.env.API_URL ?? process.env.API_BASE_URL ?? "http://localhost:8000";
 
 export function apiBase(): string {
-  return isServer ? SERVER_BASE : BROWSER_BASE;
+  return SERVER_BASE;
 }
 
 export class ApiError extends Error {
@@ -47,8 +49,11 @@ async function getJson<T>(path: string, revalidateSeconds = 0): Promise<T> {
       cache: revalidateSeconds > 0 ? undefined : "no-store",
     });
   } catch (cause) {
+    // Status 0 means the request never reached the api -- DNS, connection
+    // refused, timeout. Callers distinguish it from a real HTTP status; the
+    // transcript proxy turns it into a 502, which is what it actually is.
     throw new ApiError(
-      `Could not reach the API at ${url}. Is it running? (\`make dev\`)`,
+      `Could not reach the API at ${url}: ${cause instanceof Error ? cause.message : String(cause)}`,
       0,
     );
   }

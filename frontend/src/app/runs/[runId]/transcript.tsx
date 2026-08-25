@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import { getTranscript } from "@/lib/api";
 import type { SampleTranscript } from "@/lib/types";
 
 /**
@@ -15,6 +14,12 @@ import type { SampleTranscript } from "@/lib/types";
  *
  * This is the evidence half of D-3: every score on the page above is one click
  * away from the exact exchange that produced it.
+ *
+ * Fetched from a SAME-ORIGIN route handler, not from the api. The api has no
+ * Ingress in any environment, so a browser has no path to it; the handler at
+ * src/app/api/runs/[runId]/results/[sampleId]/transcript runs server-side and
+ * proxies. That is also why there is no NEXT_PUBLIC_API_BASE_URL anywhere in
+ * this codebase -- see src/lib/api.ts.
  */
 export function Transcript({
   runId,
@@ -38,7 +43,17 @@ export function Transcript({
     setLoading(true);
     setError(null);
     try {
-      setData(await getTranscript(runId, sampleId));
+      const response = await fetch(
+        `/api/runs/${encodeURIComponent(runId)}` +
+          `/results/${encodeURIComponent(sampleId)}/transcript`,
+        { headers: { Accept: "application/json" } },
+      );
+      if (!response.ok) {
+        throw new Error(
+          `Could not load the transcript (${response.status} ${response.statusText}).`,
+        );
+      }
+      setData((await response.json()) as SampleTranscript);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
