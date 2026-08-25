@@ -100,6 +100,10 @@ cd frontend && npm ci && npm run dev
 
 dev and staging sit behind the platform's org-login gate; prod is public.
 
+There are **no PR preview environments** — deferred, with the four platform-side
+gaps written up in [`docs/preview-environments.md`](docs/preview-environments.md).
+Opening a PR runs the five CI gates and nothing else.
+
 **No pull request and no dev deploy can spend provider credits or reach campus
 hardware.** That is enforced in CI, in the overlays, and asserted by a render
 test — three places, because a rule that lives in one file is a rule the next

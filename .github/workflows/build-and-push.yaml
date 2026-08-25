@@ -29,7 +29,17 @@ on:
   push:
     branches: [main]     # -> dev, tag = git-describe
     tags: ["v*"]         # -> the ONE immutable :X.Y.Z image staging and prod share
-  pull_request:          # -> preview, tag = pull-<sha>
+  # ⚠ PULL-REQUEST BUILDS ARE DISABLED. PR previews are DEFERRED (owner decision,
+  # 2026-08-25) -- see docs/preview-environments.md. With the tenant claim's
+  # previewEnabled: false, the platform renders NO preview ApplicationSet, so a
+  # pull-<sha> image would have nowhere to deploy: it would only put untrusted
+  # PR-built content in the team's Harbor project for nothing.
+  #
+  # The machinery below (the bump-preview job, .devops/chart/overlays/preview,
+  # promotion.yaml's preview entry) is deliberately KEPT and is inert. Reviving
+  # previews is: uncomment this one line, and flip the claim field. Nothing else
+  # in this repo needs to change.
+  # pull_request:          # -> preview, tag = pull-<sha>
 
 permissions:
   contents: read
