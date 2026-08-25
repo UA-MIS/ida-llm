@@ -22,6 +22,7 @@ that is about *evaluating* belongs in the harness, not here.
 from __future__ import annotations
 
 import logging
+import os
 import time
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
@@ -49,6 +50,7 @@ from ida_core.contracts import (
     RunStatus,
 )
 from ida_core.db import session_scope, utcnow
+from ida_core.gitmeta import current_git_sha
 from ida_core.ids import new_id, new_run_id
 from ida_core.repositories import (
     count_results_for_run,
@@ -88,9 +90,28 @@ def create_app(context: AppContext | None = None) -> FastAPI:
     store).  In production it is ``None`` and :func:`build_context` reads the
     environment.
     """
+    # ── WHAT THIS BUILD HONESTLY IS, RESOLVED ONCE ─────────────────────────
+    #
+    # `version` used to be the hardcoded `ida_api.__version__`, which no release
+    # step ever wrote to -- so the 0.1.1 image served `"version":"0.1.0"`. A
+    # health endpoint that disagrees with the release it is running is not a
+    # cosmetic bug: it is what convinces someone a deploy did not land.
+    #
+    # `IDA_VERSION` gives the release process ONE place to say what it shipped,
+    # and `__version__` remains the floor when nothing sets it. The authority is
+    # `git_sha`: it is already baked into every image (Dockerfile.python passes
+    # GIT_SHA -> IDA_GIT_SHA) and is right by construction, needing no pipeline.
+    #
+    # ⚠ RESOLVED HERE, AT BUILD TIME, NOT IN THE HANDLER. With IDA_GIT_SHA unset
+    # `current_git_sha()` shells out to git -- and /healthz is the LIVENESS path,
+    # probed every 20s on every replica. Forking a subprocess per probe is exactly
+    # the kind of work the comment below forbids, so it happens once, here.
+    build_version = os.environ.get("IDA_VERSION", "").strip() or __version__
+    build_git_sha = current_git_sha()
+
     app = FastAPI(
         title="Capstone-IDA API",
-        version=__version__,
+        version=build_version,
         description=(
             "Benchmarking platform for LLMs on non-coding academic tasks. "
             "Every result carries the full serving config and task git SHA "
@@ -157,7 +178,7 @@ def create_app(context: AppContext | None = None) -> FastAPI:
     @app.get("/healthz", response_model=HealthResponse, tags=["ops"])
     def healthz() -> HealthResponse:
         """Liveness. No dependencies, no I/O, no `ctx`. Always 200."""
-        return HealthResponse(status="ok", version=__version__, checks={})
+        return HealthResponse(status="ok", version=build_version, checks={}, git_sha=build_git_sha)
 
     def _readiness() -> tuple[HealthResponse, dict[str, bool]]:
         ctx: AppContext = app.state.context
@@ -171,8 +192,9 @@ def create_app(context: AppContext | None = None) -> FastAPI:
         }
         body = HealthResponse(
             status="ok" if all(checks.values()) else "degraded",
-            version=__version__,
+            version=build_version,
             checks=checks,
+            git_sha=build_git_sha,
         )
         return body, checks
 
