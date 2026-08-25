@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from ida_core.contracts import (
+    CriterionScore,
     Quantization,
     ResultRecord,
     RunRecord,
@@ -262,6 +263,119 @@ class TestResults:
                     _result(run.id, serving_config, sample_id="dup"),
                 ],
             )
+
+
+class TestJudgeSpendIsPersistedSeparately:
+    """A judged sample buys two things; the row must be able to tell them apart.
+
+    Folding judge tokens into ``prompt_tokens`` would be unrecoverable -- nothing
+    downstream could split the number again, and a cheap model graded by an
+    expensive judge would read as an expensive model forever.
+    """
+
+    def _judged(self, run_id: str, serving: ServingConfig) -> ResultRecord:
+        return _result(
+            run_id,
+            serving,
+            score=Score(
+                scorer=ScorerKind.LLM_JUDGE,
+                value=0.75,
+                passed=None,
+                explanation="rubric r1: weighted 0.750 over 2 criteria",
+                criteria=[
+                    CriterionScore(name="specificity", value=1.0, weight=3.0, explanation="cited"),
+                    CriterionScore(name="restraint", value=0.0, weight=1.0, explanation="rewrote"),
+                ],
+                details={"rubric_id": "r1"},
+            ),
+            usage=TokenUsage(prompt_tokens=10, completion_tokens=3),
+            cost_usd=0.0,
+            judge_serving_config=serving,
+            judge_usage=TokenUsage(prompt_tokens=200, completion_tokens=40),
+            judge_cost_usd=0.00028,
+            judge_transcript_uri="s3://ida-artifacts/runs/x/judge/s1.json",
+        )
+
+    def test_judge_usage_and_cost_survive_the_round_trip(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(session, [self._judged(run.id, serving_config)])
+        with session_scope(session_factory) as session:
+            restored = result_row_to_record(list_results_for_run(session, run.id)[0])
+        assert restored.judge_usage == TokenUsage(prompt_tokens=200, completion_tokens=40)
+        assert restored.judge_cost_usd == 0.00028
+
+    def test_the_candidate_s_own_accounting_is_untouched_by_the_judge_s(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(session, [self._judged(run.id, serving_config)])
+        with session_scope(session_factory) as session:
+            restored = result_row_to_record(list_results_for_run(session, run.id)[0])
+        assert restored.usage == TokenUsage(prompt_tokens=10, completion_tokens=3)
+        assert restored.cost_usd == 0.0
+
+    def test_the_judge_evidence_pointer_survives(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """D-3 applied to the grade: a rubric score with no traceable reasoning
+        is an opinion, not evidence."""
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(session, [self._judged(run.id, serving_config)])
+        with session_scope(session_factory) as session:
+            restored = result_row_to_record(list_results_for_run(session, run.id)[0])
+        assert restored.judge_transcript_uri == "s3://ida-artifacts/runs/x/judge/s1.json"
+
+    def test_the_per_criterion_rows_survive_and_reconstruct_the_total(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """What makes a judge-calibration study a query rather than a re-run."""
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(session, [self._judged(run.id, serving_config)])
+        with session_scope(session_factory) as session:
+            restored = result_row_to_record(list_results_for_run(session, run.id)[0])
+        rows = restored.score.criteria
+        assert [(r.name, r.value, r.weight) for r in rows] == [
+            ("specificity", 1.0, 3.0),
+            ("restraint", 0.0, 1.0),
+        ]
+        weighted = sum(r.value * r.weight for r in rows) / sum(r.weight for r in rows)
+        assert weighted == restored.score.value
+
+    def test_passed_stays_null_rather_than_collapsing_to_false(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(session, [self._judged(run.id, serving_config)])
+        with session_scope(session_factory) as session:
+            restored = result_row_to_record(list_results_for_run(session, run.id)[0])
+        assert restored.score.passed is None
+
+    def test_an_unjudged_result_stores_honest_zeros(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """Zero is the TRUE answer for a row nothing judged, not a placeholder."""
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(session, [_result(run.id, serving_config)])
+        with session_scope(session_factory) as session:
+            restored = result_row_to_record(list_results_for_run(session, run.id)[0])
+        assert restored.judge_usage.total_tokens == 0
+        assert restored.judge_cost_usd == 0.0
+        assert restored.judge_transcript_uri is None
+        assert restored.judge_serving_config is None
 
 
 class TestSweepPlanningHelpers:

@@ -12,6 +12,10 @@ Configuration (env)
                       the retry path.  Deterministic per request index, not
                       random, so a test can rely on it.
 ``MOCK_MODEL_ID``     the id echoed back in ``model`` (default ``mock-echo-1``).
+``MOCK_JUDGE_MODE``   how to answer an LLM-as-judge prompt: ``json`` (default,
+                      well-formed), ``malformed`` or ``out_of_range``.  Lets a
+                      failure drill point the harness at a *service* that
+                      misbehaves rather than at a stub that pretends to.
 """
 
 from __future__ import annotations
@@ -58,6 +62,7 @@ class MockState:
         """Fail every Nth request with 503.  0 disables.  Deterministic by design."""
 
         self.model_id = os.environ.get("MOCK_MODEL_ID", DEFAULT_MODEL_ID)
+        self.responder.judge_mode = os.environ.get("MOCK_JUDGE_MODE", "json")
 
 
 def create_app() -> FastAPI:

@@ -8,6 +8,7 @@ pass against a database that production does not have. This test is the guard.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 import sqlalchemy as sa
@@ -380,3 +381,140 @@ class TestForeignStampIsRefused:
         monkeypatch.setenv("IDA_DATABASE_URL", url)
         upgrade(_alembic_config(url), "head")
         assert {"runs", "results"} <= set(inspect(make_engine(url)).get_table_names())
+
+
+class TestPartialDowngradeToTwo:
+    """0003 -> 0002 specifically, for the same reason TestPartialDowngrade exists.
+
+    The operational case is never "tear the database down"; it is "0003 is bad,
+    go back one, keep 0002's schema and its rows".
+    """
+
+    ADDED_TO_RESULTS: ClassVar[set[str]] = {
+        "judge_prompt_tokens",
+        "judge_completion_tokens",
+        "judge_cost_usd",
+        "judge_transcript_uri",
+    }
+
+    def _config(self, engine, monkeypatch):
+        url = str(engine.url)
+        monkeypatch.setenv("IDA_DATABASE_URL", url)
+        return _alembic_config(url)
+
+    def test_head_carries_the_judge_spend_columns(self, migrated_engine) -> None:
+        columns = _describe(migrated_engine)["results"]["columns"]
+        assert set(columns) >= self.ADDED_TO_RESULTS
+
+    def test_the_spend_columns_are_not_nullable_and_default_to_zero(self, migrated_engine) -> None:
+        """Zero is the TRUE answer for a row nothing judged, so the column can be
+        NOT NULL -- there is no 'unknown' state to represent."""
+        columns = _describe(migrated_engine)["results"]["columns"]
+        for name in ("judge_prompt_tokens", "judge_completion_tokens", "judge_cost_usd"):
+            _type, nullable = columns[name]
+            assert nullable is False, name
+        assert columns["judge_transcript_uri"][1] is True, "no judge ran -> no pointer"
+
+    def test_it_removes_exactly_the_0003_columns(self, migrated_engine, monkeypatch) -> None:
+        from alembic.command import downgrade
+
+        before = _describe(migrated_engine)
+        assert set(before["results"]["columns"]) >= self.ADDED_TO_RESULTS
+
+        downgrade(self._config(migrated_engine, monkeypatch), "ida_0002_failure_and_provenance")
+        after = _describe(migrated_engine)
+
+        assert self.ADDED_TO_RESULTS.isdisjoint(after["results"]["columns"])
+
+    def test_the_0002_schema_is_left_intact(self, migrated_engine, monkeypatch) -> None:
+        """Going back one revision must not take 0002's columns with it."""
+        from alembic.command import downgrade
+
+        downgrade(self._config(migrated_engine, monkeypatch), "ida_0002_failure_and_provenance")
+        after = _describe(migrated_engine)
+
+        assert {"judge_serving_config", "score_criteria", "cached", "archive_error"} <= set(
+            after["results"]["columns"]
+        )
+        assert after["results"]["indexes"]["ix_results_run_sample"] == (
+            ("run_id", "sample_id", "repeat_index"),
+            True,
+        )
+
+    def test_downgrade_then_upgrade_round_trips_to_the_orm_schema(
+        self, migrated_engine, metadata_engine, monkeypatch
+    ) -> None:
+        from alembic.command import downgrade, upgrade
+
+        config = self._config(migrated_engine, monkeypatch)
+        downgrade(config, "ida_0002_failure_and_provenance")
+        upgrade(config, "head")
+        assert _describe(migrated_engine) == _describe(metadata_engine)
+
+    def test_the_downgrade_discards_judge_spend_and_the_docstring_says_so(
+        self, migrated_engine, monkeypatch
+    ) -> None:
+        """E8 — expected for a column drop, but it must not be a surprise.
+
+        0002 has a data-survival test; this is its counterpart, asserting the
+        opposite and pinning the warning that tells an operator so. The judge
+        TRANSCRIPTS are untouched in object storage — it is the pointers to them
+        that a rollback discards.
+        """
+        import migrations.versions as _versions  # noqa: F401 - locate the package
+        from alembic.command import downgrade, upgrade
+        from sqlalchemy import text
+
+        with migrated_engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO runs (id, status, task_id, model_key, harness_version, "
+                    "sample_count, scored_count, error_count, prompt_tokens, "
+                    "completion_tokens, total_cost_usd, created_at) VALUES "
+                    "('r1', 'succeeded', 't', 'm', '0.1.0', 1, 1, 0, 0, 0, 0.0, "
+                    "CURRENT_TIMESTAMP)"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO results (id, run_id, task_id, sample_id, repeat_index, "
+                    "model_key, serving_config, scorable, cached, prompt_tokens, "
+                    "completion_tokens, cost_usd, latency_ms, judge_prompt_tokens, "
+                    "judge_completion_tokens, judge_cost_usd, judge_transcript_uri, "
+                    "created_at) VALUES ('x1', 'r1', 't', 's1', 0, 'm', '{}', 1, 0, 10, 2, "
+                    "0.0, 1.0, 200, 40, 0.00028, 's3://b/runs/r1/judge/s1.json', "
+                    "CURRENT_TIMESTAMP)"
+                )
+            )
+
+        config = self._config(migrated_engine, monkeypatch)
+        downgrade(config, "ida_0002_failure_and_provenance")
+        upgrade(config, "head")
+
+        with migrated_engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT judge_prompt_tokens, judge_completion_tokens, judge_cost_usd, "
+                    "judge_transcript_uri FROM results WHERE id = 'x1'"
+                )
+            ).one()
+        assert tuple(row) == (0, 0, 0.0, None), "the loss is real"
+
+        # The row itself survives -- this is a column drop, not a table drop.
+        with migrated_engine.begin() as conn:
+            kept = conn.execute(
+                text("SELECT cost_usd, latency_ms FROM results WHERE id = 'x1'")
+            ).one()
+        assert tuple(kept) == (0.0, 1.0)
+
+        from pathlib import Path
+
+        source = (
+            Path(__file__).resolve().parents[3]
+            / "migrations"
+            / "versions"
+            / "0003_judge_spend_and_evidence.py"
+        ).read_text()
+        assert "THE DOWNGRADE DESTROYS DATA" in source, (
+            "an operator must be warned where they look, not only where we tested"
+        )

@@ -29,6 +29,14 @@
 # staging and prod -- and .devops/ci/chart-render.test.sh asserts both
 # directions. A literal base_url alone would make that patch a no-op.
 #
+# THE JUDGE IS JUST AN ENTRY IN THIS FILE. Subjective tasks are graded by an
+# LLM judge (packages/harness/ida_harness/judge.py), and "which model judges" is
+# `IDA_JUDGE_MODEL_KEY` naming a key below -- any key, any serving stack. There
+# is no judge-specific provider branch anywhere in the codebase, and no default:
+# unset means subjective tasks stay unscored with their transcripts archived,
+# rather than every run quietly starting to spend money. See the JUDGE example
+# at the bottom of this file and docs/llm-judge.md.
+#
 # Validated in CI against packages/core/ida_core/schemas/models.schema.json.
 version: 1
 
@@ -36,6 +44,13 @@ models:
   # --- the only entry enabled by default -----------------------------------
   # The tracer bullet, every test and `make dev` run against this. No key, no
   # GPU, no network egress, deterministic answers.
+  #
+  # It also answers the JUDGE protocol deterministically, so
+  # `IDA_JUDGE_MODEL_KEY=mock` exercises the whole subjective path locally
+  # without a key or a cent. Its grades are a hash of the criterion name and
+  # mean nothing about the response -- which is the point: they are for testing
+  # the PLUMBING, and a mock judge whose numbers looked meaningful would be far
+  # more dangerous than one that obviously does not.
   - key: mock
     display_name: Mock model (deterministic)
     base_url_env: MOCK_MODEL_BASE_URL   # in-cluster: http://ida-llm-mock-model (dev/preview), "" elsewhere
@@ -295,3 +310,65 @@ models:
   #   cost:
   #     input_usd_per_mtok: 0.0                              # self-hosted: no per-token cost
   #     output_usd_per_mtok: 0.0
+
+  # --- JUDGE: the model that grades subjective tasks -----------------------
+  #
+  # A judge entry is an ORDINARY entry. Nothing below is judge-specific except
+  # the comment; it is selected by `IDA_JUDGE_MODEL_KEY=judge-claude-haiku`, and
+  # `ida_harness.judge.build_judge` resolves it through the same factory that
+  # resolves the model under test.
+  #
+  # ⚠ WHAT IT COSTS. The judge makes ONE CALL PER RUBRIC CRITERION PER SAMPLE --
+  # deliberately, so that criterion order cannot move a score (see
+  # docs/llm-judge.md). A 5-criterion rubric over 20 samples is 100 judge calls
+  # for ONE model under test, and a sweep multiplies that by the number of
+  # models. Price the judge accordingly: a cheap, fast model with a large
+  # context is usually the right choice, and the rubric anchors -- not the
+  # judge's cleverness -- are what carry the grading.
+  #
+  # ⚠ WHAT IT MEANS FOR COMPARABILITY. The judge's full serving config is
+  # recorded on every result it grades, because swapping the judge moves scores
+  # exactly as surely as swapping the model under test. Two results graded by
+  # different judges are NOT comparable, and the stored `judge_serving_config`
+  # is how you can tell. Change the judge deliberately, and expect to regrade.
+  #
+  # ⚠ SELF-PREFERENCE. A model tends to grade its own outputs generously. Prefer
+  # a judge from a different family than the models under test, or accept that
+  # the one entry that shares a family with the judge carries a known bias --
+  # and record which you chose.
+  #
+  # ⚠ SAMPLING. temperature 1.0 here for the same reason as the other Anthropic
+  # examples above (current Claude models reject a non-default temperature), NOT
+  # because judging wants sampling. For a stack that accepts it, use 0.0: a
+  # judge is a measuring instrument and should wobble as little as possible.
+  #
+  # Pricing retrieved 2026-08-25.
+  #
+  # - key: judge-claude-haiku
+  #   display_name: Claude Haiku 4.5 (rubric judge)
+  #   base_url: https://api.anthropic.com/v1
+  #   api_key_env: ANTHROPIC_API_KEY
+  #   enabled: true                               # build_judge REFUSES a disabled
+  #                                               # entry rather than quietly
+  #                                               # bypassing the spend switch
+  #   timeout_s: 120
+  #   max_retries: 4
+  #   tags: [cloud, judge, anthropic]
+  #   serving:
+  #     model_id: claude-haiku-4-5
+  #     serving_stack: anthropic_compat
+  #     serving_version: null
+  #     quantization: unknown
+  #     revision: null
+  #     context_window: 200000
+  #     hardware: null
+  #     sampling:
+  #       temperature: 1.0                        # see the SAMPLING note above
+  #       top_p: 1.0
+  #       max_tokens: 512                         # a judgment is a score + a few
+  #                                               # sentences; a large ceiling here
+  #                                               # only buys a slower, chattier one
+  #       seed: null                              # unsupported by the Messages API
+  #   cost:
+  #     input_usd_per_mtok: 1.00
+  #     output_usd_per_mtok: 5.00
