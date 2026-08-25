@@ -34,10 +34,22 @@ system_prompt: >-
   line, with no units, no label and no other text on that line.
 scorer:
   kind: numeric_match
-  # Several answers are proportions in [0,1] where two decimal places would be
-  # too coarse, so the items ask for four and the tolerance admits 0.0005 of
-  # rounding. Nearest wrong-method distances below are all >= 0.4.
-  tolerance: 0.001
+  # 0.01, and this file is the mixed-precision trap worth understanding.
+  # There is ONE tolerance per task, so it must admit the LOOSEST rounding any
+  # item in the file asks for. The system prompt here says two decimal places,
+  # which allows 0.005 of rounding error -- so a tolerance of 0.001 would mark a
+  # correctly-rounded answer WRONG, which is the guide's own tolerance principle
+  # inverted. The area item asks for four decimals; that is tighter, so it is
+  # still admitted. If one item genuinely needs a tolerance the rest of the file
+  # cannot live with, that item belongs in a different task.
+  #
+  # Distractor distances: the variants enumerated beside each item below are all
+  # >= 0.6 away (60x). Two further variants a student might reach for are closer
+  # and still comfortably rejected -- a standard error taken as sigma/sqrt(n-1)
+  # lands 0.035 from the key (3.5x), and subtracting the wrong tail on the area
+  # item lands 0.397 away (40x). Stated because the old blanket claim here
+  # ("all >= 0.4") was true of the enumerated variants and false as written.
+  tolerance: 0.01
   normalisation:
     strip: true
     collapse_whitespace: true

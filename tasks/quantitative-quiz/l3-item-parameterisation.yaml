@@ -51,7 +51,7 @@ samples:
       the nearest cent.
     # 2400 * 0.035 * 4 = 336.00
     # Compounding instead gives 2400*(1.035^4 - 1) = 354.30 -- 18.30 away.
-    target: "336"
+    target: "336.00"
     metadata: { skill: simple-interest, template: interest-v1, provenance: synthetic }
 
   - id: template-compound-interest
@@ -74,7 +74,7 @@ samples:
       places.
     # (903 - 840) / 840 * 100 = 63 / 840 * 100 = 7.50
     # Dividing by the NEW value gives 63/903*100 = 6.98 -- 0.52 away.
-    target: "7.5"
+    target: "7.50"
     metadata: { skill: percent-change, template: change-v1, provenance: synthetic }
 
   - id: template-unit-cost

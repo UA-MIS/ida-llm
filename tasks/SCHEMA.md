@@ -320,13 +320,21 @@ Write out the full item; do not assume shared context.
   silently pass and it will not take the rest of the run down.
 - **No units, no currency symbol, no label.** `"336"`, not `"$336.00"`. Put the
   formatting demand in the `system_prompt` instead.
-- **The target must not appear verbatim in the `input`.** If it does, a model
-  that copies the last number of the prompt passes. This bites hardest on
-  invariance items ("the SD was 6.4; after shifting every value by 5, what is
-  the SD?" — answer 6.4, present in the prompt). Rephrase so one step is
-  required:
+- **The target must not be liftable from the prompt without doing the work.**
+  The thing to defend against is a model that copies **the last number of the
+  prompt**, or echoes a figure the item just handed it, and passes. This bites
+  hardest on invariance items ("the SD was 6.4; after shifting every value by 5,
+  what is the SD?" — answer 6.4, quoted in the prompt and also the answer).
+  Rephrase so at least one step is required:
   [`l2-spread-key.yaml`](quantitative-quiz/l2-spread-key.yaml) gives the
   *variance* and asks for the standard deviation.
+
+  A target that merely *coincides* with one of the supplied data values is
+  fine — for a mode it is unavoidable, since the mode is by definition a member
+  of the data set, and a median often is too. `l1/mode-single` (target `5`) and
+  `l2/iqr-tukey-hinges` (target `8`) both do this and both are sound: neither
+  target is the last number in its prompt, and reaching it still requires the
+  work. Check *liftability*, not string presence.
 - **Avoid values that sit exactly on a rounding boundary.** `1092/144 = 7.5833`
   is a fine item; `1098/144 = 7.625` is not, because round-half-up and
   round-half-even disagree and your item has two defensible keys.
@@ -397,6 +405,15 @@ There are two forces, and a tolerance has to satisfy both:
    value. A tolerance of `0` fails it. Two decimal places → `0.01`. Four →
    `0.001`. Money rounded to the cent → `0.011` if any exact value can land a
    half-cent from the target.
+
+   **There is one tolerance per task, so it must admit the loosest rounding any
+   item in the file asks for.** A file whose system prompt says "two decimal
+   places" cannot use `0.001` even if most of its items are exact — one added
+   item later and it marks a correctly-rounded correct answer wrong, silently.
+   [`l4-distribution-key.yaml`](quantitative-quiz/l4-distribution-key.yaml)
+   mixes two- and four-decimal items and therefore uses `0.01`, the looser of
+   the two. If one item genuinely needs a tolerance the rest of the file cannot
+   live with, that item belongs in a different task.
 2. **Narrow enough to reject the nearest *wrong method*.** This is the half
    people forget, and it is the half that decides whether the item measures
    anything.
@@ -848,7 +865,9 @@ Verifiable tasks:
 - [ ] A `numeric_match` target contains exactly one number, no units, no symbols.
 - [ ] **Every target carries its derivation in a YAML comment** — and nothing
       answer-shaped is in `metadata`.
-- [ ] The target does not appear verbatim in the `input`.
+- [ ] The target is not liftable from the prompt — in particular it is not the
+      last number in the `input`. (Coinciding with a supplied data value is
+      fine: a mode always does.)
 - [ ] No target sits on a rounding boundary.
 - [ ] Tolerance is wide enough for the rounding you asked for and at least ~10×
       narrower than the distance to the nearest wrong method — and that distance

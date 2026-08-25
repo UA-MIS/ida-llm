@@ -54,15 +54,21 @@ samples:
     input: >-
       A quiz item reads: "In a sample of 400 respondents, 58% agreed. Test the
       null hypothesis that the population proportion is 0.50. Compute the z test
-      statistic." Produce the value for the answer key.
+      statistic, using the standard error evaluated under the null hypothesis
+      and without a continuity correction." Produce the value for the answer
+      key.
     # SE under H0 = sqrt(0.5*0.5/400) = sqrt(0.000625) = 0.025
     # z = (0.58 - 0.50) / 0.025 = 0.08 / 0.025 = 3.2
-    # Using the SAMPLE proportion in the standard error gives
-    # sqrt(0.58*0.42/400) = 0.02467 -> z = 3.24 -- 0.04 away. That is only four
-    # times the tolerance, which is thin; the item names the null value
-    # explicitly so the intended convention is unambiguous. Flagged here rather
-    # than left for a reader to discover -- see the guide's "Choosing a
-    # tolerance" section on recording a thin margin instead of hiding it.
+    # This item NAMES its standard-error convention because three forms are
+    # taught in introductory courses and they disagree:
+    #   Wald SE (sample proportion): sqrt(0.58*0.42/400) = 0.02468 -> 3.24
+    #   continuity-corrected:        (0.08 - 1/800) / 0.025      -> 3.15
+    # Those sit 0.04 and 0.05 from the key -- four and five times the tolerance,
+    # the thinnest margins in the family, so they are correctly rejected. But
+    # naming the null-hypothesis SE is what makes this a single-answer item at
+    # all: "compute the z test statistic" alone has three defensible keys, and
+    # the guide is explicit that such an item is invalid, not hard. See "pin
+    # every convention the item depends on".
     target: "3.2"
     metadata: { skill: one-proportion-z, provenance: synthetic }
 

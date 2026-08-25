@@ -13,10 +13,13 @@
 # single answer exists -- is the most useful technique in this whole family, and
 # it is worth trying on any task you are tempted to file as subjective.
 #
-# Every item here is a distractor for an item that appears earlier in the
-# ladder. The correct answers are in l2, l3 and l4; the mistaken answers are
-# here. Reviewing this file means checking those two numbers differ and that
-# the misconception really produces the one claimed.
+# FIVE of the six items here are distractors for a question that appears earlier
+# in the ladder: the correct answers live in l2, l3 and l4, the mistaken ones
+# here, and each of those samples carries a `mirrors:` key naming the file to
+# check it against. The sixth, mean-of-means-unweighted, has no counterpart in
+# the ladder and states its own correct answer in its comment instead.
+# Reviewing this file means checking that the two numbers differ and that the
+# named misconception really produces the one claimed.
 version: 1
 id: quantitative-quiz/l7-distractor-key
 title: Quiz key -- distractor values from named misconceptions
@@ -28,8 +31,9 @@ description: >
   an unnamed "plausible wrong answer" would have no single correct value and
   would need a judge and a rubric instead.
 
-  Every item is a distractor for a question that appears earlier in this family,
-  so the correct answer and the distractor can be checked against each other.
+  Five of the six items are distractors for a question that appears earlier in
+  this family, so the correct answer and the distractor can be checked against
+  each other; the sixth states its correct answer in a comment instead.
 
   Provenance: every scenario is synthetic, authored for this file. The
   misconceptions are the ordinary ones any introductory-statistics instructor
