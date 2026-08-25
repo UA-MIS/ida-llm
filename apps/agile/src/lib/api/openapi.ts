@@ -332,7 +332,7 @@ export function buildOpenApiDocument(): Record<string, unknown> {
         delete: { summary: 'Delete a sprint (its items return to the backlog)', parameters: [idParam], responses: { 200: { description: 'Deleted.' } } },
       },
       '/api/v1/members': { get: { summary: 'Team members (assignee candidates)', responses: { 200: { description: 'Members.' } } } },
-      '/api/v1/prs': { get: { summary: 'Open pull requests, annotated with AB#<id> references', responses: { 200: { description: 'Pull requests.' } } } },
+      '/api/v1/prs': { get: { summary: 'Pull requests attached to board items (open and merged), with the items each is attached to', responses: { 200: { description: 'Pull requests.' } } } },
       '/api/v1/tokens': {
         get: { summary: 'List your API tokens', responses: { 200: { description: 'Tokens (never their values).' } } },
         post: { summary: 'Create an API token (session only)', responses: { 201: { description: 'The token, shown once.' } } },
