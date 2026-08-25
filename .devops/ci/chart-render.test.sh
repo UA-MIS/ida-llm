@@ -82,10 +82,14 @@ config = next((d for d in by_kind.get("ConfigMap", []) if d["metadata"]["name"] 
 named = {d["metadata"]["name"]: d for d in deploys}
 
 # ---- shape -----------------------------------------------------------------
-check(len(deploys) == 6, f"6 Deployments (got {len(deploys)})")
+expected_deploys = 6 if env == "prod" else 5
+check(len(deploys) == expected_deploys,
+      f"{expected_deploys} Deployments (got {len(deploys)})")
 check(len(statefulsets) == 1, f"1 StatefulSet (got {len(statefulsets)})")
 check(len(cronjobs) == 3, f"3 CronJobs (got {len(cronjobs)})")
-check(len(services) == 7, f"7 Services (got {len(services)})")
+expected_services = 7 if env == "prod" else 6
+check(len(services) == expected_services,
+      f"{expected_services} Services (got {len(services)})")
 check(len(services) <= 15, "Services within the tenant quota of 15")
 
 # Every Service must select a workload that exists -- a renamed component leaves
@@ -215,23 +219,48 @@ for container in containers:
                 check("value" not in entry,
                       f"{container['name']}: {entry['name']} comes from a secretKeyRef, not a literal")
 
-# ---- the agile board -----------------------------------------------------------
+# ---- the agile board: PROD ONLY, AND EXACTLY ONE CLAIMANT FOR ITS HOST ---------
+# This block is a REGRESSION TEST. The board originally lived in base/, so its
+# Ingress HOST RULE rendered into all three environments -- three Ingress objects
+# claiming ida-agile.capstone.uamishub.com, which made Traefik pick among them
+# non-deterministically. Only prod had a backend, and dev/staging carry the tenant
+# SSO middlewares, so the board worked or 302'd to a DIFFERENT app's auth proxy
+# depending on which object won. Scaling the Deployment to 0 elsewhere did not
+# help: a host rule is claimed by the RULE, not by whether it has endpoints.
 agile = named.get("ida-llm-agile")
-check(agile is not None, "the agile Deployment is rendered")
-if agile:
-    if env == "prod":
-        check(agile["spec"]["replicas"] == 1, "prod: agile runs 1 replica")
-    else:
-        # It runs a background GitHub poller: a second live copy doubles the
-        # rate-limit burn on one token and duplicates webhook work.
-        check(agile["spec"]["replicas"] == 0, f"{env}: agile is scaled to zero (prod-only)")
+agile_ingresses = [
+    i for i in by_kind.get("Ingress", [])
+    if any(r["host"] == "ida-agile.capstone.uamishub.com" for r in i["spec"]["rules"])
+]
+if env == "prod":
+    check(agile is not None and agile["spec"]["replicas"] == 1,
+          "prod: the agile Deployment runs 1 replica")
+    check(len(agile_ingresses) == 1,
+          f"prod: exactly ONE Ingress claims the agile host (got {len(agile_ingresses)})")
+    if agile_ingresses:
+        ing = agile_ingresses[0]
+        # It must NOT be the app's `ida-llm` Ingress: the env ApplicationSet
+        # attaches SSO forwardAuth by targeting that NAME, and the annotation is
+        # per-OBJECT. Sharing it double-gates the UI and kills bearer-token API
+        # access, because this app does its own Dex OIDC.
+        check(ing["metadata"]["name"] == "ida-llm-agile",
+              f"prod: the agile host is on its OWN Ingress, not the app's (got {ing['metadata']['name']})")
+        check("traefik.ingress.kubernetes.io/router.middlewares"
+              not in ing["metadata"].get("annotations", {}),
+              "prod: the agile Ingress carries no forwardAuth middleware")
+        tls_hosts = {h for t in ing["spec"].get("tls", []) for h in t["hosts"]}
+        check(tls_hosts == {"ida-agile.capstone.uamishub.com"},
+              f"prod: the agile Ingress TLS matches its rule (got {sorted(tls_hosts)})")
+else:
+    check(agile is None, f"{env}: no agile Deployment (prod-only)")
+    check(not agile_ingresses,
+          f"{env}: NOTHING claims the agile host here (got {len(agile_ingresses)})")
 
 if ingress:
-    hosts = [r["host"] for r in ingress["spec"]["rules"]]
-    # The board's host is env-LESS in every overlay -- the per-env patches touch
-    # rules[0] only. If an overlay ever patched rules[1], this catches it.
-    check("ida-agile.capstone.uamishub.com" in hosts,
-          f"{env}: the agile host is unpatched by the overlay (got {hosts})")
+    # The app's own Ingress must never carry the board's host.
+    app_hosts = [r["host"] for r in ingress["spec"]["rules"]]
+    check("ida-agile.capstone.uamishub.com" not in app_hosts,
+          f"{env}: the app Ingress does NOT claim the agile host (got {app_hosts})")
 
 # ---- servicemonitors + autoscaling ---------------------------------------------
 monitors = {d["metadata"]["name"] for d in by_kind.get("ServiceMonitor", [])}

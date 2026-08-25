@@ -17,7 +17,14 @@ resources:
   - ../../base
   - app-secret.externalsecret.yaml
   - database.externalsecret.yaml
-  # PROD ONLY -- the sprint board runs nowhere else. See the file header.
+  # ── THE SPRINT BOARD LIVES HERE, NOT IN base/ ─────────────────────────────
+  # Prod-only is enforced by these files being in THIS overlay. It used to live
+  # in base/ with replicas:0 patches elsewhere, which left its Ingress HOST RULE
+  # declared on all three environments' Ingress objects — three claimants for one
+  # host, non-deterministic routing, and an intermittently broken board. See
+  # agile.yaml's header.
+  - agile-config.yaml
+  - agile.yaml
   - agile-secret.externalsecret.yaml
 
 labels:

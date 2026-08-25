@@ -36,7 +36,6 @@ metadata:
     app.kubernetes.io/name: ida-llm
 spec:
   rules:
-    # rules[0] — the main app frontend. THE ONLY RULE THE OVERLAYS PATCH.
     - host: ida-llm.capstone.uamishub.com
       http:
         paths:
@@ -47,39 +46,6 @@ spec:
                 name: ida-llm-frontend
                 port:
                   name: http
-    # rules[1] — the sprint board. ⚠ AN EXPLICIT, ENVIRONMENT-LESS HOST.
-    #
-    # Every other host on this platform folds the env into the label
-    # (`ida-llm-dev`). This one does NOT, because the board is a single
-    # always-on instance for the team rather than a three-environment app — so
-    # `ida-agile.capstone.uamishub.com` is the host in EVERY overlay and the
-    # per-env patches must leave rules[1] alone. They patch `/spec/rules/0/host`
-    # only, by index, for exactly this reason.
-    #
-    # Still SINGLE-LABEL under capstone.uamishub.com: the Cloudflare Universal
-    # SSL wildcard covers exactly one level, so `ida-agile.capstone...` resolves
-    # to valid public TLS while `agile.ida-llm.capstone...` would not.
-    #
-    # On THIS Ingress object rather than its own: the env ApplicationSet attaches
-    # the non-prod SSO forwardAuth by targeting `kind: Ingress, name: ida-llm`,
-    # so a separate object would silently get no gate. The annotation is
-    # per-OBJECT, not per-rule, so in dev/staging this host inherits the
-    # org-login gate along with the main app — harmless, since the board runs
-    # only in prod, and the correct default if it ever gains a non-prod presence.
-    - host: ida-agile.capstone.uamishub.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: ida-llm-agile
-                port:
-                  name: http
   tls:
     - hosts:
         - ida-llm.capstone.uamishub.com
-        # ⚠ The overlays REPLACE this whole list. Each one must re-list the
-        # agile host verbatim alongside its own env host, or the router serves a
-        # hostname the certificate does not cover.
-        - ida-agile.capstone.uamishub.com

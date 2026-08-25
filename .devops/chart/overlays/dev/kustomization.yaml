@@ -35,18 +35,6 @@ images:
     newTag: "4aa72ea"
 
 patches:
-  # ── agile: PROD ONLY ──────────────────────────────────────────────────────
-  # The sprint board is ONE always-on instance for the team, not a
-  # three-environment app: it runs a background GitHub poller, so a second live
-  # copy means double the rate-limit burn against one token and duplicate webhook
-  # work. Scaled to zero rather than omitted so the object still exists here (it
-  # can be scaled up for a same-shape debugging session without editing the
-  # chart) and so the promotion seam keeps moving all three components together.
-  - target: { kind: Deployment, name: ida-llm-agile }
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
   # Replicas are JSON6902 patches, NOT the kustomize builtin `replicas:`
   # transformer — the builtin errors on non-Deployment workload GVKs, and this
   # chart contains a StatefulSet and (later) possibly a Rollout.
@@ -94,11 +82,6 @@ patches:
         path: /spec/tls/0/hosts
         value:
           - ida-llm-dev.capstone.uamishub.com
-          # ⚠ RE-LISTED VERBATIM. This patch replaces the WHOLE tls.hosts list,
-          # so omitting the agile host here would leave rules[1] serving a
-          # hostname the certificate does not cover. The host is env-less on
-          # purpose -- see base/ingress.yaml rules[1].
-          - ida-agile.capstone.uamishub.com
   # dev's `requests.storage` quota is 5Gi TOTAL and the redis volumeClaimTemplate
   # already takes 1Gi of it, so the prod-sized 10Gi claim in base would leave
   # redis unable to bind — with the confusing symptom being redis, not this.

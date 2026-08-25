@@ -11,7 +11,6 @@ kind: Kustomization
 resources:
   - serviceaccount.yaml
   - configmap.yaml
-  - agile-config.yaml
   - pvc.yaml
   - statefulset.yaml
   - deployments.yaml
