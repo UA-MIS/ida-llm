@@ -845,3 +845,87 @@ class TestRubricContractAssumptions:
     def test_the_default_scale_is_zero_to_one(self) -> None:
         rubric = Rubric(id="r", criteria=[RubricCriterion(name="c", description="d")])
         assert (rubric.scale_min, rubric.scale_max) == (0.0, 1.0)
+
+
+class TestTheRealExemplarRubrics:
+    """Grade the repository's OWN subjective exemplars, not a fixture.
+
+    ``tasks/conceptual-grading/`` is five tasks whose rubrics carry countable,
+    behavioural anchor levels written for a judge to read. A fixture rubric can
+    be shaped to fit the implementation; these were written independently, so
+    they are the honest test of "does the judge work on what people actually
+    author here".
+    """
+
+    @staticmethod
+    def _subjective_tasks():
+        from pathlib import Path
+
+        from ida_core.contracts import TaskKind
+        from ida_harness.tasks import TaskCatalog
+
+        root = Path(__file__).resolve().parents[3] / "tasks"
+        catalog = TaskCatalog.from_directory(root)
+        return [t for t in catalog.all() if t.kind is TaskKind.SUBJECTIVE]
+
+    def test_there_are_exemplars_to_grade(self) -> None:
+        """Guards the guard: if the exemplars move, the tests below would pass
+        vacuously over an empty list."""
+        tasks = self._subjective_tasks()
+        assert len(tasks) >= 5
+        assert sum(len(t.rubric.criteria) for t in tasks) >= 22
+
+    def test_every_authored_rubric_can_be_prompted(self) -> None:
+        for task in self._subjective_tasks():
+            for criterion in task.rubric.criteria:
+                messages = build_criterion_messages(
+                    task=task,
+                    sample=task.samples[0],
+                    completion="A plausible response.",
+                    criterion=criterion,
+                    rubric=task.rubric,
+                )
+                user = messages[-1].content
+                assert criterion.description.strip() in user, (
+                    f"{task.id}/{criterion.name}: anchors did not survive into the prompt"
+                )
+
+    def test_no_authored_criterion_leaks_its_weight_or_its_neighbours(self) -> None:
+        """The bias controls have to hold for REAL rubrics, where criterion names
+        are long and descriptions cross-reference the task."""
+        for task in self._subjective_tasks():
+            names = [c.name for c in task.rubric.criteria]
+            for criterion in task.rubric.criteria:
+                user = build_criterion_messages(
+                    task=task,
+                    sample=task.samples[0],
+                    completion="A plausible response.",
+                    criterion=criterion,
+                    rubric=task.rubric,
+                )[-1].content
+                body = user.split("## The one criterion you are grading")[1]
+                others = [
+                    n for n in names if n != criterion.name and n not in criterion.description
+                ]
+                for other in others:
+                    assert other not in body, f"{task.id}: {other!r} leaked into {criterion.name!r}"
+
+    def test_a_full_exemplar_task_grades_end_to_end(self, judge_entry) -> None:
+        """Every criterion of a real 5-criterion rubric, through the real mock
+        service answering the real protocol."""
+        from ida_harness.client import OpenAICompatibleClient
+        from ida_mock_model.testing import make_transport
+
+        task = next(t for t in self._subjective_tasks() if t.id.startswith("conceptual-grading/"))
+        client = OpenAICompatibleClient(judge_entry, transport=make_transport())
+        with LLMJudge(entry=judge_entry, client=client, owns_client=True) as judge:
+            verdict = judge.grade(
+                task=task,
+                sample=task.samples[0],
+                completion="The student believes the p-value is P(H0 | data).",
+            )
+        assert verdict.error is None
+        assert verdict.score is not None
+        assert 0.0 <= verdict.score.value <= 1.0
+        assert len(verdict.score.criteria) == len(task.rubric.criteria)
+        assert verdict.score.value == pytest.approx(aggregate(verdict.score.criteria))
