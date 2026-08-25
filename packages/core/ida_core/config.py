@@ -27,8 +27,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_LOG_LEVELS = frozenset({"CRITICAL", "FATAL", "ERROR", "WARN", "WARNING", "INFO", "DEBUG"})
+"""The names `logging` accepts. NOTSET is deliberately excluded: it means
+"inherit", which is not a meaningful thing to configure a service to."""
 
 
 def repo_root() -> Path:
@@ -87,6 +91,10 @@ class Settings(BaseSettings):
     )
 
     log_level: str = Field("INFO", validation_alias=AliasChoices("IDA_LOG_LEVEL", "LOG_LEVEL"))
+    """Normalised to UPPER CASE -- see the validator below. The platform writes
+    lower case (`LOG_LEVEL: info` in the ConfigMap; `.env.example` documents
+    "one of: debug, info, warning, error") and `logging.basicConfig` accepts
+    only the upper-case names."""
 
     s3_bucket: str = Field(
         "run-artifacts", validation_alias=AliasChoices("IDA_S3_BUCKET", "MINIO_BUCKET")
@@ -144,6 +152,34 @@ class Settings(BaseSettings):
     API consumes it through one dependency-injected placeholder
     (``ida_api.auth.current_principal``).  This flag is the seam.
     """
+
+    @field_validator("log_level", mode="after")
+    @classmethod
+    def _normalise_log_level(cls, value: str) -> str:
+        """Upper-case the level, and reject anything that is not a real one.
+
+        ⚠ THE CASE MISMATCH IS NOT COSMETIC -- it crash-looped every api and
+        runner pod on the first deploy of the port. The platform's ConfigMap
+        writes `LOG_LEVEL: info`, and `.env.example` documents lower case as the
+        convention; `logging.basicConfig` accepts only `INFO`. Our default was
+        already `"INFO"`, so nothing local and nothing in CI ever exercised the
+        platform's actual value -- and the failure was `ValueError: Unknown
+        level: 'info'` raised at IMPORT time, before any logging existed to
+        report it.
+
+        Rejecting an unknown level rather than quietly falling back to INFO:
+        `basicConfig` raises either way, so the only question is WHERE and with
+        WHAT MESSAGE. Failing where the value enters the system, naming the
+        allowed set, beats the same crash six frames deep in the stdlib with
+        nothing but the bad value to go on.
+        """
+        normalised = value.strip().upper()
+        if normalised not in _LOG_LEVELS:
+            raise ValueError(
+                f"log level {value!r} is not a logging level; "
+                f"expected one of {sorted(_LOG_LEVELS)} (case-insensitive)"
+            )
+        return normalised
 
     # ── resolvers ──────────────────────────────────────────────────────────
 
