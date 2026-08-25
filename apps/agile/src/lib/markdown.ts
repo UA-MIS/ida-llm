@@ -11,7 +11,11 @@ import sanitizeHtml from 'sanitize-html';
  * IMAGES
  * ------
  * `img` is allowed so narrative pages can carry the architecture diagrams. The
- * allow-list is widened by exactly one tag, three attributes and one scheme:
+ * allow-list is widened by exactly one tag and three attributes -- and by NO
+ * scheme, which is the part that is easy to misread and was previously written
+ * down wrong (review finding INFO-3): an image source may carry no scheme at
+ * all, so it resolves same-origin or it is dropped. Not "relative or https".
+ * Not "https only". Same-origin only:
  *
  *   - attributes are `src`, `alt`, `title` and nothing else, so every event
  *     handler (`onerror`, `onload`, …) is dropped by omission rather than by a
@@ -48,7 +52,7 @@ const ALLOWED_TAGS = [
   'ul', 'ol', 'li',
   'strong', 'em', 'del', 'code', 'pre',
   'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
-  'img', // relative or https sources only; see the note above
+  'img', // SAME-ORIGIN sources only -- no scheme at all; see the note above
   'input', // task-list checkboxes only; forced disabled below
 ];
 
