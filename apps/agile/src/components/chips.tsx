@@ -1,3 +1,17 @@
+'use client';
+
+// `PrChip` attaches an onClick, and React Server Components cannot receive event
+// handlers as props — rendering it from a Server Component throws
+// "Event handlers cannot be passed to Client Component props" at request time.
+// The backlog page is a Server Component and renders these chips directly, so
+// without this directive it 500-ed for any item that had a linked pull request
+// (AB#30). `next build` cannot catch that; only rendering with real data does.
+//
+// Marking the module costs nothing: three of its four consumers (Board, Ready,
+// ItemDetail) are already client components, so these chips are in the client
+// bundle regardless. The backlog page itself stays a Server Component and keeps
+// fetching its data on the server.
+
 import type { PullRequestLink, WorkItemState, WorkItemType } from '@/lib/domain/workitem';
 
 const TYPE_COLOR: Record<WorkItemType, string> = {
