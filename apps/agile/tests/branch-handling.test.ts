@@ -3,13 +3,17 @@ import { installTestEnv } from './helpers/db';
 import {
   BRANCHING_ITEM_TYPES,
   WORK_ITEM_TYPES,
+  createWorkItemRequestSchema,
+  createWorkItemSchema,
   shouldCreateBranch,
   startWorkSchema,
   typeCreatesBranch,
   updateWorkItemSchema,
 } from '@/lib/domain/workitem';
+import { seedSchema } from '@/lib/api/seed';
+import { buildOpenApiDocument } from '@/lib/api/openapi';
 import { validationError } from '@/lib/api/respond';
-import { listCommitsAheadOfBase } from '@/lib/github/client';
+import { clearGitHubCaches, listCommitsAheadOfBase } from '@/lib/github/client';
 
 installTestEnv('agile_branch_handling_test');
 
@@ -66,6 +70,7 @@ describe('start-work body validation', () => {
   it('accepts the documented options', () => {
     expect(startWorkSchema.parse({ branch: false })).toEqual({ branch: false });
     expect(startWorkSchema.parse({ activate: false })).toEqual({ activate: false });
+    expect(startWorkSchema.parse({ assign: false })).toEqual({ assign: false });
     expect(startWorkSchema.parse({ repo: 'UA-MIS/ida-llm' })).toEqual({ repo: 'UA-MIS/ida-llm' });
   });
 
@@ -173,6 +178,119 @@ describe('PATCH /items/{id} rejects unknown fields (422, not a silent 200)', () 
   });
 });
 
+/**
+ * The same silent-drop defect as fix 4, on the create path: `POST {"branchName":
+ * null}` used to 201 and quietly discard the key. Strictness lives at the HTTP
+ * boundary rather than on the shared schema, because `createWorkItem()`
+ * re-parses through that schema and `/seed` legitimately hands it a wider
+ * object.
+ */
+describe('POST /items rejects unknown fields, without breaking /seed', () => {
+  it('refuses an unknown key at the request boundary', () => {
+    expect(createWorkItemRequestSchema.safeParse({ title: 'x', branchName: null }).success).toBe(false);
+    expect(createWorkItemRequestSchema.safeParse({ title: 'x', commitCount: 3 }).success).toBe(false);
+  });
+
+  it('still applies every create default', () => {
+    expect(createWorkItemRequestSchema.parse({ title: 'Fresh' })).toEqual({
+      title: 'Fresh',
+      description: '',
+      itemType: 'Story',
+      state: 'New',
+      assigneeLogin: null,
+      assigneeAvatarUrl: null,
+      storyPoints: null,
+      priority: 2,
+      sprintId: null,
+      tags: [],
+      repoFullName: null,
+      wave: null,
+    });
+  });
+
+  it('leaves the INTERNAL schema lenient, so the seed path keeps working', () => {
+    // `/seed` calls createWorkItem({...item, sprintId}) with `key`, `sprintKey`
+    // and `dependsOn` still attached, and createWorkItem re-parses through
+    // createWorkItemSchema. Making that schema strict would 500 the seed
+    // endpoint on its own payload.
+    expect(
+      createWorkItemSchema.safeParse({
+        title: 'Seeded',
+        key: 'story-a',
+        sprintKey: 'sprint-1',
+        dependsOn: ['story-b'],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts a realistic seed payload end to end', () => {
+    const parsed = seedSchema.safeParse({
+      sprints: [{ key: 's1', name: 'Sprint 1', startsOn: '2026-08-01', endsOn: '2026-08-14' }],
+      items: [
+        { key: 'a', title: 'First', itemType: 'Story', sprintKey: 's1' },
+        { key: 'b', title: 'Second', dependsOn: ['a'] },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('but a mistyped seed key fails loudly instead of vanishing', () => {
+    // A silently-dropped `dependsOnn` in a 500-item seed leaves the dependency
+    // graph quietly wrong, which is the worst possible outcome for a seed.
+    const parsed = seedSchema.safeParse({
+      items: [{ title: 'First', dependsOnn: ['a'] }],
+    });
+    expect(parsed.success).toBe(false);
+  });
+});
+
+/**
+ * The machine-readable contract has to change when the behaviour does.
+ * `docs/api.md` documented strict PATCH while the OpenAPI document still
+ * pointed PATCH at the CREATE schema and advertised no 422 — so a generated
+ * client would send `title` as required and believe unknown fields were fine.
+ */
+describe('OpenAPI reflects the endpoints this PR changed', () => {
+  const doc = buildOpenApiDocument() as {
+    paths: Record<string, Record<string, { requestBody?: unknown; responses: Record<string, unknown> }>>;
+    components: { schemas: Record<string, { additionalProperties?: unknown; required?: string[]; properties: Record<string, unknown> }> };
+  };
+
+  it('points PATCH at an update schema, not the create schema', () => {
+    const patch = doc.paths['/api/v1/items/{id}']!.patch!;
+    const ref = JSON.stringify(patch.requestBody);
+    expect(ref).toContain('UpdateWorkItem');
+    expect(ref).not.toContain('CreateWorkItem');
+  });
+
+  it('documents 422 on PATCH — the headline client-visible change', () => {
+    expect(Object.keys(doc.paths['/api/v1/items/{id}']!.patch!.responses)).toContain('422');
+  });
+
+  it('declares both write schemas closed, matching the server', () => {
+    expect(doc.components.schemas.UpdateWorkItem!.additionalProperties).toBe(false);
+    expect(doc.components.schemas.CreateWorkItem!.additionalProperties).toBe(false);
+  });
+
+  it('makes no field required on update, and only title on create', () => {
+    expect(doc.components.schemas.UpdateWorkItem!.required).toBeUndefined();
+    expect(doc.components.schemas.CreateWorkItem!.required).toEqual(['title']);
+  });
+
+  it('publishes exactly the writable field set the server accepts', () => {
+    const published = Object.keys(doc.components.schemas.UpdateWorkItem!.properties).sort();
+    // Derived from the schema itself, so the contract cannot drift from it.
+    const actual = Object.keys(updateWorkItemSchema.shape).sort();
+    expect(published).toEqual(actual);
+  });
+
+  it('documents the start-work branch and assign overrides', () => {
+    const body = JSON.stringify(doc.paths['/api/v1/items/{id}/start-work']!.post!.requestBody);
+    expect(body).toContain('branch');
+    expect(body).toContain('additionalProperties');
+  });
+});
+
 // ---------------------------------------------------------------------------
 
 const REPO = 'UA-MIS/ida-llm';
@@ -202,6 +320,7 @@ function commit(sha: string) {
 describe('listCommitsAheadOfBase — the base branch is not the item\'s work', () => {
   /** Serves the repo's default branch, then whatever compare result is given. */
   function stub(compare: unknown, status = 200) {
+    clearGitHubCaches();
     const calls: string[] = [];
     const fetchImpl = (async (url: string | URL | Request) => {
       const href = String(url);
@@ -212,6 +331,30 @@ describe('listCommitsAheadOfBase — the base branch is not the item\'s work', (
       return jsonResponse(compare, status);
     }) as unknown as typeof fetch;
     return { fetchImpl, calls };
+  }
+
+  /**
+   * A stub that PAGINATES the way GitHub really does: `commits` is oldest-first
+   * and truncated to one page, while `total_commits` reports the whole
+   * ahead-count. A stub that hands back the entire array in one response — as
+   * the first version of this suite did — cannot see the bug in MED-3, because
+   * pagination never happens.
+   */
+  function paginatingStub(total: number, pageSize = 100) {
+    clearGitHubCaches();
+    const all = Array.from({ length: total }, (_, i) => commit(`c${i}`));
+    const calls: string[] = [];
+    const fetchImpl = (async (url: string | URL | Request) => {
+      const href = String(url);
+      calls.push(href);
+      if (href === `https://api.github.com/repos/${REPO}`) {
+        return jsonResponse({ default_branch: 'main' });
+      }
+      const page = Number(new URL(href).searchParams.get('page') ?? '1');
+      const slice = all.slice((page - 1) * pageSize, page * pageSize);
+      return jsonResponse({ total_commits: total, ahead_by: total, commits: slice });
+    }) as unknown as typeof fetch;
+    return { fetchImpl, calls, all };
   }
 
   it('reports ZERO for a branch sitting at the base branch tip', async () => {
@@ -255,16 +398,97 @@ describe('listCommitsAheadOfBase — the base branch is not the item\'s work', (
   it('keeps the most RECENT commits when a branch is longer than the limit', async () => {
     // compare returns oldest-first, so a naive slice(0, n) would keep the oldest.
     const many = Array.from({ length: 8 }, (_, i) => commit(`c${i}`));
-    const { fetchImpl } = stub({ ahead_by: 8, commits: many });
+    const { fetchImpl } = stub({ total_commits: 8, ahead_by: 8, commits: many });
     const commits = await listCommitsAheadOfBase(REPO, 'story/42-judge', 'tok', fetchImpl, 3);
     expect(commits.map((c) => c.sha)).toEqual(['c5', 'c6', 'c7']);
   });
 
-  it('fails soft — a commit count must never break reconciliation', async () => {
+  it('keeps the NEWEST commits on a branch further ahead than one page', async () => {
+    // The bug this guards: GitHub returns the FIRST page of an oldest-first
+    // list, so a single request on a 300-ahead branch holds commits 0..99 and
+    // slicing its tail yields the MIDDLE of the branch, never the newest.
+    const { fetchImpl } = paginatingStub(300);
+
+    const commits = await listCommitsAheadOfBase(REPO, 'story/42-judge', 'tok', fetchImpl, 50);
+
+    expect(commits).toHaveLength(50);
+    expect(commits[0]!.sha).toBe('c250');
+    expect(commits.at(-1)!.sha).toBe('c299');
+    // Not the tail of page one, which is what the naive slice returned.
+    expect(commits.map((c) => c.sha)).not.toContain('c99');
+  });
+
+  it('still fills the limit when the final page holds only a handful', async () => {
+    // 101 ahead => the last page has exactly ONE commit. Reading only that page
+    // would return 1 instead of the 50 most recent.
+    const { fetchImpl } = paginatingStub(101);
+
+    const commits = await listCommitsAheadOfBase(REPO, 'story/42-judge', 'tok', fetchImpl, 50);
+
+    expect(commits).toHaveLength(50);
+    expect(commits.at(-1)!.sha).toBe('c100');
+    expect(commits[0]!.sha).toBe('c51');
+  });
+
+  it('makes exactly one compare request when the branch fits in a page', async () => {
+    const { fetchImpl, calls } = paginatingStub(12);
+
+    await listCommitsAheadOfBase(REPO, 'story/42-judge', 'tok', fetchImpl, 50);
+
+    expect(calls.filter((c) => c.includes('/compare/'))).toHaveLength(1);
+  });
+
+  it('fails soft on the COMPARE call — a commit count must never break reconciliation', async () => {
     const { fetchImpl } = stub({ message: 'Not Found' }, 404);
     expect(await listCommitsAheadOfBase(REPO, 'story/42-judge', 'tok', fetchImpl)).toEqual([]);
 
     const { fetchImpl: weird } = stub({ ahead_by: 2 }); // no commits array at all
     expect(await listCommitsAheadOfBase(REPO, 'story/42-judge', 'tok', weird)).toEqual([]);
+  });
+
+  it('does NOT fail soft when the base branch itself cannot be read', async () => {
+    // A rate-limited GitHub must not be indistinguishable from "0 ahead" —
+    // that is the wrong-but-plausible answer AB#25 was. The poller turns this
+    // throw into a visible warning.
+    clearGitHubCaches();
+    const rateLimited = (async () =>
+      jsonResponse({ message: 'API rate limit exceeded' }, 403)) as unknown as typeof fetch;
+
+    await expect(
+      listCommitsAheadOfBase(REPO, 'story/42-judge', 'tok', rateLimited),
+    ).rejects.toThrow(/Could not read repository/);
+  });
+
+  it('asks for the repo default branch ONCE, then serves it from cache', async () => {
+    // Uncached this cost a GET /repos/{repo} per item per poll cycle, all
+    // returning the same immutable string against a shared org rate budget.
+    const { fetchImpl, calls } = paginatingStub(3);
+
+    await listCommitsAheadOfBase(REPO, 'story/42-judge', 'tok', fetchImpl);
+    await listCommitsAheadOfBase(REPO, 'story/43-other', 'tok', fetchImpl);
+    await listCommitsAheadOfBase(REPO, 'story/44-third', 'tok', fetchImpl);
+
+    expect(calls.filter((c) => c === `https://api.github.com/repos/${REPO}`)).toHaveLength(1);
+    expect(calls.filter((c) => c.includes('/compare/'))).toHaveLength(3);
+  });
+
+  it('does not cache a FAILED default-branch lookup', async () => {
+    clearGitHubCaches();
+    let attempt = 0;
+    const flaky = (async (url: string | URL | Request) => {
+      const href = String(url);
+      if (href === `https://api.github.com/repos/${REPO}`) {
+        attempt += 1;
+        return attempt === 1
+          ? jsonResponse({ message: 'rate limited' }, 403)
+          : jsonResponse({ default_branch: 'main' });
+      }
+      return jsonResponse({ total_commits: 0, commits: [] });
+    }) as unknown as typeof fetch;
+
+    await expect(listCommitsAheadOfBase(REPO, 'story/42-judge', 'tok', flaky)).rejects.toThrow();
+    // A 403 must not pin an absence for half an hour; the retry re-asks.
+    await expect(listCommitsAheadOfBase(REPO, 'story/42-judge', 'tok', flaky)).resolves.toEqual([]);
+    expect(attempt).toBe(2);
   });
 });

@@ -74,10 +74,18 @@ class TtlCache<T> {
 
 const membersCache = new TtlCache<TeamMember[]>(5 * 60 * 1000);
 const prCache = new TtlCache<AnnotatedPullRequest[]>(60 * 1000);
+/**
+ * A repo's default branch changes approximately never, and three call sites
+ * now need it — `createBranch`, `compareWithDefault` and the commit walk. Left
+ * uncached it cost one `GET /repos/{repo}` per item per poll cycle, all
+ * returning the same immutable string against a shared org rate budget.
+ */
+const defaultBranchCache = new TtlCache<string>(30 * 60 * 1000);
 
 export function clearGitHubCaches(): void {
   membersCache.clear();
   prCache.clear();
+  defaultBranchCache.clear();
 }
 
 // ---------------------------------------------------------------- members
@@ -199,12 +207,19 @@ export async function getRepoDefaultBranch(
   token: string,
   fetchImpl: Fetcher = fetch,
 ): Promise<string> {
+  const cached = defaultBranchCache.get(repoFullName);
+  if (cached) return cached;
+
   const res = await fetchImpl(`https://api.github.com/repos/${repoFullName}`, {
     headers: ghHeaders(token),
   });
+  // Deliberately NOT cached on failure: a 403 rate-limit must not pin a wrong
+  // answer (or an absence) for half an hour.
   if (!res.ok) throw new GitHubError(`Could not read repository ${repoFullName}.`, res.status);
   const body = (await res.json()) as { default_branch?: string };
-  return body.default_branch ?? 'main';
+  const branch = body.default_branch ?? 'main';
+  defaultBranchCache.set(repoFullName, branch);
+  return branch;
 }
 
 export async function getRefSha(
@@ -294,9 +309,12 @@ export async function compareWithDefault(
 
 // ------------------------------------------------------------------- commits
 
+/** GitHub's maximum page size for the compare endpoint. */
+const COMPARE_PAGE_SIZE = 100;
+
 /**
- * The commits on `branch` that are NOT already on the repo's base branch —
- * i.e. the work done ON this branch.
+ * The most recent `limit` commits on `branch` that are NOT already on the
+ * repo's base branch — i.e. the work done ON this branch.
  *
  * This deliberately does NOT use `GET /commits?sha={branch}`, which returns the
  * branch's whole ANCESTRY. A board branch is cut from the base branch, so its
@@ -308,8 +326,18 @@ export async function compareWithDefault(
  * `compare/base...branch` answers the question a human is actually asking:
  * `commits` there is exactly the ahead-set, so a freshly-cut branch is 0.
  *
- * Fails soft (empty list) on anything GitHub will not answer, because commit
- * counts are a display signal and must never break reconciliation.
+ * PAGINATION. `commits` is ordered OLDEST-FIRST and is capped at one page, so
+ * on a branch more than a page ahead the first response holds the OLDEST 100
+ * commits and slicing its tail yields the middle of the branch, never the
+ * newest. `total_commits` is the authoritative ahead-count regardless of page
+ * size, so it is used to walk to the end and take the genuinely newest ones.
+ *
+ * FAILURE. The compare call fails soft (empty list): a display count must not
+ * break reconciliation. The base-branch lookup deliberately does NOT — a
+ * rate-limited or unreachable GitHub would otherwise be indistinguishable from
+ * "this branch is 0 commits ahead", which is exactly the wrong-looking-right
+ * answer AB#25 was. The poller wraps this call and surfaces the throw as a
+ * warning, which is the louder and more honest outcome.
  */
 export async function listCommitsAheadOfBase(
   repoFullName: string,
@@ -323,15 +351,38 @@ export async function listCommitsAheadOfBase(
   // let the base branch's own history be attributed to an item.
   if (base === branch) return [];
 
-  const res = await fetchImpl(
-    `https://api.github.com/repos/${repoFullName}/compare/${encodeURIComponent(base)}...${encodeURIComponent(branch)}?per_page=100`,
-    { headers: ghHeaders(token) },
-  );
-  if (!res.ok) return [];
-  const body = (await res.json()) as { commits?: unknown };
-  if (!Array.isArray(body.commits)) return [];
-  // The compare endpoint returns oldest-first; keep the most recent `limit`.
-  return body.commits.slice(-limit).map((c) => mapCommit(c as Record<string, unknown>));
+  const compare = `https://api.github.com/repos/${repoFullName}/compare/${encodeURIComponent(base)}...${encodeURIComponent(branch)}`;
+
+  const page = async (n: number): Promise<{ total: number; commits: unknown[] } | null> => {
+    const res = await fetchImpl(`${compare}?per_page=${COMPARE_PAGE_SIZE}&page=${n}`, {
+      headers: ghHeaders(token),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { commits?: unknown; total_commits?: unknown };
+    if (!Array.isArray(body.commits)) return null;
+    const total = typeof body.total_commits === 'number' ? body.total_commits : body.commits.length;
+    return { total, commits: body.commits };
+  };
+
+  const first = await page(1);
+  if (!first) return [];
+
+  let commits = first.commits;
+  const lastPage = Math.ceil(first.total / COMPARE_PAGE_SIZE);
+  if (lastPage > 1) {
+    // Walk to the end. Two pages always cover any `limit` <= COMPARE_PAGE_SIZE,
+    // because the final page may hold as few as one commit.
+    const tail: unknown[] = [];
+    for (const n of [lastPage - 1, lastPage]) {
+      if (n <= 1) continue;
+      const p = await page(n);
+      if (p) tail.push(...p.commits);
+    }
+    if (tail.length) commits = lastPage === 2 ? [...first.commits, ...tail] : tail;
+  }
+
+  // Oldest-first, so the newest `limit` are at the end.
+  return commits.slice(-limit).map((c) => mapCommit(c as Record<string, unknown>));
 }
 
 export function mapCommit(c: Record<string, unknown>): CommitInfo {

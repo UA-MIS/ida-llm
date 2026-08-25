@@ -181,6 +181,12 @@ export const updateWorkItemSchema = z.strictObject(workItemFields).partial();
 export const startWorkSchema = z.strictObject({
   /** Skip the New -> Active transition. Defaults to activating. */
   activate: z.boolean().optional(),
+  /**
+   * Skip claiming the item. Starting work claims an UNOWNED item by default —
+   * "start work" is first-person — but a lead activating a card on someone
+   * else's behalf can pass false rather than silently becoming its owner.
+   */
+  assign: z.boolean().optional(),
   /** Create (true) or skip (false) the branch, overriding the type default. */
   branch: z.boolean().optional(),
   /** Branch in a non-primary repo the board follows. */
@@ -188,6 +194,20 @@ export const startWorkSchema = z.strictObject({
 });
 
 export type StartWorkInput = z.infer<typeof startWorkSchema>;
+
+/**
+ * The CREATE schema as an HTTP boundary: unknown keys are refused.
+ *
+ * Kept separate from `createWorkItemSchema` on purpose. That schema is also the
+ * INTERNAL one — `createWorkItem()` re-parses through it so defaults are applied
+ * exactly once wherever a call originated — and internal callers legitimately
+ * hand it a wider object: `/seed` builds `{...item, sprintId}` where `item`
+ * still carries `key`, `sprintKey` and `dependsOn`. Making the shared schema
+ * strict would reject the seed endpoint's own payload on the way to the
+ * database. Strictness belongs at the edge, where a client's typo is a client
+ * bug; internally it would only forbid a call convention this code already uses.
+ */
+export const createWorkItemRequestSchema = createWorkItemSchema.strict();
 
 /** What a caller may pass — optional fields get their defaults on parse. */
 export type CreateWorkItemInput = z.input<typeof createWorkItemSchema>;

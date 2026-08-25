@@ -31,9 +31,13 @@ const seedItemSchema = createWorkItemSchema.extend({
   sprintKey: z.string().trim().min(1).max(64).optional(),
   /** Keys (or numeric ids of pre-existing items) this item is blocked by. */
   dependsOn: z.array(z.union([z.string(), z.number().int().positive()])).max(50).default([]),
-});
+})
+  // Strict at the boundary, like every other request schema: a mistyped
+  // `dependsOnn` in a 500-item seed must fail loudly, not vanish and leave the
+  // dependency graph quietly wrong.
+  .strict();
 
-export const seedSchema = z.object({
+export const seedSchema = z.strictObject({
   sprints: z.array(seedSprintSchema).max(50).default([]),
   items: z.array(seedItemSchema).max(500).default([]),
   /** Optionally make one of the new sprints the board-wide current sprint. */

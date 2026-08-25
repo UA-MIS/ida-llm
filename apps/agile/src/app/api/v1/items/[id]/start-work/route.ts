@@ -88,8 +88,9 @@ export const POST = withApi(async ({ request, params, principal }) => {
   }
 
   // 1b. Assignment. Starting work means taking it; an item that already has an
-  //     owner keeps them.
-  if (!item.assigneeLogin && actor.login) {
+  //     owner keeps them, and `{"assign": false}` opts out entirely for the
+  //     lead who is starting a card on someone else's behalf.
+  if (body.assign !== false && !item.assigneeLogin && actor.login) {
     const claimed = await updateWorkItem(id, { assigneeLogin: actor.login }, actor);
     if (claimed) item = claimed;
   }

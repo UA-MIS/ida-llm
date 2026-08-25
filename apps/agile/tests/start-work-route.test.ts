@@ -208,6 +208,15 @@ d('POST /items/{id}/start-work (real Postgres)', () => {
     expect((await q.getWorkItem(spike.id))?.state).toBe('New');
   });
 
+  it('lets a lead start a card without silently claiming it', async () => {
+    const story = await q.createWorkItem({ ...BASE, title: 'For someone else', itemType: 'Story' }, 'tester');
+
+    const { body } = await startWork(story.id, { assign: false });
+
+    expect((body.item as unknown as { state: string }).state).toBe('Active');
+    expect((body.item as unknown as { assigneeLogin: string | null }).assigneeLogin).toBeNull();
+  });
+
   it('does not steal an item that already has an owner', async () => {
     const story = await q.createWorkItem(
       { ...BASE, title: 'Already claimed', itemType: 'Story', assigneeLogin: 'someone-else' },

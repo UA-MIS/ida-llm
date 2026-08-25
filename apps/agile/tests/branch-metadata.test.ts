@@ -261,12 +261,42 @@ d('migration 004 — cleans branch metadata already written (real Postgres)', ()
     return item.id;
   }
 
-  /** Runs the migration's SQL by hand — it was already applied at setup. */
-  async function runCleanup() {
+  /**
+   * Runs the migration's SQL by hand — it was already applied at setup.
+   * Supplies `ida_agile.instance_key` exactly as `migrate.ts` does, so this
+   * exercises the real contract rather than a relaxed one.
+   */
+  async function runCleanup(instanceKey = 'test-instance') {
     await db.withTransaction(async (client) => {
       await client.query(`SET LOCAL search_path TO ${SCHEMA}, public`);
+      await client.query('SELECT set_config($1, $2, true)', [
+        'ida_agile.instance_key',
+        instanceKey,
+      ]);
       await client.query(migrationSql);
     });
+  }
+
+  /** Records commits against an item's own branch at a given time. */
+  async function commitsOnBranch(
+    id: number,
+    branch: string,
+    when: string,
+    shas: string[],
+  ) {
+    await q.recordCommits(
+      id,
+      REPO,
+      branch,
+      shas.map((sha) => ({
+        sha,
+        message: `real work ${sha}`,
+        authorLogin: 'ccsmith33',
+        authorName: 'Clayton',
+        url: `https://github.com/${REPO}/commit/${sha}`,
+        committedAt: when,
+      })),
+    );
   }
 
   beforeAll(async () => {
@@ -448,6 +478,114 @@ d('migration 004 — cleans branch metadata already written (real Postgres)', ()
     expect(after?.branchName).toBeNull();
     // Narrowed to `ic.branch = wi.branch_name`, so this one survives.
     expect(after?.commitCount).toBe(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // Regression: the shapes an earlier version of this migration DESTROYED.
+  //
+  // Arm A deletes commit rows, and its first draft guarded only on "has no PR".
+  // That is the ordinary mid-flight state of any started Task — before this PR
+  // every type branched — so real, pushed, unrecoverable work was swept. The
+  // deleted SHAs live nowhere else and the poller cannot re-ingest them once
+  // the branch pointer it reads from has been nulled.
+  //
+  // Ancestry commits predate the branch cut; real work follows it. That is the
+  // discriminator, and these two tests are the ones that would have caught it.
+  // -------------------------------------------------------------------------
+
+  it('PRESERVES an Active Task with real commits pushed after the cut and no PR yet', async () => {
+    const id = await seed('Deploy the staging overlay', 'Task', 'task/200-deploy');
+    const cutAt = (await q.getWorkItem(id))!.branchCreatedAt!;
+    // Two commits pushed AFTER the branch was cut. No PR open yet.
+    await commitsOnBranch(id, 'task/200-deploy', new Date(Date.parse(cutAt) + 60_000).toISOString(), [
+      'realwork1',
+      'realwork2',
+    ]);
+    await q.updateWorkItem(id, { state: 'Active' }, 'tester');
+
+    await runCleanup();
+
+    const after = await q.getWorkItem(id);
+    // Both must survive: these SHAs are recorded nowhere else in the system.
+    expect(after?.commitCount).toBe(2);
+    // And the pointer stays, or the poller can never reach the branch again.
+    expect(after?.branchName).toBe('task/200-deploy');
+    expect(after?.branchUrl).not.toBeNull();
+  });
+
+  it('PRESERVES a Spike using the {branch:true} escape hatch this PR adds', async () => {
+    // The migration must not destroy the exact case its own PR introduced.
+    const id = await seed('Prototype pgvector recall', 'Spike', 'spike/201-pgvector');
+    const cutAt = (await q.getWorkItem(id))!.branchCreatedAt!;
+    await commitsOnBranch(id, 'spike/201-pgvector', new Date(Date.parse(cutAt) + 60_000).toISOString(), [
+      'spikework1',
+    ]);
+    await q.updateWorkItem(id, { state: 'Active' }, 'tester');
+
+    await runCleanup();
+
+    const after = await q.getWorkItem(id);
+    expect(after?.commitCount).toBe(1);
+    expect(after?.branchName).toBe('spike/201-pgvector');
+  });
+
+  it('still clears a Spike whose ONLY commits predate the branch cut (the #25 discriminator)', async () => {
+    // This is what makes the guard a discriminator and not just "any commit
+    // protects": #25's 20 rows are main's history, and they must still go.
+    const id = await seed('Read the policy corpus', 'Spike', 'spike/202-policy');
+    const cutAt = (await q.getWorkItem(id))!.branchCreatedAt!;
+    await commitsOnBranch(id, 'spike/202-policy', new Date(Date.parse(cutAt) - 86_400_000).toISOString(), [
+      'ancestry1',
+      'ancestry2',
+    ]);
+
+    await runCleanup();
+
+    const after = await q.getWorkItem(id);
+    expect(after?.branchName).toBeNull();
+    expect(after?.commitCount).toBe(0);
+  });
+
+  it('treats an unknown branch-cut time as "cannot prove stale" and leaves the item alone', async () => {
+    const id = await seed('Unknown provenance', 'Task', 'task/203-unknown');
+    await commitsOnBranch(id, 'task/203-unknown', '2026-08-25T12:00:00Z', ['mystery']);
+    // A row from before branch_created_at was populated.
+    await db.query(
+      `UPDATE ${SCHEMA}.work_items SET branch_created_at = NULL WHERE id = $1`,
+      [id],
+    );
+
+    await runCleanup();
+
+    const after = await q.getWorkItem(id);
+    expect(after?.branchName).toBe('task/203-unknown');
+    expect(after?.commitCount).toBe(1);
+  });
+
+  it('is scoped to this board — another instance_key is never touched', async () => {
+    const id = await seed('Someone else\'s spike', 'Spike', 'spike/300-other-board');
+    await db.query(
+      `UPDATE ${SCHEMA}.work_items SET instance_key = 'OTHER-BOARD' WHERE id = $1`,
+      [id],
+    );
+
+    await runCleanup('test-instance');
+
+    const rows = await db.query<{ branch_name: string | null }>(
+      `SELECT branch_name FROM ${SCHEMA}.work_items WHERE id = $1`,
+      [id],
+    );
+    expect(rows[0]?.branch_name).toBe('spike/300-other-board');
+  });
+
+  it('refuses to run at all when the runner does not say which board it is', async () => {
+    // Fail loudly rather than fall back to editing every board's rows.
+    await expect(
+      db.withTransaction(async (client) => {
+        await client.query(`SET LOCAL search_path TO ${SCHEMA}, public`);
+        await client.query(migrationSql);
+      }),
+    ).rejects.toThrow(/ida_agile\.instance_key/);
   });
 
   it('is safe to run twice', async () => {

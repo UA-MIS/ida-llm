@@ -210,6 +210,10 @@ curl -X POST "$AGILE/api/v1/items" \
 Only `title` is required. For many at once use `/seed` (above), or
 `{"items":[ ... ]}` on this endpoint when you do not need sprints or dependencies.
 
+Like PATCH below, **create rejects unrecognized fields with 422** rather than
+dropping them — a mistyped key in a 500-item seed is a bug you want to hear
+about, not one that leaves the board quietly wrong.
+
 ### Update / delete
 
 ```sh
@@ -421,6 +425,15 @@ never rolled back by a branch failure** — a GitHub outage must not block the
 board, so the response is still `200` with `branch.status` set to `"failed"`
 and a message saying what to do.
 
+| Option | Default | Effect |
+|---|---|---|
+| `activate` | `true` | Move `New` → `Active` |
+| `assign` | `true` | Claim the item, if nobody owns it already |
+| `branch` | by item type | Force branch creation on or off |
+| `repo` | primary repo | Branch in another repo the board follows |
+
+Starting a card on someone else's behalf: `{"assign": false}`.
+
 **A branch is only created for the types whose work lives in git.**
 
 | Item type | Start work does |
@@ -449,7 +462,8 @@ error worth showing as one.
 
 `commitCount` counts the commits **ahead of the repo's default branch** — the
 work done on that branch. A branch that has just been cut reads `0`, not the
-base branch's history.
+base branch's history. The board stores the most recent 50 of them; the count
+you see is over what it has stored.
 
 ---
 

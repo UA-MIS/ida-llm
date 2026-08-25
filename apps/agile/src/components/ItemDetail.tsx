@@ -52,8 +52,17 @@ export function ItemDetail({
   const [commentBody, setCommentBody] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
 
-  /** Story/Bug work ends in a diff; Spike/Task work does not (AB#25). */
-  const branchesOnStart = typeCreatesBranch(item.itemType);
+  /**
+   * Story/Bug work ends in a diff; Spike/Task work does not (AB#25).
+   *
+   * `willBranch` decides whether the button *implies git* — it gets the branch
+   * icon and stays available while an in-flight item still needs a ref.
+   * `canStart` is the broader question, and covers the case branching alone
+   * misses: a New Story on a board with AUTO_BRANCH=false is still startable,
+   * it just starts without a branch, exactly as `{"branch": false}` does.
+   */
+  const willBranch = typeCreatesBranch(item.itemType) && autoBranch && !item.branchName;
+  const canStart = willBranch || item.state === 'New';
 
   const sprintName = sprints.find((s) => s.id === item.sprintId)?.name ?? null;
   const linked = new Set(item.pullRequests.map((p) => `${p.repoFullName}#${p.prNumber}`));
@@ -193,26 +202,24 @@ export function ItemDetail({
         <StateBadge state={item.state} />
         <span className="spacer" />
         {/*
-          * "Start work" must not imply a branch for a type that does not get
-          * one. A Story or Bug offers it while it still needs a branch (and
-          * only when branching is enabled at all); a Spike or Task offers it
-          * only while it is still New, where pressing it activates and claims
-          * the item and creates nothing in git (AB#25).
+          * "Start work" must not imply a branch for an item that will not get
+          * one — a Spike, a Task, or any type on a board with branching turned
+          * off. Those still start (Active + claimed); they just create nothing
+          * in git, so they render without the branch icon (AB#25).
           */}
-        {branchesOnStart ? (
-          autoBranch && !item.branchName ? (
-            <button className="btn" onClick={() => void startWork()} disabled={busy === 'branch'}>
-              {busy === 'branch' ? <span className="spinner" /> : <GitBranchIcon />} Start work
-            </button>
-          ) : null
-        ) : item.state === 'New' ? (
+        {canStart ? (
           <button
             className="btn"
             onClick={() => void startWork()}
             disabled={busy === 'branch'}
-            title={`Activate and claim this ${item.itemType}. No branch is created.`}
+            title={
+              willBranch
+                ? 'Activate and claim this item, and create its branch.'
+                : `Activate and claim this ${item.itemType}. No branch is created.`
+            }
           >
-            {busy === 'branch' ? <span className="spinner" /> : null} Start work
+            {busy === 'branch' ? <span className="spinner" /> : willBranch ? <GitBranchIcon /> : null}{' '}
+            Start work
           </button>
         ) : null}
         <button className="btn" onClick={() => setEditing(true)}>Edit</button>
