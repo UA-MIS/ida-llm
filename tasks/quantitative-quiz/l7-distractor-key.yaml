@@ -1,0 +1,131 @@
+# quantitative-quiz, rung 7 of 7 -- the top of the ladder.
+#
+# EXEMPLAR. What this rung measures: given a quiz item and a NAMED
+# misconception, produce the number a student holding that misconception would
+# arrive at. That number is the multiple-choice distractor.
+#
+# WHY THIS IS VERIFIABLE, AND WHY THAT IS NOT OBVIOUS.
+# "Write a good distractor" is a subjective task -- there is no single right
+# answer and it would need a rubric. But once the misconception is NAMED, its
+# arithmetic is as determined as the correct method's, and the distractor has
+# exactly one value. Naming the misconception is what moves this item across the
+# verifiable/subjective line. That move -- constraining an open task until a
+# single answer exists -- is the most useful technique in this whole family, and
+# it is worth trying on any task you are tempted to file as subjective.
+#
+# Every item here is a distractor for an item that appears earlier in the
+# ladder. The correct answers are in l2, l3 and l4; the mistaken answers are
+# here. Reviewing this file means checking those two numbers differ and that
+# the misconception really produces the one claimed.
+version: 1
+id: quantitative-quiz/l7-distractor-key
+title: Quiz key -- distractor values from named misconceptions
+description: >
+  Rung 7 of the quantitative-quiz ladder, and the top of it. Each item pairs a
+  quiz question with a named student misconception and asks for the value that
+  misconception produces -- the number that belongs in a multiple-choice
+  distractor slot. Naming the misconception is what keeps the task verifiable:
+  an unnamed "plausible wrong answer" would have no single correct value and
+  would need a judge and a rubric instead.
+
+  Every item is a distractor for a question that appears earlier in this family,
+  so the correct answer and the distractor can be checked against each other.
+
+  Provenance: every scenario is synthetic, authored for this file. The
+  misconceptions are the ordinary ones any introductory-statistics instructor
+  sees; none is drawn from published research or from real student work.
+kind: verifiable
+domain: statistics
+system_prompt: >-
+  You are writing multiple-choice distractors for an undergraduate
+  introductory-statistics quiz. Each item gives you a question and a specific
+  mistake a student might make. Work out the value that mistake produces -- NOT
+  the correct answer -- and put that value alone on the last line, with no
+  units, no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  # Two decimal places -> 0.005 worst-case rounding; 0.01 admits it. For this
+  # rung the distance that matters is between the distractor and the CORRECT
+  # answer: a distractor within tolerance of the key is not a distractor, it is
+  # a second correct option. The smallest such gap below is 0.20.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [exemplar, quantitative-quiz, ladder-l7, distractor-design, item-generation]
+samples:
+  - id: sd-population-divisor
+    input: >-
+      Quiz item: "The five values 4, 8, 6, 5, 3 are a SAMPLE. Compute the sample
+      standard deviation, rounded to two decimal places." Student mistake: the
+      student divides the sum of squared deviations by n instead of n - 1.
+      What value does that student report?
+    # sum of squared deviations = 14.8 ; the mistake divides by 5, not 4:
+    # sqrt(14.8/5) = sqrt(2.96) = 1.72046... -> 1.72
+    # The correct key (l2-spread-key/sample-sd-small) is 1.92 -- 0.20 apart.
+    target: "1.72"
+    metadata: { skill: distractor-population-divisor, mirrors: l2-spread-key, provenance: synthetic }
+
+  - id: percent-change-wrong-base
+    input: >-
+      Quiz item: "Enrolment moved from 840 students to 903 students. What was
+      the percent change, to two decimal places?" Student mistake: the student
+      divides the difference by the NEW value instead of the original value.
+      What value does that student report?
+    # 63 / 903 * 100 = 6.9767... -> 6.98
+    # The correct key (l3-item-parameterisation/template-percent-change) is
+    # 7.50 -- 0.52 apart.
+    target: "6.98"
+    metadata: { skill: distractor-wrong-base, mirrors: l3-item-parameterisation, provenance: synthetic }
+
+  - id: standard-error-divides-by-n
+    input: >-
+      Quiz item: "A population has standard deviation 15 and samples of size 36
+      are drawn. What is the standard error of the sample mean, to two decimal
+      places?" Student mistake: the student divides by n instead of by the
+      square root of n. What value does that student report?
+    # 15 / 36 = 0.41666... -> 0.42
+    # The correct key (l4-distribution-key/standard-error-of-the-mean) is
+    # 2.50 -- 2.08 apart.
+    target: "0.42"
+    metadata: { skill: distractor-forgot-sqrt-n, mirrors: l4-distribution-key, provenance: synthetic }
+
+  - id: mean-of-means-unweighted
+    input: >-
+      Quiz item: "One section of 20 students averaged 78 on an exam and another
+      section of 30 students averaged 88. What is the mean score across all 50
+      students?" Student mistake: the student averages the two section means
+      without weighting them by section size. What value does that student
+      report?
+    # (78 + 88) / 2 = 83
+    # The correct answer is (20*78 + 30*88)/50 = 4200/50 = 84 -- 1.00 apart.
+    # A nice property of this distractor: it is close enough to the key to be
+    # tempting and far enough to be unambiguously wrong.
+    target: "83"
+    metadata: { skill: distractor-unweighted-mean, provenance: synthetic }
+
+  - id: z-of-mean-uses-sigma
+    input: >-
+      Quiz item: "A population is normally distributed with mean 70 and standard
+      deviation 12. A sample of 9 observations has sample mean 74.8. Compute the
+      z-score of the sample mean." Student mistake: the student divides by the
+      population standard deviation instead of by the standard error of the
+      mean. What value does that student report?
+    # (74.8 - 70) / 12 = 4.8 / 12 = 0.4
+    # The correct key (l4-distribution-key/z-of-a-sample-mean) is 1.20 --
+    # 0.80 apart.
+    target: "0.4"
+    metadata: { skill: distractor-sigma-not-se, mirrors: l4-distribution-key, provenance: synthetic }
+
+  - id: compound-treated-as-simple
+    input: >-
+      Quiz item: "A principal of 1500 dollars is invested at 6% annual interest
+      compounded annually for 3 years. What is the balance at the end, to the
+      nearest cent?" Student mistake: the student applies simple interest
+      instead of compounding. What value does that student report?
+    # 1500 * (1 + 0.06*3) = 1500 * 1.18 = 1770.00
+    # The correct key (l3-item-parameterisation/template-compound-interest) is
+    # 1786.52 -- 16.52 apart.
+    target: "1770"
+    metadata: { skill: distractor-simple-not-compound, mirrors: l3-item-parameterisation, provenance: synthetic }

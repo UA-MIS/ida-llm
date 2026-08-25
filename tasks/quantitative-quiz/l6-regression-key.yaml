@@ -1,0 +1,122 @@
+# quantitative-quiz, rung 6 of 7 -- regression keys from summary statistics.
+#
+# EXEMPLAR. What this rung measures: producing keys for a CHAIN of items that
+# all describe the same fitted line. Samples 1, 2, 5, 6 and 7 are deliberately
+# the same regression: slope, then intercept, then a prediction, then the
+# residual at that prediction, then the effect of a change in x. A wrong slope
+# propagates. That is what makes this rung harder than rung 5, where each item
+# stood alone.
+#
+# It also makes the file easy to REVIEW: a reader checks one fitted line, not
+# seven unrelated arithmetic chains. When items in a task share a scenario, say
+# so in a comment -- it is the difference between a reviewable key and a wall of
+# numbers nobody re-derives.
+version: 1
+id: quantitative-quiz/l6-regression-key
+title: Quiz key -- simple linear regression from summary statistics
+description: >
+  Rung 6 of the quantitative-quiz ladder. Slope, intercept, correlation-based
+  slope, coefficient of determination, prediction and residual for a simple
+  linear regression, worked from supplied summary statistics rather than raw
+  data. Five of the seven samples describe the same fitted line, so an error in
+  the slope shows up again downstream.
+
+  Provenance: every set of summary statistics is synthetic, authored for this
+  file.
+kind: verifiable
+domain: statistics
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory-statistics
+  quiz on simple linear regression. Round to two decimal places unless the item
+  says otherwise. Put the final numeric answer alone on the last line, with no
+  units, no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  # Two decimal places -> 0.005 worst-case rounding; 0.01 admits it. The
+  # smallest distance to a wrong-method answer below is 0.08
+  # (r-squared-from-sums-of-squares) -- see that item's comment.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [exemplar, quantitative-quiz, ladder-l6, regression]
+samples:
+  # --- the shared fitted line: Sxy = 84, Sxx = 60, xbar = 12, ybar = 41 -------
+  # slope     b1 = 84/60 = 1.4
+  # intercept b0 = 41 - 1.4*12 = 41 - 16.8 = 24.2
+  # so yhat = 24.2 + 1.4x, which samples 5, 6 and 7 below use.
+  - id: slope-from-sums-of-squares
+    input: >-
+      A quiz item reads: "For a simple linear regression of y on x, the sum of
+      cross-products Sxy is 84.0 and the sum of squares Sxx is 60.0. Compute the
+      slope of the least-squares line." Produce the value for the answer key.
+    # b1 = Sxy / Sxx = 84.0 / 60.0 = 1.4
+    # Inverting the ratio gives 60/84 = 0.71 -- 0.69 away.
+    target: "1.4"
+    metadata: { skill: least-squares-slope, scenario: shared-line, provenance: synthetic }
+
+  - id: intercept-from-means
+    input: >-
+      A quiz item reads: "A least-squares line has slope 1.4. The mean of x is
+      12.0 and the mean of y is 41.0. Compute the intercept." Produce the value
+      for the answer key.
+    # b0 = ybar - b1*xbar = 41.0 - 1.4*12.0 = 41.0 - 16.8 = 24.2
+    # Adding instead of subtracting gives 57.8 -- 33.60 away.
+    target: "24.2"
+    metadata: { skill: least-squares-intercept, scenario: shared-line, provenance: synthetic }
+
+  - id: slope-from-correlation
+    input: >-
+      A quiz item reads: "In a different data set the correlation between x and
+      y is 0.72, the sample standard deviation of y is 9.0 and the sample
+      standard deviation of x is 4.5. Compute the slope of the least-squares
+      line of y on x." Produce the value for the answer key.
+    # b1 = r * (sy / sx) = 0.72 * (9.0 / 4.5) = 0.72 * 2 = 1.44
+    # Inverting the sd ratio gives 0.72 * 0.5 = 0.36 -- 1.08 away.
+    # Reporting r itself gives 0.72 -- 0.72 away.
+    target: "1.44"
+    metadata: { skill: slope-from-correlation, provenance: synthetic }
+
+  - id: r-squared-from-sums-of-squares
+    input: >-
+      A quiz item reads: "For a regression the total sum of squares is 250.0 and
+      the residual (error) sum of squares is 40.0. Compute the coefficient of
+      determination." Produce the value for the answer key.
+    # R^2 = (SST - SSE) / SST = (250 - 40) / 250 = 210 / 250 = 0.84
+    # Reporting SSE/SST instead gives 0.16 -- 0.68 away.
+    # Reporting the correlation sqrt(0.84) = 0.92 -- 0.08 away. That is eight
+    # times the tolerance; the item says "coefficient of determination", not
+    # "correlation", so the intended quantity is named unambiguously.
+    target: "0.84"
+    metadata: { skill: coefficient-of-determination, provenance: synthetic }
+
+  - id: predicted-value
+    input: >-
+      A quiz item reads: "A fitted least-squares line is yhat = 24.2 + 1.4x.
+      Compute the predicted value of y when x = 15." Produce the value for the
+      answer key.
+    # 24.2 + 1.4 * 15 = 24.2 + 21.0 = 45.2
+    # Swapping slope and intercept gives 1.4 + 24.2*15 = 364.4 -- 319.20 away.
+    target: "45.2"
+    metadata: { skill: prediction, scenario: shared-line, provenance: synthetic }
+
+  - id: residual-at-a-point
+    input: >-
+      A quiz item reads: "A fitted least-squares line is yhat = 24.2 + 1.4x. At
+      x = 15 the observed value of y is 47.0. Compute the residual." Produce the
+      value for the answer key.
+    # predicted = 45.2 ; residual = observed - predicted = 47.0 - 45.2 = 1.8
+    # Subtracting in the wrong order gives -1.8 -- 3.60 away.
+    target: "1.8"
+    metadata: { skill: residual, scenario: shared-line, provenance: synthetic }
+
+  - id: change-in-prediction-per-unit-x
+    input: >-
+      A quiz item reads: "A fitted least-squares line is yhat = 24.2 + 1.4x. By
+      how much does the predicted value of y change when x increases by 6
+      units?" Produce the value for the answer key.
+    # The change is b1 * 6 = 1.4 * 6 = 8.4; the intercept does not enter.
+    # Including the intercept gives 24.2 + 8.4 = 32.6 -- 24.20 away.
+    target: "8.4"
+    metadata: { skill: slope-interpretation, scenario: shared-line, provenance: synthetic }

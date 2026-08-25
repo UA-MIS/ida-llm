@@ -1,0 +1,111 @@
+# quantitative-quiz, rung 4 of 7 -- distributions, with every table value
+# SUPPLIED IN THE PROMPT.
+#
+# EXEMPLAR. Read the design note below before copying this file: it is the one
+# decision in this family most likely to be got wrong by a new author.
+#
+# DESIGN NOTE -- why the normal-table values are given to the model.
+# If an item says "what proportion lies below z = 1.28?" and expects 0.8997,
+# it is measuring whether the model memorised a four-decimal table, and it will
+# mark a model wrong for answering 0.90 from a three-decimal table. That is a
+# measurement of the wrong thing. Supplying the lookup value turns the item
+# back into what the course actually assesses: knowing WHICH value to look up
+# and what to do with it. Where a task depends on an external reference, put the
+# reference in the prompt.
+version: 1
+id: quantitative-quiz/l4-distribution-key
+title: Quiz key -- normal distribution items with supplied table values
+description: >
+  Rung 4 of the quantitative-quiz ladder. Standardisation, inverse
+  standardisation, areas between two z-values, and the standard error of a
+  sample mean. Every normal-table lookup the item needs is stated in the item
+  itself, so the rung measures the method rather than which table the model
+  memorised.
+
+  Provenance: every scenario is synthetic, authored for this file. The normal
+  quantiles quoted in the prompts are standard mathematical constants, not
+  copied from any published table.
+kind: verifiable
+domain: statistics
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory-statistics
+  quiz. Use only the table values the item supplies. Round to two decimal places
+  unless the item says otherwise. Put the final numeric answer alone on the last
+  line, with no units, no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  # Several answers are proportions in [0,1] where two decimal places would be
+  # too coarse, so the items ask for four and the tolerance admits 0.0005 of
+  # rounding. Nearest wrong-method distances below are all >= 0.4.
+  tolerance: 0.001
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [exemplar, quantitative-quiz, ladder-l4, normal-distribution, sampling]
+samples:
+  - id: z-score-basic
+    input: >-
+      A quiz item reads: "Exam scores are normally distributed with mean 76 and
+      standard deviation 8. Compute the z-score of a score of 88." Produce the
+      value for the answer key.
+    # (88 - 76) / 8 = 12 / 8 = 1.5
+    # Subtracting in the wrong order gives -1.5 -- 3.0 away.
+    target: "1.5"
+    metadata: { skill: standardisation, provenance: synthetic }
+
+  - id: raw-from-z
+    input: >-
+      A quiz item reads: "A measurement is normally distributed with mean 64.5
+      and standard deviation 2.7. What raw value has a z-score of -1.2?"
+      Produce the value for the answer key.
+    # 64.5 + (-1.2)(2.7) = 64.5 - 3.24 = 61.26
+    # Adding instead of subtracting gives 67.74 -- 6.48 away.
+    target: "61.26"
+    metadata: { skill: inverse-standardisation, provenance: synthetic }
+
+  - id: area-between-two-z
+    input: >-
+      A quiz item reads: "For the standard normal distribution you are given
+      the cumulative probabilities P(Z < 1.28) = 0.8997 and
+      P(Z < -0.52) = 0.3015. What proportion of the distribution lies between
+      z = -0.52 and z = 1.28? Give four decimal places." Produce the value for
+      the answer key.
+    # 0.8997 - 0.3015 = 0.5982
+    # Adding the two areas instead gives 1.2012 -- 0.6030 away.
+    target: "0.5982"
+    metadata: { skill: area-between-bounds, provenance: synthetic }
+
+  - id: percentile-to-raw
+    input: >-
+      A quiz item reads: "A standardised test is normally distributed with mean
+      500 and standard deviation 100. The 90th percentile of the standard normal
+      distribution is z = 1.2816. What test score sits at the 90th percentile?"
+      Produce the value for the answer key.
+    # 500 + 1.2816 * 100 = 500 + 128.16 = 628.16
+    # Reading the percentile as the raw score gives 590 -- 38.16 away.
+    target: "628.16"
+    metadata: { skill: percentile-to-raw-score, provenance: synthetic }
+
+  - id: standard-error-of-the-mean
+    input: >-
+      A quiz item reads: "A population has standard deviation 15. Samples of
+      size 36 are drawn. What is the standard error of the sample mean?"
+      Produce the value for the answer key.
+    # 15 / sqrt(36) = 15 / 6 = 2.5
+    # Dividing by n instead of sqrt(n) gives 0.42 -- 2.08 away.
+    target: "2.5"
+    metadata: { skill: standard-error, provenance: synthetic }
+
+  - id: z-of-a-sample-mean
+    input: >-
+      A quiz item reads: "A population is normally distributed with mean 70 and
+      standard deviation 12. A sample of 9 observations has a sample mean of
+      74.8. Compute the z-score of that SAMPLE MEAN." Produce the value for the
+      answer key.
+    # standard error = 12 / sqrt(9) = 4 ; z = (74.8 - 70) / 4 = 4.8 / 4 = 1.2
+    # Using sigma rather than the standard error gives 0.4 -- 0.8 away. This is
+    # the single most common error on this item, and rung 7 turns it into a
+    # distractor.
+    target: "1.2"
+    metadata: { skill: central-limit-standardisation, provenance: synthetic }

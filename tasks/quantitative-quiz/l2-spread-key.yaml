@@ -1,0 +1,118 @@
+# quantitative-quiz, rung 2 of 7 -- the first rung that requires a method choice.
+#
+# EXEMPLAR. What this rung measures: does the model pick the RIGHT formula, not
+# just execute one correctly? Every item here has a well-known wrong sibling
+# (population vs sample divisor, sd vs variance, wrong base). Rung 1 could be
+# passed by careful arithmetic; this rung cannot.
+#
+# Note how each item names its convention explicitly ("sample standard
+# deviation", "population variance"). An item whose convention is left implicit
+# is not a hard item, it is an INVALID item: two defensible readings, one key.
+version: 1
+id: quantitative-quiz/l2-spread-key
+title: Quiz key -- measures of spread, with the sample/population distinction
+description: >
+  Rung 2 of the quantitative-quiz ladder. Measures of spread, where the same
+  data set has two defensible answers depending on the divisor. Auto-generated
+  keys get this wrong more than any other elementary item, which is exactly why
+  it earns its own rung: a family that averaged this in with rung 1 would hide
+  the failure behind six easy samples.
+
+  Provenance: every data set is synthetic, authored for this file.
+kind: verifiable
+domain: statistics
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory-statistics
+  quiz. Use exactly the convention the item names. Round to two decimal places.
+  Put the final numeric answer alone on the last line, with no units, no label
+  and no other text on that line.
+scorer:
+  kind: numeric_match
+  # Two decimal places -> at most 0.005 of rounding error, so 0.01 is the
+  # smallest tolerance that never fails a correct answer. Each item's comment
+  # records the distance to its nearest wrong-method answer; the smallest is
+  # 0.20 (sample-sd-small), twenty times the tolerance.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [exemplar, quantitative-quiz, ladder-l2, descriptive-statistics, spread]
+samples:
+  - id: sample-sd-small
+    input: >-
+      A quiz item reads: "The following five values are a SAMPLE drawn from a
+      larger population: 4, 8, 6, 5, 3. Compute the sample standard deviation,
+      rounded to two decimal places." Produce the value for the answer key.
+    # mean = 26/5 = 5.2
+    # squared deviations: 1.44 + 7.84 + 0.64 + 0.04 + 4.84 = 14.8
+    # sample variance = 14.8 / (5-1) = 3.7 ; sd = sqrt(3.7) = 1.9235... -> 1.92
+    # Population divisor would give sqrt(14.8/5) = 1.72 -- 0.20 away.
+    target: "1.92"
+    metadata: { skill: sample-standard-deviation, provenance: synthetic }
+
+  - id: population-variance
+    input: >-
+      A quiz item reads: "The following four values are the ENTIRE population:
+      10, 12, 14, 16. Compute the population variance." Produce the value for
+      the answer key.
+    # mean = 13; squared deviations: 9 + 1 + 1 + 9 = 20
+    # population variance = 20 / 4 = 5
+    # Sample divisor would give 20/3 = 6.67 -- 1.67 away.
+    target: "5"
+    metadata: { skill: population-variance, provenance: synthetic }
+
+  - id: iqr-tukey-hinges
+    input: >-
+      A quiz item reads: "For the values 2, 4, 6, 8, 10, 12, 14, 16, compute the
+      interquartile range. Use Tukey's hinges: split the ordered data at the
+      median into a lower and an upper half, and take the median of each half."
+      Produce the value for the answer key.
+    # lower half = 2,4,6,8 -> Q1 = (4+6)/2 = 5
+    # upper half = 10,12,14,16 -> Q3 = (12+14)/2 = 13
+    # IQR = 13 - 5 = 8
+    # The quartile method is stated in the item ON PURPOSE: at least four
+    # quartile conventions are in common use and they disagree. An item that
+    # says only "compute the IQR" has more than one correct answer and cannot
+    # be scored against a single key.
+    target: "8"
+    metadata: { skill: interquartile-range, provenance: synthetic }
+
+  - id: coefficient-of-variation
+    input: >-
+      A quiz item reads: "The following five values are a sample:
+      20, 22, 24, 26, 28. Compute the coefficient of variation as a percentage,
+      using the sample standard deviation, rounded to two decimal places."
+      Produce the value for the answer key.
+    # mean = 24; squared deviations: 16 + 4 + 0 + 4 + 16 = 40
+    # sample variance = 40/4 = 10 ; sd = sqrt(10) = 3.16227766
+    # CV = 3.16227766 / 24 * 100 = 13.1761569... -> 13.18
+    # Population divisor would give sqrt(8)/24*100 = 11.79 -- 1.39 away.
+    target: "13.18"
+    metadata: { skill: coefficient-of-variation, provenance: synthetic }
+
+  - id: sd-under-a-constant-shift
+    input: >-
+      A quiz item reads: "Every one of the 30 scores in a data set is increased
+      by 5 points. Before the change the sample variance was 40.96. What is the
+      sample standard deviation afterwards?" Produce the value for the answer
+      key.
+    # Adding a constant shifts the mean by the same constant, so every deviation
+    # from the mean is unchanged: the variance is still 40.96 and the standard
+    # deviation is sqrt(40.96) = 6.4.
+    # Deliberately phrased so the key does NOT appear in the prompt: an
+    # invariance item that asks for the same number it just stated is passed by
+    # any model that copies. Adding the shift gives 11.4 (5.0 away); leaving it
+    # as a variance gives 40.96 (34.56 away).
+    target: "6.4"
+    metadata: { skill: invariance-under-location-shift, provenance: synthetic }
+
+  - id: variance-from-sd
+    input: >-
+      A quiz item reads: "A sample of 12 observations has a sample standard
+      deviation of 4.5. Compute the sample variance." Produce the value for the
+      answer key.
+    # variance = sd^2 = 4.5^2 = 20.25
+    # Reporting the sd back gives 4.5 -- 15.75 away.
+    target: "20.25"
+    metadata: { skill: variance-sd-relationship, provenance: synthetic }

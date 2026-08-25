@@ -1,0 +1,100 @@
+# quantitative-quiz, rung 3 of 7 -- the first rung that is quiz GENERATION
+# rather than quiz answering.
+#
+# EXEMPLAR. What this rung measures: given an item TEMPLATE with named
+# parameters and a set of parameter values, can the model instantiate the
+# template and produce the key for that instance? This is the mechanic behind a
+# parameterised item bank -- one template, a hundred versions, a hundred keys
+# that all have to be right.
+#
+# It is still verifiable because the template pins the arithmetic exactly.
+# "Write me a good quiz question" is subjective; "instantiate THIS template at
+# THESE values and give me the key" is not.
+version: 1
+id: quantitative-quiz/l3-item-parameterisation
+title: Quiz key -- instantiating a parameterised item template
+description: >
+  Rung 3 of the quantitative-quiz ladder. Each sample supplies an item template
+  with named parameters and a concrete binding for them; the model must
+  instantiate the template and report the key for that instance. This is the
+  first rung that exercises the generation half of the workflow rather than the
+  answering half, and it stays verifiable because the template fixes the
+  arithmetic.
+
+  Provenance: every template and binding is synthetic, authored for this file.
+kind: verifiable
+domain: quantitative-methods
+system_prompt: >-
+  You are producing the answer key for one instance of a parameterised quiz
+  item. Substitute the given parameter values into the template, work the item
+  out, and round as the template instructs. Put the final numeric answer alone
+  on the last line, with no units, no currency symbol, no label and no other
+  text on that line.
+scorer:
+  kind: numeric_match
+  # Money items round to the cent, so 0.01 of rounding error is possible and
+  # the tolerance must admit it. Nearest wrong-method distances are recorded
+  # per item below; the smallest is 0.52 (template-percent-change), fifty times
+  # this.
+  tolerance: 0.011
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [exemplar, quantitative-quiz, ladder-l3, item-generation, finance]
+samples:
+  - id: template-simple-interest
+    input: >-
+      Template: "A principal of ${P} is invested at {r}% SIMPLE annual interest
+      for {t} years. How much interest is earned?" Instantiate it with
+      P = 2400, r = 3.5, t = 4, and give the answer key in dollars rounded to
+      the nearest cent.
+    # 2400 * 0.035 * 4 = 336.00
+    # Compounding instead gives 2400*(1.035^4 - 1) = 354.30 -- 18.30 away.
+    target: "336"
+    metadata: { skill: simple-interest, template: interest-v1, provenance: synthetic }
+
+  - id: template-compound-interest
+    input: >-
+      Template: "A principal of ${P} is invested at {r}% annual interest
+      COMPOUNDED ANNUALLY for {t} years. What is the balance at the end?"
+      Instantiate it with P = 1500, r = 6, t = 3, and give the answer key in
+      dollars rounded to the nearest cent.
+    # 1500 * 1.06^3 = 1500 * 1.191016 = 1786.524 -> 1786.52
+    # Simple interest instead gives 1500*(1+0.18) = 1770.00 -- 16.52 away.
+    # Reporting the INTEREST rather than the balance gives 286.52 -- 1500 away.
+    target: "1786.52"
+    metadata: { skill: compound-interest, template: interest-v2, provenance: synthetic }
+
+  - id: template-percent-change
+    input: >-
+      Template: "Enrolment in a programme moved from {a} students to {b}
+      students. What was the percent change?" Instantiate it with a = 840,
+      b = 903, and give the answer key as a percentage rounded to two decimal
+      places.
+    # (903 - 840) / 840 * 100 = 63 / 840 * 100 = 7.50
+    # Dividing by the NEW value gives 63/903*100 = 6.98 -- 0.52 away.
+    target: "7.5"
+    metadata: { skill: percent-change, template: change-v1, provenance: synthetic }
+
+  - id: template-unit-cost
+    input: >-
+      Template: "A shipment of {q} identical units costs ${c} in total. What is
+      the cost per unit?" Instantiate it with q = 144, c = 1092, and give the
+      answer key in dollars rounded to the nearest cent.
+    # 1092 / 144 = 7.5833... -> 7.58
+    # Deliberately NOT a value ending in a half cent: 1092/144 avoids the
+    # 7.625 case, where round-half-up and round-half-even disagree and the item
+    # would have two defensible keys.
+    target: "7.58"
+    metadata: { skill: unit-rate, template: rate-v1, provenance: synthetic }
+
+  - id: template-two-step-headcount
+    input: >-
+      Template: "A cohort of {n} students sat an exam and {p}% of them passed.
+      How many students FAILED?" Instantiate it with n = 250, p = 88, and give
+      the answer key as a whole number of students.
+    # passed = 0.88 * 250 = 220 ; failed = 250 - 220 = 30
+    # Stopping at the first step and reporting the passers gives 220 -- 190 away.
+    target: "30"
+    metadata: { skill: complement-after-percentage, template: headcount-v1, provenance: synthetic }

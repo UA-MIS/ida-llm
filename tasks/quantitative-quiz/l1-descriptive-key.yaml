@@ -1,0 +1,95 @@
+# quantitative-quiz, rung 1 of 7 -- the floor of the ladder.
+#
+# EXEMPLAR. This family is one of the two worked examples referenced by
+# tasks/SCHEMA.md. Copy its shape, not its subject matter.
+#
+# What this rung measures: can the model produce a correct answer key for a
+# one-step descriptive-statistics item? Nothing here needs a method choice or a
+# convention -- if a model fails this rung, no later rung tells you anything new.
+#
+# Gold-answer derivations are in YAML COMMENTS beside each target, never in
+# `metadata`: `GET /tasks/{id}` publishes sample metadata unauthenticated while
+# it redacts targets, so a derivation in metadata would hand out the answer key.
+version: 1
+id: quantitative-quiz/l1-descriptive-key
+title: Quiz key -- one-step descriptive statistics
+description: >
+  Rung 1 of the quantitative-quiz ladder. Given a generated quiz item asking for
+  a single descriptive statistic over a small data set, produce the value that
+  belongs in the answer key. One step, no method choice, no convention to pin:
+  this rung establishes that a model can be trusted with arithmetic at all
+  before the later rungs ask it to choose between methods.
+
+  Provenance: every data set is synthetic, authored for this file. No textbook
+  content, no real student data.
+kind: verifiable
+domain: statistics
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory-statistics
+  quiz. Work the item out, then put the final numeric answer alone on the last
+  line, with no units, no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  # 0.01 admits an answer rounded to two decimal places (worst case 0.005 of
+  # error) and nothing else. Every item below is designed so the nearest
+  # plausible WRONG answer is further than 0.01 away -- see the guide's
+  # "Choosing a tolerance" section. A tolerance wide enough to swallow a method
+  # error is a tolerance that stopped measuring anything.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [exemplar, quantitative-quiz, ladder-l1, descriptive-statistics]
+samples:
+  - id: mean-integers
+    input: >-
+      A quiz item reads: "Compute the mean of the following exam scores:
+      12, 15, 11, 18, 14." Produce the value for the answer key.
+    # sum = 70, n = 5, mean = 14
+    target: "14"
+    metadata: { skill: arithmetic-mean, provenance: synthetic }
+
+  - id: median-even-n
+    input: >-
+      A quiz item reads: "Compute the median of the following values:
+      7, 3, 9, 4." Produce the value for the answer key.
+    # sorted = 3, 4, 7, 9; n even, so median = (4 + 7) / 2 = 5.5
+    target: "5.5"
+    metadata: { skill: median-even-sample, provenance: synthetic }
+
+  - id: range-with-negative
+    input: >-
+      A quiz item reads: "Compute the range of the following temperature
+      readings, in degrees Celsius: -4, 12, 3, -9, 7." Produce the value for the
+      answer key.
+    # max = 12, min = -9, range = 12 - (-9) = 21
+    target: "21"
+    metadata: { skill: range-across-zero, provenance: synthetic }
+
+  - id: mode-single
+    input: >-
+      A quiz item reads: "Compute the mode of the following values:
+      2, 5, 5, 7, 9, 5, 2." Produce the value for the answer key.
+    # 5 appears three times, 2 twice, 7 and 9 once each; mode = 5
+    target: "5"
+    metadata: { skill: mode, provenance: synthetic }
+
+  - id: mean-decimal
+    input: >-
+      A quiz item reads: "Compute the mean of the following reaction times, in
+      seconds: 3.2, 4.8, 5.5, 2.5." Produce the value for the answer key.
+    # sum = 16.0, n = 4, mean = 4.0
+    target: "4"
+    metadata: { skill: arithmetic-mean-decimal, provenance: synthetic }
+
+  - id: weighted-mean-gradebook
+    input: >-
+      A quiz item reads: "A course grade is 20% quizzes, 30% midterm and 50%
+      final. A student scores 82 on quizzes, 74 on the midterm and 91 on the
+      final. Compute the course grade." Produce the value for the answer key.
+    # 0.20*82 = 16.4; 0.30*74 = 22.2; 0.50*91 = 45.5; total = 84.1
+    # Unweighted mean would be (82+74+91)/3 = 82.33 -- 1.77 away, far outside
+    # the 0.01 tolerance, so the item still separates the two methods.
+    target: "84.1"
+    metadata: { skill: weighted-mean, provenance: synthetic }
