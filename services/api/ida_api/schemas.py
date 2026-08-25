@@ -24,6 +24,16 @@ class HealthResponse(BaseModel):
     checks: dict[str, bool]
     """Per-dependency liveness: ``database``, ``queue``.  All must be true for ``ok``."""
 
+    git_sha: str | None = None
+    """The commit this build was made from, or ``None`` when it cannot be known.
+
+    THE FIELD THAT IDENTIFIES THE RUNNING BUILD.  ``version`` is whatever the
+    release process was told to say; this is baked into the image at build time
+    (``IDA_GIT_SHA``, from the ``GIT_SHA`` build-arg) and is correct by
+    construction.  ``None`` means "unreproducible" and is never a placeholder --
+    a wrong SHA looks like a real one (see :mod:`ida_core.gitmeta`).
+    """
+
 
 class ModelSummary(BaseModel):
     """A registry entry as the UI wants it: no secrets, key *name* only."""
