@@ -1,11 +1,17 @@
-# The subjective placeholder.
+# The subjective exemplar.
 #
-# This task LOADS and VALIDATES today and is deliberately NOT scorable: it needs
-# LLM-as-judge, which the walking skeleton implements as an interface only
-# (ida_harness.scoring.LLMJudgeScorer). The API reports it with
-# `scorable: false` and a reason; the runner records results with score=null
-# rather than zeros. It is here so the subjective branch of the taxonomy has a
-# real, validated example to code against.
+# This task is SCORABLE -- when a judge model is configured. LLM-as-judge is
+# implemented (ida_harness/judge.py, docs/llm-judge.md) and deliberately off by
+# default: grading costs one judge call per criterion per sample, so it starts
+# when an operator sets IDA_JUDGE_MODEL_KEY, not because a feature merged.
+#
+# With no judge configured the API reports it with `scorable: false` and a
+# reason, and the runner records score=null rather than zeros -- and the
+# transcripts are archived, so `python -m ida_harness.regrade <run_id>` can
+# grade the run afterwards. The `not-yet-scorable` tag below reflects that
+# DEFAULT deployment state; it is left untouched deliberately, because tags are
+# part of the task's content_sha and editing one would change this task's
+# comparability key for a comment-level clarification.
 version: 1
 id: demo/essay-feedback
 title: Undergraduate essay feedback

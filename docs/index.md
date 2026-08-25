@@ -13,6 +13,7 @@ is yours, and [`.devops/README.md`](../.devops/README.md) for the deploy contrac
 | every environment variable | [`.env.example`](../.env.example) |
 | the model registry | [`models.yaml`](../models.yaml) |
 | **provider clients** -- which client answers for which entry, the Anthropic/OpenAI gotchas, retry and `Retry-After`, why there is no mock fallback | [`docs/model-clients.md`](model-clients.md) |
+| **LLM-as-judge** -- how subjective tasks are scored, the bias controls, what judging costs, retroactive grading | [`docs/llm-judge.md`](llm-judge.md) |
 | off-cluster inference (Sparks) | [`infra/inference/README.md`](../infra/inference/README.md) |
 
 ## Suggested first tasks
@@ -27,8 +28,14 @@ not scaffolding.
    still parked is one real call per provider, which needs credits and a tag.
    The documented gotchas (OpenAI's `max_completion_tokens`, Anthropic's
    sampling rejections) are the likeliest first failures.
-2. **Make `subjective` tasks scorable.** The schema loads and validates them
-   today (`tasks/SCHEMA.md`), but the LLM-as-judge scorer is still an interface.
+2. **Turn the judge on, and calibrate it.** LLM-as-judge is implemented
+   ([`docs/llm-judge.md`](llm-judge.md)) and **off by default** -- set
+   `IDA_JUDGE_MODEL_KEY` to a `models.yaml` key to grade subjective runs, and
+   `python -m ida_harness.regrade <run_id>` to grade ones that already finished.
+   Two follow-ons are named in that document: wiring the setting through the
+   runner service, and a `POST /runs/{id}/regrade` endpoint so a retroactive
+   grade reaches Postgres and the UI. The calibration record shape exists; the
+   human-agreement study has not been run.
 3. **Fill in the three sweeps.** `services/runner/ida_runner/sweeps.py` is
    scaffold: the CronJobs run nightly and exit 0 without doing work. Every sweep
    must stay idempotent and MUST exit non-zero on failure.

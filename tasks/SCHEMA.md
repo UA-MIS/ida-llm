@@ -195,7 +195,7 @@ platform is built around, and it decides how the task can ever be scored.
 | Scored by | a program (`exact_match`, `numeric_match`) | an LLM judge against a rubric |
 | Every sample needs | a `target` (gold answer) | **no** `target` |
 | Needs a `rubric` | no — forbidden | yes — required |
-| Working today? | **yes** | **loaded and validated, not yet scorable** |
+| Working today? | **yes** | **yes, when a judge model is configured** |
 
 ### The decision procedure
 
@@ -212,23 +212,29 @@ Ask, in this order:
 3. **Is what I actually care about the reasoning, the framing or the
    pedagogy?** Then it is genuinely `subjective`, and it needs a rubric.
 
-**Prefer `verifiable` wherever it is honest to.** It is scorable today, it costs
-nothing to run, and its results are reproducible. A subjective task is a real
-contribution but you will not see a number from it yet.
+**Prefer `verifiable` wherever it is honest to.** It is scorable with no extra
+configuration and costs nothing to run; a subjective task needs a judge model,
+and a judge model costs money per criterion per sample.
 
-> **Subjective tasks do not produce scores yet.** The LLM-as-judge path is an
-> interface in the walking skeleton
-> (`ida_harness.scoring.LLMJudgeScorer` raises `NotImplementedError`). Subjective
-> tasks load, validate, run against the model, and store their transcripts — but
-> their results carry `scorable: false` and `score: null`. That is deliberate:
-> a blank is honest, a zero would look like a failing model.
+> **Subjective scoring is implemented, and OFF BY DEFAULT.** Grading a rubric
+> costs one judge call *per criterion per sample*, so it starts when an operator
+> sets `IDA_JUDGE_MODEL_KEY` to a key in `models.yaml` — not because a feature
+> merged. With no judge configured, subjective tasks load, validate, run against
+> the model and store their transcripts, and their results carry
+> `scorable: false` and `score: null`. That is deliberate: a blank is honest, a
+> zero would look like a failing model.
+>
+> Such a run is **not lost**: `python -m ida_harness.regrade <run_id>` grades it
+> afterwards from the archived completions, without re-calling the model under
+> test. See [`docs/llm-judge.md`](../docs/llm-judge.md).
 >
 > **You do not have to mark this anywhere.** `kind: subjective` plus
-> `scorer.kind: llm_judge` *is* the mechanism: `TaskSpec.is_scorable` becomes
-> False, the API reports an `unscorable_reason`, and the UI shows "not yet
-> scorable". Nothing in your file changes when the judge lands. Adding
-> `not-yet-scorable` to `tags` is a convention the exemplars follow so a human
-> scanning the listing sees it too.
+> `scorer.kind: llm_judge` *is* the mechanism: `TaskSpec.is_scorable` is False
+> (it means "gradable with no judge"), and with no judge configured the API
+> reports an `unscorable_reason` and the UI shows "not yet scorable". Nothing in
+> your file changes when a judge is turned on. Adding `not-yet-scorable` to
+> `tags` is a convention the exemplars follow so a human scanning the listing
+> sees the default state too.
 
 ---
 
@@ -393,8 +399,14 @@ reporting different numbers for the same benchmark.
 
 #### `llm_judge`
 
-Requires `scorer.rubric_id` to equal `rubric.id`. Not implemented yet — see
-[above](#the-one-decision-that-shapes-everything-kind).
+Requires `scorer.rubric_id` to equal `rubric.id`. Grades the completion against
+the rubric with a judge model — **one call per criterion**, so criterion order
+cannot move a score. Each criterion's score is normalised from the rubric's scale
+onto `[0, 1]` and combined as a weighted mean; `passed` stays `null`, because a
+rubric score is graded by construction and a pass mark would be a cutoff nobody
+chose. Needs a judge model configured — see
+[above](#the-one-decision-that-shapes-everything-kind) and
+[`docs/llm-judge.md`](../docs/llm-judge.md).
 
 ### Choosing a tolerance
 
@@ -540,13 +552,29 @@ rubric:
 ```
 
 Version rubric ids (`-v1`, `-v2`) rather than editing them in place: a grade is
-only comparable to grades produced by the same rubric.
+only comparable to grades produced by the same rubric. Editing one in place also
+makes an already-finished run **un-regradable** — `ida_harness.regrade` compares
+the task's recorded `content_sha` against the current one and refuses to grade an
+old completion against an edited rubric.
+
+`scale_min`/`scale_max` are the range the judge is asked to answer on. Each
+criterion's score is normalised onto `[0, 1]` before weighting, so a rubric
+authored on 0–4 and one on 0–1 stay comparable. A rubric with **no criteria**, or
+with `scale_min == scale_max`, is refused at grading time rather than scored
+`0.0` — a weighted mean over nothing is undefined, and `0.0` would read as "this
+model failed every criterion".
 
 ### Criterion descriptions are written for the judge
 
 The `description` is not documentation. It is **the instruction the judge model
-reads when it grades**. Vague criteria produce noisy grades, and a criterion
-that cannot be disagreed with cannot discriminate.
+reads when it grades**, and it reaches that model **verbatim** — the whole
+string, uncut, in the prompt for that criterion. Vague criteria produce noisy
+grades, and a criterion that cannot be disagreed with cannot discriminate.
+
+Each criterion is graded in its **own** model call, which sees no other
+criterion and no verdict already reached. That is what makes criterion order
+unable to move a score — so a criterion has to stand on its own; one that only
+makes sense after reading the one above it will not be read that way.
 
 ### The anchored-rubric template
 
@@ -610,6 +638,11 @@ behaviour at each of five levels, you have three levels and three unlabelled gap
 
 `weight` is relative and must be `> 0`. Weights are what stop a judge from
 maximising the easy criteria and ignoring the one that matters.
+
+> **The judge is never told the weight.** A judge told a criterion is "worth 3"
+> grades it more harshly, which is an effect nobody asked for and one that would
+> be invisible in the number. Weight is aggregation metadata, applied afterwards,
+> and it is *relative*: `[2,2,1,1]` and `[4,4,2,2]` produce the same result.
 
 The technique worth stealing from
 [`l4-actionable-feedback.yaml`](conceptual-grading/l4-actionable-feedback.yaml):
