@@ -3,13 +3,16 @@
 # front of the image build; triggering here on push too would run everything
 # twice for every merge.
 #
-# FIVE independent gates, deliberately parallel so one slow leg does not hide the
+# SIX independent gates, deliberately parallel so one slow leg does not hide the
 # others' results:
 #
-#   python        ruff + pytest over packages/ and services/
+#   python        ruff + pytest over packages/ and services/, then the
+#                 in-process tracer bullet
 #   frontend      lint + typecheck + build
-#   task-schema   schema-validate tasks/** and models.yaml  (a malformed rubric
-#                 fails the PR, not a benchmark run three hours in)
+#   agile         the sprint board's own suite (see that job)
+#   task-schema   schema-validate tasks/** and models.yaml, BOTH layers (a
+#                 malformed rubric fails the PR, not a benchmark run three
+#                 hours in)
 #   migrations    alembic upgrade head against a THROWAWAY Postgres, then
 #                 downgrade back -- catches a migration that only works forward
 #   chart         render all four overlays and assert the deploy invariants
@@ -60,9 +63,10 @@ jobs:
         run: |
           set -eu
           python -m pip install --upgrade pip
-          # Same four distributions, same order, as Dockerfile.python -- so a
+          # Same FIVE distributions, same order, as Dockerfile.python -- so a
           # dependency problem surfaces here rather than at image build.
-          pip install -e packages/core -e packages/harness -e services/api -e services/runner
+          pip install -e packages/core -e packages/harness -e services/api -e services/runner \
+                      -e services/mock-model
           pip install -r requirements-dev.txt
 
       - name: Lint (ruff)
@@ -73,6 +77,27 @@ jobs:
 
       - name: Test (pytest)
         run: pytest
+
+      - name: E2E tracer bullet (standalone, in process, no Docker)
+        # The tracer drives the api, the queue, the runner and the harness end to
+        # end in ONE process -- no containers, so it runs in this Docker-less job
+        # -- with the same assertions the compose-mode tracer makes against the
+        # real stack. `test_tracer_compose.py` self-skips when no API answers,
+        # which is why running the whole directory is safe here.
+        #
+        # ⚠ YES, `pytest` ABOVE ALREADY RAN THIS (e2e is in testpaths), AND THAT
+        # IS THE POINT -- but not for the reason you might assume. `cd e2e` does
+        # NOT give the suite its own rootdir: pytest walks up, finds the root
+        # pyproject.toml, and rootdir stays the repo root (test ids still print
+        # as `e2e/test_...`, and the root `addopts` still apply).
+        #
+        # What it DOES change is WHICH SIBLING CONFTESTS GET LOADED. A root run
+        # collects five conftest.py files (core, harness, api, runner, e2e); this
+        # run collects one. That is exactly the axis the bug this guards against
+        # lives on -- `from conftest import ...` binds to whichever conftest
+        # loaded first -- and this repo has already had that bug. Two seconds for
+        # a standing check on a failure mode we have actually hit.
+        run: cd e2e && python -m pytest .
 
   frontend:
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
@@ -161,11 +186,42 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - name: Install PyYAML
-        run: pip install --upgrade pip && pip install pyyaml==6.0.2
+      - name: Install ida-core (the JSON Schemas + the pydantic contracts)
+        # Bare PyYAML is no longer enough: the validator now checks BOTH layers
+        # -- the JSON Schema in packages/core/ida_core/schemas/ and then the
+        # pydantic contract -- because a document can be schema-valid and still
+        # violate a rule the schema cannot express (a verifiable task with no
+        # gold answers, a duplicate task id).
+        run: pip install --upgrade pip && pip install -e packages/core
 
       - name: Validate tasks/** and models.yaml
         run: python tools/validate_tasks.py
+
+      - name: Check the JSON Schemas are themselves valid
+        # THE GATE'S OWN GATE. Everything above trusts these two files to say
+        # what a task and a model are. A malformed schema does not fail loudly --
+        # jsonschema happily validates against a broken document and reports
+        # everything as fine, so the whole task-schema job goes green while
+        # checking nothing. That is the single worst failure mode a gate can
+        # have, and it costs one second to rule out.
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          import jsonschema
+
+          schemas = sorted(pathlib.Path("packages/core/ida_core/schemas").glob("*.json"))
+          assert schemas, "no schemas found -- the gate would pass vacuously"
+
+          failures = 0
+          for path in schemas:
+              try:
+                  jsonschema.Draft202012Validator.check_schema(json.loads(path.read_text()))
+                  print(f"  ok  {path}")
+              except (jsonschema.SchemaError, json.JSONDecodeError) as exc:
+                  print(f"FAIL  {path}: {exc}", file=sys.stderr)
+                  failures += 1
+          sys.exit(failures)
+          PY
 
   migrations:
     # Alembic against a THROWAWAY Postgres 17 -- the same major version the

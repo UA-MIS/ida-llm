@@ -1,0 +1,84 @@
+/**
+ * The single place the frontend talks to the API.
+ *
+ * ONE BASE URL, AND IT IS SERVER-SIDE ONLY. That is not a simplification of a
+ * richer design -- it is the only design this deployment permits:
+ *
+ * - The api has NO INGRESS in any environment (`.devops/components.yaml` gives
+ *   the python-app `path: ""`). A browser cannot reach it. Ever.
+ * - `NEXT_PUBLIC_*` is inlined into the client bundle at BUILD time, but ONE
+ *   frontend image is built and then promoted byte-identically through dev,
+ *   staging and prod. A per-environment public API URL is therefore structurally
+ *   impossible here, not merely discouraged.
+ *
+ * So every call runs server-side, against the in-namespace Service name the
+ * platform supplies as `API_URL` (`http://ida-llm-api`, no port -- the Service
+ * listens on :80). Anything the browser needs goes through a same-origin route
+ * handler that proxies here; see src/app/api/runs/[runId]/results/... .
+ *
+ * `API_BASE_URL` is accepted as a fallback for older local .env files.
+ */
+
+import type { RunDetail, RunListResponse, SampleTranscript } from "./types";
+
+const SERVER_BASE =
+  process.env.API_URL ?? process.env.API_BASE_URL ?? "http://localhost:8000";
+
+export function apiBase(): string {
+  return SERVER_BASE;
+}
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+async function getJson<T>(path: string, revalidateSeconds = 0): Promise<T> {
+  const url = `${apiBase()}${path}`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { Accept: "application/json" },
+      // Runs change while you watch them, so never serve a cached list.
+      next: revalidateSeconds > 0 ? { revalidate: revalidateSeconds } : undefined,
+      cache: revalidateSeconds > 0 ? undefined : "no-store",
+    });
+  } catch (cause) {
+    // Status 0 means the request never reached the api -- DNS, connection
+    // refused, timeout. Callers distinguish it from a real HTTP status; the
+    // transcript proxy turns it into a 502, which is what it actually is.
+    throw new ApiError(
+      `Could not reach the API at ${url}: ${cause instanceof Error ? cause.message : String(cause)}`,
+      0,
+    );
+  }
+  if (!response.ok) {
+    throw new ApiError(
+      `GET ${path} failed: ${response.status} ${response.statusText}`,
+      response.status,
+    );
+  }
+  return (await response.json()) as T;
+}
+
+export function listRuns(limit = 50): Promise<RunListResponse> {
+  return getJson<RunListResponse>(`/runs?limit=${limit}`);
+}
+
+export function getRun(runId: string): Promise<RunDetail> {
+  return getJson<RunDetail>(`/runs/${encodeURIComponent(runId)}`);
+}
+
+export function getTranscript(
+  runId: string,
+  sampleId: string,
+): Promise<SampleTranscript> {
+  return getJson<SampleTranscript>(
+    `/runs/${encodeURIComponent(runId)}/results/${encodeURIComponent(sampleId)}/transcript`,
+  );
+}

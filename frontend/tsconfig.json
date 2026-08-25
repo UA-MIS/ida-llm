@@ -11,6 +11,10 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // Our UI code was written and typechecked under this. Indexing an array
+    // yields `T | undefined`, which is what stops `results[0].score` from
+    // compiling against an empty run and blowing up at render.
+    "noUncheckedIndexedAccess": true,
     "jsx": "preserve",
     "incremental": true,
     "plugins": [{ "name": "next" }],

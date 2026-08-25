@@ -1,0 +1,43 @@
+# The tracer-bullet task: small, verifiable, and genuinely passable.
+#
+# Shape: the model is given a quiz item a professor might auto-generate and
+# asked to compute the answer. Scoring is numeric_match, so a model that shows
+# its working still passes as long as the final number is right.
+version: 1
+id: demo/arithmetic-quiz-check
+title: Arithmetic quiz answer check
+description: >
+  Given a generated arithmetic quiz item, compute the correct answer. Stands in
+  for the "auto-generate a quiz and verify the key is right" workflow that
+  motivates the verifiable half of the taxonomy. Deliberately trivial: this task
+  exists to prove the pipeline works, not to discriminate between models.
+kind: verifiable
+domain: mathematics
+system_prompt: >-
+  You are grading assistant for a university course. Compute the answer to the
+  arithmetic question. Respond with the final numeric answer on the last line.
+scorer:
+  kind: numeric_match
+  tolerance: 0.0001
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [tracer, arithmetic, smoke]
+samples:
+  - id: add-simple
+    input: "A quiz item reads: What is 17 + 25? Compute the answer."
+    target: "42"
+    metadata: { difficulty: trivial }
+  - id: mul-simple
+    input: "A quiz item reads: What is 12 * 12? Compute the answer."
+    target: "144"
+    metadata: { difficulty: trivial }
+  - id: sub-negative
+    input: "A quiz item reads: What is 8 - 19? Compute the answer."
+    target: "-11"
+    metadata: { difficulty: easy, note: "answer is negative" }
+  - id: div-decimal
+    input: "A quiz item reads: What is 7 / 2? Compute the answer."
+    target: "3.5"
+    metadata: { difficulty: easy, note: "non-integer answer exercises the tolerance" }

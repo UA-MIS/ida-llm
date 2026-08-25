@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://capstone-ida.dev/schemas/models.schema.json",
+  "title": "models.yaml -- the model registry",
+  "description": "D-1: every model is an OpenAI-compatible endpoint described by a base URL, a key reference and a serving config. Adding a model is a YAML edit, never a code change.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "models"],
+  "properties": {
+    "version": { "const": 1 },
+    "models": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/modelEntry" }
+    }
+  },
+  "$defs": {
+    "samplingParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+        "top_p": { "type": "number", "minimum": 0, "maximum": 1 },
+        "max_tokens": { "type": "integer", "minimum": 1, "maximum": 131072 },
+        "seed": { "type": ["integer", "null"] },
+        "stop": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "servingConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model_id", "serving_stack"],
+      "properties": {
+        "model_id": { "type": "string", "minLength": 1 },
+        "registry_key": { "type": "string" },
+        "serving_stack": {
+          "type": "string",
+          "enum": ["openai_api", "anthropic_compat", "vllm", "ollama", "llama_cpp", "mock"]
+        },
+        "serving_version": { "type": ["string", "null"] },
+        "quantization": {
+          "type": "string",
+          "enum": ["none", "fp8", "int8", "int4", "awq", "gptq", "unknown"]
+        },
+        "revision": { "type": ["string", "null"] },
+        "context_window": { "type": ["integer", "null"], "minimum": 1 },
+        "sampling": { "$ref": "#/$defs/samplingParams" },
+        "hardware": { "type": ["string", "null"] },
+        "extra": { "type": "object" }
+      }
+    },
+    "modelEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "display_name", "serving"],
+      "anyOf": [
+        { "required": ["base_url"], "properties": { "base_url": { "minLength": 1 } } },
+        { "required": ["base_url_env"] }
+      ],
+      "$comment": "An entry needs SOMEWHERE to send the request: a literal base_url, an env var naming one, or both (env wins, literal is the fallback). base_url may be the empty string only alongside base_url_env -- that is the deliberate 'fail loudly, never guess' shape used by sparks-local.",
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+          "description": "Stable registry key referenced by RunRequest.model_keys."
+        },
+        "display_name": { "type": "string", "minLength": 1 },
+        "base_url": {
+          "type": "string",
+          "pattern": "^(https?://.+)?$",
+          "description": "OpenAI-compatible base URL, INCLUDING the /v1 suffix. May be empty ONLY when base_url_env is set, meaning there is no fallback and an unset variable must fail loudly rather than resolve to a guess."
+        },
+        "base_url_env": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "description": "Name of an env var that OVERRIDES base_url when set and non-empty. The NAME, never a URL. This is the safety switch: one image is promoted byte-identically across environments, so a per-env endpoint cannot be a literal."
+        },
+        "api_key_env": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "description": "Name of the env var holding the key. The key itself is NEVER in YAML."
+        },
+        "serving": { "$ref": "#/$defs/servingConfig" },
+        "cost": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "USD per MILLION tokens. Zero for self-hosted.",
+          "properties": {
+            "input_usd_per_mtok": { "type": "number", "minimum": 0 },
+            "output_usd_per_mtok": { "type": "number", "minimum": 0 }
+          }
+        },
+        "timeout_s": { "type": "number", "exclusiveMinimum": 0 },
+        "max_retries": { "type": "integer", "minimum": 0, "maximum": 10 },
+        "enabled": { "type": "boolean" },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,62 @@
+# The subjective placeholder.
+#
+# This task LOADS and VALIDATES today and is deliberately NOT scorable: it needs
+# LLM-as-judge, which the walking skeleton implements as an interface only
+# (ida_harness.scoring.LLMJudgeScorer). The API reports it with
+# `scorable: false` and a reason; the runner records results with score=null
+# rather than zeros. It is here so the subjective branch of the taxonomy has a
+# real, validated example to code against.
+version: 1
+id: demo/essay-feedback
+title: Undergraduate essay feedback
+description: >
+  Given a short excerpt from an undergraduate essay, produce formative feedback
+  a professor could hand back. Judged against a rubric, not a gold answer --
+  there is no single correct response.
+kind: subjective
+domain: writing
+system_prompt: >-
+  You are an experienced university writing instructor. Give brief, specific,
+  actionable formative feedback on the excerpt. Do not rewrite it for the student.
+scorer:
+  kind: llm_judge
+  rubric_id: essay-feedback-v1
+rubric:
+  id: essay-feedback-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: specificity
+      description: >-
+        Feedback points at concrete passages in the excerpt rather than offering
+        generic advice that would apply to any essay.
+      weight: 2.0
+    - name: actionability
+      description: >-
+        The student could act on the feedback in a revision without further
+        clarification.
+      weight: 2.0
+    - name: tone
+      description: >-
+        Constructive and appropriate for an undergraduate; neither harsh nor
+        empty praise.
+      weight: 1.0
+    - name: restraint
+      description: >-
+        Does not rewrite the passage for the student or supply the thesis itself.
+      weight: 1.0
+tags: [tracer, subjective, not-yet-scorable]
+samples:
+  - id: thesis-vague
+    input: >-
+      Give formative feedback on this excerpt from a first-year history essay:
+      "The industrial revolution was a very important event that changed many
+      things about society. There were lots of factories and people moved to
+      cities. This essay will talk about some of the effects."
+    metadata: { excerpt_kind: introduction }
+  - id: evidence-thin
+    input: >-
+      Give formative feedback on this excerpt from a first-year history essay:
+      "Working conditions in factories were bad. Many sources say this. Child
+      labour was also a problem during this time period, which was bad too."
+    metadata: { excerpt_kind: body-paragraph }

@@ -104,7 +104,8 @@ jobs:
         run: |
           set -eu
           python -m pip install --upgrade pip
-          pip install -e packages/core -e packages/harness -e services/api -e services/runner
+          pip install -e packages/core -e packages/harness -e services/api -e services/runner \
+                      -e services/mock-model
           pip install -r requirements-dev.txt
       - name: Lint
         run: ruff check packages services tools
@@ -112,6 +113,8 @@ jobs:
         run: ruff format --check packages services tools
       - name: Test
         run: pytest
+      - name: E2E tracer bullet (in process, no Docker)
+        run: cd e2e && python -m pytest .
       - name: Validate tasks/** and models.yaml
         run: python tools/validate_tasks.py
 
@@ -214,6 +217,7 @@ jobs:
             --context=dir://${GITHUB_WORKSPACE}/${CONTEXT}
             --dockerfile=${DOCKERFILE}
             --destination=${IMAGE}
+            --build-arg=GIT_SHA=${GIT_SHA}
             --reproducible
             --snapshot-mode=redo
             --use-new-run
@@ -221,6 +225,25 @@ jobs:
             '
         env:
           IMAGE: ${{ needs.resolve.outputs.REGISTRY }}/${{ matrix.image }}:${{ needs.resolve.outputs.TAG }}
+          # PROVENANCE, and it is not the same thing as the TAG above.
+          #
+          # A container has no .git, so the commit that produced an image has to
+          # be baked in: Dockerfile.python takes ARG GIT_SHA and exports it as
+          # IDA_GIT_SHA, which ida_core.gitmeta reads and every persisted result
+          # cites. Without this build-arg the ARG defaults to "" and EVERY
+          # deployed result records `task_git_sha: null` -- a benchmark number
+          # that cannot say which code produced it.
+          #
+          # The TAG is `git describe` (v0.0.0-15-gabc1234): for humans and for
+          # promotion. This is the citation. Do not collapse them.
+          #
+          # Safe alongside --reproducible: that flag normalises timestamps, not
+          # build args. The digest already changes per commit because the source
+          # does.
+          #
+          # gitmeta.is_sha() accepts only 40 lowercase hex, so an unsubstituted
+          # or empty value yields an honest null rather than a fake SHA.
+          GIT_SHA: ${{ github.sha }}
           CONTEXT: ${{ matrix.context }}
           DOCKERFILE: ${{ matrix.dockerfile }}
           DOCKER_CONFIG_DIR: ${{ env.DOCKER_CONFIG_DIR }}

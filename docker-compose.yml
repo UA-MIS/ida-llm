@@ -1,0 +1,186 @@
+# Local development stack. `make dev` brings this up; `make tracer` runs the
+# end-to-end test against it.
+#
+# Everything here has an in-cluster counterpart:
+#   postgres    -> CloudNativePG
+#   minio       -> the platform MinIO tenant
+#   redis       -> the redis StatefulSet in .devops/chart/base
+#   mock-model  -> the ida-llm-mock-model Deployment (dev/preview only; 0 replicas
+#                  in staging and prod -- that is the credit safety switch)
+# api, runner and mock-model are the SAME image, differing only by command --
+# exactly as in the cluster, which is what makes "build once, promote the same
+# image" mean something.
+#
+# HOST PORTS ARE OVERRIDABLE. Every published port reads an env var with a
+# sensible default, because a developer machine may already be running something
+# on 9000 (MinIO's default is a popular port) or 5432. Nothing inside the stack
+# uses these -- services reach each other by compose-network DNS on the
+# container port -- so overriding them is always safe:
+#
+#   MINIO_PORT=9100 MINIO_CONSOLE_PORT=9101 make dev
+#
+# Copy the block into .env to make an override permanent.
+
+name: capstone-ida
+
+x-python-image: &python-image
+  build:
+    context: .
+    dockerfile: Dockerfile.python
+    args:
+      GIT_SHA: ${GIT_SHA:-}
+
+# ⚠ THE PLATFORM'S NAMES, NOT OURS, wherever the cluster supplies one. The
+# ConfigMap `ida-llm-config` and the ESO-materialised Secrets write UNPREFIXED
+# variables, so local dev exercises the same code path the cluster does. Using
+# IDA_-prefixed names here would leave the dual-alias in ida_core.config
+# untested by anything anyone actually runs.
+#
+# `postgresql://` -- bare, no +psycopg -- ON PURPOSE: that is the scheme ESO
+# writes, and normalising it is the app's job (ida_core.config
+# .normalize_database_url). Writing the normalised form here would hide the very
+# bug that helper exists to prevent.
+x-python-env: &python-env
+  DATABASE_URL: postgresql://ida:ida@postgres:5432/ida
+  REDIS_URL: redis://redis:6379/0
+  MINIO_ENDPOINT: minio
+  MINIO_PORT: "9000"
+  MINIO_USE_SSL: "false"
+  MINIO_ACCESS_KEY: minioadmin
+  MINIO_SECRET_KEY: minioadmin
+  MINIO_BUCKET: run-artifacts
+  MOCK_MODEL_BASE_URL: http://mock-model:8000/v1
+  LOG_LEVEL: INFO
+  # App-internal knobs have no ConfigMap entry, so they keep the IDA_ prefix.
+  IDA_ARTIFACT_BACKEND: s3
+  IDA_MODELS_FILE: /app/models.yaml
+  IDA_TASKS_DIR: /app/tasks
+  IDA_AUTH_MODE: disabled
+
+services:
+  postgres:
+    image: postgres:17-alpine  # matches the platform's tenant DB tier
+    environment:
+      POSTGRES_USER: ida
+      POSTGRES_PASSWORD: ida
+      POSTGRES_DB: ida
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ida -d ida"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  minio:
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  mock-model:
+    <<: *python-image
+    # The SAME console script the chart's Deployment runs, not a bare uvicorn
+    # line -- so local dev exercises the entry point the cluster uses.
+    command: ["ida-mock-model"]
+    environment:
+      MOCK_MODEL_ID: mock-echo-1
+      MOCK_LATENCY_MS: "25"   # a little latency so timings in the UI are non-zero
+      MOCK_FAIL_EVERY: "0"    # set to e.g. 5 to exercise the retry path
+    ports:
+      - "${MOCK_MODEL_PORT:-8100}:8000"
+    healthcheck:
+      test:
+        ["CMD", "python", "-c",
+         "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  # One-shot: waits for Postgres, creates the schema, creates the MinIO bucket.
+  # Everything downstream waits for this to exit 0.
+  bootstrap:
+    <<: *python-image
+    command: ["python", "/app/scripts/bootstrap.py"]
+    environment: *python-env
+    volumes:
+      - ./scripts:/app/scripts:ro
+    depends_on:
+      postgres: {condition: service_healthy}
+      minio: {condition: service_healthy}
+    restart: "no"
+
+  api:
+    <<: *python-image
+    command: ["ida-api"]
+    environment: *python-env
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      bootstrap: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+      mock-model: {condition: service_healthy}
+    healthcheck:
+      test:
+        ["CMD", "python", "-c",
+         "import urllib.request,json,sys; b=json.load(urllib.request.urlopen('http://localhost:8000/health')); sys.exit(0 if b['status']=='ok' else 1)"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  runner:
+    <<: *python-image
+    command: ["ida-runner"]
+    environment: *python-env
+    depends_on:
+      bootstrap: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+      mock-model: {condition: service_healthy}
+    # Scale with: docker compose up -d --scale runner=3
+    # BLPOP gives fair work-stealing across replicas for free.
+
+  frontend:
+    build:
+      # ⚠ CONTEXT IS THE REPO ROOT, matching .devops/components.yaml. The
+      # frontend Dockerfile's paths are repo-relative for that reason.
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      # THE ONLY api base, and it is server-side. There is no NEXT_PUBLIC_*
+      # equivalent and there must not be one: the browser can never reach the
+      # api (it has no Ingress in any environment), and NEXT_PUBLIC_* is inlined
+      # at BUILD time while one frontend image is promoted byte-identically
+      # across dev, staging and prod. `API_URL` is the ConfigMap's name for it.
+      API_URL: http://api:8000
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      api: {condition: service_healthy}
+
+volumes:
+  postgres-data:
+  minio-data:

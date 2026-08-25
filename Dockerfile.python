@@ -6,7 +6,7 @@
 #
 #   ida-api           FastAPI (services/api)
 #   ida-runner        queue worker (services/runner)
-#   ida-mock-model    the deterministic stub endpoint (services/runner)
+#   ida-mock-model    the deterministic stub endpoint (services/mock-model)
 #   ida-sweep <name>  the three nightly CronJobs (services/runner)
 #
 # That is what makes "build once, promote the same image" hold across all of
@@ -47,6 +47,7 @@ COPY packages/core/pyproject.toml     packages/core/
 COPY packages/harness/pyproject.toml  packages/harness/
 COPY services/api/pyproject.toml      services/api/
 COPY services/runner/pyproject.toml   services/runner/
+COPY services/mock-model/pyproject.toml services/mock-model/
 
 COPY packages/ packages/
 COPY services/ services/
@@ -64,15 +65,33 @@ RUN pip install --upgrade pip setuptools wheel \
       ./packages/harness \
       ./services/api \
       ./services/runner \
+      ./services/mock-model \
       alembic==1.16.5
 
 # ---- runtime ---------------------------------------------------------------
 FROM ${PYTHON_IMAGE} AS runtime
+
+# PROVENANCE. A container has no `.git`, so the commit that produced this image
+# has to be BAKED IN at build time -- `ida_core.gitmeta` reads IDA_GIT_SHA and
+# every persisted result cites it. The Kaniko step in build-and-push.yaml passes
+# `--build-arg=GIT_SHA=${{ github.sha }}`; without BOTH halves of that wiring
+# every deployed result records `task_git_sha: null` and proves nothing.
+#
+# `gitmeta.is_sha()` accepts only 40 lowercase hex characters, so an empty or
+# unsubstituted value yields an honest `null` rather than a fake SHA. Keep that
+# guard: a wrong provenance string is worse than a missing one.
+#
+# ⚠ Not the same thing as the image TAG (`git describe`, e.g. v0.0.0-15-gabc1234).
+# The tag is for humans and promotion; this is the citation. Do not collapse them.
+ARG GIT_SHA=""
+
 ENV PATH="/opt/venv/bin:${PATH}" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     HOST=0.0.0.0 \
-    PORT=8000
+    PORT=8000 \
+    IDA_GIT_SHA=${GIT_SHA} \
+    IDA_REPO_ROOT=/app
 
 # 65532 matches the chart's securityContext runAsUser. Keep them in lockstep.
 RUN groupadd --gid 65532 nonroot && useradd --uid 65532 --gid 65532 --no-create-home nonroot
