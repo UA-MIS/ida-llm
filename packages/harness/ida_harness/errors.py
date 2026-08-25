@@ -22,9 +22,23 @@ class HarnessError(Exception):
 class ModelError(HarnessError):
     """A call to a model endpoint failed."""
 
-    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        retry_after_s: float | None = None,
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
+        self.retry_after_s = retry_after_s
+        """Seconds the provider asked us to wait, parsed from ``Retry-After``.
+
+        ``None`` when the header was absent or not expressed in seconds.  The
+        retry loop in :mod:`ida_harness.client` uses it as a FLOOR on the next
+        delay -- a provider that says "wait 30s" is telling us something our
+        exponential backoff cannot know.
+        """
 
 
 class TransientModelError(ModelError):

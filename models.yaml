@@ -1,9 +1,22 @@
-# The model registry (D-1).
+# The model registry (D-13 -- the reproducibility decision;
+# the D-1..D-12 entries in the decision log are empty stubs).
 #
 # Every model -- a hosted commercial API, a campus vLLM deployment, a laptop
-# llama.cpp server -- is an OpenAI-compatible endpoint described by a base URL,
-# the NAME of an env var holding its key, and a serving config. Adding a model
-# is an edit to this file. There is no per-provider code anywhere.
+# llama.cpp server -- is described by a base URL, the NAME of an env var holding
+# its key, and a serving config. Adding a model is an edit to THIS FILE and
+# nothing else: `serving.serving_stack` selects the client that will answer
+# (packages/harness/ida_harness/factory.py), so a new vLLM box or a new hosted
+# model needs no code change at all.
+#
+# Two clients exist, because two wire formats exist:
+#
+#   anthropic_compat  -> the Anthropic Messages API (x-api-key, `system` hoisted
+#                        out of `messages`, `content` as a block list)
+#   everything else   -> OpenAI-compatible POST {base_url}/chat/completions
+#
+# Neither contains an `if provider == ...`; the table in factory.py is the one
+# place a provider is named. See docs/model-clients.md for why the Messages API
+# is used directly rather than through Anthropic's compatibility shim.
 #
 # SECRETS ARE NEVER IN THIS FILE. `api_key_env` names an environment variable;
 # in-cluster that variable is projected from Vault, locally it comes from .env.
@@ -90,43 +103,166 @@ models:
       input_usd_per_mtok: 0.0           # self-hosted: no per-token cost
       output_usd_per_mtok: 0.0
 
-  # --- EXAMPLES: uncomment and fill in when the real endpoints exist --------
+  # --- EXAMPLES: uncomment when there are credits and a tag to run them ----
   #
-  # A hosted commercial API. Anthropic exposes an OpenAI-compatible surface, so
-  # it needs no special-casing -- only a base URL, a key env var and honest
-  # metadata. Note quantization: unknown -- we are not told, and recording
-  # `none` would be a fabricated measurement.
+  # These are accurate for the clients that are actually implemented -- copy,
+  # uncomment, and check the pricing line before you spend anything.
   #
-  # - key: claude-sonnet
-  #   display_name: Claude Sonnet 4.5
-  #   base_url: https://api.anthropic.com/v1        # OpenAI-compatible surface
-  #   api_key_env: ANTHROPIC_API_KEY                # TODO-PLACEHOLDER(vault-path):
-  #                                                 # projected from Vault at
-  #                                                 # secret/data/capstone-ida/<env>/anthropic
+  # ⚠ PRICING IS AUTHORED HERE, NEVER IN CODE. `cost.input_usd_per_mtok` and
+  # `cost.output_usd_per_mtok` are USD per MILLION tokens; the harness multiplies
+  # them by the token counts the PROVIDER reported (never an estimate) in
+  # TokenUsage.cost_usd, and stamps the result on every ResultRecord. A wrong
+  # number here is a wrong number in the database, so the retrieval date is part
+  # of the record.
+
+  # --- Anthropic (Messages API) --------------------------------------------
+  #
+  # serving_stack: anthropic_compat selects AnthropicMessagesClient. The base URL
+  # keeps its /v1 -- the client appends /messages.
+  #
+  # ⚠ SAMPLING. Anthropic's defaults are temperature 1.0 and top_p 1.0, and the
+  # client OMITS a parameter that is already at its default (which is honest --
+  # the endpoint then uses exactly the value recorded here). Current Claude
+  # models -- Opus 5, Sonnet 5, Opus 4.8/4.7 -- REJECT a non-default temperature
+  # or top_p with a 400, and Claude 4.x also rejects both being sent together.
+  # So: temperature 1.0 below is not laziness, it is the only value those models
+  # accept, and writing 0.0 here would earn an immediate 400 naming the field.
+  # Models that DO accept sampling (Sonnet 4.6, Haiku 4.5 -- see the third
+  # example) can use the benchmark default of 0.0.
+  #
+  # ⚠ SEED. The Messages API has no seed parameter. Leave it null; the client
+  # REFUSES to run with a seed set rather than record a seeded run that was not
+  # seeded.
+  #
+  # Pricing retrieved 2026-08-25.
+  #
+  # - key: claude-opus-5
+  #   display_name: Claude Opus 5
+  #   base_url: https://api.anthropic.com/v1
+  #   api_key_env: ANTHROPIC_API_KEY              # TODO-PLACEHOLDER(vault-path):
+  #                                               # secret/data/capstone-ida/<env>/anthropic
   #   enabled: true
   #   timeout_s: 120
   #   max_retries: 4
-  #   tags: [cloud, frontier, baseline]
+  #   tags: [cloud, frontier, baseline, anthropic]
   #   serving:
-  #     model_id: claude-sonnet-4-5                 # exact id sent in the body
+  #     model_id: claude-opus-5                   # exact id sent in the body
   #     serving_stack: anthropic_compat
-  #     serving_version: null                       # provider does not report one
-  #     quantization: unknown                       # hosted APIs never tell us
-  #     revision: null                              # no snapshot pinning offered
-  #     context_window: 200000
+  #     serving_version: null                     # provider does not report one
+  #     quantization: unknown                     # hosted APIs never tell us
+  #     revision: null                            # no snapshot pinning offered
+  #     context_window: 1000000
+  #     hardware: null
+  #     sampling:
+  #       temperature: 1.0                        # see SAMPLING note above
+  #       top_p: 1.0
+  #       max_tokens: 2048                        # REQUIRED by the Messages API
+  #       seed: null                              # unsupported; see SEED note
+  #   cost:
+  #     input_usd_per_mtok: 5.00
+  #     output_usd_per_mtok: 25.00
+  #
+  # - key: claude-sonnet-4-6
+  #   display_name: Claude Sonnet 4.6
+  #   base_url: https://api.anthropic.com/v1
+  #   api_key_env: ANTHROPIC_API_KEY
+  #   enabled: true
+  #   timeout_s: 120
+  #   max_retries: 4
+  #   tags: [cloud, frontier, anthropic]
+  #   serving:
+  #     model_id: claude-sonnet-4-6
+  #     serving_stack: anthropic_compat
+  #     serving_version: null
+  #     quantization: unknown
+  #     revision: null
+  #     context_window: 1000000
+  #     hardware: null
+  #     sampling:
+  #       temperature: 0.0                        # 4.6 still accepts sampling...
+  #       top_p: 1.0                              # ...but NOT both non-default
+  #       max_tokens: 2048
+  #       seed: null
+  #   cost:
+  #     input_usd_per_mtok: 3.00
+  #     output_usd_per_mtok: 15.00
+
+  # --- OpenAI (chat completions) -------------------------------------------
+  #
+  # serving_stack: openai_api takes the default OpenAICompatibleClient -- the
+  # same one the mock model and campus vLLM use. Nothing about OpenAI is
+  # special-cased; it is simply the endpoint the client was written against.
+  #
+  # ⚠ max_tokens. This client sends `max_tokens`, which OpenAI has deprecated in
+  # favour of `max_completion_tokens` and which the o-series REJECTS outright:
+  #     "Unsupported parameter: 'max_tokens' is not supported with this model.
+  #      Use 'max_completion_tokens' instead."
+  # That error now reaches the operator verbatim. Prefer a non-reasoning chat
+  # model here until the harness can send either name (see docs/model-clients.md
+  # -- deliberately NOT guessed at, because the exact set of affected models is
+  # not documented and inventing the boundary would be worse than the gap).
+  # Reasoning models also reject a non-default temperature/top_p.
+  #
+  # Pricing retrieved 2026-08-25 from developers.openai.com/api/docs/pricing.
+  #
+  # - key: gpt-5
+  #   display_name: GPT-5
+  #   base_url: https://api.openai.com/v1
+  #   api_key_env: OPENAI_API_KEY                 # TODO-PLACEHOLDER(vault-path):
+  #                                               # secret/data/capstone-ida/<env>/openai
+  #   enabled: true
+  #   timeout_s: 120
+  #   max_retries: 4
+  #   tags: [cloud, frontier, baseline, openai]
+  #   serving:
+  #     model_id: gpt-5
+  #     serving_stack: openai_api
+  #     serving_version: null                     # `system_fingerprint` is in the
+  #                                               # archived raw response, but it
+  #                                               # is per-response, not per-entry
+  #     quantization: unknown
+  #     revision: null
+  #     context_window: 400000                    # TODO-PLACEHOLDER(context): confirm
+  #     hardware: null
+  #     sampling:
+  #       temperature: 0.0                        # see the max_tokens/sampling note
+  #       top_p: 1.0
+  #       max_tokens: 2048
+  #       seed: null                              # accepted but best-effort only
+  #   cost:
+  #     input_usd_per_mtok: 1.25
+  #     output_usd_per_mtok: 10.00
+  #
+  # - key: gpt-5-mini
+  #   display_name: GPT-5 mini
+  #   base_url: https://api.openai.com/v1
+  #   api_key_env: OPENAI_API_KEY
+  #   enabled: true
+  #   timeout_s: 120
+  #   max_retries: 4
+  #   tags: [cloud, small, cost-baseline, openai]
+  #   serving:
+  #     model_id: gpt-5-mini
+  #     serving_stack: openai_api
+  #     serving_version: null
+  #     quantization: unknown
+  #     revision: null
+  #     context_window: 400000                    # TODO-PLACEHOLDER(context): confirm
   #     hardware: null
   #     sampling:
   #       temperature: 0.0
   #       top_p: 1.0
   #       max_tokens: 2048
-  #       seed: null                                # not supported by this API
+  #       seed: null
   #   cost:
-  #     input_usd_per_mtok: 3.00                    # TODO-PLACEHOLDER(pricing):
-  #     output_usd_per_mtok: 15.00                  # confirm against the current price list
+  #     input_usd_per_mtok: 0.25
+  #     output_usd_per_mtok: 2.00
+
+  # --- A local model served by vLLM on the campus GPU hardware -------------
   #
-  # A local model served by vLLM on the off-cluster campus GPU hardware. This is
-  # where the reproducibility fields earn their keep: quantization, revision and
-  # hardware are all knowable here and all change the numbers.
+  # OpenAI-compatible, so it takes the default client. This is where the
+  # reproducibility fields earn their keep: quantization, revision and hardware
+  # are all knowable here and all change the numbers.
   # See infra/inference/README.md.
   #
   # - key: vllm-spark-qwen3-32b
@@ -151,7 +287,7 @@ models:
   #       temperature: 0.0
   #       top_p: 1.0
   #       max_tokens: 2048
-  #       seed: 20260101                                     # vLLM honours seed; APIs mostly do not
+  #       seed: 20260101                                     # vLLM honours seed; hosted APIs mostly do not
   #     extra:
   #       tensor_parallel_size: 1
   #       gpu_memory_utilization: 0.90
