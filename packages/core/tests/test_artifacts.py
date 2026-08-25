@@ -8,6 +8,7 @@ from ida_core.artifacts import (
     DEFAULT_BUCKET,
     LocalArtifactStore,
     eval_log_key,
+    judge_key,
     parse_uri,
     run_prefix,
     sample_key,
@@ -186,3 +187,58 @@ class TestLocalStoreHandlesRepeats:
 
         assert store.get_json(sample_key("run_x", "s1", 2)) == {"which": "repeat-2-of-s1"}
         assert store.get_json(sample_key("run_x", "s1.r2", 0)) == {"which": "sample-named-s1.r2"}
+
+
+class TestJudgeKeyConvention:
+    """The judge prefix is ADDITIVE: nothing that was already written moves.
+
+    A judged run gains ``runs/<id>/judge/``; ``transcripts/`` is byte-for-byte
+    what it was. That matters beyond tidiness -- anything counting keys under
+    ``transcripts/`` to mean "samples in this run" would have silently doubled
+    if judge objects had been interleaved there.
+    """
+
+    def test_literal(self) -> None:
+        assert judge_key("run_abc", "s1") == "runs/run_abc/judge/s1.json"
+
+    def test_repeat_literal(self) -> None:
+        assert judge_key("run_abc", "s1", 2) == "runs/run_abc/judge/s1/r2.json"
+
+    def test_it_is_a_sibling_of_transcripts_not_a_child(self) -> None:
+        assert judge_key("run_abc", "s1") != sample_key("run_abc", "s1")
+        assert "transcripts/" not in judge_key("run_abc", "s1")
+
+    def test_it_lives_under_the_run_prefix(self) -> None:
+        """So deleting a run is still ONE prefixed delete."""
+        assert judge_key("run_abc", "s1").startswith(run_prefix("run_abc"))
+        assert judge_key("run_abc", "s1", 3).startswith(run_prefix("run_abc"))
+
+    def test_a_run_with_no_judge_has_no_judge_prefix(self) -> None:
+        """'Was this run graded?' is answerable from object storage alone."""
+        keys = {sample_key("run_abc", "s1"), eval_log_key("run_abc")}
+        assert not any(k.startswith("runs/run_abc/judge/") for k in keys)
+
+    @pytest.mark.parametrize(
+        "hostile", ["../escape", "a/b", ".hidden", "", "x" * 300, "..", "/abs"]
+    )
+    def test_hostile_sample_ids_are_refused_here_too(self, hostile: str) -> None:
+        """Same defence as sample_key -- a hostile task file must not be able to
+        write outside its run prefix through the judge path either."""
+        with pytest.raises(ValueError):
+            judge_key("run_abc", hostile)
+
+    def test_a_negative_repeat_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="repeat_index"):
+            judge_key("run_abc", "s1", -1)
+
+    def test_repeats_cannot_collide_with_a_dotted_sample_id(self) -> None:
+        """The ``s1.r2`` collision that motivated nesting in sample_key applies
+        identically here, so it is defended identically."""
+        assert judge_key("run_abc", "s1.r2") != judge_key("run_abc", "s1", 2)
+
+    def test_it_round_trips_through_a_real_store(self, tmp_path) -> None:
+        store = LocalArtifactStore(tmp_path)
+        store.ensure_bucket()
+        uri = store.put_json(judge_key("run_abc", "s1"), {"aggregate": 0.75})
+        assert uri.endswith("runs/run_abc/judge/s1.json")
+        assert store.get_json(judge_key("run_abc", "s1"))["aggregate"] == 0.75

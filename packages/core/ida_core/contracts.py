@@ -28,10 +28,15 @@ Every task is exactly one of:
 
 ``verifiable``  scored programmatically against a gold answer
                 (:class:`ScorerKind.EXACT_MATCH`, :class:`ScorerKind.NUMERIC_MATCH`).
-``subjective``  scored by an LLM judge against a rubric.  **Not implemented in
-                the walking skeleton** -- the interface exists, the scorer
-                raises ``NotImplementedError``, and such tasks are loaded and
-                validated but marked not-yet-scorable.
+``subjective``  scored by an LLM judge against a rubric
+                (:class:`ScorerKind.LLM_JUDGE`, implemented in
+                :mod:`ida_harness.judge`).  A judged result carries a second
+                serving config (:attr:`ResultRecord.judge_serving_config`), its
+                own token/cost accounting (:attr:`ResultRecord.judge_usage`)
+                and a per-criterion breakdown (:class:`CriterionScore`).  A run
+                executed with **no judge configured** still records
+                ``scorable=False`` / ``score=None`` rather than zeros, and can
+                be graded later from its archived transcripts.
 """
 
 from __future__ import annotations
@@ -435,7 +440,14 @@ class ScorerSpec(BaseModel):
 
 
 class Rubric(BaseModel):
-    """A judging rubric.  Loaded and validated today; *applied* in a later phase."""
+    """A judging rubric.  Applied by :mod:`ida_harness.judge`, one call per criterion.
+
+    ``scale_min``/``scale_max`` are the range the judge is asked to answer on;
+    the harness normalises each criterion onto ``[0, 1]`` before weighting, so a
+    rubric authored on 0-4 and one authored on 0-1 produce comparable numbers.
+    A degenerate scale (``scale_min == scale_max``) is refused at grading time
+    rather than dividing by zero.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -587,10 +599,14 @@ class TaskSpec(BaseModel):
 
     @property
     def is_scorable(self) -> bool:
-        """False for ``subjective`` tasks until the judge lands.
+        """True when this task can be scored with **no judge model**.
 
-        The API and the UI surface this so a subjective task shows as
-        *loaded, validated, not yet scorable* rather than silently failing.
+        Deliberately unchanged now that the judge exists: it answers "can a
+        program grade this on its own", and for a ``subjective`` task the answer
+        is still no -- grading it costs a second model call that somebody has to
+        configure and pay for.  :func:`ida_harness.runner.unscorable_reason`
+        takes the judge into account; this property is the judge-free floor the
+        API and UI read to say *loaded, validated, needs a judge*.
         """
         return self.kind is TaskKind.VERIFIABLE
 
@@ -752,8 +768,12 @@ class CriterionScore(BaseModel):
     before anyone can read it.  "specificity 0.4, tone 0.9" is precisely what a
     professor reviewing a recommendation wants to see; "0.58" is not.
 
-    Populated by the LLM judge when it lands (see
-    :class:`ida_harness.scoring.LLMJudgeScorer`); empty for programmatic scorers.
+    Populated by :class:`ida_harness.judge.LLMJudge`; empty for programmatic
+    scorers.  :attr:`value` is the criterion's score **normalised onto [0, 1]**
+    from the rubric's scale, and :attr:`weight` is copied from the rubric, so
+    the weighted total on the parent :class:`Score` is reconstructible from
+    these rows alone -- which is what makes a judge-calibration study a query
+    rather than a re-run.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -883,6 +903,37 @@ class ResultRecord(BaseModel):
     samples the skeleton produces.
     """
 
+    judge_usage: TokenUsage = Field(default_factory=TokenUsage)
+    """Tokens the JUDGE consumed grading this sample, kept apart from :attr:`usage`.
+
+    A judged sample buys two things: the answer and the grade.  Adding them
+    together would make a cheap model judged by an expensive one look expensive,
+    which is precisely the comparison this platform exists to get right -- and
+    it would be unrecoverable, because nothing downstream could tell the two
+    apart again.  So the judge's tokens get their own field and their own
+    columns, for the same reason :attr:`judge_serving_config` got its own:
+    separate questions deserve separate answers.
+
+    Zero for programmatic scorers and for samples no judge graded.
+    """
+
+    judge_cost_usd: Annotated[float, Field(ge=0.0)] = 0.0
+    """Money spent on the GRADE, priced at the *judge's* rates -- not the
+    candidate's.  Excluded from :attr:`cost_usd` on purpose; a consumer that
+    wants the all-in figure adds them, and one that wants to know what grading
+    costs can now ask."""
+
+    judge_transcript_uri: str | None = None
+    """``s3://<bucket>/<key>`` pointing at the judge's own transcript.
+
+    D-3 applied to the grade.  A rubric score that cannot be traced back to the
+    per-criterion judgments that produced it is an opinion, not evidence -- and
+    "the judge said 0.4 for specificity because ..." is the sentence a professor
+    reviewing a recommendation actually needs.  Built by
+    :func:`ida_core.artifacts.judge_key`.  ``None`` when no judge ran, or when
+    archival failed (see :attr:`archive_error`).
+    """
+
     task_content_sha: str | None = None
     """SHA-256 of this task's canonicalised definition.
 
@@ -895,7 +946,7 @@ class ResultRecord(BaseModel):
     """``None`` when the sample errored, or when the task is not yet scorable."""
 
     scorable: bool = True
-    """False for ``subjective`` samples in the skeleton (no judge yet).
+    """False for a ``subjective`` sample that ran with **no judge configured**.
 
     Read together with :attr:`error`, this distinguishes the two very different
     reasons :attr:`score` can be ``None``::
@@ -1098,3 +1149,17 @@ class EvalLog(BaseModel):
         for result in self.results:
             total = total + result.usage
         return total
+
+    @property
+    def total_judge_usage(self) -> TokenUsage:
+        """Tokens the JUDGE consumed across this log.  Never folded into
+        :attr:`total_usage` -- see :attr:`ResultRecord.judge_usage`."""
+        total = TokenUsage()
+        for result in self.results:
+            total = total + result.judge_usage
+        return total
+
+    @property
+    def total_judge_cost_usd(self) -> float:
+        """What grading this run cost, priced at the judge's rates."""
+        return sum(r.judge_cost_usd for r in self.results)

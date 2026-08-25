@@ -135,6 +135,20 @@ class ResultRow(Base):
     "every result graded by judge X" is an indexable query, not a JSON scan.
     """
 
+    judge_prompt_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    judge_completion_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    """What the JUDGE spent grading this sample -- never folded into
+    ``prompt_tokens``/``completion_tokens``.  A cheap model graded by an
+    expensive one must not read as an expensive model."""
+
+    judge_cost_usd: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    """Money spent on the GRADE, priced at the judge's rates.  Excluded from
+    ``cost_usd``; a consumer wanting the all-in figure adds the two."""
+
+    judge_transcript_uri: Mapped[str | None] = mapped_column(String(1024))
+    """``s3://bucket/key`` -- the judge's per-criterion transcript (D-3 applied
+    to the grade).  NULL when no judge ran.  See ida_core.artifacts.judge_key."""
+
     task_content_sha: Mapped[str | None] = mapped_column(String(64), index=True)
     """SHA-256 of the task's canonicalised content (B8)."""
 
@@ -148,7 +162,10 @@ class ResultRow(Base):
     score_details: Mapped[dict | None] = mapped_column(JSON)
 
     scorable: Mapped[bool] = mapped_column(default=True, nullable=False)
-    """False for ``subjective`` samples until the LLM judge lands."""
+    """False for a ``subjective`` sample that ran with no judge configured.
+
+    Such a row is gradable later from its archived transcript -- see
+    ``ida_harness.regrade``."""
 
     prompt_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     completion_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

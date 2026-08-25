@@ -273,6 +273,12 @@ def result_row_to_record(row: ResultRow) -> ResultRecord:
             if row.judge_serving_config
             else None
         ),
+        judge_usage=TokenUsage(
+            prompt_tokens=row.judge_prompt_tokens,
+            completion_tokens=row.judge_completion_tokens,
+        ),
+        judge_cost_usd=row.judge_cost_usd,
+        judge_transcript_uri=row.judge_transcript_uri,
         task_content_sha=row.task_content_sha,
         score=score,
         scorable=row.scorable,
@@ -309,6 +315,10 @@ def insert_results(session: Session, records: list[ResultRecord]) -> list[Result
                 if record.judge_serving_config
                 else None
             ),
+            judge_prompt_tokens=record.judge_usage.prompt_tokens,
+            judge_completion_tokens=record.judge_usage.completion_tokens,
+            judge_cost_usd=record.judge_cost_usd,
+            judge_transcript_uri=record.judge_transcript_uri,
             task_content_sha=record.task_content_sha,
             scorer=record.score.scorer.value if record.score else None,
             score_value=record.score.value if record.score else None,

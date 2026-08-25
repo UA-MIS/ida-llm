@@ -8,6 +8,7 @@ pass against a database that production does not have. This test is the guard.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 import sqlalchemy as sa
@@ -380,3 +381,72 @@ class TestForeignStampIsRefused:
         monkeypatch.setenv("IDA_DATABASE_URL", url)
         upgrade(_alembic_config(url), "head")
         assert {"runs", "results"} <= set(inspect(make_engine(url)).get_table_names())
+
+
+class TestPartialDowngradeToTwo:
+    """0003 -> 0002 specifically, for the same reason TestPartialDowngrade exists.
+
+    The operational case is never "tear the database down"; it is "0003 is bad,
+    go back one, keep 0002's schema and its rows".
+    """
+
+    ADDED_TO_RESULTS: ClassVar[set[str]] = {
+        "judge_prompt_tokens",
+        "judge_completion_tokens",
+        "judge_cost_usd",
+        "judge_transcript_uri",
+    }
+
+    def _config(self, engine, monkeypatch):
+        url = str(engine.url)
+        monkeypatch.setenv("IDA_DATABASE_URL", url)
+        return _alembic_config(url)
+
+    def test_head_carries_the_judge_spend_columns(self, migrated_engine) -> None:
+        columns = _describe(migrated_engine)["results"]["columns"]
+        assert set(columns) >= self.ADDED_TO_RESULTS
+
+    def test_the_spend_columns_are_not_nullable_and_default_to_zero(self, migrated_engine) -> None:
+        """Zero is the TRUE answer for a row nothing judged, so the column can be
+        NOT NULL -- there is no 'unknown' state to represent."""
+        columns = _describe(migrated_engine)["results"]["columns"]
+        for name in ("judge_prompt_tokens", "judge_completion_tokens", "judge_cost_usd"):
+            _type, nullable = columns[name]
+            assert nullable is False, name
+        assert columns["judge_transcript_uri"][1] is True, "no judge ran -> no pointer"
+
+    def test_it_removes_exactly_the_0003_columns(self, migrated_engine, monkeypatch) -> None:
+        from alembic.command import downgrade
+
+        before = _describe(migrated_engine)
+        assert set(before["results"]["columns"]) >= self.ADDED_TO_RESULTS
+
+        downgrade(self._config(migrated_engine, monkeypatch), "ida_0002_failure_and_provenance")
+        after = _describe(migrated_engine)
+
+        assert self.ADDED_TO_RESULTS.isdisjoint(after["results"]["columns"])
+
+    def test_the_0002_schema_is_left_intact(self, migrated_engine, monkeypatch) -> None:
+        """Going back one revision must not take 0002's columns with it."""
+        from alembic.command import downgrade
+
+        downgrade(self._config(migrated_engine, monkeypatch), "ida_0002_failure_and_provenance")
+        after = _describe(migrated_engine)
+
+        assert {"judge_serving_config", "score_criteria", "cached", "archive_error"} <= set(
+            after["results"]["columns"]
+        )
+        assert after["results"]["indexes"]["ix_results_run_sample"] == (
+            ("run_id", "sample_id", "repeat_index"),
+            True,
+        )
+
+    def test_downgrade_then_upgrade_round_trips_to_the_orm_schema(
+        self, migrated_engine, metadata_engine, monkeypatch
+    ) -> None:
+        from alembic.command import downgrade, upgrade
+
+        config = self._config(migrated_engine, monkeypatch)
+        downgrade(config, "ida_0002_failure_and_provenance")
+        upgrade(config, "head")
+        assert _describe(migrated_engine) == _describe(metadata_engine)

@@ -4,6 +4,8 @@ Path convention (**stable -- treat as a contract**)::
 
     <bucket>/runs/<run_id>/transcripts/<sample_id>.json      one SampleTranscript
     <bucket>/runs/<run_id>/transcripts/<sample_id>/r<n>.json  repetition n > 0
+    <bucket>/runs/<run_id>/judge/<sample_id>.json            one JudgeTranscript
+    <bucket>/runs/<run_id>/judge/<sample_id>/r<n>.json        repetition n > 0
     <bucket>/runs/<run_id>/eval-log.json                     the whole EvalLog
 
 Rules behind the shape:
@@ -87,6 +89,33 @@ def sample_key(run_id: str, sample_id: str, repeat_index: int = 0) -> str:
     if repeat_index == 0:
         return f"{run_prefix(run_id)}transcripts/{leaf}.json"
     return f"{run_prefix(run_id)}transcripts/{leaf}/r{repeat_index}.json"
+
+
+def judge_key(run_id: str, sample_id: str, repeat_index: int = 0) -> str:
+    """Object key for one sample's **judge** transcript.
+
+    A sibling prefix of ``transcripts/``, not a suffix inside it, and that is
+    the whole design:
+
+    * ``transcripts/`` stays exactly what it was.  Every key already written is
+      still at the key it was written to, and a consumer that lists
+      ``transcripts/`` still sees one object per sample -- interleaving judge
+      objects there would have silently doubled that count and broken
+      "one transcript per sample" for anything counting keys.
+    * A run's grading evidence is one ``LIST runs/<run_id>/judge/`` away, and a
+      run with no judge simply has no such prefix.  "Was this run graded?" is
+      answerable from object storage alone.
+
+    Repetition nesting mirrors :func:`sample_key` exactly, for exactly the same
+    collision reason -- a sample legitimately named ``s1.r2`` must not be able
+    to write over repetition 2 of ``s1``.
+    """
+    leaf = _check_segment(sample_id, "sample_id")
+    if repeat_index < 0:
+        raise ValueError(f"repeat_index must be >= 0, got {repeat_index}")
+    if repeat_index == 0:
+        return f"{run_prefix(run_id)}judge/{leaf}.json"
+    return f"{run_prefix(run_id)}judge/{leaf}/r{repeat_index}.json"
 
 
 def eval_log_key(run_id: str) -> str:

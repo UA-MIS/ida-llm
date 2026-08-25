@@ -185,6 +185,20 @@ class Settings(BaseSettings):
     status update; erring short would report a healthy run as failed, which is
     the kind of false statement this platform exists to avoid."""
 
+    judge_model_key: str = ""
+    """``models.yaml`` key of the model that grades ``subjective`` tasks.
+
+    **Empty by default, and that default is a decision.**  A judge is a second
+    model call per criterion per sample; turning it on spends real money on every
+    subjective run, so it must be an operator's explicit choice rather than
+    something that starts happening because a feature merged.  Empty means
+    subjective tasks stay ``scorable=False`` with their transcripts archived, and
+    ``python -m ida_harness.regrade`` can grade them later.
+
+    Any registry key works -- the judge goes through the same client factory as
+    the model under test, so "who judges" is a YAML edit (D-13).
+    """
+
     auth_mode: str = "disabled"
     """``disabled`` today.
 
