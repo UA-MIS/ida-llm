@@ -9,6 +9,10 @@ An LLM benchmark harness and results platform.
 > verified end to end. The application logic is deliberately left to you — files
 > that are placeholders say so at the top, in the file itself.
 
+> **Sprint board:** work items for this project live at
+> **<https://ida-agile.capstone.uamishub.com>** (`apps/agile/` — sign in with GitHub;
+> access is limited to the `UA-MIS/ida-llm` team).
+
 ---
 
 ## What is real, and what is yours
