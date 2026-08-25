@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import type {
-  ActivityEntry,
-  Attachment,
-  Comment,
-  Sprint,
-  WorkItem,
+import {
+  typeCreatesBranch,
+  type ActivityEntry,
+  type Attachment,
+  type Comment,
+  type Sprint,
+  type WorkItem,
 } from '@/lib/domain/workitem';
 import type { TeamMember, AnnotatedPullRequest } from '@/lib/github/client';
 import { api, ApiError } from '@/lib/apiClient';
@@ -51,6 +52,9 @@ export function ItemDetail({
   const [commentBody, setCommentBody] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
 
+  /** Story/Bug work ends in a diff; Spike/Task work does not (AB#25). */
+  const branchesOnStart = typeCreatesBranch(item.itemType);
+
   const sprintName = sprints.find((s) => s.id === item.sprintId)?.name ?? null;
   const linked = new Set(item.pullRequests.map((p) => `${p.repoFullName}#${p.prNumber}`));
   const suggestions = openPrs.filter((pr) => !linked.has(`${pr.repoFullName}#${pr.number}`));
@@ -84,6 +88,11 @@ export function ItemDetail({
           text: res.branch.status === 'created' ? `Branch ${res.branch.name} created.` : `Linked existing branch ${res.branch.name}.`,
           action: res.branch.url ? { label: 'Open', href: res.branch.url } : undefined,
         });
+      } else if (res.branch.status === 'skipped') {
+        // The designed outcome for a Spike or a Task: the item really is
+        // started. Reporting that as a branch failure is what made the old
+        // flow feel like it owed you a branch.
+        toast.push({ tone: 'ok', text: `#${item.id} is Active. ${res.branch.message ?? ''}`.trim() });
       } else {
         toast.push({ tone: 'error', text: res.branch.message ?? 'Could not create the branch.' });
       }
@@ -183,9 +192,27 @@ export function ItemDetail({
         </h1>
         <StateBadge state={item.state} />
         <span className="spacer" />
-        {autoBranch && !item.branchName ? (
-          <button className="btn" onClick={() => void startWork()} disabled={busy === 'branch'}>
-            {busy === 'branch' ? <span className="spinner" /> : <GitBranchIcon />} Start work
+        {/*
+          * "Start work" must not imply a branch for a type that does not get
+          * one. A Story or Bug offers it while it still needs a branch (and
+          * only when branching is enabled at all); a Spike or Task offers it
+          * only while it is still New, where pressing it activates and claims
+          * the item and creates nothing in git (AB#25).
+          */}
+        {branchesOnStart ? (
+          autoBranch && !item.branchName ? (
+            <button className="btn" onClick={() => void startWork()} disabled={busy === 'branch'}>
+              {busy === 'branch' ? <span className="spinner" /> : <GitBranchIcon />} Start work
+            </button>
+          ) : null
+        ) : item.state === 'New' ? (
+          <button
+            className="btn"
+            onClick={() => void startWork()}
+            disabled={busy === 'branch'}
+            title={`Activate and claim this ${item.itemType}. No branch is created.`}
+          >
+            {busy === 'branch' ? <span className="spinner" /> : null} Start work
           </button>
         ) : null}
         <button className="btn" onClick={() => setEditing(true)}>Edit</button>

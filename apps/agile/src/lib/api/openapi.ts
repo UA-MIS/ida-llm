@@ -223,12 +223,35 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       },
       '/api/v1/items/{id}/start-work': {
         post: {
-          summary: 'Activate the item and create its GitHub branch',
+          summary: 'Activate and claim the item, and branch it when its type branches',
           description:
             'Requires a signed-in session (branch creation uses the user\'s GitHub token). ' +
-            'The state change is applied first and is never rolled back by a branch failure.',
+            'The state change is applied first and is never rolled back by a branch failure. ' +
+            'A branch is created for Story and Bug items only: Spike and Task work does not ' +
+            'live in git, so they are activated and assigned with no branch and the response ' +
+            'carries branch.status "skipped". Send {"branch": true} or {"branch": false} to ' +
+            'override that default in either direction.',
           parameters: [idParam],
-          responses: { 200: { description: 'Item, plus branch status (which may be "failed").' } },
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  additionalProperties: false,
+                  properties: {
+                    activate: { type: 'boolean', description: 'Set false to claim/branch without moving the item to Active.' },
+                    branch: { type: 'boolean', description: 'Force branch creation on or off, overriding the item-type default.' },
+                    repo: { type: 'string', description: 'Branch in a non-primary repo the board follows.' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            200: { description: 'Item, plus branch status ("created", "existing", "skipped", "disabled" or "failed").' },
+            422: { description: 'Unrecognized or invalid field in the body.' },
+          },
         },
       },
       '/api/v1/items/{id}/links': {

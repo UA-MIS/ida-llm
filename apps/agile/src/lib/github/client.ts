@@ -294,20 +294,44 @@ export async function compareWithDefault(
 
 // ------------------------------------------------------------------- commits
 
-export async function listBranchCommits(
+/**
+ * The commits on `branch` that are NOT already on the repo's base branch —
+ * i.e. the work done ON this branch.
+ *
+ * This deliberately does NOT use `GET /commits?sha={branch}`, which returns the
+ * branch's whole ANCESTRY. A board branch is cut from the base branch, so its
+ * tip IS the base's tip until someone pushes: listing it returned the base's
+ * last 50 commits, every one of which was then ingested and attributed to the
+ * item. A research spike whose branch was never touched displayed
+ * `commitCount: 20` — main's history, wearing the item's name (AB#25).
+ *
+ * `compare/base...branch` answers the question a human is actually asking:
+ * `commits` there is exactly the ahead-set, so a freshly-cut branch is 0.
+ *
+ * Fails soft (empty list) on anything GitHub will not answer, because commit
+ * counts are a display signal and must never break reconciliation.
+ */
+export async function listCommitsAheadOfBase(
   repoFullName: string,
   branch: string,
   token: string,
   fetchImpl: Fetcher = fetch,
+  limit = 50,
 ): Promise<CommitInfo[]> {
+  const base = await getRepoDefaultBranch(repoFullName, token, fetchImpl);
+  // A branch compared with itself is zero ahead; skip the round-trip and never
+  // let the base branch's own history be attributed to an item.
+  if (base === branch) return [];
+
   const res = await fetchImpl(
-    `https://api.github.com/repos/${repoFullName}/commits?sha=${encodeURIComponent(branch)}&per_page=50`,
+    `https://api.github.com/repos/${repoFullName}/compare/${encodeURIComponent(base)}...${encodeURIComponent(branch)}?per_page=100`,
     { headers: ghHeaders(token) },
   );
   if (!res.ok) return [];
-  const body = (await res.json()) as unknown;
-  if (!Array.isArray(body)) return [];
-  return body.map((c) => mapCommit(c as Record<string, unknown>));
+  const body = (await res.json()) as { commits?: unknown };
+  if (!Array.isArray(body.commits)) return [];
+  // The compare endpoint returns oldest-first; keep the most recent `limit`.
+  return body.commits.slice(-limit).map((c) => mapCommit(c as Record<string, unknown>));
 }
 
 export function mapCommit(c: Record<string, unknown>): CommitInfo {

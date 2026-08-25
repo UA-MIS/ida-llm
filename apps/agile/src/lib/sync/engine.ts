@@ -1,5 +1,6 @@
 import { config } from '@/lib/env';
 import {
+  clearItemBranch,
   findItemByBranch,
   findItemsByPullRequest,
   getWorkItem,
@@ -125,6 +126,33 @@ export async function handlePush(payload: PushPayload): Promise<SyncOutcome> {
     }
   }
 
+  return outcome;
+}
+
+/**
+ * `delete` webhook: a branch went away, so the item must stop advertising it.
+ *
+ * Without this the board kept a name, a URL and a created-at for a ref that no
+ * longer resolves — an open research card in front of the team with a link that
+ * 404s (AB#25). The item's commits and PR links stay: they record what
+ * happened, and only the pointer at the dead ref is wrong.
+ */
+export async function handleBranchDeleted(
+  repoFullName: string,
+  branch: string,
+): Promise<SyncOutcome> {
+  const outcome = empty();
+  if (!config.isKnownRepo(repoFullName) || !branch) return outcome;
+
+  const item = await findItemByBranch(repoFullName, branch);
+  if (!item) return outcome;
+
+  const cleared = await clearItemBranch(item.id, {
+    login: 'github',
+    source: 'github',
+    note: `branch ${branch} was deleted on ${repoFullName}`,
+  });
+  if (cleared) outcome.itemsTouched.push(item.id);
   return outcome;
 }
 
