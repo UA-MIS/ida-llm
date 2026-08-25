@@ -8,6 +8,7 @@ remember to honour.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy import func, select
@@ -347,11 +348,160 @@ def insert_results(session: Session, records: list[ResultRecord]) -> list[Result
     return rows
 
 
-def list_results_for_run(session: Session, run_id: str) -> list[ResultRow]:
-    """All results for a run, in stable ``sample_id`` order."""
+def list_results_for_run(
+    session: Session,
+    run_id: str,
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+) -> list[ResultRow]:
+    """Results for a run, in stable ``(sample_id, repeat_index)`` order.
+
+    ``limit=None`` -- the default -- returns every row, which is what the runner
+    and the tests want. The API passes an explicit page so that one run cannot
+    produce an unbounded response: a sweep with repeats over a large task is one
+    row per (sample, repetition), and nothing else caps that.
+
+    The ordering is total and deterministic, which is what makes paging over it
+    correct: a page boundary that fell inside a group of equal sort keys could
+    otherwise repeat or skip a row between requests.
+    """
     stmt = (
         select(ResultRow)
         .where(ResultRow.run_id == run_id)
         .order_by(ResultRow.sample_id.asc(), ResultRow.repeat_index.asc())
     )
+    if offset:
+        stmt = stmt.offset(offset)
+    if limit is not None:
+        stmt = stmt.limit(limit)
     return list(session.scalars(stmt))
+
+
+# ---------------------------------------------------------------- sweeps ----
+# Read-only helpers the scheduled sweeps (ida_runner.sweeps) plan against. They
+# live here, not in the runner, because they are contracts <-> rows mapping and
+# this module is the only place that is allowed to be.
+
+
+def existing_run_keys(
+    session: Session,
+    *,
+    statuses: Sequence[RunStatus],
+    model_keys: Sequence[str] | None = None,
+    created_after: datetime | None = None,
+) -> set[tuple[str, str, str | None]]:
+    """``(task_id, model_key, task_content_sha)`` for every run in ``statuses``.
+
+    The dedupe index a sweep plans against.  ``task_content_sha`` is part of the
+    key on purpose (B8): editing a task changes its content sha, which makes the
+    old measurement stale and the pair legitimately re-runnable.  Comparing on
+    ``(task_id, model_key)`` alone would mean a task could be rewritten and never
+    re-measured, and the dashboard would keep showing the previous version's
+    numbers under the new task's name.
+
+    ``None`` shas are returned as-is rather than dropped.  A row whose sha is
+    NULL predates content hashing; it will simply never match a candidate (whose
+    sha is non-NULL), so such a pair is re-run once and thereafter deduped
+    normally.  Silently treating NULL as "matches anything" would suppress the
+    re-measurement that backfills it.
+
+    ``created_after`` bounds the query to recent rows.  Callers use it for the
+    ``queued``/``running`` half of the index, and the bound is LOAD-BEARING: an
+    unbounded "is it in flight?" question answered from a row alone treats a run
+    that nothing will ever process as one that is about to be, which suppresses
+    the pair for good.  See the note above :func:`fail_run` in the sweep's
+    enqueue path for the failure this exists to stop.
+
+    A single ``SELECT DISTINCT`` rather than a query per candidate: a sweep asks
+    this once and then does set membership in Python, so planning is one round
+    trip regardless of how far the registry x catalog cross product grows.
+    """
+    if not statuses:
+        return set()
+    stmt = select(RunRow.task_id, RunRow.model_key, RunRow.task_content_sha).where(
+        RunRow.status.in_([s.value for s in statuses])
+    )
+    if model_keys is not None:
+        if not model_keys:
+            return set()
+        stmt = stmt.where(RunRow.model_key.in_(list(model_keys)))
+    if created_after is not None:
+        stmt = stmt.where(RunRow.created_at >= created_after)
+    return {
+        (task_id, model_key, sha) for task_id, model_key, sha in session.execute(stmt.distinct())
+    }
+
+
+def models_with_any_run(
+    session: Session,
+    *,
+    statuses: Sequence[RunStatus],
+) -> set[str]:
+    """Model keys that have at least one run in ``statuses``.
+
+    What ``ida-sweep model-sweep`` diffs the registry against: a model absent
+    from this set has never been measured (or never successfully), which is the
+    definition of "new" that sweep acts on.  Deliberately not "has a run for
+    every current task" -- that is the nightly rebenchmark's job, and conflating
+    the two would make the cheap targeted sweep re-enqueue the whole suite.
+    """
+    if not statuses:
+        return set()
+    stmt = select(RunRow.model_key).where(RunRow.status.in_([s.value for s in statuses])).distinct()
+    return set(session.scalars(stmt))
+
+
+def list_ungraded_subjective_results(session: Session, *, limit: int = 500) -> list[ResultRow]:
+    """Subjective samples that carry no score yet, oldest first.
+
+    ``scorable=False`` is the harness's marker for a sample from a
+    ``subjective`` task, written because no programmatic scorer can touch it
+    (see ``ida_harness.runner``).  ``score_value IS NULL`` is the second half of
+    the predicate rather than a redundancy: once the LLM judge grades a sample
+    retroactively it writes a score onto exactly these rows, and a candidate
+    query that ignored the score would keep re-grading everything it had already
+    graded -- every night, at full provider cost.
+
+    Oldest first so a bounded pass makes progress through the backlog instead of
+    re-examining the same head of it.  Bounded by ``limit`` for the same reason
+    :func:`list_stale_running_runs` is: one pass must not become an unbounded
+    transaction.  A caller that hits the bound should say so in its log line
+    rather than let a truncated pass read as "that was all".
+
+    ⚠ OPEN CONTRACT: WHAT A **FAILED** JUDGE LEAVES BEHIND.  This predicate says
+    "no score yet", which today is the same set as "never graded" because nothing
+    grades.  It stops being the same set the moment a judge can FAIL on a sample.
+    If a failed grading leaves ``score_value`` NULL, this query nominates that
+    sample again on every subsequent pass -- forever, at judge cost -- while a
+    grader that refuses to retry it never clears it.  That standoff is the
+    disagreement flagged as E3 against the judge PR, and it is unresolved
+    upstream at the time of writing.
+
+    Deliberately NOT pre-emptively guessed at here.  Whoever lands the judge must
+    decide what a failed grading writes (an ``error`` on the result?  a sentinel
+    score?  an attempt counter?) and then make this predicate agree with it in
+    the SAME change.  Encoding a guess now would produce two components that look
+    consistent and are not, which is strictly worse than a query with a known
+    open question written on it.
+    """
+    stmt = (
+        select(ResultRow)
+        .where(ResultRow.scorable.is_(False))
+        .where(ResultRow.score_value.is_(None))
+        .order_by(ResultRow.created_at.asc(), ResultRow.id.asc())
+        .limit(limit)
+    )
+    return list(session.scalars(stmt))
+
+
+def count_results_for_run(session: Session, run_id: str) -> int:
+    """How many results the run has, ignoring pagination.
+
+    Returned alongside the page for the same reason :func:`count_runs` is (A11):
+    without it a client cannot tell a genuinely empty run from a page past the
+    end, and the UI classifies those two very differently -- an empty result set
+    reads as "all errored".
+    """
+    stmt = select(func.count()).select_from(ResultRow).where(ResultRow.run_id == run_id)
+    return int(session.scalar(stmt) or 0)

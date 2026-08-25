@@ -51,6 +51,7 @@ from ida_core.contracts import (
 from ida_core.db import session_scope, utcnow
 from ida_core.ids import new_id, new_run_id
 from ida_core.repositories import (
+    count_results_for_run,
     count_runs,
     create_run,
     get_run,
@@ -413,14 +414,39 @@ def create_app(context: AppContext | None = None) -> FastAPI:
             )
 
     @app.get("/runs/{run_id}", response_model=RunDetail, tags=["runs"])
-    def get_run_detail(run_id: str, ctx: AppContext = Depends(get_context)) -> RunDetail:
-        """One run plus every result: score, serving config, artifact pointer."""
+    def get_run_detail(
+        run_id: str,
+        ctx: AppContext = Depends(get_context),
+        limit: int = Query(MAX_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+        offset: int = Query(0, ge=0),
+    ) -> RunDetail:
+        """One run plus a page of its results: score, serving config, artifact pointer.
+
+        **Why this is paged at all.** A run holds one result per (sample,
+        repetition). Nothing bounds that product -- a large task swept with
+        repeats is the normal way to get a big one -- and this endpoint used to
+        serialise every row, so the response size was set by authored data
+        rather than by anything the API controls.
+
+        The default is the maximum page rather than a small one, deliberately:
+        no run this platform can currently produce reaches it, so existing
+        clients see exactly what they saw before, while the response gains a
+        ceiling. ``results_total`` always reports the true count, so a client
+        can detect a partial view instead of quietly drawing conclusions from
+        one.
+        """
         with session_scope(ctx.session_factory) as session:
             row = get_run(session, run_id)
             if row is None:
                 raise HTTPException(status.HTTP_404_NOT_FOUND, f"no run {run_id!r}")
-            results = [result_row_to_record(r) for r in list_results_for_run(session, run_id)]
-            return RunDetail(run=run_row_to_record(row), results=results)
+            rows = list_results_for_run(session, run_id, limit=limit, offset=offset)
+            return RunDetail(
+                run=run_row_to_record(row),
+                results=[result_row_to_record(r) for r in rows],
+                results_total=count_results_for_run(session, run_id),
+                results_limit=limit,
+                results_offset=offset,
+            )
 
     @app.get("/runs/{run_id}/results/{sample_id}/transcript", tags=["runs"])
     def get_transcript(run_id: str, sample_id: str, ctx: AppContext = Depends(get_context)) -> dict:

@@ -20,12 +20,15 @@ from ida_core.db import session_scope
 from ida_core.ids import new_result_id, new_run_id
 from ida_core.repositories import (
     create_run,
+    existing_run_keys,
     finish_run,
     get_run,
     insert_results,
     list_results_for_run,
     list_runs,
+    list_ungraded_subjective_results,
     mark_run_running,
+    models_with_any_run,
     result_row_to_record,
     run_row_to_record,
 )
@@ -373,3 +376,194 @@ class TestJudgeSpendIsPersistedSeparately:
         assert restored.judge_cost_usd == 0.0
         assert restored.judge_transcript_uri is None
         assert restored.judge_serving_config is None
+
+
+class TestSweepPlanningHelpers:
+    """The read-only queries the scheduled sweeps plan against.
+
+    Tested here, at the contracts<->rows layer where they live, and not only
+    through the sweeps that call them: these are the predicates that decide
+    whether a nightly CronJob spends provider credits, and a wrong answer is
+    silent -- a duplicate charge or a measurement that never happens.
+    """
+
+    def test_existing_run_keys_returns_the_dedupe_triple(self, session_factory) -> None:
+        run = _run(status=RunStatus.SUCCEEDED, task_content_sha="sha-1")
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+        with session_scope(session_factory) as session:
+            keys = existing_run_keys(session, statuses=[RunStatus.SUCCEEDED])
+        assert keys == {("demo/t", "mock", "sha-1")}
+
+    def test_existing_run_keys_filters_by_status(self, session_factory) -> None:
+        """`succeeded` and `failed` must never be conflated.
+
+        Including a failed run in the index would let one bad night permanently
+        suppress a pair; excluding a succeeded one would re-buy a number we have.
+        """
+        with session_scope(session_factory) as session:
+            create_run(session, _run(status=RunStatus.SUCCEEDED, task_content_sha="ok"))
+            create_run(session, _run(status=RunStatus.FAILED, task_content_sha="bad"))
+        with session_scope(session_factory) as session:
+            keys = existing_run_keys(session, statuses=[RunStatus.SUCCEEDED])
+        assert keys == {("demo/t", "mock", "ok")}
+
+    def test_existing_run_keys_distinguishes_content_shas(self, session_factory) -> None:
+        """B8: the same pair at two task versions is two different measurements."""
+        with session_scope(session_factory) as session:
+            create_run(session, _run(status=RunStatus.SUCCEEDED, task_content_sha="v1"))
+            create_run(session, _run(status=RunStatus.SUCCEEDED, task_content_sha="v2"))
+        with session_scope(session_factory) as session:
+            keys = existing_run_keys(session, statuses=[RunStatus.SUCCEEDED])
+        assert keys == {("demo/t", "mock", "v1"), ("demo/t", "mock", "v2")}
+
+    def test_existing_run_keys_keeps_a_null_sha_as_null(self, session_factory) -> None:
+        """A NULL must not be coerced into a wildcard that matches every candidate."""
+        with session_scope(session_factory) as session:
+            create_run(session, _run(status=RunStatus.SUCCEEDED, task_content_sha=None))
+        with session_scope(session_factory) as session:
+            keys = existing_run_keys(session, statuses=[RunStatus.SUCCEEDED])
+        assert keys == {("demo/t", "mock", None)}
+
+    def test_existing_run_keys_honours_the_model_scope(self, session_factory) -> None:
+        with session_scope(session_factory) as session:
+            create_run(session, _run(status=RunStatus.SUCCEEDED, task_content_sha="s"))
+            create_run(
+                session,
+                _run(status=RunStatus.SUCCEEDED, model_key="other", task_content_sha="s"),
+            )
+        with session_scope(session_factory) as session:
+            assert existing_run_keys(
+                session, statuses=[RunStatus.SUCCEEDED], model_keys=["other"]
+            ) == {("demo/t", "other", "s")}
+
+    def test_existing_run_keys_short_circuits_on_empty_inputs(self, session_factory) -> None:
+        """An empty scope means "nothing", never "everything".
+
+        The dangerous reading is the other one: an empty model list silently
+        widening to the whole table would make a scoped sweep dedupe against
+        runs that have nothing to do with it.
+        """
+        with session_scope(session_factory) as session:
+            create_run(session, _run(status=RunStatus.SUCCEEDED, task_content_sha="s"))
+        with session_scope(session_factory) as session:
+            assert existing_run_keys(session, statuses=[]) == set()
+            assert (
+                existing_run_keys(session, statuses=[RunStatus.SUCCEEDED], model_keys=[]) == set()
+            )
+
+    def test_models_with_any_run_reports_only_measured_models(self, session_factory) -> None:
+        with session_scope(session_factory) as session:
+            create_run(session, _run(status=RunStatus.SUCCEEDED, model_key="measured"))
+            create_run(session, _run(status=RunStatus.FAILED, model_key="only-failed"))
+        with session_scope(session_factory) as session:
+            assert models_with_any_run(session, statuses=[RunStatus.SUCCEEDED]) == {"measured"}
+
+    def test_list_ungraded_subjective_results_finds_unscored_samples(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(
+                session,
+                [_result(run.id, serving_config, sample_id="s1", score=None, scorable=False)],
+            )
+        with session_scope(session_factory) as session:
+            assert [r.sample_id for r in list_ungraded_subjective_results(session)] == ["s1"]
+
+    def test_a_scored_subjective_sample_is_not_a_candidate(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """The half of the predicate that stops nightly re-grading of graded work.
+
+        Without it every judge-calibration firing would re-grade its entire
+        history, at full provider cost, forever.
+        """
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(
+                session,
+                [
+                    _result(
+                        run.id,
+                        serving_config,
+                        sample_id="graded",
+                        scorable=False,
+                        score=Score(
+                            scorer=ScorerKind.LLM_JUDGE, value=0.7, passed=True, explanation="ok"
+                        ),
+                    )
+                ],
+            )
+        with session_scope(session_factory) as session:
+            assert list_ungraded_subjective_results(session) == []
+
+    def test_a_scorable_sample_is_never_a_candidate(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """Verifiable samples are scored programmatically; a judge must not touch them."""
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(
+                session,
+                [_result(run.id, serving_config, sample_id="s1", score=None, scorable=True)],
+            )
+        with session_scope(session_factory) as session:
+            assert list_ungraded_subjective_results(session) == []
+
+    def test_the_candidate_list_is_bounded(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """One pass must not become an unbounded transaction."""
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(
+                session,
+                [
+                    _result(run.id, serving_config, sample_id=f"s{i}", score=None, scorable=False)
+                    for i in range(5)
+                ],
+            )
+        with session_scope(session_factory) as session:
+            assert len(list_ungraded_subjective_results(session, limit=2)) == 2
+
+    def test_existing_run_keys_honours_the_created_after_bound(self, session_factory) -> None:
+        """The bound that stops an abandoned `queued` row suppressing its pair forever.
+
+        A sweep asks "is this pair in flight?" and answers it from a row. A row
+        old enough that nothing will ever process it must answer no.
+        """
+        from datetime import timedelta
+
+        from ida_core.db import utcnow as _utcnow
+
+        now = _utcnow()
+        with session_scope(session_factory) as session:
+            create_run(
+                session,
+                _run(
+                    status=RunStatus.QUEUED,
+                    task_content_sha="fresh",
+                    created_at=now - timedelta(seconds=10),
+                ),
+            )
+            create_run(
+                session,
+                _run(
+                    status=RunStatus.QUEUED,
+                    task_content_sha="ancient",
+                    created_at=now - timedelta(days=30),
+                ),
+            )
+
+        cutoff = now - timedelta(hours=6)
+        with session_scope(session_factory) as session:
+            bounded = existing_run_keys(session, statuses=[RunStatus.QUEUED], created_after=cutoff)
+            unbounded = existing_run_keys(session, statuses=[RunStatus.QUEUED])
+
+        assert bounded == {("demo/t", "mock", "fresh")}
+        assert len(unbounded) == 2, "without the bound both rows answer 'in flight'"

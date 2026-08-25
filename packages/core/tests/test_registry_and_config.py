@@ -101,9 +101,67 @@ class TestSettings:
         assert settings.resolved_models_file() == tmp_path / "m.yaml"
         assert settings.resolved_tasks_dir() == tmp_path / "t"
 
+    def test_sweep_knobs_are_settable_from_the_environment(self, monkeypatch) -> None:
+        """The CronJobs run a FIXED argv, so the environment is the ONLY lever.
+
+        A sweep setting that could be reached solely through a CLI flag would be
+        unreachable in the cluster -- and the flag it duplicates would look like
+        a working control while the schedule ignored it. Asserted here rather
+        than trusted to the prefix convention.
+        """
+        monkeypatch.setenv("IDA_SWEEP_MAX_RUNS", "7")
+        monkeypatch.setenv("IDA_SWEEP_MAX_SAMPLES", "70")
+        monkeypatch.setenv("IDA_SWEEP_FORCE", "1")
+        monkeypatch.setenv("IDA_SWEEP_JUDGE_CANDIDATE_LIMIT", "9")
+
+        settings = Settings()
+
+        assert settings.sweep_max_runs == 7
+        assert settings.sweep_max_samples == 70
+        assert settings.sweep_force is True
+        assert settings.sweep_judge_candidate_limit == 9
+
+    def test_sweep_defaults_are_the_deployed_values(self) -> None:
+        """No ConfigMap entry exists for these, so the defaults ARE production."""
+        settings = Settings()
+
+        assert settings.sweep_force is False, "forcing spend must never be the default"
+        assert settings.sweep_max_runs > 0
+        assert settings.sweep_max_samples > 0
+
     def test_repo_root_honours_explicit_env(self, monkeypatch, tmp_path) -> None:
         monkeypatch.setenv("IDA_REPO_ROOT", str(tmp_path))
         assert repo_root() == tmp_path
+
+    # --- artifact_backend is a closed set, not free text ---------------------
+
+    @pytest.mark.parametrize("value", ["s3", "local"])
+    def test_artifact_backend_accepts_the_two_real_backends(self, monkeypatch, value) -> None:
+        monkeypatch.setenv("IDA_ARTIFACT_BACKEND", value)
+        assert Settings().artifact_backend == value
+
+    @pytest.mark.parametrize("typo", ["locl", "Local ", "minio", "s3 ", ""])
+    def test_a_misspelt_artifact_backend_fails_loudly(self, monkeypatch, typo) -> None:
+        """A typo must not silently select S3.
+
+        Every consumer branches `if artifact_backend == "local": ... else:
+        <s3>` (ida_api.deps, ida_runner.main, scripts.bootstrap), so before this
+        was a Literal, `IDA_ARTIFACT_BACKEND=locl` fell through to the else and
+        chose object storage. Nothing logged, nothing failed -- a developer who
+        asked for local artifacts got writes aimed at S3 instead. The failure
+        now arrives at construction, naming the field.
+        """
+        monkeypatch.setenv("IDA_ARTIFACT_BACKEND", typo)
+        with pytest.raises(PydanticValidationError, match="artifact_backend"):
+            Settings()
+
+    def test_the_typo_would_previously_have_selected_s3(self, monkeypatch) -> None:
+        """Pin the branch that made the typo dangerous, so it stays covered.
+
+        This asserts the *consumer* shape the Literal protects: anything that is
+        not exactly "local" means S3 to every call site.
+        """
+        assert Settings(artifact_backend="s3").artifact_backend != "local"
 
 
 class TestGitMeta:

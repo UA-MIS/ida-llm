@@ -41,6 +41,7 @@ Every task is exactly one of:
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal
@@ -504,6 +505,116 @@ def content_sha_of(document: Any) -> str:
     return hashlib.sha256(blob.encode()).hexdigest()
 
 
+_METADATA_NUMBER = re.compile(r"(?<![0-9A-Za-z._-])[-+]?\d+(?:\.\d+)?(?![0-9A-Za-z])")
+r"""A number in a metadata string, ignoring digits that are part of a word.
+
+The lookarounds are the whole point.  Sample metadata is full of identifiers
+that contain digits -- ``ladder-l3``, ``interest-v2``, ``mirrors:
+l4-distribution-key`` -- and a bare ``\d+`` would read the ``4`` out of
+``l4-distribution-key`` and report a task whose target is ``4`` as leaking.  A
+digit glued to a letter is part of a name, not a value.
+"""
+
+
+def _metadata_scalars(value: Any, path: str = "") -> list[tuple[str, Any]]:
+    """Every scalar reachable from a metadata value, paired with where it lives.
+
+    The path is carried so the error can NAME the offending field.  A gate that
+    says only "something in metadata matches" leaves the author hunting, and an
+    author who cannot find the problem switches the gate off.
+    """
+    if isinstance(value, dict):
+        out: list[tuple[str, Any]] = []
+        for key, item in value.items():
+            here = f"{path}.{key}" if path else str(key)
+            out.append((here, key))
+            out.extend(_metadata_scalars(item, here))
+        return out
+    if isinstance(value, (list, tuple, set)):
+        return [
+            pair for i, item in enumerate(value) for pair in _metadata_scalars(item, f"{path}[{i}]")
+        ]
+    return [(path, value)]
+
+
+def _target_leaks_into_metadata(target: str, metadata: dict[str, Any]) -> str | None:
+    """Return a human-readable reason if ``target`` is recoverable from ``metadata``.
+
+    **Why this rule exists.**  ``GET /tasks/{id}`` redacts every ``target``
+    unless the caller holds the ``author`` role -- publishing the answer key is
+    both an integrity risk (anyone can tune against it) and a contamination one
+    (a scraped key reaches a future training corpus).  But that same endpoint
+    returns ``sample.metadata`` **verbatim, to everyone, unauthenticated**
+    (``ida_api.schemas.SampleView``).  An author who writes the derivation into
+    ``metadata`` therefore hands out exactly what the redaction exists to
+    protect, and nothing used to say so.  Derivations belong in YAML comments,
+    which are not parsed, not part of ``content_sha``, and never served.
+
+    **What this catches**: the target as a standalone value or token in any
+    metadata scalar (recursively, keys included), and -- for numeric targets --
+    the same value written in another format (``7.50`` for ``7.5``, ``+3`` for
+    ``3``).
+
+    **What this does NOT catch, honestly.**  It is a tripwire, not a proof:
+
+    * a derivation that yields the answer without stating it
+      (``{working: "sum=70, n=5"}`` for a target of ``14``);
+    * the answer in words (``{note: "forty-two"}``);
+    * the answer in a *different* sample's metadata, or in ``description``,
+      ``title`` or ``tags``;
+    * an answer a reader can infer from a hint (``{note: "answer is negative"}``).
+
+    Passing this check is not evidence that a task keeps its key secret.  The
+    rule exists to make the common, mechanical mistake impossible to commit.
+
+    **It also has one false positive, by design.**  A plain numeric metadata
+    field that happens to equal a small-integer target trips it --
+    ``{n_samples: 5}`` beside a target of ``"5"``, ``{error_count: 0}`` beside
+    ``"0"``.  There is no derivation there to move, so the message says so and
+    names the field: the honest fix is to rename the field or drop it, and a
+    blunt tripwire that occasionally asks that question is the right trade for a
+    rule protecting an answer key.  What is NOT acceptable is a message that
+    misdiagnoses the situation, because that is what gets a gate switched off
+    rather than satisfied.
+    """
+    scalars = _metadata_scalars(metadata)
+    stripped = target.strip()
+    if not stripped:
+        return None
+    folded = stripped.casefold()
+
+    for path, scalar in scalars:
+        if isinstance(scalar, str) and scalar.strip().casefold() == folded:
+            return f"metadata.{path} is exactly the target ({stripped!r})"
+
+    try:
+        wanted = float(stripped)
+    except ValueError:
+        # Non-numeric target (exact_match): a standalone-token match is a leak.
+        pattern = re.compile(rf"(?<![0-9A-Za-z_]){re.escape(stripped)}(?![0-9A-Za-z_])", re.I)
+        for path, scalar in scalars:
+            if isinstance(scalar, str) and pattern.search(scalar):
+                return f"metadata.{path} contains the target {stripped!r}"
+        return None
+
+    for path, scalar in scalars:
+        if isinstance(scalar, bool):
+            continue
+        if isinstance(scalar, (int, float)) and float(scalar) == wanted:
+            return f"metadata.{path} is numerically the target ({scalar!r} == {stripped!r})"
+        if isinstance(scalar, str):
+            for found in _METADATA_NUMBER.findall(scalar):
+                try:
+                    if float(found) == wanted:
+                        return (
+                            f"metadata.{path} contains the target as a number "
+                            f"({found!r} == {stripped!r})"
+                        )
+                except ValueError:  # pragma: no cover - regex guarantees parseability
+                    continue
+    return None
+
+
 class TaskSpec(BaseModel):
     """A parsed task YAML.  The unit of benchmarking work.
 
@@ -584,6 +695,39 @@ class TaskSpec(BaseModel):
         dupes = {i for i in sample_ids if sample_ids.count(i) > 1}
         if dupes:
             raise ValueError(f"task {self.id!r} has duplicate sample ids: {sorted(dupes)}")
+        return self
+
+    @model_validator(mode="after")
+    def _targets_do_not_leak_into_metadata(self) -> TaskSpec:
+        """A gold answer must not be recoverable from its own sample's metadata.
+
+        Targets are redacted by ``GET /tasks/{id}``; ``metadata`` is not.  A
+        derivation written into ``metadata`` therefore publishes the answer key
+        the redaction exists to protect -- see
+        :func:`_target_leaks_into_metadata` for what this does and does not
+        catch.  Put derivations in YAML comments instead.
+
+        Enforced here rather than in the JSON Schema because it is a
+        data-dependent cross-field rule the schema cannot express, and enforced
+        in ``ida_core`` rather than in ``tools/validate_tasks.py`` so that it
+        binds everywhere a task is loaded -- the CI ``task-schema`` job, the
+        harness catalog, and API startup -- not only when someone runs the CLI.
+        """
+        leaks = []
+        for sample in self.samples:
+            if sample.target is None or not sample.metadata:
+                continue
+            reason = _target_leaks_into_metadata(sample.target, sample.metadata)
+            if reason is not None:
+                leaks.append(f"{sample.id}: {reason}")
+        if leaks:
+            raise ValueError(
+                f"task {self.id!r} leaks gold answers through sample metadata "
+                f"(GET /tasks/{{id}} redacts targets but serves metadata "
+                f"unauthenticated). Move the derivation into a YAML comment -- "
+                f"or, if this field is not a derivation, rename it or move it "
+                f"out of metadata: " + "; ".join(leaks)
+            )
         return self
 
     @classmethod
@@ -1068,12 +1212,26 @@ class RunRecord(BaseModel):
 
 
 class RunDetail(BaseModel):
-    """API response for ``GET /runs/{run_id}``: the run plus its results."""
+    """API response for ``GET /runs/{run_id}``: the run plus a page of results."""
 
     model_config = ConfigDict(extra="forbid")
 
     run: RunRecord
     results: list[ResultRecord]
+
+    results_total: int
+    """Results this run has, ignoring pagination.
+
+    Load-bearing, not decorative. ``results`` alone cannot distinguish a run
+    that produced nothing from a page requested past the end, and the UI
+    classifies those differently -- an empty result set reads as *all errored*
+    (``frontend/src/lib/outcome.ts``). A client comparing ``len(results)`` with
+    ``results_total`` can also tell that it is looking at a partial view before
+    it draws a conclusion from it.
+    """
+
+    results_limit: int
+    results_offset: int
 
 
 class EvalLog(BaseModel):

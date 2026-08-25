@@ -28,17 +28,26 @@ not scaffolding.
    still parked is one real call per provider, which needs credits and a tag.
    The documented gotchas (OpenAI's `max_completion_tokens`, Anthropic's
    sampling rejections) are the likeliest first failures.
-2. **Turn the judge on, and calibrate it.** LLM-as-judge is implemented
-   ([`docs/llm-judge.md`](llm-judge.md)) and **off by default** -- set
-   `IDA_JUDGE_MODEL_KEY` to a `models.yaml` key to grade subjective runs, and
-   `python -m ida_harness.regrade <run_id>` to grade ones that already finished.
-   Two follow-ons are named in that document: wiring the setting through the
-   runner service, and a `POST /runs/{id}/regrade` endpoint so a retroactive
-   grade reaches Postgres and the UI. The calibration record shape exists; the
-   human-agreement study has not been run.
-3. **Fill in the three sweeps.** `services/runner/ida_runner/sweeps.py` is
-   scaffold: the CronJobs run nightly and exit 0 without doing work. Every sweep
-   must stay idempotent and MUST exit non-zero on failure.
+2. **Calibrate the judge.** LLM-as-judge is implemented and **off by default**
+   ([`docs/llm-judge.md`](llm-judge.md)): set `IDA_JUDGE_MODEL_KEY` to a
+   `models.yaml` key, and `python -m ida_harness.regrade <run_id>` grades runs
+   that already finished. The calibration record shape exists and is queryable
+   per sample and criterion; the human-agreement study has not been run.
+3. **Wire the judge into the runner and into `judge-calibration`.**
+   `rebenchmark` and `model-sweep` are implemented in
+   `services/runner/ida_runner/sweeps.py`; `judge-calibration` ships as an
+   orchestration shell that finds ungraded subjective samples, says how many it
+   skipped and exits 0. The precondition it was waiting on -- *what a failed
+   grading writes* -- is now settled and written down as
+   [the row-level predicate contract](llm-judge.md#the-row-level-predicate-contract),
+   which is the spec for both the retroactive wiring (`_load_retroactive_grader`)
+   and the live one (`IDA_JUDGE_MODEL_KEY` → Worker → `run_task(judge=…)`), plus
+   a `POST /runs/{id}/regrade` endpoint so a retroactive grade reaches Postgres
+   and the UI. **Read that contract before writing the sweep's SELECT**: the
+   obvious predicate is wrong in both directions, and it names the retry bound a
+   nightly pass needs so it cannot re-nominate the same failed samples at judge
+   cost forever. Every sweep must stay idempotent and MUST exit non-zero on
+   failure.
 4. **Write real tasks.** [`tasks/SCHEMA.md`](../tasks/SCHEMA.md) is the whole
    authoring guide and `tasks/quantitative-quiz/` and `tasks/conceptual-grading/`
    are the two families to copy from. (`tasks/demo/` is not an exemplar -- it is

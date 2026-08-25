@@ -431,10 +431,32 @@ it matters.
 2. **No LLM judge.** Subjective tasks run and archive transcripts but are not
    scored. → `packages/harness/ida_harness/scoring.py::LLMJudgeScorer`
 
-3. **The three nightly sweeps are scaffold.** `ida-sweep <name>` runs, logs its
-   plan and exits 0 without doing work. The CronJobs are active in dev, staging
-   and prod today. Every sweep must stay **idempotent** and **must exit non-zero
-   on failure** — a CronJob that exits 0 after failing looks successful forever.
+3. **`judge-calibration` is a shell; the other two sweeps are implemented.**
+   `ida-sweep rebenchmark` and `ida-sweep model-sweep` plan a `(task, model)`
+   cross product, dedupe it against what is already measured or in flight, and
+   enqueue the rest — a sweep enqueues, runners execute. `ida-sweep
+   judge-calibration` finds the subjective samples that carry no score, logs
+   `judge not yet available -- skipped N candidates` and exits 0.
+
+   Two pieces are deferred **with** the judge rather than ahead of it, so they
+   land agreeing by construction: the retroactive wiring at
+   `_load_retroactive_grader`, and the live-scoring wiring
+   (`IDA_JUDGE_MODEL_KEY` → Worker → `run_task(judge=…)`). The blocker is not a
+   signature but the semantics — what a *failed* grading writes decides whether
+   this sweep's candidate query converges or re-nominates the same samples every
+   night at judge cost. See the OPEN CONTRACT note on
+   `list_ungraded_subjective_results`.
+
+   Two things stay true of every sweep: **idempotent**, and **exit non-zero on
+   failure** — a CronJob that exits 0 after failing looks successful forever. A
+   sweep that enqueues nothing because everything is measured is a normal, quiet
+   success, and is the steady state of a healthy nightly.
+
+   Spend is bounded by `IDA_SWEEP_MAX_RUNS` and `IDA_SWEEP_MAX_SAMPLES`, and a
+   plan that exceeds either is **refused whole** rather than truncated: a capped
+   sweep would report a partial suite as a complete one and hide the cap behind
+   an exit 0. `IDA_SWEEP_FORCE=1` re-measures pairs that are already done; the
+   caps still apply.
    → `services/runner/ida_runner/sweeps.py`
 
 4. **No auth.** `auth_mode: disabled` yields an anonymous principal. Any other
