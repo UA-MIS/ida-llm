@@ -576,7 +576,7 @@ def _enqueueing_sweep(
             session,
             statuses=IN_FLIGHT_STATUSES,
             model_keys=dedupe_model_scope,
-            created_after=in_flight_cutoff,
+            created_after=None,
         )
     candidates = apply_dedupe(candidates, seen=seen, force=ctx.settings.sweep_force, report=report)
 
@@ -690,9 +690,26 @@ def run_model_sweep(ctx: SweepContext, *, dry_run: bool = False) -> SweepReport:
 def _load_retroactive_grader():
     """The judge's retroactive-grading entry point, or ``None`` if not built yet.
 
-    ⚠ THE WIRING POINT. The judge is in flight as PR #12, which exposes
-    ``ida_harness.regrade.regrade_run`` -- per RUN, not per result, which is why
-    this sweep already collects ``candidate_runs`` alongside the sample ids::
+    ⚠ THE WIRING POINT -- AND IT IS DELIBERATELY NOT WIRED YET. The judge is in
+    flight as PR #12, which was REJECTED at review and is on a retry: a blocking
+    parse hole in judge-output extraction, plus a disagreement between the runner
+    and the retroactive path about what a judge FAILURE means, which currently
+    leaves judge-failed samples permanently un-regradable.
+
+    That second one is not upstream trivia -- it decides whether this sweep's
+    candidate query converges or re-nominates the same failed samples every
+    night, at judge cost, indefinitely. See the OPEN CONTRACT note on
+    :func:`ida_core.repositories.list_ungraded_subjective_results`.
+
+    So this sweep ships skipping honestly rather than wiring against a contract
+    being renegotiated. Wiring it now would yield a nightly job that looks
+    finished while resting on both a signature and a failure semantics that are
+    still moving.
+
+    The shape exposed at rejection time was
+    ``ida_harness.regrade.regrade_run(run_id, judge_model, ...)`` -- per RUN, not
+    per result, which is why this sweep already collects ``candidate_runs``
+    alongside the sample ids::
 
         from ida_harness.regrade import regrade_run
         return regrade_run
@@ -703,8 +720,9 @@ def _load_retroactive_grader():
     already carries a store while the other two sweeps deliberately do not).
 
     Everything else here -- candidate query, bound, truncation note, reporting,
-    exit code -- is already correct and needs no edit. Named against the PR as it
-    stands, not guessed: check the merged signature before trusting this verbatim.
+    exit code -- is already correct and needs no edit. That signature is recorded
+    from a REJECTED revision, so treat it as a pointer, not a contract: re-read
+    the merged version, and reconcile the failure semantics, before wiring.
 
     Deliberately a lookup returning ``None`` rather than a ``try: import`` with a
     swallowed ``ImportError``: a bare import guard cannot tell "the judge is not
@@ -774,6 +792,16 @@ def run_judge_calibration(ctx: SweepContext, *, dry_run: bool = False) -> SweepR
         "see _load_retroactive_grader"
     )
 
+
+# ── ALSO DEFERRED WITH THE JUDGE: THE RUNNER-SIDE WIRING ─────────────────────
+# `IDA_JUDGE_MODEL_KEY` -> Worker -> `run_task(judge=...)` is the live-scoring
+# counterpart to this sweep's retroactive path, and it belongs to this module's
+# surface. It is NOT absent by oversight: the judge PR it depends on was rejected
+# at review over judge-failure semantics, and wiring live scoring against a
+# contract under renegotiation would put subjective scoring into the nightly path
+# on a definition that is about to change. It lands with the judge, together with
+# the regrade wiring above, so the two agree by construction rather than by two
+# people remembering.
 
 NEEDS_ARTIFACTS = frozenset({"judge-calibration"})
 """Sweeps that read archived transcripts and therefore need object storage.

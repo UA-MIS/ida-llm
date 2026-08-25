@@ -458,6 +458,22 @@ def list_ungraded_subjective_results(session: Session, *, limit: int = 500) -> l
     :func:`list_stale_running_runs` is: one pass must not become an unbounded
     transaction.  A caller that hits the bound should say so in its log line
     rather than let a truncated pass read as "that was all".
+
+    ⚠ OPEN CONTRACT: WHAT A **FAILED** JUDGE LEAVES BEHIND.  This predicate says
+    "no score yet", which today is the same set as "never graded" because nothing
+    grades.  It stops being the same set the moment a judge can FAIL on a sample.
+    If a failed grading leaves ``score_value`` NULL, this query nominates that
+    sample again on every subsequent pass -- forever, at judge cost -- while a
+    grader that refuses to retry it never clears it.  That standoff is the
+    disagreement flagged as E3 against the judge PR, and it is unresolved
+    upstream at the time of writing.
+
+    Deliberately NOT pre-emptively guessed at here.  Whoever lands the judge must
+    decide what a failed grading writes (an ``error`` on the result?  a sentinel
+    score?  an attempt counter?) and then make this predicate agree with it in
+    the SAME change.  Encoding a guess now would produce two components that look
+    consistent and are not, which is strictly worse than a query with a known
+    open question written on it.
     """
     stmt = (
         select(ResultRow)
