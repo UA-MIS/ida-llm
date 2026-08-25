@@ -36,9 +36,13 @@ export default async function DeniedPage({
           GitHub, then sign in again.
         </p>
 
-        <a className="btn" style={{ width: '100%', justifyContent: 'center' }} href="/api/auth/logout">
-          Sign in as someone else
-        </a>
+        {/* POST, not a link -- see the logout route: a state-changing GET is
+            reachable by any <img> on a page that renders user markdown. */}
+        <form action="/api/auth/logout" method="post" style={{ display: 'contents' }}>
+          <button className="btn" style={{ width: '100%', justifyContent: 'center' }} type="submit">
+            Sign in as someone else
+          </button>
+        </form>
       </div>
     </div>
   );
