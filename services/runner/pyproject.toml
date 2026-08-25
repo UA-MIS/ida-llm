@@ -1,30 +1,29 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ida-runner"
 version = "0.1.0"
-description = "Queue workers, scheduled sweeps, and the in-repo mock model endpoint."
+description = "Capstone-IDA queue worker and scheduled sweeps: consumes run jobs, executes the harness, persists results."
 requires-python = ">=3.12"
 dependencies = [
-  "ida-core",
-  "ida-harness",
-  "redis>=5.2,<7",
-  "fastapi>=0.115,<0.120",
-  "uvicorn[standard]>=0.32,<0.40",
-  "sqlalchemy>=2.0,<3",
-  "psycopg[binary]>=3.2,<4",
-  "prometheus-client>=0.21,<1",
+    "ida-core==0.1.0",
+    "ida-harness==0.1.0",
+    "psycopg[binary]~=3.2",
+    # The runner serves /metrics on :9100 for the ServiceMonitor -- and
+    # ida_llm_runner_queue_depth is the HPA's scaling metric, so this is
+    # load-bearing, not observability garnish.
+    "prometheus-client~=0.21",
 ]
 
 [project.scripts]
-# THREE commands, ONE image. The `runner` Deployment, the `mock-model` Deployment
-# and all three CronJobs are the same built artifact with a different argv --
-# which is what makes "build once, promote the same image" hold across them.
-ida-runner = "ida_runner.worker:main"
-ida-mock-model = "ida_runner.mock_model:main"
+# TWO commands, ONE image. The `runner` Deployment and all three CronJobs are the
+# same built artifact with a different argv -- which is what makes "build once,
+# promote the same image" hold across them. (`ida-mock-model` lives in its own
+# distribution, services/mock-model, and installs into the same image.)
+ida-runner = "ida_runner.main:main"
 ida-sweep = "ida_runner.sweeps:main"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+include = ["ida_runner*"]

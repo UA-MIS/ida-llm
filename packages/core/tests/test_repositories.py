@@ -1,0 +1,265 @@
+"""Persistence round-trips. The D-1 invariant (serving config by value) lives here."""
+
+from __future__ import annotations
+
+import pytest
+
+from ida_core.contracts import (
+    Quantization,
+    ResultRecord,
+    RunRecord,
+    RunStatus,
+    SamplingParams,
+    Score,
+    ScorerKind,
+    ServingConfig,
+    TokenUsage,
+)
+from ida_core.db import session_scope
+from ida_core.ids import new_result_id, new_run_id
+from ida_core.repositories import (
+    create_run,
+    finish_run,
+    get_run,
+    insert_results,
+    list_results_for_run,
+    list_runs,
+    mark_run_running,
+    result_row_to_record,
+    run_row_to_record,
+)
+
+
+def _run(serving=None, **overrides) -> RunRecord:
+    base = {
+        "id": new_run_id(),
+        "status": RunStatus.QUEUED,
+        "task_id": "demo/t",
+        "model_key": "mock",
+        "harness_version": "0.1.0",
+        "task_git_sha": "a" * 40,
+        "sample_count": 2,
+        "serving_config": serving,
+    }
+    base.update(overrides)
+    return RunRecord(**base)
+
+
+def _result(run_id: str, serving: ServingConfig, **overrides) -> ResultRecord:
+    base = {
+        "id": new_result_id(),
+        "run_id": run_id,
+        "task_id": "demo/t",
+        "sample_id": "s1",
+        "model_key": "mock",
+        "serving_config": serving,
+        "score": Score(scorer=ScorerKind.EXACT_MATCH, value=1.0, passed=True, explanation="ok"),
+        "usage": TokenUsage(prompt_tokens=10, completion_tokens=3),
+        "cost_usd": 0.0,
+        "latency_ms": 12.5,
+        "transcript_uri": "s3://ida-artifacts/runs/x/transcripts/s1.json",
+    }
+    base.update(overrides)
+    return ResultRecord(**base)
+
+
+class TestRunRoundTrip:
+    def test_create_then_read(self, session_factory) -> None:
+        record = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, record)
+        with session_scope(session_factory) as session:
+            restored = run_row_to_record(get_run(session, record.id))
+        assert restored.id == record.id
+        assert restored.status is RunStatus.QUEUED
+        assert restored.task_git_sha == "a" * 40
+        assert restored.serving_config is None
+
+    def test_missing_run_returns_none(self, session_factory) -> None:
+        with session_scope(session_factory) as session:
+            assert get_run(session, "run_nope") is None
+
+    def test_mark_running_records_serving_config(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        record = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, record)
+        with session_scope(session_factory) as session:
+            mark_run_running(session, record.id, serving_config)
+        with session_scope(session_factory) as session:
+            restored = run_row_to_record(get_run(session, record.id))
+        assert restored.status is RunStatus.RUNNING
+        assert restored.started_at is not None
+        assert restored.serving_config == serving_config
+
+    def test_mark_running_unknown_run_raises(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        with session_scope(session_factory) as session, pytest.raises(KeyError):
+            mark_run_running(session, "run_nope", serving_config)
+
+    def test_finish_run_writes_rollup(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        record = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, record)
+        record.status = RunStatus.SUCCEEDED
+        record.serving_config = serving_config
+        record.scored_count = 2
+        record.mean_score = 0.5
+        record.total_usage = TokenUsage(prompt_tokens=20, completion_tokens=6)
+        record.total_cost_usd = 0.25
+        with session_scope(session_factory) as session:
+            finish_run(session, record)
+        with session_scope(session_factory) as session:
+            restored = run_row_to_record(get_run(session, record.id))
+        assert restored.status is RunStatus.SUCCEEDED
+        assert restored.mean_score == 0.5
+        assert restored.total_usage.total_tokens == 26
+        assert restored.total_cost_usd == 0.25
+        assert restored.finished_at is not None
+
+
+class TestListRuns:
+    def test_newest_first(self, session_factory) -> None:
+        ids = []
+        with session_scope(session_factory) as session:
+            for _ in range(3):
+                record = _run()
+                ids.append(record.id)
+                create_run(session, record)
+        with session_scope(session_factory) as session:
+            listed = [r.id for r in list_runs(session)]
+        assert listed[0] == ids[-1]
+
+    def test_filters(self, session_factory) -> None:
+        with session_scope(session_factory) as session:
+            create_run(session, _run(task_id="a", model_key="m1"))
+            create_run(session, _run(task_id="b", model_key="m2", status=RunStatus.FAILED))
+        with session_scope(session_factory) as session:
+            assert len(list_runs(session, task_id="a")) == 1
+            assert len(list_runs(session, model_key="m2")) == 1
+            assert len(list_runs(session, status=RunStatus.FAILED)) == 1
+            assert len(list_runs(session, status=RunStatus.SUCCEEDED)) == 0
+
+    def test_pagination(self, session_factory) -> None:
+        with session_scope(session_factory) as session:
+            for _ in range(5):
+                create_run(session, _run())
+        with session_scope(session_factory) as session:
+            assert len(list_runs(session, limit=2)) == 2
+            assert len(list_runs(session, limit=2, offset=4)) == 1
+
+
+class TestResults:
+    def test_round_trip_preserves_serving_config_by_value(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """D-1: the stored config must survive verbatim, including sampling params."""
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(session, [_result(run.id, serving_config)])
+        with session_scope(session_factory) as session:
+            rows = list_results_for_run(session, run.id)
+        restored = result_row_to_record(rows[0])
+        assert restored.serving_config == serving_config
+        assert restored.serving_config.sampling.seed == serving_config.sampling.seed
+
+    def test_editing_the_registry_later_cannot_rewrite_history(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """The whole point of copying by value: mutate the source, stored row is untouched."""
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(session, [_result(run.id, serving_config)])
+        serving_config.quantization = Quantization.INT4
+        serving_config.sampling = SamplingParams(temperature=1.9)
+        with session_scope(session_factory) as session:
+            restored = result_row_to_record(list_results_for_run(session, run.id)[0])
+        assert restored.serving_config.quantization is Quantization.NONE
+        assert restored.serving_config.sampling.temperature == 0.0
+
+    def test_score_is_flattened_and_reassembled(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        run = _run()
+        score = Score(
+            scorer=ScorerKind.NUMERIC_MATCH,
+            value=1.0,
+            passed=True,
+            explanation="got 42, want 42",
+            details={"target": 42.0, "extracted": 42.0},
+        )
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(session, [_result(run.id, serving_config, score=score)])
+        with session_scope(session_factory) as session:
+            restored = result_row_to_record(list_results_for_run(session, run.id)[0])
+        assert restored.score == score
+
+    def test_unscorable_result_has_no_score(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """Subjective samples store a null score, never a zero."""
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(
+                session, [_result(run.id, serving_config, score=None, scorable=False)]
+            )
+        with session_scope(session_factory) as session:
+            restored = result_row_to_record(list_results_for_run(session, run.id)[0])
+        assert restored.score is None
+        assert restored.scorable is False
+
+    def test_errored_result_records_the_reason(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(
+                session,
+                [_result(run.id, serving_config, score=None, error="TransientModelError: 503")],
+            )
+        with session_scope(session_factory) as session:
+            restored = result_row_to_record(list_results_for_run(session, run.id)[0])
+        assert restored.error is not None and "503" in restored.error
+
+    def test_results_are_ordered_by_sample_id(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(
+                session,
+                [
+                    _result(run.id, serving_config, sample_id="z"),
+                    _result(run.id, serving_config, sample_id="a"),
+                ],
+            )
+        with session_scope(session_factory) as session:
+            assert [r.sample_id for r in list_results_for_run(session, run.id)] == ["a", "z"]
+
+    def test_one_result_per_sample_per_run_is_enforced(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """The unique index is what stops a double-processed job double-counting."""
+        from sqlalchemy.exc import IntegrityError
+
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+        with pytest.raises(IntegrityError), session_scope(session_factory) as session:
+            insert_results(
+                session,
+                [
+                    _result(run.id, serving_config, sample_id="dup"),
+                    _result(run.id, serving_config, sample_id="dup"),
+                ],
+            )

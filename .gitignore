@@ -3,10 +3,16 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+.python-version
 *.egg-info/
+.eggs/
+build/
+dist/
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
 .coverage
+coverage.xml
 htmlcov/
 
 # Node / Next.js
@@ -15,10 +21,24 @@ node_modules/
 out/
 next-env.d.ts
 *.tsbuildinfo
+.npm/
 
 # Local env — NEVER commit real values. Copy .env.example -> .env.
 .env
 .env.local
 
-# Local artifacts
+# Local artifacts / scratch data
 /artifacts-local/
+.artifacts/
+*.db
+*.sqlite3
+
+# The Capstone-IDA process artifact. Deliberately NOT carried into this repo
+# (D-26): it is evidence of how the skeleton was built, not part of the product.
+/.evidence/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store

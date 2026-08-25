@@ -1,38 +1,77 @@
-# Root tooling config ONLY. The four installable distributions live under
+# Root tooling config ONLY. The FIVE installable distributions live under
 # packages/ and services/ and each carry their own pyproject.toml; this file
 # configures ruff + pytest once for all of them so a contributor runs one command
 # at the repo root and gets the same result CI gets.
 #
 # Deliberately NOT a workspace/monorepo build backend. `pip install -e` over the
-# four paths is boring, needs no extra resolver in the CI container, and is
+# five paths is boring, needs no extra resolver in the CI container, and is
 # exactly what the Dockerfile does -- so local, CI and image builds agree.
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# FLAT layout, not src-layout: `packages/core/ida_core`, not
+# `packages/core/src/ida_core`. Both install identically under `pip install -e`
+# and Dockerfile.python copies whole directories, so nothing else reads this --
+# but ruff's isort needs the right roots to classify first-party imports.
 src = [
-  "packages/core/src",
-  "packages/harness/src",
-  "services/api/src",
-  "services/runner/src",
+  "packages/core",
+  "packages/harness",
+  "services/api",
+  "services/runner",
+  "services/mock-model",
   "tools",
+  "scripts",
 ]
+extend-exclude = ["frontend", ".venv", "**/migrations/versions/*.py"]
 
 [tool.ruff.lint]
 # E/F pycodestyle+pyflakes, I import sorting, UP pyupgrade, B bugbear,
-# S bandit-style security. S is the one worth keeping loud in a repo that handles
-# API keys.
-select = ["E", "F", "I", "UP", "B", "S"]
+# S bandit-style security, C4 comprehensions, SIM simplifications, RUF
+# ruff-specific. S is the one worth keeping loud in a repo that handles API keys.
+select = ["E", "F", "I", "UP", "B", "S", "C4", "SIM", "RUF"]
 ignore = [
-  "E501",  # line length is formatter territory; ruff-format handles it
+  "E501",   # line length is formatter territory; ruff-format handles it
+  "B008",   # FastAPI's Depends() in defaults is the documented idiom
+  "SIM108", # ternaries are not always clearer than an if/else
 ]
 
 [tool.ruff.lint.per-file-ignores]
 # assert is the entire point of a test file.
-"**/tests/**" = ["S101"]
-"**/test_*.py" = ["S101"]
+"**/tests/**" = ["S101", "B011"]
+"**/test_*.py" = ["S101", "B011"]
+"e2e/**" = ["S101", "B011", "E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ida_core", "ida_harness", "ida_api", "ida_runner", "ida_mock_model"]
 
 [tool.pytest.ini_options]
 # `-q` keeps CI logs readable; `--strict-markers` turns a typo'd marker into an
 # error instead of a silently-skipped test.
-addopts = "-q --strict-markers"
-testpaths = ["packages", "services", "tools"]
+#
+# `--import-mode=importlib` is CHEAP INSURANCE, not decoration. CI runs ONE
+# pytest from the repo root across five distributions that each own a `tests/`
+# package. Under the default `prepend` import mode, two test files anywhere in
+# the tree sharing a basename collide with `import file mismatch`. There are no
+# duplicates today; importlib means the next one does not break the build.
+addopts = "-q --strict-markers --import-mode=importlib"
+testpaths = ["packages", "services", "tools", "e2e"]
+filterwarnings = [
+    "error::DeprecationWarning:ida_.*",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["ida_core", "ida_harness", "ida_api", "ida_runner", "ida_mock_model"]
+omit = ["*/migrations/*", "*/tests/*"]
+relative_files = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "\\.\\.\\.",
+]

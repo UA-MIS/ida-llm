@@ -1,0 +1,32 @@
+# Pinned runtime dependencies for every Python service.
+#
+# Package manager: plain pip. Chosen over uv/poetry so a new contributor needs
+# nothing but a Python 3.12 install, and so the Dockerfile has no extra
+# bootstrap stage. `uv pip install -r requirements.txt` also works verbatim if
+# you prefer uv locally -- see README.md.
+#
+# Pins are compatible-release (~=): patch and minor updates are allowed, majors
+# are not. Regenerate a fully-locked set with `pip freeze` if the platform ever
+# requires hash-pinned builds.
+
+# --- contracts / data -------------------------------------------------------
+pydantic~=2.9
+pydantic-settings~=2.5
+SQLAlchemy~=2.0
+alembic~=1.13
+psycopg[binary]~=3.2
+
+# --- services ---------------------------------------------------------------
+fastapi~=0.115
+uvicorn[standard]~=0.32
+
+# --- infrastructure clients -------------------------------------------------
+redis~=5.1
+boto3~=1.35
+
+# --- authoring formats ------------------------------------------------------
+PyYAML~=6.0
+jsonschema~=4.23
+
+# --- harness ----------------------------------------------------------------
+httpx~=0.27

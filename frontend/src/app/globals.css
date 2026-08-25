@@ -1,0 +1,99 @@
+/* Minimal, dependency-free styling. No Tailwind, no CSS framework: the skeleton
+   should not commit the project to a design system before there is a design. */
+
+:root {
+  --bg: #ffffff;
+  --fg: #16181d;
+  --muted: #61656e;
+  --border: #e3e5e9;
+  --surface: #f7f8fa;
+  --accent: #2b5fd9;
+  --pass: #17794a;
+  --fail: #c0392b;
+  --pending: #8a6d1f;
+  --radius: 6px;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --fg: #e8eaee;
+    --muted: #9aa0aa;
+    --border: #2a2e35;
+    --surface: #1b1e24;
+    --accent: #7aa2f7;
+    --pass: #4cc38a;
+    --fail: #f07171;
+    --pending: #e2b93d;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+main { max-width: 1080px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+
+h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+h2 { font-size: 1.1rem; margin: 2rem 0 0.75rem; }
+h3 { font-size: 0.95rem; margin: 0 0 0.5rem; }
+
+a { color: var(--accent); }
+
+.subtitle { color: var(--muted); margin: 0 0 1.5rem; }
+
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th, td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+tbody tr:hover { background: var(--surface); }
+
+.mono { font-family: var(--mono); font-size: 0.85em; }
+.muted { color: var(--muted); }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.badge {
+  display: inline-block; padding: 0.1rem 0.45rem; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border);
+}
+.badge-succeeded { color: var(--pass); border-color: currentColor; }
+.badge-failed    { color: var(--fail); border-color: currentColor; }
+.badge-partial   { color: var(--pending); border-color: currentColor; }
+.badge-running,
+.badge-queued    { color: var(--pending); border-color: currentColor; }
+
+.card {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); padding: 1rem; margin-bottom: 1rem;
+}
+
+.grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem 1.5rem;
+}
+.grid dt { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.grid dd { margin: 0.1rem 0 0; }
+
+.notice {
+  border: 1px solid var(--border); border-left: 3px solid var(--pending);
+  border-radius: var(--radius); background: var(--surface);
+  padding: 0.75rem 1rem; margin: 1rem 0;
+}
+.notice-error { border-left-color: var(--fail); }
+
+pre {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 0.75rem; overflow-x: auto;
+  font-family: var(--mono); font-size: 0.82rem; margin: 0;
+  white-space: pre-wrap; word-break: break-word;
+}
+
+.empty { text-align: center; color: var(--muted); padding: 3rem 1rem; }
+.back { display: inline-block; margin-bottom: 1rem; font-size: 0.9rem; }

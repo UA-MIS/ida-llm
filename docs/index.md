@@ -15,14 +15,18 @@ is yours, and [`.devops/README.md`](../.devops/README.md) for the deploy contrac
 
 ## Suggested first tasks
 
-1. **Fill in one provider client.** `packages/harness/src/ida_harness/clients.py`
-   already fixes the `ModelClient` protocol; implement `anthropic` or `openai`
-   against it and the mock stays interchangeable with the real thing.
-2. **Make the runner actually run a task.** The loop claims a job from Redis and
-   drops it. Wire `load_tasks` → `build_client` → `score_response` → write rows.
-   Keep the SIGTERM handler.
-3. **Write real tasks.** Replace `tasks/examples/`. The schema gate runs on every
-   PR, so a malformed rubric fails the pull request instead of a benchmark run.
-4. **Give the frontend something to show.** `/api/runs` returns an empty list with
-   the right shape; the api has no public Ingress, so call it server-side at
-   `http://ida-llm-api`.
+The walking skeleton has landed: the harness runs, the runner consumes the
+queue, results persist, and the frontend renders them. What is left is depth,
+not scaffolding.
+
+1. **Fill in a real provider client.** `packages/harness/ida_harness/client.py`
+   fixes the OpenAI-compatible surface and the mock proves it end to end. Add
+   `anthropic` and keep it interchangeable with the mock.
+2. **Make `subjective` tasks scorable.** The schema loads and validates them
+   today (`tasks/SCHEMA.md`), but the LLM-as-judge scorer is still an interface.
+3. **Fill in the three sweeps.** `services/runner/ida_runner/sweeps.py` is
+   scaffold: the CronJobs run nightly and exit 0 without doing work. Every sweep
+   must stay idempotent and MUST exit non-zero on failure.
+4. **Write real tasks.** `tasks/demo/` is two worked examples. The schema gate
+   runs on every PR, so a malformed rubric fails the pull request instead of a
+   benchmark run three hours in.

@@ -1,27 +1,27 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ida-api"
 version = "0.1.0"
-description = "FastAPI read/write API for benchmark runs and results."
+description = "Capstone-IDA public API: model registry, task catalog, run enqueue and run/result reads."
 requires-python = ">=3.12"
 dependencies = [
-  "ida-core",
-  "fastapi>=0.115,<0.120",
-  "uvicorn[standard]>=0.32,<0.40",
-  "sqlalchemy>=2.0,<3",
-  "psycopg[binary]>=3.2,<4",
-  "prometheus-client>=0.21,<1",
-  # /readyz checks redis and the object store, so the api needs both clients even
-  # though it does not otherwise talk to them yet.
-  "redis>=5.2,<7",
-  "httpx>=0.28,<0.29",
+    "ida-core==0.1.0",
+    "ida-harness==0.1.0",
+    "fastapi~=0.115",
+    "uvicorn~=0.32",
+    "psycopg[binary]~=3.2",
+    "prometheus-client~=0.21",
+    # /readyz checks redis and the object store, so the api needs both clients even
+    # though it does not otherwise talk to them yet. Deliberate -- do not "clean up".
+    "redis~=5.1",
+    "httpx~=0.28",
 ]
 
 [project.scripts]
-ida-api = "ida_api.__main__:main"
+ida-api = "ida_api.main:main"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+include = ["ida_api*"]

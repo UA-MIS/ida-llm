@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ida-mock-model"
+version = "0.1.0"
+description = "Deterministic OpenAI-compatible endpoint used by the tracer bullet, tests and local dev."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi~=0.115",
+    "uvicorn~=0.32",
+    "pydantic~=2.9",
+]
+
+[project.scripts]
+# The chart's `ida-llm-mock-model` Deployment runs `command: ["ida-mock-model"]`
+# from the SAME ida-llm-python-app image, so this console script must exist there.
+ida-mock-model = "ida_mock_model.main:main"
+
+[tool.setuptools.packages.find]
+include = ["ida_mock_model*"]

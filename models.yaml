@@ -1,61 +1,110 @@
-# models.yaml — THE model registry. Every benchmark result cites a model id from
-# this file plus the git SHA of the file itself, so a result is reproducible
-# without trusting anybody's memory of "which model was that, again".
+# The model registry (D-1).
 #
-# ⚠ SCHEMA-VALIDATED IN CI. tools/validate_tasks.py checks this file on every PR
-# (`ida-validate-tasks`). A malformed entry fails the PR rather than failing a
-# benchmark run three hours in. The schema lives in tasks/SCHEMA.md.
+# Every model -- a hosted commercial API, a campus vLLM deployment, a laptop
+# llama.cpp server -- is an OpenAI-compatible endpoint described by a base URL,
+# the NAME of an env var holding its key, and a serving config. Adding a model
+# is an edit to this file. There is no per-provider code anywhere.
 #
-# NO SECRETS HERE. `api_key_env` names the ENVIRONMENT VARIABLE the runner reads;
-# the value arrives from Vault via ESO at runtime (see .devops/README.md). A key
-# pasted into this file would be committed to a repo the whole team can read.
+# SECRETS ARE NEVER IN THIS FILE. `api_key_env` names an environment variable;
+# in-cluster that variable is projected from Vault, locally it comes from .env.
 #
-# `base_url_env` is the escape hatch that makes CI and PR previews safe: when it
-# is set and that variable is populated, the runner calls THAT endpoint instead of
-# the provider's. CI sets it to the in-repo mock (`ida-mock-model`), which is why
-# no pull request can burn credits or touch campus hardware.
-apiVersion: ida.capstone/v1
+# Validated in CI against packages/core/ida_core/schemas/models.schema.json.
+version: 1
+
 models:
-  - id: mock-echo
-    provider: mock
-    # The in-repo stub. Deterministic, free, offline — the DEFAULT everywhere the
-    # answer does not need to be real (CI, PR previews, local dev).
-    model: mock-echo-v1
-    base_url_env: MOCK_MODEL_BASE_URL
-    api_key_env: MOCK_MODEL_API_KEY
-    max_tokens: 1024
-    temperature: 0.0
-    tags: [mock, ci]
+  # --- the only entry enabled by default -----------------------------------
+  # The tracer bullet, every test and `make dev` run against this. No key, no
+  # GPU, no network egress, deterministic answers.
+  - key: mock
+    display_name: Mock model (deterministic)
+    base_url: http://mock-model:8000/v1
+    api_key_env: null
+    enabled: true
+    timeout_s: 30
+    max_retries: 2
+    tags: [mock, ci, tracer]
+    serving:
+      model_id: mock-echo-1
+      serving_stack: mock
+      serving_version: ida-mock-model 0.1.0
+      quantization: none
+      context_window: 8192
+      hardware: null
+      sampling:
+        temperature: 0.0
+        top_p: 1.0
+        max_tokens: 256
+        seed: 20260101
+    cost:
+      input_usd_per_mtok: 0.0
+      output_usd_per_mtok: 0.0
 
-  - id: claude-sonnet
-    provider: anthropic
-    # Pin the dated model id, never a floating alias: a result that says "sonnet"
-    # is not reproducible six months later. Update deliberately, in its own PR.
-    model: claude-sonnet-4-5-20250929
-    api_key_env: ANTHROPIC_API_KEY
-    max_tokens: 4096
-    temperature: 0.0
-    tags: [cloud, frontier]
-
-  - id: gpt-4o
-    provider: openai
-    model: gpt-4o-2024-11-20
-    api_key_env: OPENAI_API_KEY
-    max_tokens: 4096
-    temperature: 0.0
-    tags: [cloud, frontier]
-
-  # Campus-hosted vLLM ("Sparks"). PRESENT BUT NOT REACHABLE YET — deliberately.
-  # The cluster egress policy does not open a route to it (deferred by owner
-  # decision; platform-infra/platform-services/ida-llm-egress/netpol.yaml carries
-  # the exact one-block change and the traps). Until SPARKS_BASE_URL is populated
-  # AND that egress block is added, selecting this model fails fast with a clear
-  # error rather than hanging on a dropped connection.
-  - id: sparks-local
-    provider: openai-compatible
-    model: PLACEHOLDER-set-when-sparks-is-reachable
-    base_url_env: SPARKS_BASE_URL
-    api_key_env: SPARKS_API_KEY
-    max_tokens: 4096
-    temperature: 0.0
-    tags: [local, sparks, deferred]
+  # --- EXAMPLES: uncomment and fill in when the real endpoints exist --------
+  #
+  # A hosted commercial API. Anthropic exposes an OpenAI-compatible surface, so
+  # it needs no special-casing -- only a base URL, a key env var and honest
+  # metadata. Note quantization: unknown -- we are not told, and recording
+  # `none` would be a fabricated measurement.
+  #
+  # - key: claude-sonnet
+  #   display_name: Claude Sonnet 4.5
+  #   base_url: https://api.anthropic.com/v1        # OpenAI-compatible surface
+  #   api_key_env: ANTHROPIC_API_KEY                # TODO-PLACEHOLDER(vault-path):
+  #                                                 # projected from Vault at
+  #                                                 # secret/data/capstone-ida/<env>/anthropic
+  #   enabled: true
+  #   timeout_s: 120
+  #   max_retries: 4
+  #   tags: [cloud, frontier, baseline]
+  #   serving:
+  #     model_id: claude-sonnet-4-5                 # exact id sent in the body
+  #     serving_stack: anthropic_compat
+  #     serving_version: null                       # provider does not report one
+  #     quantization: unknown                       # hosted APIs never tell us
+  #     revision: null                              # no snapshot pinning offered
+  #     context_window: 200000
+  #     hardware: null
+  #     sampling:
+  #       temperature: 0.0
+  #       top_p: 1.0
+  #       max_tokens: 2048
+  #       seed: null                                # not supported by this API
+  #   cost:
+  #     input_usd_per_mtok: 3.00                    # TODO-PLACEHOLDER(pricing):
+  #     output_usd_per_mtok: 15.00                  # confirm against the current price list
+  #
+  # A local model served by vLLM on the off-cluster campus GPU hardware. This is
+  # where the reproducibility fields earn their keep: quantization, revision and
+  # hardware are all knowable here and all change the numbers.
+  # See infra/inference/README.md.
+  #
+  # - key: vllm-spark-qwen3-32b
+  #   display_name: Qwen3 32B (campus vLLM, AWQ)
+  #   base_url: http://TODO-PLACEHOLDER-vllm-host:8000/v1   # TODO-PLACEHOLDER(inference-host):
+  #                                                          # the Spark's address or the
+  #                                                          # ExternalName Service in front of it
+  #   api_key_env: VLLM_API_KEY                              # vLLM --api-key; null if behind NetworkPolicy only
+  #   enabled: true
+  #   timeout_s: 300                                         # local models are slower to first token
+  #   max_retries: 3
+  #   tags: [local, campus, open-weights]
+  #   serving:
+  #     model_id: Qwen/Qwen3-32B-AWQ                         # exactly what --model was given
+  #     serving_stack: vllm
+  #     serving_version: vllm 0.6.3                          # TODO-PLACEHOLDER(vllm-version): pin at deploy time
+  #     quantization: awq
+  #     revision: main                                       # HF revision actually loaded
+  #     context_window: 32768
+  #     hardware: 1x DGX Spark GB10 128GB unified
+  #     sampling:
+  #       temperature: 0.0
+  #       top_p: 1.0
+  #       max_tokens: 2048
+  #       seed: 20260101                                     # vLLM honours seed; APIs mostly do not
+  #     extra:
+  #       tensor_parallel_size: 1
+  #       gpu_memory_utilization: 0.90
+  #       max_model_len: 32768
+  #   cost:
+  #     input_usd_per_mtok: 0.0                              # self-hosted: no per-token cost
+  #     output_usd_per_mtok: 0.0

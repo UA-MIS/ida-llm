@@ -9,3 +9,4 @@ pytest-asyncio==1.2.0
 httpx==0.28.1
 alembic==1.16.5
 psycopg[binary]==3.2.10
+coverage==7.10.7
