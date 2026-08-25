@@ -271,11 +271,43 @@ def insert_results(session: Session, records: list[ResultRecord]) -> list[Result
     return rows
 
 
-def list_results_for_run(session: Session, run_id: str) -> list[ResultRow]:
-    """All results for a run, in stable ``sample_id`` order."""
+def list_results_for_run(
+    session: Session,
+    run_id: str,
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+) -> list[ResultRow]:
+    """Results for a run, in stable ``(sample_id, repeat_index)`` order.
+
+    ``limit=None`` -- the default -- returns every row, which is what the runner
+    and the tests want. The API passes an explicit page so that one run cannot
+    produce an unbounded response: a sweep with repeats over a large task is one
+    row per (sample, repetition), and nothing else caps that.
+
+    The ordering is total and deterministic, which is what makes paging over it
+    correct: a page boundary that fell inside a group of equal sort keys could
+    otherwise repeat or skip a row between requests.
+    """
     stmt = (
         select(ResultRow)
         .where(ResultRow.run_id == run_id)
         .order_by(ResultRow.sample_id.asc(), ResultRow.repeat_index.asc())
     )
+    if offset:
+        stmt = stmt.offset(offset)
+    if limit is not None:
+        stmt = stmt.limit(limit)
     return list(session.scalars(stmt))
+
+
+def count_results_for_run(session: Session, run_id: str) -> int:
+    """How many results the run has, ignoring pagination.
+
+    Returned alongside the page for the same reason :func:`count_runs` is (A11):
+    without it a client cannot tell a genuinely empty run from a page past the
+    end, and the UI classifies those two very differently -- an empty result set
+    reads as "all errored".
+    """
+    stmt = select(func.count()).select_from(ResultRow).where(ResultRow.run_id == run_id)
+    return int(session.scalar(stmt) or 0)

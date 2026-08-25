@@ -1111,12 +1111,26 @@ class RunRecord(BaseModel):
 
 
 class RunDetail(BaseModel):
-    """API response for ``GET /runs/{run_id}``: the run plus its results."""
+    """API response for ``GET /runs/{run_id}``: the run plus a page of results."""
 
     model_config = ConfigDict(extra="forbid")
 
     run: RunRecord
     results: list[ResultRecord]
+
+    results_total: int
+    """Results this run has, ignoring pagination.
+
+    Load-bearing, not decorative. ``results`` alone cannot distinguish a run
+    that produced nothing from a page requested past the end, and the UI
+    classifies those differently -- an empty result set reads as *all errored*
+    (``frontend/src/lib/outcome.ts``). A client comparing ``len(results)`` with
+    ``results_total`` can also tell that it is looking at a partial view before
+    it draws a conclusion from it.
+    """
+
+    results_limit: int
+    results_offset: int
 
 
 class EvalLog(BaseModel):
