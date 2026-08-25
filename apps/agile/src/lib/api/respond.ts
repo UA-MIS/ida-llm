@@ -54,3 +54,19 @@ export function parseId(raw: string): number | null {
   const n = Number(raw);
   return Number.isInteger(n) && n > 0 ? n : null;
 }
+
+/**
+ * Reads an optional non-negative integer query parameter (`limit`, `offset`).
+ *
+ * Returns undefined for anything absent, empty or unusable, so an unparseable
+ * value degrades to "no filter" instead of becoming NaN. That distinction is
+ * load-bearing: `Number('abc')` is NaN, and `typeof NaN === 'number'`, so a raw
+ * `Number()` slips past every downstream `!== undefined` / `typeof` guard and
+ * reaches Postgres as a bind parameter — `GET /api/v1/items?limit=abc` returned
+ * `invalid input syntax for type bigint: "NaN"` as a 500 (AB#30, review M-1).
+ */
+export function parseNonNegativeInt(raw: string | null | undefined): number | undefined {
+  if (raw === null || raw === undefined || raw.trim() === '') return undefined;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 ? n : undefined;
+}

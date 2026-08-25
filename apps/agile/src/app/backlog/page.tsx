@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { requireSession } from '@/lib/auth/guard';
 import { ensureSchema } from '@/lib/bootstrap';
 import { listSprints, listWorkItems } from '@/lib/domain/queries';
+import { parseSprintFilter } from '@/lib/domain/workitem';
 import { Shell } from '@/components/Shell';
 import { Assignee, PriorityChip, PrChip, StateBadge, TypeChip } from '@/components/chips';
 import { toPlainText } from '@/lib/markdown';
@@ -22,8 +23,7 @@ export default async function BacklogPage({
     listWorkItems({
       search: sp.q,
       assignee: sp.assignee === 'mine' ? session.login : sp.assignee || undefined,
-      sprintId:
-        !sp.sprint || sp.sprint === 'all' ? undefined : sp.sprint === 'none' ? null : Number(sp.sprint),
+      sprintId: parseSprintFilter(sp.sprint),
     }),
   ]);
 

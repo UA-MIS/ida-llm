@@ -75,24 +75,65 @@ const tagSchema = z
   .max(40)
   .regex(/^[\w][\w .+/-]*$/, 'Tags may only contain letters, numbers and . _ + / -');
 
-export const createWorkItemSchema = z.object({
+/**
+ * Field rules WITHOUT defaults.
+ *
+ * Create and update validate a field identically but must disagree about what a
+ * MISSING key means, so the rules are declared once here and each schema below
+ * layers its own missing-key policy on top.
+ */
+const workItemFields = {
   title: z.string().trim().min(1, 'Title is required').max(300),
-  description: z.string().max(20_000).default(''),
-  itemType: typeSchema.default('Story'),
-  state: stateSchema.default('New'),
-  assigneeLogin: z.string().trim().max(100).nullable().default(null),
-  assigneeAvatarUrl: z.string().url().max(500).nullable().default(null),
-  storyPoints: z.number().int().min(0).max(1000).nullable().default(null),
-  priority: z.number().int().min(1).max(4).default(2),
-  sprintId: z.number().int().positive().nullable().default(null),
-  tags: z.array(tagSchema).max(20).default([]),
+  description: z.string().max(20_000),
+  itemType: typeSchema,
+  state: stateSchema,
+  assigneeLogin: z.string().trim().max(100).nullable(),
+  assigneeAvatarUrl: z.string().url().max(500).nullable(),
+  storyPoints: z.number().int().min(0).max(1000).nullable(),
+  priority: z.number().int().min(1).max(4),
+  sprintId: z.number().int().positive().nullable(),
+  tags: z.array(tagSchema).max(20),
   /** Optional; only meaningful when the board follows more than one repo. */
-  repoFullName: z.string().regex(/^[\w.-]+\/[\w.-]+$/).nullable().default(null),
+  repoFullName: z.string().regex(/^[\w.-]+\/[\w.-]+$/).nullable(),
   /** Free-form band, e.g. "Wave 1". Kept as text so teams pick their own scheme. */
-  wave: z.string().trim().max(40).nullable().default(null),
+  wave: z.string().trim().max(40).nullable(),
+};
+
+/** Create: a missing key takes the field's default. Only `title` is required. */
+export const createWorkItemSchema = z.object({
+  ...workItemFields,
+  description: workItemFields.description.default(''),
+  itemType: workItemFields.itemType.default('Story'),
+  state: workItemFields.state.default('New'),
+  assigneeLogin: workItemFields.assigneeLogin.default(null),
+  assigneeAvatarUrl: workItemFields.assigneeAvatarUrl.default(null),
+  storyPoints: workItemFields.storyPoints.default(null),
+  priority: workItemFields.priority.default(2),
+  sprintId: workItemFields.sprintId.default(null),
+  tags: workItemFields.tags.default([]),
+  repoFullName: workItemFields.repoFullName.default(null),
+  wave: workItemFields.wave.default(null),
 });
 
-export const updateWorkItemSchema = createWorkItemSchema.partial();
+/**
+ * Update: JSON merge-patch semantics.
+ *
+ *   key present with a value  -> update that field
+ *   key present as null       -> deliberate clear, e.g. {"sprintId": null} sends
+ *                                an item back to the backlog
+ *   key ABSENT                -> leave the stored value untouched
+ *
+ * Deliberately built from the UN-DEFAULTED fields. `createWorkItemSchema.partial()`
+ * reads as equivalent and is not: `.partial()` wraps each field in ZodOptional but
+ * does NOT strip its ZodDefault, so parsing `{"assigneeLogin":"x"}` returned every
+ * OTHER key filled in with its default. `updateWorkItem` skips only `undefined`
+ * values, so those defaults were written to the row — a partial PATCH silently
+ * blanked description, wave, repoFullName, storyPoints and sprintId, and the
+ * injected `state: 'New'` made assigning a Resolved/Closed item fail as an illegal
+ * transition (AB#28). Keep this derived from `workItemFields`, never from
+ * `createWorkItemSchema`.
+ */
+export const updateWorkItemSchema = z.object(workItemFields).partial();
 
 /** What a caller may pass — optional fields get their defaults on parse. */
 export type CreateWorkItemInput = z.input<typeof createWorkItemSchema>;
@@ -115,6 +156,25 @@ export const sprintSchema = z
 
 export type SprintInput = z.input<typeof sprintSchema>;
 export type ParsedSprint = z.output<typeof sprintSchema>;
+
+/**
+ * Reads the backlog's `?sprint=` filter into a `listWorkItems` sprintId filter.
+ *
+ *   absent / "all" -> undefined (every sprint)
+ *   "none"         -> null      (items with no sprint)
+ *   "12"           -> 12        (that sprint)
+ *
+ * Anything else — a stale bookmark, a hand-edited URL — falls back to "all"
+ * rather than reaching the query layer. `Number('abc')` is NaN, and NaN is still
+ * `typeof 'number'`, so an unguarded value used to be passed straight into the
+ * SQL filter and error the entire backlog page with a 500 (AB#30).
+ */
+export function parseSprintFilter(raw: string | undefined): number | null | undefined {
+  if (!raw || raw === 'all') return undefined;
+  if (raw === 'none') return null;
+  const id = Number(raw);
+  return Number.isInteger(id) && id > 0 ? id : undefined;
+}
 
 /** Who or what performed a change. */
 export type ActorSource = 'user' | 'api' | 'github' | 'system';
