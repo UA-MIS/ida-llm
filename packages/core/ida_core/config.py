@@ -30,6 +30,11 @@ from pathlib import Path
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Safe: ida_core.queue imports only ida_core.contracts, which imports nothing
+# from this package, so there is no cycle -- and the defaults stay defined once,
+# next to the code that reasons about them.
+from ida_core.queue import DEFAULT_HEARTBEAT_TTL_S, DEFAULT_MAX_ATTEMPTS
+
 _LOG_LEVELS = frozenset({"CRITICAL", "FATAL", "ERROR", "WARN", "WARNING", "INFO", "DEBUG"})
 """The names `logging` accepts. NOTSET is deliberately excluded: it means
 "inherit", which is not a meaningful thing to configure a service to."""
@@ -144,6 +149,41 @@ class Settings(BaseSettings):
     runner_metrics_port: int = 9100
     """The runner's /metrics listener.  9100 matches the container port the
     ServiceMonitor scrapes -- see services/runner/ida_runner/metrics.py."""
+
+    # ── queue durability (see ida_core.queue) ─────────────────────────────
+    # All IDA_-only with in-image defaults: the ConfigMap carries no entry for
+    # any of them, so the defaults below ARE the deployed values until somebody
+    # deliberately overrides one.
+
+    queue_max_attempts: int = DEFAULT_MAX_ATTEMPTS
+    """How many times a run job may be delivered before it is dead-lettered."""
+
+    runner_heartbeat_interval_s: int = 30
+    """How often a runner refreshes its liveness key while a job is in flight.
+
+    Must stay comfortably below :attr:`runner_heartbeat_ttl_s`, or a runner
+    working normally on a long job looks dead and its job gets duplicated."""
+
+    runner_heartbeat_ttl_s: int = DEFAULT_HEARTBEAT_TTL_S
+    """TTL on the liveness key.  3x the interval, so two missed refreshes are
+    survivable."""
+
+    reaper_interval_s: int = 60
+    """How often each runner runs the recovery/stale-run pass.  Every replica
+    does it; the pass is idempotent and lock-free (see ida_core.queue)."""
+
+    stale_run_ttl_s: int = 21600
+    """How long a run may sit ``running`` with nobody claiming it before it is
+    closed out as ``failed``.
+
+    Six hours, not minutes.  This is the LAST-RESORT backstop for a run whose
+    claim record is gone entirely (Redis flushed, key evicted); the ordinary
+    crash path is caught in seconds by claim recovery, which knows the truth
+    rather than guessing from a clock.  A run that a live runner is still
+    working on is never eligible however old it is -- see
+    :meth:`ida_core.queue.RunQueue.live_claims`.  Erring long costs a delayed
+    status update; erring short would report a healthy run as failed, which is
+    the kind of false statement this platform exists to avoid."""
 
     auth_mode: str = "disabled"
     """``disabled`` today.

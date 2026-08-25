@@ -7,6 +7,7 @@ than a silently stuck one.
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 
@@ -28,7 +29,8 @@ from ida_core.contracts import (
     RunStatus,
     SamplingParams,
 )
-from ida_core.db import session_scope
+from ida_core.db import session_scope, utcnow
+from ida_core.queue import InMemoryQueue
 from ida_core.repositories import (
     get_run,
     list_results_for_run,
@@ -36,7 +38,32 @@ from ida_core.repositories import (
     run_row_to_record,
 )
 from ida_harness.client import OpenAICompatibleClient
+from ida_runner.reaper import Reaper
 from ida_runner.worker import Worker, execute_job
+
+
+def _drain(worker: Worker, *, jobs: int, timeout: float = 10.0) -> None:
+    """Run the loop for ``jobs`` messages, turning a HANG into a failure.
+
+    `run_forever(max_jobs=N)` with a zero poll timeout spins until N messages
+    have been consumed. That is fine while the code is correct -- and it means a
+    regression that stops a message being requeued does not fail these tests, it
+    WEDGES them, and CI reports a job timeout with no indication of which
+    property broke. Found the hard way: mutating out the worker's nack hung the
+    suite instead of failing it.
+
+    A test that cannot fail loudly is not a test.
+    """
+    thread = threading.Thread(target=worker.run_forever, kwargs={"max_jobs": jobs}, daemon=True)
+    thread.start()
+    thread.join(timeout=timeout)
+    if thread.is_alive():
+        worker.stop()
+        thread.join(timeout=5)
+        pytest.fail(
+            f"the loop was still waiting for job {worker.jobs_processed + 1} of {jobs} "
+            f"after {timeout}s -- a message that should have been requeued was not"
+        )
 
 
 def _execute(message, *, session_factory, registry, catalog, artifact_store, **kwargs):
@@ -541,89 +568,12 @@ class TestPoisonMessages:
         assert worker.jobs_processed == 0
 
 
-class TestRedisDeadLettering:
-    """The Redis implementation must park undecodable payloads too.
-
-    Driven through a minimal fake that implements the Redis commands used --
-    enough to pin the dead-letter behaviour without a live server. The Redis
-    path itself is exercised for real by the compose tracer.
-    """
-
-    class _FakeRedis:
-        def __init__(self, payloads: list[bytes]) -> None:
-            self.lists: dict[str, list[bytes]] = {"ida:queue:runs": list(payloads)}
-            self.trimmed = False
-
-        def blpop(self, keys, timeout=0):
-            key = keys[0]
-            if not self.lists.get(key):
-                return None
-            return (key.encode(), self.lists[key].pop(0))
-
-        def rpush(self, key, value):
-            self.lists.setdefault(key, []).append(value)
-
-        def llen(self, key):
-            return len(self.lists.get(key, []))
-
-        def ltrim(self, key, start, end):
-            self.trimmed = True
-
-        def pipeline(self):
-            outer = self
-
-            class _Pipe:
-                def __init__(self):
-                    self.ops = []
-
-                def rpush(self, key, value):
-                    self.ops.append(lambda: outer.rpush(key, value))
-                    return self
-
-                def ltrim(self, key, start, end):
-                    self.ops.append(lambda: outer.ltrim(key, start, end))
-                    return self
-
-                def execute(self):
-                    for op in self.ops:
-                        op()
-
-            return _Pipe()
-
-    def test_undecodable_payload_goes_to_the_dead_letter_key(self) -> None:
-        from ida_core.queue import DEAD_LETTER_KEY, RedisQueue
-
-        fake = self._FakeRedis([b'{"not": "a valid message"}'])
-        queue = RedisQueue(fake)
-        assert queue.dequeue(timeout_s=0) is None
-        assert fake.lists[DEAD_LETTER_KEY] == [b'{"not": "a valid message"}']
-        assert queue.dead_letter_depth() == 1
-
-    def test_the_dead_letter_list_is_bounded(self) -> None:
-        """An unbounded dead-letter list is its own outage."""
-        from ida_core.queue import RedisQueue
-
-        fake = self._FakeRedis([b"garbage"])
-        RedisQueue(fake).dequeue(timeout_s=0)
-        assert fake.trimmed, "ltrim must cap the list"
-
-    def test_a_valid_payload_still_decodes(self) -> None:
-        from ida_core.queue import RedisQueue
-
-        message = _message("run_ok")
-        fake = self._FakeRedis([message.to_wire().encode()])
-        assert RedisQueue(fake).dequeue(timeout_s=0).run_id == "run_ok"
-
-    def test_a_failing_dead_letter_write_does_not_escalate(self) -> None:
-        """Redis being in trouble must not turn a bad message into a dead runner."""
-        from ida_core.queue import RedisQueue
-
-        class BrokenRedis(TestRedisDeadLettering._FakeRedis):
-            def pipeline(self):
-                raise ConnectionError("redis is down")
-
-        queue = RedisQueue(BrokenRedis([b"garbage"]))
-        assert queue.dequeue(timeout_s=0) is None  # logged, not raised
+# NOTE: the Redis implementation's own tests -- dead-lettering, claim/ack,
+# recovery -- now live in `packages/core/tests/test_queue.py`, next to the
+# contract they belong to and next to the parity suite that runs the SAME
+# assertions against InMemoryQueue. They were here because there was nowhere
+# else; keeping two half-fakes of Redis in two distributions is how the double
+# and the real thing come to disagree.
 
 
 class TestRunRollupHonesty:
@@ -706,3 +656,504 @@ class TestRunRollupHonesty:
         assert all(r.task_content_sha == stored.task_content_sha for r in results)
         assert all(r.repeat_index == 0 for r in results)
         assert all(r.cached is False for r in results)
+
+
+class TestClaimAckAndRetry:
+    """What the worker does with a claim -- the half the queue cannot decide.
+
+    The queue owns "retry or park"; the worker owns the run ROW. A message put
+    back on the queue while its row still says `running`, or dead-lettered while
+    its row says `running` for ever, is only half a fix -- and the half that is
+    missing is the half a human reads.
+    """
+
+    def _worker(self, queue, session_factory, registry, catalog, artifact_store, **kwargs):
+        kwargs.setdefault("poll_timeout_s", 0)
+        kwargs.setdefault("heartbeat_interval_s", 0)  # no thread unless a test wants one
+        return Worker(
+            queue=queue,
+            session_factory=session_factory,
+            registry=registry,
+            catalog=catalog,
+            artifact_store=artifact_store,
+            **kwargs,
+        )
+
+    def test_a_finished_run_releases_its_claim(
+        self, queue, session_factory, registry, catalog, artifact_store, mock_transport_factory
+    ) -> None:
+        """A terminal verdict is a finished job; holding the claim would only
+        get it re-delivered and re-run for the same answer."""
+        run_id = _seed_run(session_factory)
+        queue.enqueue(_message(run_id))
+
+        worker = self._worker(
+            queue,
+            session_factory,
+            registry,
+            catalog,
+            artifact_store,
+            client_factory=mock_transport_factory,
+        )
+        worker.run_forever(max_jobs=1)
+
+        with session_scope(session_factory) as session:
+            assert run_row_to_record(get_run(session, run_id)).status is RunStatus.SUCCEEDED
+        assert queue.processing_depth() == 0, "acked"
+        assert queue.depth() == 0
+
+    def test_an_UNRESOLVABLE_job_is_acked_not_retried(
+        self, queue, session_factory, registry, catalog, artifact_store, mock_transport_factory
+    ) -> None:
+        """A verdict of 'failed' is still a verdict.
+
+        `execute_job` turns an unknown task/model into a persisted `failed` run
+        on purpose. Retrying that would produce the identical verdict three
+        times and park a message about a question already answered.
+        """
+        run_id = _seed_run(session_factory, task_id="demo/no-such-task")
+        queue.enqueue(_message(run_id, task_id="demo/no-such-task"))
+
+        worker = self._worker(
+            queue,
+            session_factory,
+            registry,
+            catalog,
+            artifact_store,
+            client_factory=mock_transport_factory,
+        )
+        worker.run_forever(max_jobs=1)
+
+        with session_scope(session_factory) as session:
+            assert run_row_to_record(get_run(session, run_id)).status is RunStatus.FAILED
+        assert worker.jobs_retried == 0
+        assert queue.depth() == 0 and queue.processing_depth() == 0
+        assert queue.dead_letters == []
+
+    def test_an_unexpected_explosion_returns_the_job_and_un_runs_the_row(
+        self, session_factory, registry, catalog, artifact_store, monkeypatch
+    ) -> None:
+        """A pod that falls over mid-job must leave the run WAITING, not running."""
+        queue = InMemoryQueue(consumer_id="runner-a", max_attempts=3)
+        run_id = _seed_run(session_factory, status=RunStatus.RUNNING, started_at=utcnow())
+        queue.enqueue(_message(run_id))
+
+        def _explode(*_args, **_kwargs):
+            raise RuntimeError("pod OOMKilled")
+
+        monkeypatch.setattr("ida_runner.worker.execute_job", _explode)
+        worker = self._worker(queue, session_factory, registry, catalog, artifact_store)
+        worker.run_forever(max_jobs=1)
+
+        assert worker.jobs_retried == 1
+        assert queue.depth() == 1, "back on the queue for someone to try again"
+        assert queue.processing_depth() == 0
+        with session_scope(session_factory) as session:
+            record = run_row_to_record(get_run(session, run_id))
+        assert record.status is RunStatus.QUEUED, "waiting, not 'running' with nobody on it"
+        assert record.started_at is None
+
+    def test_retry_exhaustion_ends_in_a_FAILED_run_and_a_dead_letter(
+        self, session_factory, registry, catalog, artifact_store, monkeypatch
+    ) -> None:
+        """The end of the line has to be honest and has to be visible.
+
+        Two deliveries, then the queue gives up. The run must say `failed` with
+        a reason -- never `running`, which is the status the old loop left
+        behind and which a dashboard repeats to a human indefinitely.
+        """
+        queue = InMemoryQueue(consumer_id="runner-a", max_attempts=2)
+        run_id = _seed_run(session_factory, status=RunStatus.RUNNING, started_at=utcnow())
+        queue.enqueue(_message(run_id))
+
+        def _explode(*_args, **_kwargs):
+            raise ConnectionError("the endpoint is gone")
+
+        monkeypatch.setattr("ida_runner.worker.execute_job", _explode)
+        worker = self._worker(queue, session_factory, registry, catalog, artifact_store)
+        _drain(worker, jobs=2)
+
+        assert worker.jobs_retried == 1
+        assert worker.jobs_dead_lettered == 1
+        assert queue.depth() == 0, "it is not going round for ever"
+
+        with session_scope(session_factory) as session:
+            record = run_row_to_record(get_run(session, run_id))
+        assert record.status is RunStatus.FAILED
+        assert record.error and "gave up after 2 attempt(s)" in record.error
+        assert "the endpoint is gone" in record.error, "the ORIGINAL cause survives"
+        assert record.finished_at is not None
+
+        parked = json.loads(queue.dead_letters[0])
+        assert parked["run_id"] == run_id
+        assert parked["attempts"] == 2
+
+    def test_the_loop_survives_a_queue_that_cannot_retry(
+        self, session_factory, registry, catalog, artifact_store, monkeypatch
+    ) -> None:
+        """Defence in depth, and an honest fallback.
+
+        A RunQueue implementation predating claims (or a partial test double)
+        has no `nack`. The worker must not crash on the missing method -- and
+        must still close the run out rather than leave it 'running'.
+        """
+
+        class ClaimlessQueue:
+            def __init__(self, message) -> None:
+                self._messages = [message]
+
+            def enqueue(self, message):
+                self._messages.append(message)
+
+            def dequeue(self, timeout_s=5):
+                return self._messages.pop(0) if self._messages else None
+
+            def depth(self):
+                return len(self._messages)
+
+        run_id = _seed_run(session_factory, status=RunStatus.RUNNING, started_at=utcnow())
+        queue = ClaimlessQueue(_message(run_id))
+
+        def _explode(*_args, **_kwargs):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr("ida_runner.worker.execute_job", _explode)
+        worker = self._worker(queue, session_factory, registry, catalog, artifact_store)
+        worker.run_forever(max_jobs=1)
+
+        with session_scope(session_factory) as session:
+            record = run_row_to_record(get_run(session, run_id))
+        assert record.status is RunStatus.FAILED, "closed out, not abandoned as 'running'"
+
+    def test_an_ack_that_fails_is_counted_not_fatal(
+        self, session_factory, registry, catalog, artifact_store, mock_transport_factory
+    ) -> None:
+        """A failed ack means the job is re-delivered later: wasteful, never
+        lost, and never a reason to kill the runner."""
+
+        class UnackableQueue(InMemoryQueue):
+            def ack(self, message):
+                raise ConnectionError("redis went away at the worst moment")
+
+        queue = UnackableQueue(consumer_id="runner-a")
+        run_id = _seed_run(session_factory)
+        queue.enqueue(_message(run_id))
+
+        worker = self._worker(
+            queue,
+            session_factory,
+            registry,
+            catalog,
+            artifact_store,
+            client_factory=mock_transport_factory,
+        )
+        worker.run_forever(max_jobs=1)
+
+        assert worker.ack_failures == 1
+        with session_scope(session_factory) as session:
+            assert run_row_to_record(get_run(session, run_id)).status is RunStatus.SUCCEEDED
+
+
+class TestCrashRecoveryEndToEnd:
+    """kill -9 between the claim and the ack -- and the job still gets run."""
+
+    def test_a_job_claimed_by_a_runner_that_dies_is_completed_by_another(
+        self, session_factory, registry, catalog, artifact_store, mock_transport_factory
+    ) -> None:
+        """The whole story, end to end, at the level a human cares about.
+
+        Runner A takes the job and its pod is destroyed before it does anything.
+        Under the old BLPOP loop that run was gone -- no message, no result, and
+        a row saying `running` until somebody noticed. Here, runner B's reaper
+        finds it and runner B finishes it.
+        """
+        queue_a = InMemoryQueue(consumer_id="runner-a", max_attempts=3)
+        queue_b = queue_a.for_consumer("runner-b")
+        run_id = _seed_run(session_factory)
+        queue_a.enqueue(_message(run_id))
+
+        claimed = queue_a.dequeue(timeout_s=0)  # runner-a claims it...
+        assert claimed is not None and queue_a.depth() == 0
+        queue_a.simulate_consumer_death()  # ...and is killed right here.
+
+        Reaper(queue=queue_b, session_factory=session_factory, stale_run_ttl_s=3600).sweep()
+
+        worker_b = Worker(
+            queue=queue_b,
+            session_factory=session_factory,
+            registry=registry,
+            catalog=catalog,
+            artifact_store=artifact_store,
+            poll_timeout_s=0,
+            heartbeat_interval_s=0,
+            client_factory=mock_transport_factory,
+        )
+        assert worker_b.run_forever(max_jobs=1) == 1
+
+        with session_scope(session_factory) as session:
+            record = run_row_to_record(get_run(session, run_id))
+        assert record.status is RunStatus.SUCCEEDED, "the work was not lost"
+        assert record.sample_count == 4 and record.scored_count == 4
+        assert queue_b.processing_depth() == 0, "and runner-b acked it"
+        assert queue_b.dead_letters == []
+
+
+class TestHousekeepingInTheLoop:
+    """The reaper and the heartbeat run alongside consumption, and cannot stop it."""
+
+    class _StubReaper:
+        def __init__(self, explode: bool = False) -> None:
+            self.sweeps = 0
+            self._explode = explode
+
+        def sweep(self):
+            self.sweeps += 1
+            if self._explode:
+                raise ConnectionError("redis is unreachable")
+            from ida_runner.reaper import ReaperReport
+
+            return ReaperReport()
+
+    def _worker(self, queue, session_factory, registry, catalog, artifact_store, **kwargs):
+        return Worker(
+            queue=queue,
+            session_factory=session_factory,
+            registry=registry,
+            catalog=catalog,
+            artifact_store=artifact_store,
+            poll_timeout_s=0,
+            heartbeat_interval_s=0,
+            **kwargs,
+        )
+
+    def test_the_reaper_runs_from_the_consume_loop(
+        self, queue, session_factory, registry, catalog, artifact_store
+    ) -> None:
+        reaper = self._StubReaper()
+        worker = self._worker(
+            queue,
+            session_factory,
+            registry,
+            catalog,
+            artifact_store,
+            reaper=reaper,
+            reaper_interval_s=0,
+        )
+        worker.stop()
+        worker.run_forever()  # stopped before the first iteration
+        assert reaper.sweeps == 0
+
+        worker2 = self._worker(
+            queue,
+            session_factory,
+            registry,
+            catalog,
+            artifact_store,
+            reaper=reaper,
+            reaper_interval_s=0,
+        )
+        thread = threading.Thread(target=worker2.run_forever, daemon=True)
+        thread.start()
+        deadline = time.monotonic() + 5
+        while reaper.sweeps < 2 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        worker2.stop()
+        thread.join(timeout=5)
+        assert reaper.sweeps >= 2, "it is periodic, not once-per-process"
+
+    def test_a_reaper_that_is_not_due_yet_is_not_run(
+        self, queue, session_factory, registry, catalog, artifact_store
+    ) -> None:
+        """Every replica does this pass; doing it on every single poll would
+        turn an idle tier into a Redis scan loop."""
+        reaper = self._StubReaper()
+        worker = self._worker(
+            queue,
+            session_factory,
+            registry,
+            catalog,
+            artifact_store,
+            reaper=reaper,
+            reaper_interval_s=3600,
+        )
+        thread = threading.Thread(target=worker.run_forever, daemon=True)
+        thread.start()
+        # Wait for the entry sweep rather than sleeping a guessed interval: a
+        # timing assumption is how a test like this becomes flaky in CI.
+        deadline = time.monotonic() + 5
+        while reaper.sweeps < 1 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        time.sleep(0.05)  # ...and now give a SECOND sweep every chance to happen
+        worker.stop()
+        thread.join(timeout=5)
+        assert reaper.sweeps == 1, "once on entry, then not again for an hour"
+
+    def test_a_FAILING_reaper_does_not_stop_the_runner_draining_the_queue(
+        self, queue, session_factory, registry, catalog, artifact_store, mock_transport_factory
+    ) -> None:
+        """Housekeeping is not the job.  Losing it must not lose the work."""
+        run_id = _seed_run(session_factory)
+        queue.enqueue(_message(run_id))
+        reaper = self._StubReaper(explode=True)
+
+        worker = self._worker(
+            queue,
+            session_factory,
+            registry,
+            catalog,
+            artifact_store,
+            reaper=reaper,
+            reaper_interval_s=0,
+            client_factory=mock_transport_factory,
+        )
+        worker.run_forever(max_jobs=1)
+
+        assert worker.reaper_failures >= 1
+        with session_scope(session_factory) as session:
+            assert run_row_to_record(get_run(session, run_id)).status is RunStatus.SUCCEEDED
+
+    def test_the_heartbeat_keeps_beating_while_a_long_job_runs(
+        self, session_factory, registry, catalog, artifact_store, monkeypatch
+    ) -> None:
+        """Without this, a job that outlives the heartbeat TTL makes a HEALTHY
+        runner look dead -- and its claim is recovered and run a second time.
+
+        The loop's own dequeue heartbeats when idle; a runner is least idle
+        exactly when it most needs to look alive.
+        """
+        beats = threading.Event()
+        counter = {"n": 0}
+
+        class CountingQueue(InMemoryQueue):
+            def heartbeat(self):
+                super().heartbeat()
+                counter["n"] += 1
+                if counter["n"] >= 3:
+                    beats.set()
+
+        queue = CountingQueue(consumer_id="runner-a")
+        run_id = _seed_run(session_factory)
+        queue.enqueue(_message(run_id))
+
+        def _slow(*_args, **_kwargs):
+            beats.wait(timeout=5)  # the "job" lasts as long as the beating needs
+            raise RuntimeError("done pretending")
+
+        monkeypatch.setattr("ida_runner.worker.execute_job", _slow)
+        worker = Worker(
+            queue=queue,
+            session_factory=session_factory,
+            registry=registry,
+            catalog=catalog,
+            artifact_store=artifact_store,
+            poll_timeout_s=0,
+            heartbeat_interval_s=0.02,
+        )
+        worker.run_forever(max_jobs=1)
+
+        assert beats.is_set(), "the heartbeat thread ran DURING the job, not only between jobs"
+
+    def test_the_heartbeat_thread_does_not_outlive_the_loop(
+        self, queue, session_factory, registry, catalog, artifact_store
+    ) -> None:
+        worker = Worker(
+            queue=queue,
+            session_factory=session_factory,
+            registry=registry,
+            catalog=catalog,
+            artifact_store=artifact_store,
+            poll_timeout_s=0,
+            heartbeat_interval_s=0.01,
+        )
+        worker.stop()
+        worker.run_forever()
+        assert worker._heartbeat_thread is None
+
+
+class TestAtLeastOnceIsSafe:
+    """Re-delivery is a FEATURE of the durability pass -- and its sharpest edge.
+
+    A runner that commits a finished run and dies before acking will meet that
+    message again. Running it twice would append a second full set of result
+    rows for one run, and results are the citable evidence behind every
+    recommendation (D-3): duplicating them corrupts the output quietly and
+    permanently. The old at-most-once queue could not do this; this queue can,
+    so the guard is part of the same change.
+    """
+
+    def test_a_re_delivered_FINISHED_run_is_not_run_again(
+        self, session_factory, registry, catalog, artifact_store, mock_transport_factory
+    ) -> None:
+        run_id = _seed_run(session_factory)
+        message = _message(run_id)
+
+        first = _execute(
+            message,
+            session_factory=session_factory,
+            registry=registry,
+            catalog=catalog,
+            artifact_store=artifact_store,
+            client_factory=mock_transport_factory,
+        )
+        assert first.status is RunStatus.SUCCEEDED
+        with session_scope(session_factory) as session:
+            results_after_one = len(list_results_for_run(session, run_id))
+        assert results_after_one == 4
+
+        # ...the ack never landed, so the message comes back.
+        again = _execute(
+            message.model_copy(update={"attempt": 2}),
+            session_factory=session_factory,
+            registry=registry,
+            catalog=catalog,
+            artifact_store=artifact_store,
+            client_factory=mock_transport_factory,
+        )
+
+        assert again.status is RunStatus.SUCCEEDED, "reported, so the worker acks it"
+        with session_scope(session_factory) as session:
+            assert len(list_results_for_run(session, run_id)) == results_after_one, (
+                "the citable evidence was NOT duplicated"
+            )
+
+    @pytest.mark.parametrize("status", [RunStatus.SUCCEEDED, RunStatus.PARTIAL, RunStatus.FAILED])
+    def test_every_terminal_status_is_treated_as_work_already_done(
+        self, status, session_factory, registry, catalog, artifact_store
+    ) -> None:
+        """Including `failed`: a run that failed for a real reason must keep that
+        reason, not have it overwritten by a second opinion."""
+        run_id = _seed_run(session_factory, status=status, error="the original reason")
+
+        record = _execute(
+            _message(run_id),
+            session_factory=session_factory,
+            registry=registry,
+            catalog=catalog,
+            artifact_store=artifact_store,
+        )
+
+        assert record.status is status
+        with session_scope(session_factory) as session:
+            assert run_row_to_record(get_run(session, run_id)).error == "the original reason"
+
+    def test_a_REQUEUED_run_is_not_mistaken_for_a_finished_one(
+        self, session_factory, registry, catalog, artifact_store, mock_transport_factory
+    ) -> None:
+        """The guard must not swallow a legitimate retry.
+
+        A recovered or nacked run goes back to `queued`, which is precisely why
+        the reaper resets the row instead of leaving it alone.
+        """
+        run_id = _seed_run(session_factory, status=RunStatus.QUEUED)
+
+        record = _execute(
+            _message(run_id, attempt=2),
+            session_factory=session_factory,
+            registry=registry,
+            catalog=catalog,
+            artifact_store=artifact_store,
+            client_factory=mock_transport_factory,
+        )
+
+        assert record.status is RunStatus.SUCCEEDED, "the retry actually ran"
+        assert record.sample_count == 4

@@ -8,7 +8,10 @@ remember to honour.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import func, select
+from sqlalchemy import or_ as sa_or
 from sqlalchemy.orm import Session
 
 from ida_core.contracts import (
@@ -153,6 +156,69 @@ def mark_run_running(session: Session, run_id: str, serving_config: ServingConfi
     row.started_at = utcnow()
     row.serving_config = serving_config.model_dump(mode="json")
     return row
+
+
+def requeue_run(session: Session, run_id: str) -> RunRow | None:
+    """Put a claimed-but-unfinished run back to ``queued``.
+
+    Called when a dead runner's claim is recovered.  A recovered run left
+    ``running`` is precisely the bug this pass exists to fix: the message is on
+    the queue again, so the row must say "waiting", not "in progress".
+
+    Returns ``None`` for a run that is missing or already terminal -- both are
+    normal races (the runner may have finished and acked between the heartbeat
+    lapsing and this call), not errors.
+    """
+    row = session.get(RunRow, run_id)
+    if row is None or row.status not in (RunStatus.RUNNING.value, RunStatus.QUEUED.value):
+        return None
+    row.status = RunStatus.QUEUED.value
+    row.started_at = None
+    row.error = None
+    return row
+
+
+def fail_run(session: Session, run_id: str, error: str) -> RunRow | None:
+    """Close out a run as ``failed`` with a readable reason, rollup untouched.
+
+    The reaper's terminal write.  Deliberately narrower than :func:`finish_run`,
+    which needs a whole :class:`RunRecord`: the reaper has no results to report,
+    only the honest statement that nobody is going to finish this run.  Leaves
+    ``sample_count``/``error_count`` as they are rather than inventing zeros
+    that would read as "measured, and it was empty".
+
+    Returns ``None`` if the run is missing or already terminal; a run that
+    finished while the reaper was deciding must not be overwritten.
+    """
+    row = session.get(RunRow, run_id)
+    if row is None or row.status not in (RunStatus.RUNNING.value, RunStatus.QUEUED.value):
+        return None
+    row.status = RunStatus.FAILED.value
+    row.error = error
+    row.finished_at = utcnow()
+    return row
+
+
+def list_stale_running_runs(
+    session: Session, *, started_before: datetime, limit: int = 200
+) -> list[RunRow]:
+    """Runs stuck ``running`` since before ``started_before``, oldest first.
+
+    ``started_at IS NULL`` is included: a row marked ``running`` without a start
+    time is a partially-applied claim, which is stuck in exactly the same way.
+
+    Bounded by ``limit`` so one reaper pass cannot turn into an unbounded
+    transaction; the next pass picks up the rest.  Callers that bound their work
+    should say so in a log line rather than let it look like "that was all".
+    """
+    stmt = (
+        select(RunRow)
+        .where(RunRow.status == RunStatus.RUNNING.value)
+        .where(sa_or(RunRow.started_at.is_(None), RunRow.started_at < started_before))
+        .order_by(RunRow.started_at.asc().nulls_first(), RunRow.created_at.asc())
+        .limit(limit)
+    )
+    return list(session.scalars(stmt))
 
 
 def finish_run(session: Session, record: RunRecord) -> RunRow:
