@@ -330,7 +330,18 @@ export function Board({
                       {item.storyPoints !== null ? <span className="points">{item.storyPoints}</span> : null}
                     </div>
 
-                    <div className="card-title">{item.title}</div>
+                    {/* The title links to the full read view. Double-click still
+                        opens the edit dialog, so the card keeps both affordances
+                        instead of only exposing edit (AB#31). */}
+                    <div className="card-title">
+                      <Link
+                        href={`/items/${item.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        draggable={false}
+                      >
+                        {item.title}
+                      </Link>
+                    </div>
 
                     {blockedOf(item) || item.wave || staleOf(item) ? (
                       <div className="card-foot" style={{ marginBottom: 'var(--s-2)' }}>
