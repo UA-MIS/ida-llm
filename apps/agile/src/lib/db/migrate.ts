@@ -45,6 +45,17 @@ export async function runMigrations(dir: string = MIGRATIONS_DIR): Promise<strin
         const sql = await readFile(path.join(dir, file), 'utf8');
         await client.query('BEGIN');
         try {
+          // Which board this deploy is. Data-repair migrations need it for the
+          // same reason every runtime query does: `instance_key` scopes a row to
+          // one board, and a migration that ignores it edits rows it does not
+          // own. Exposed as a GUC because a .sql file takes no parameters.
+          // is_local = true: scoped to THIS transaction, so it cannot leak to
+          // the next migration file, nor back into the pool on a connection
+          // this runner borrowed.
+          await client.query('SELECT set_config($1, $2, true)', [
+            'ida_agile.instance_key',
+            config.instanceKey,
+          ]);
           await client.query(sql);
           await client.query('INSERT INTO schema_migrations (version) VALUES ($1)', [file]);
           await client.query('COMMIT');

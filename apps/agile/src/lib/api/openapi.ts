@@ -28,20 +28,54 @@ export function buildOpenApiDocument(): Record<string, unknown> {
     },
   };
 
+  /**
+   * The writable field set, declared once. Create and update disagree only
+   * about what a MISSING key means, so listing the fields twice is how the
+   * published contract drifts from the code it claims to describe.
+   */
+  const writableProperties = {
+    title: { type: 'string', maxLength: 300 },
+    description: { type: 'string' },
+    itemType: { type: 'string', enum: [...WORK_ITEM_TYPES] },
+    state: { type: 'string', enum: [...WORK_ITEM_STATES] },
+    assigneeLogin: { type: 'string', nullable: true },
+    assigneeAvatarUrl: { type: 'string', format: 'uri', nullable: true },
+    storyPoints: { type: 'integer', minimum: 0, nullable: true },
+    priority: { type: 'integer', minimum: 1, maximum: 4 },
+    sprintId: { type: 'integer', nullable: true },
+    tags: { type: 'array', items: { type: 'string' } },
+    repoFullName: { type: 'string', nullable: true },
+    wave: { type: 'string', nullable: true },
+  };
+
   const createInput = {
     type: 'object',
     required: ['title'],
+    // Unknown keys are refused (422) rather than silently dropped.
+    additionalProperties: false,
     properties: {
-      title: { type: 'string', maxLength: 300 },
-      description: { type: 'string', default: '' },
-      itemType: { type: 'string', enum: [...WORK_ITEM_TYPES], default: 'Story' },
-      state: { type: 'string', enum: [...WORK_ITEM_STATES], default: 'New' },
-      assigneeLogin: { type: 'string', nullable: true },
-      storyPoints: { type: 'integer', nullable: true },
-      priority: { type: 'integer', minimum: 1, maximum: 4, default: 2 },
-      sprintId: { type: 'integer', nullable: true },
-      tags: { type: 'array', items: { type: 'string' }, default: [] },
+      ...writableProperties,
+      description: { ...writableProperties.description, default: '' },
+      itemType: { ...writableProperties.itemType, default: 'Story' },
+      state: { ...writableProperties.state, default: 'New' },
+      priority: { ...writableProperties.priority, default: 2 },
+      tags: { ...writableProperties.tags, default: [] },
     },
+  };
+
+  /**
+   * Update is a JSON merge patch over exactly the writable set: a key with a
+   * value updates, an explicit null clears, an absent key is left untouched,
+   * and anything else is a 422 rather than a silent no-op.
+   */
+  const updateInput = {
+    type: 'object',
+    description:
+      'JSON merge patch. Key present with a value updates it; key present as null clears it; ' +
+      'key absent leaves it untouched. Unrecognized keys are rejected with 422 validation_failed — ' +
+      'branch metadata in particular is owned by the start-work flow and is not writable here.',
+    additionalProperties: false,
+    properties: writableProperties,
   };
 
   const errorSchema = {
@@ -86,6 +120,7 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       schemas: {
         WorkItem: workItem,
         CreateWorkItem: createInput,
+        UpdateWorkItem: updateInput,
         PullRequestLink: {
           type: 'object',
           properties: {
@@ -182,19 +217,25 @@ export function buildOpenApiDocument(): Record<string, unknown> {
           responses: {
             201: { description: 'Created.' },
             409: { description: 'Idempotency-Key reused with a different body.', content: { 'application/json': { schema: errorSchema } } },
-            422: { description: 'Validation failed.', content: { 'application/json': { schema: errorSchema } } },
+            422: { description: 'Validation failed, including any unrecognized field.', content: { 'application/json': { schema: errorSchema } } },
           },
         },
       },
       '/api/v1/items/{id}': {
         get: { summary: 'Get one item with comments, history and attachments', parameters: [idParam], responses: { 200: { description: 'The item.' }, 404: { description: 'Not found.' } } },
         patch: {
-          summary: 'Update fields, including state',
+          summary: 'Update fields, including state (JSON merge patch)',
+          description:
+            'Partial update over the writable field set. An absent key is left untouched and an ' +
+            'explicit null clears the field. An unrecognized key rejects the WHOLE body with 422 ' +
+            'rather than applying the rest — no request is ever half-applied.',
           parameters: [idParam],
-          requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateWorkItem' } } } },
+          requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateWorkItem' } } } },
           responses: {
             200: { description: 'Updated.' },
+            404: { description: 'No such item.', content: { 'application/json': { schema: errorSchema } } },
             409: { description: 'Illegal state transition.', content: { 'application/json': { schema: errorSchema } } },
+            422: { description: 'Unrecognized or invalid field in the body.', content: { 'application/json': { schema: errorSchema } } },
           },
         },
         delete: { summary: 'Delete permanently (prefer state "Removed")', parameters: [idParam], responses: { 200: { description: 'Deleted.' } } },
@@ -223,12 +264,35 @@ export function buildOpenApiDocument(): Record<string, unknown> {
       },
       '/api/v1/items/{id}/start-work': {
         post: {
-          summary: 'Activate the item and create its GitHub branch',
+          summary: 'Activate and claim the item, and branch it when its type branches',
           description:
             'Requires a signed-in session (branch creation uses the user\'s GitHub token). ' +
-            'The state change is applied first and is never rolled back by a branch failure.',
+            'The state change is applied first and is never rolled back by a branch failure. ' +
+            'A branch is created for Story and Bug items only: Spike and Task work does not ' +
+            'live in git, so they are activated and assigned with no branch and the response ' +
+            'carries branch.status "skipped". Send {"branch": true} or {"branch": false} to ' +
+            'override that default in either direction.',
           parameters: [idParam],
-          responses: { 200: { description: 'Item, plus branch status (which may be "failed").' } },
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  additionalProperties: false,
+                  properties: {
+                    activate: { type: 'boolean', description: 'Set false to claim/branch without moving the item to Active.' },
+                    branch: { type: 'boolean', description: 'Force branch creation on or off, overriding the item-type default.' },
+                    repo: { type: 'string', description: 'Branch in a non-primary repo the board follows.' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            200: { description: 'Item, plus branch status ("created", "existing", "skipped", "disabled" or "failed").' },
+            422: { description: 'Unrecognized or invalid field in the body.' },
+          },
         },
       },
       '/api/v1/items/{id}/links': {

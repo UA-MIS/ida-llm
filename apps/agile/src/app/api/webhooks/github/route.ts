@@ -3,7 +3,12 @@ import { config } from '@/lib/env';
 import { ensureSchema } from '@/lib/bootstrap';
 import { query, queryOne } from '@/lib/db/pool';
 import { verifyWebhookSignature } from '@/lib/sync/webhook';
-import { handleCheckState, handlePullRequest, handlePush } from '@/lib/sync/engine';
+import {
+  handleBranchDeleted,
+  handleCheckState,
+  handlePullRequest,
+  handlePush,
+} from '@/lib/sync/engine';
 
 export const dynamic = 'force-dynamic';
 
@@ -106,6 +111,18 @@ async function dispatch(event: string, payload: Record<string, unknown>) {
           };
         }),
       });
+      return summarise(outcome);
+    }
+
+    case 'delete': {
+      // GitHub sends `delete` for branches AND tags; only a branch concerns us.
+      if (String(payload.ref_type ?? '') !== 'branch') {
+        return { ignored: `not a branch (ref_type "${String(payload.ref_type ?? '')}")` };
+      }
+      // Documented as the bare name, but strip the prefix defensively so a
+      // `refs/heads/` form can never silently fail to match an item.
+      const branch = String(payload.ref ?? '').replace(/^refs\/heads\//, '');
+      const outcome = await handleBranchDeleted(repoFullName, branch);
       return summarise(outcome);
     }
 

@@ -1,7 +1,7 @@
 import { config } from '@/lib/env';
 import { backgroundCredential } from '@/lib/github/credential';
 import { query, queryOne } from '@/lib/db/pool';
-import { listBranchCommits, fetchPullRequest, compareWithDefault } from '@/lib/github/client';
+import { listCommitsAheadOfBase, fetchPullRequest, compareWithDefault } from '@/lib/github/client';
 import { getWorkItem, linkPullRequest, listWorkItems } from '@/lib/domain/queries';
 import { handlePullRequest, handlePush, type SyncOutcome } from './engine';
 import type { WorkItem } from '@/lib/domain/workitem';
@@ -57,10 +57,12 @@ export async function reconcileItem(
   const resource = `item:${item.id}`;
   if (!opts.force && !(await shouldPoll(resource, config.onViewRefreshSeconds))) return outcome;
 
-  // 1. Commits on the item's branch.
+  // 1. Commits made ON the item's branch — the ahead-set only. Listing the
+  //    branch's full ancestry attributed the base branch's history to the item
+  //    (AB#25); see listCommitsAheadOfBase.
   if (item.branchRepo && item.branchName && config.isKnownRepo(item.branchRepo)) {
     try {
-      const commits = await listBranchCommits(item.branchRepo, item.branchName, githubToken);
+      const commits = await listCommitsAheadOfBase(item.branchRepo, item.branchName, githubToken);
       if (commits.length) {
         const pushOutcome = await handlePush({
           repoFullName: item.branchRepo,

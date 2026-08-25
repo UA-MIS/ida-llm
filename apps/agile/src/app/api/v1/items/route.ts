@@ -2,7 +2,11 @@ import { withApi } from '@/lib/api/route';
 import { apiError, ok, parseNonNegativeInt, readJson, validationError } from '@/lib/api/respond';
 import { lookupIdempotent, saveIdempotent } from '@/lib/api/idempotency';
 import { principalToActor } from '@/lib/auth/principal';
-import { createWorkItemSchema, parseSprintFilter, type WorkItemState } from '@/lib/domain/workitem';
+import {
+  createWorkItemRequestSchema,
+  parseSprintFilter,
+  type WorkItemState,
+} from '@/lib/domain/workitem';
 import { createWorkItem, listWorkItems } from '@/lib/domain/queries';
 import { readinessMap } from '@/lib/domain/deps-queries';
 import { z } from 'zod';
@@ -50,7 +54,7 @@ export const GET = withApi(async ({ request, principal }) => {
  * creation (an agent seeding a plan wants one round trip, not twenty).
  * Honours an `Idempotency-Key` header so a retried call cannot duplicate.
  */
-const bulkSchema = z.object({ items: z.array(createWorkItemSchema).min(1).max(100) });
+const bulkSchema = z.strictObject({ items: z.array(createWorkItemRequestSchema).min(1).max(100) });
 
 export const POST = withApi(async ({ request, principal }) => {
   const parsedBody = await readJson(request);
@@ -91,7 +95,7 @@ export const POST = withApi(async ({ request, principal }) => {
     responseBody = { items: created, count: created.length };
     status = 201;
   } else {
-    const parsed = createWorkItemSchema.safeParse(body);
+    const parsed = createWorkItemRequestSchema.safeParse(body);
     if (!parsed.success) return validationError(parsed.error);
     responseBody = { item: await createWorkItem(parsed.data, actor) };
     status = 201;

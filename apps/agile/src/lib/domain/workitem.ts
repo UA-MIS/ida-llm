@@ -10,6 +10,35 @@ export const BOARD_COLUMNS: readonly WorkItemState[] = ['New', 'Active', 'Resolv
 export const WORK_ITEM_TYPES = ['Story', 'Task', 'Bug', 'Spike'] as const;
 export type WorkItemType = (typeof WORK_ITEM_TYPES)[number];
 
+/**
+ * Types whose work lives in git, and which therefore get a branch when started.
+ *
+ * A Spike is pure research and a Task is often coordination or paperwork —
+ * neither produces a commit, so cutting a branch for one creates a ref nobody
+ * will ever push to, and a card that advertises a branch that will be deleted
+ * unused (AB#25 started a research spike and got `spike/25-...`). Story and Bug
+ * are the types that end in a diff, so they keep the existing behaviour.
+ */
+export const BRANCHING_ITEM_TYPES: readonly WorkItemType[] = ['Story', 'Bug'];
+
+/** Whether this type gets a branch by default when "Start work" is pressed. */
+export function typeCreatesBranch(itemType: WorkItemType): boolean {
+  return BRANCHING_ITEM_TYPES.includes(itemType);
+}
+
+/**
+ * The branch decision for one "Start work" call.
+ *
+ * The type-based default is the rule; `explicit` is the caller's override, so a
+ * spike that genuinely needs a scratch branch can ask for one (`{branch:true}`)
+ * and a story that does not can decline (`{branch:false}`). Undefined — the
+ * shape every current UI caller sends — means "use the default for this type".
+ */
+export function shouldCreateBranch(itemType: WorkItemType, explicit?: boolean): boolean {
+  if (typeof explicit === 'boolean') return explicit;
+  return typeCreatesBranch(itemType);
+}
+
 /** 1 = highest. Mirrors ADO's 1..4 priority field. */
 export const PRIORITIES = [1, 2, 3, 4] as const;
 
@@ -132,8 +161,53 @@ export const createWorkItemSchema = z.object({
  * injected `state: 'New'` made assigning a Resolved/Closed item fail as an illegal
  * transition (AB#28). Keep this derived from `workItemFields`, never from
  * `createWorkItemSchema`.
+ *
+ * STRICT on purpose. A key that is not a writable field is a client bug, and the
+ * endpoint used to answer it with 200 having changed nothing: `PATCH
+ * {"branchName": null}` — a reasonable guess at how to clear a dead branch link
+ * — was accepted, silently dropped, and reported success. "The API said 200 and
+ * you believed it" is the same failure family as AB#28, so an unrecognised key
+ * now fails as 422 `validation_failed` and names itself. Merge-patch semantics
+ * for the WRITABLE set above are unchanged: absent still means untouched and an
+ * explicit null still clears.
  */
-export const updateWorkItemSchema = z.object(workItemFields).partial();
+export const updateWorkItemSchema = z.strictObject(workItemFields).partial();
+
+/**
+ * Body of POST /api/v1/items/{id}/start-work. Strict for the same reason as
+ * the PATCH schema: a misspelled `{"branches": false}` must not read as the
+ * default rather than as an error.
+ */
+export const startWorkSchema = z.strictObject({
+  /** Skip the New -> Active transition. Defaults to activating. */
+  activate: z.boolean().optional(),
+  /**
+   * Skip claiming the item. Starting work claims an UNOWNED item by default —
+   * "start work" is first-person — but a lead activating a card on someone
+   * else's behalf can pass false rather than silently becoming its owner.
+   */
+  assign: z.boolean().optional(),
+  /** Create (true) or skip (false) the branch, overriding the type default. */
+  branch: z.boolean().optional(),
+  /** Branch in a non-primary repo the board follows. */
+  repo: z.string().regex(/^[\w.-]+\/[\w.-]+$/).optional(),
+});
+
+export type StartWorkInput = z.infer<typeof startWorkSchema>;
+
+/**
+ * The CREATE schema as an HTTP boundary: unknown keys are refused.
+ *
+ * Kept separate from `createWorkItemSchema` on purpose. That schema is also the
+ * INTERNAL one — `createWorkItem()` re-parses through it so defaults are applied
+ * exactly once wherever a call originated — and internal callers legitimately
+ * hand it a wider object: `/seed` builds `{...item, sprintId}` where `item`
+ * still carries `key`, `sprintKey` and `dependsOn`. Making the shared schema
+ * strict would reject the seed endpoint's own payload on the way to the
+ * database. Strictness belongs at the edge, where a client's typo is a client
+ * bug; internally it would only forbid a call convention this code already uses.
+ */
+export const createWorkItemRequestSchema = createWorkItemSchema.strict();
 
 /** What a caller may pass — optional fields get their defaults on parse. */
 export type CreateWorkItemInput = z.input<typeof createWorkItemSchema>;
