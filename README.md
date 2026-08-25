@@ -185,7 +185,7 @@ flowchart TB
 
 | Decision | Consequence you can see in the code |
 |---|---|
-| **D-1** — every model is an OpenAI-compatible endpoint | Exactly one HTTP client (`ida_harness/client.py`), zero `if provider == ...`. Adding a model is a `models.yaml` edit. |
+| **D-1** — every model is an OpenAI-compatible endpoint | Held until Anthropic. Benchmarking through its compatibility shim would record numbers from a surface we did not choose and cannot version, so `anthropic_compat` selects a second client (`ida_harness/anthropic_client.py`) that speaks the Messages API natively. **Two** wire formats now, picked by a lookup table on `serving_stack` — still zero `if provider == ...`, and adding a model is still a `models.yaml` edit. |
 | **D-1** — results must be reproducible | `ServingConfig` is copied **by value** onto every result row, alongside the task git SHA. Editing the registry tomorrow cannot rewrite yesterday's results. |
 | **D-4** — custom harness | `packages/harness` is ours. We studied Inspect AI's *concepts* (task/solver/scorer split, structured eval logs, sample-level caching) and import nothing from it. |
 | **D-5** — no auth service | One dependency-injected placeholder, `ida_api/auth.py`. Platform SSO/OIDC replaces its body and nothing else. |
@@ -473,22 +473,10 @@ commit to a design system before there is a design.
 These are **not** oversights. Each is documented at the point in the code where
 it matters.
 
-1. **The queue has no ack/retry.** `BLPOP` removes a message before the runner
-   has done anything with it. A runner pod that dies mid-run loses the message
-   and the run stays `running` forever. The fix is a reliable-queue pattern
-   (`BLMOVE` + a reaper) or Redis Streams with consumer groups.
-   `RunJobMessage.attempt` exists so that change stays additive.
-   → `packages/core/ida_core/queue.py`
-
-   *Not* to be confused with poison-message handling, which **is** implemented:
-   an undecodable payload is dead-lettered to `ida:queue:runs:dead` and skipped,
-   and the worker loop survives it. That is the path a `schema_version` bump
-   takes while old replicas are still rolling.
-
-2. **No LLM judge.** Subjective tasks run and archive transcripts but are not
+1. **No LLM judge.** Subjective tasks run and archive transcripts but are not
    scored. → `packages/harness/ida_harness/scoring.py::LLMJudgeScorer`
 
-3. **`judge-calibration` is a shell; the other two sweeps are implemented.**
+2. **`judge-calibration` is a shell; the other two sweeps are implemented.**
    `ida-sweep rebenchmark` and `ida-sweep model-sweep` plan a `(task, model)`
    cross product, dedupe it against what is already measured or in flight, and
    enqueue the rest — a sweep enqueues, runners execute. `ida-sweep
@@ -516,35 +504,32 @@ it matters.
    caps still apply.
    → `services/runner/ida_runner/sweeps.py`
 
-4. **No auth.** `auth_mode: disabled` yields an anonymous principal. Any other
+3. **No auth.** `auth_mode: disabled` yields an anonymous principal. Any other
    value returns 501 rather than silently allowing traffic.
    → `services/api/ida_api/auth.py`
 
-5. **No recommendation engine.** Half of D-3 is not built. The data model
+4. **No recommendation engine.** Half of D-3 is not built. The data model
    supports it — `results` carries the score, the serving config, the task
    content hash and the evidence pointer that a recommendation would cite, and
    `error_count` so an outage is never read as "no data for this model".
 
-6. **No stale-run reaper.** A run claimed by a runner that then dies stays
-   `running`. Related to gap 1.
-
-7. **No cache backend ships.** `NullCache` is the default and the tracer bullet
+5. **No cache backend ships.** `NullCache` is the default and the tracer bullet
    uses it, so every run genuinely exercises the HTTP path. The *semantics* are
    implemented and tested: a hit archives the real prompt, reports `cached:
    true`, and bills nothing. A Redis- or MinIO-backed store drops in behind the
    `CompletionCache` protocol.
    → `packages/harness/ida_harness/cache.py`
 
-8. **Repeated sampling is contract-ready but not emitted.** `repeat_index`
+6. **Repeated sampling is contract-ready but not emitted.** `repeat_index`
    exists on the record, in the unique index and in the artifact key, so
    self-consistency / pass@k needs no migration — but the runner always emits
    `0`. → `packages/core/ida_core/contracts.py`
 
-9. **The LLM-judge fields are reserved, not populated.**
+7. **The LLM-judge fields are reserved, not populated.**
    `judge_serving_config` and `Score.criteria` exist with `None`/`[]` defaults
    so the judge story is additive; nothing writes them yet.
 
-10. **No browser tests.** Frontend coverage is typecheck + lint + build. The
+8. **No browser tests.** Frontend coverage is typecheck + lint + build. The
     classification logic the UI depends on is asserted through its *inputs* in
     the tracer bullet. A headless browser in CI is a maintenance cost this
     project has not earned.
