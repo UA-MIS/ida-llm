@@ -1,6 +1,7 @@
 import { withApi } from '@/lib/api/route';
 import { ok } from '@/lib/api/respond';
 import { listWorkItems } from '@/lib/domain/queries';
+import { parseSprintFilter } from '@/lib/domain/workitem';
 import { readinessMap } from '@/lib/domain/deps-queries';
 
 export const dynamic = 'force-dynamic';
@@ -19,12 +20,7 @@ export const GET = withApi(async ({ request }) => {
   const [items, readiness] = await Promise.all([
     listWorkItems({
       state: 'New',
-      sprintId:
-        sprintParam === null || sprintParam === '' || sprintParam === 'all'
-          ? undefined
-          : sprintParam === 'none'
-            ? null
-            : Number(sprintParam),
+      sprintId: parseSprintFilter(sprintParam ?? undefined),
     }),
     readinessMap(),
   ]);
