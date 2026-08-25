@@ -1,0 +1,169 @@
+# conceptual-grading, rung 1 of 5 -- the floor of the subjective ladder.
+#
+# EXEMPLAR. This family is the worked SUBJECTIVE example referenced by
+# tasks/SCHEMA.md. Copy its rubric shape, not its subject matter.
+#
+# NOT YET SCORABLE, ON PURPOSE. `kind: subjective` + `scorer.kind: llm_judge`
+# means TaskSpec.is_scorable is False until the judge lands: the task loads,
+# validates, runs against the model and stores its transcripts, and the runner
+# records `scorable: false, score: null` rather than a zero. A zero would read
+# as "the model failed"; a blank reads as "we have not measured this yet",
+# which is the truth. Nothing in this file needs to change when the judge
+# arrives.
+#
+# RUBRIC ANCHORS. Every criterion description below states what a 1.0, a 0.5 and
+# a 0.0 response actually DOES, in observable terms. Adjectives ("good",
+# "thorough", "appropriate") are not anchors -- two judges will read them
+# differently and the grade becomes noise. The descriptions are written to be
+# read by the judge model, so they are instructions, not documentation.
+#
+# The descriptions use a literal block scalar (|-) rather than a folded one
+# (>-): folding would run the three anchors together into one paragraph.
+version: 1
+id: conceptual-grading/l1-key-point-coverage
+title: Conceptual grading -- which marking-key points does this answer contain?
+description: >
+  Rung 1 of the conceptual-grading ladder. The model is given a short-answer
+  quiz question, an instructor's marking key listing the points that earn
+  credit, and a student's answer. It must report which key points the answer
+  actually contains. No mark is assigned yet -- that is rung 2 -- so this rung
+  isolates the one judgement everything else is built on: can the model tell
+  what a student did and did not say?
+
+  Provenance: every question, marking key and student answer in this file is
+  SYNTHETIC, written for this file to imitate the shape of undergraduate work.
+  No real student writing is used anywhere in this family. Real student work is
+  an education record under FERPA and must never enter this repository, even
+  with names removed.
+kind: subjective
+domain: assessment
+system_prompt: >-
+  You are assisting an instructor with marking short-answer quiz responses. You
+  are given a question, a marking key, and one student's answer. For each
+  numbered point in the marking key, state PRESENT or ABSENT and quote the exact
+  words from the student's answer that justify a PRESENT verdict. Do not assign
+  a mark and do not write feedback to the student.
+scorer:
+  kind: llm_judge
+  rubric_id: conceptual-grading-coverage-v1
+rubric:
+  id: conceptual-grading-coverage-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: recall-of-present-points
+      description: |-
+        Does the response mark PRESENT every marking-key point that the student
+        answer actually contains?
+
+        1.0 -- every point the answer contains is marked PRESENT.
+        0.5 -- one point the answer contains is marked ABSENT.
+        0.0 -- two or more points the answer contains are marked ABSENT.
+      weight: 3.0
+    - name: precision-against-false-credit
+      description: |-
+        Does the response avoid marking PRESENT any point the student answer
+        does not contain? Credit given for something unsaid is the failure mode
+        that makes an automated marker unusable, so it is weighted equally with
+        recall.
+
+        1.0 -- no point absent from the answer is marked PRESENT.
+        0.5 -- one absent point is marked PRESENT, and the quoted evidence is at
+               least related to it.
+        0.0 -- an absent point is marked PRESENT with fabricated evidence, or
+               two or more absent points are marked PRESENT.
+      weight: 3.0
+    - name: evidence-is-verbatim
+      description: |-
+        Is every PRESENT verdict justified by words quoted exactly from the
+        student's answer, so the instructor can check the verdict without
+        re-reading the whole script?
+
+        1.0 -- every PRESENT verdict quotes text that appears verbatim in the
+               student answer.
+        0.5 -- quotes are present but paraphrased, or one PRESENT verdict has no
+               quote.
+        0.0 -- no quotes, or a quote contains words the student did not write.
+      weight: 2.0
+    - name: stays-in-scope
+      description: |-
+        Does the response do only the job it was asked to do? Rung 1 asks for
+        coverage, not a mark and not feedback.
+
+        1.0 -- reports coverage only.
+        0.5 -- reports coverage correctly but adds an unrequested mark or a line
+               of student-facing feedback.
+        0.0 -- assigns a mark or writes feedback instead of reporting coverage
+               point by point.
+      weight: 1.0
+tags: [exemplar, conceptual-grading, ladder-l1, subjective, not-yet-scorable]
+samples:
+  - id: partial-coverage-photosynthesis
+    input: >-
+      Question: "In two or three sentences, explain why plants appear green."
+
+      Marking key: (1) chlorophyll is the pigment involved; (2) chlorophyll
+      absorbs light in the red and blue parts of the spectrum; (3) green light
+      is reflected or transmitted rather than absorbed; (4) the reflected light
+      is what reaches the eye.
+
+      Student answer: "Plants are green because of chlorophyll. Chlorophyll
+      takes in red and blue light for photosynthesis. The green light bounces
+      off instead."
+    # Author's note (a COMMENT, not metadata -- see the file header): points 1,
+    # 2 and 3 are present, point 4 is absent. The answer stops at "bounces off"
+    # and never says the reflected light is what reaches the eye.
+    metadata: { probe: partial-coverage, provenance: synthetic }
+
+  - id: full-coverage-different-wording
+    input: >-
+      Question: "In two or three sentences, explain what a confidence interval
+      tells you."
+
+      Marking key: (1) the interval is computed from a sample; (2) it is a range
+      of plausible values for a POPULATION parameter; (3) the confidence level
+      describes the long-run behaviour of the procedure, not the probability
+      that one particular interval contains the parameter.
+
+      Student answer: "You work it out from the data you collected. It gives you
+      a range that the true population mean is plausibly in. The 95% part is
+      about the method -- if you repeated the study over and over, 95% of the
+      intervals you built that way would capture the real value. It's not a 95%
+      chance for the one you happen to have."
+    # Author's note: all three points are present, and NONE of them uses the
+    # key's wording. This sample exists to catch a grader that matches strings
+    # instead of meaning.
+    metadata: { probe: full-coverage-paraphrased, provenance: synthetic }
+
+  - id: adjacent-but-absent
+    input: >-
+      Question: "In two or three sentences, explain why correlation does not
+      establish causation."
+
+      Marking key: (1) a third variable may cause both; (2) the causal direction
+      may run the other way; (3) an association can arise by chance in a single
+      sample.
+
+      Student answer: "Just because two things go together doesn't mean one made
+      the other happen. There could be something else going on behind the scenes
+      that explains both of them. Researchers should run an experiment if they
+      want to say something caused something else."
+    # Author's note: only point 1 is present. The confident closing sentence is
+    # about experimental design, which is adjacent to points 2 and 3 without
+    # stating either. This sample exists to catch a grader that rewards tone.
+    metadata: { probe: adjacent-not-present, provenance: synthetic }
+
+  - id: empty-of-content
+    input: >-
+      Question: "In two or three sentences, explain what a p-value measures."
+
+      Marking key: (1) it is a probability computed ASSUMING the null hypothesis
+      is true; (2) it refers to data at least as extreme as what was observed;
+      (3) it is not the probability that the null hypothesis is true.
+
+      Student answer: "The p-value is a very important number in statistics. It
+      tells you whether your result is significant or not. If it is small then
+      your experiment worked."
+    # Author's note: none of the three points is present. A grader that cannot
+    # return an all-ABSENT verdict will invent credit here.
+    metadata: { probe: no-coverage, provenance: synthetic }

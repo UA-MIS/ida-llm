@@ -1,0 +1,177 @@
+# conceptual-grading, rung 2 of 5 -- from coverage to a mark.
+#
+# EXEMPLAR. What this rung adds over rung 1: an ARITHMETIC step and a FIDELITY
+# step. The instructor's point allocation is given in the prompt, so the mark is
+# determined once coverage is; the judgement being tested is whether the model
+# applies the instructor's allocation rather than its own sense of what the
+# answer deserves.
+#
+# This is the rung where "why is it not verifiable?" is a fair question, and the
+# answer is worth understanding. If the coverage were also given, the mark would
+# be pure arithmetic and the task would be verifiable. It is subjective because
+# deciding whether a paraphrase earns a point is a judgement, and the mark
+# inherits that judgement. When you can push a task's judgement out into the
+# prompt, do -- and then file it as verifiable.
+version: 1
+id: conceptual-grading/l2-partial-credit
+title: Conceptual grading -- assigning partial credit against a stated allocation
+description: >
+  Rung 2 of the conceptual-grading ladder. The model receives a question, a
+  marking key with an explicit point allocation, and a student answer, and must
+  award a mark out of the stated total with a justification traceable to the
+  allocation. It must not invent credit the allocation does not offer, and it
+  must not withhold credit the allocation does offer.
+
+  Provenance: every question, allocation and student answer is SYNTHETIC,
+  written for this file. No real student work appears anywhere in this family.
+kind: subjective
+domain: assessment
+system_prompt: >-
+  You are assisting an instructor with marking short-answer quiz responses. You
+  are given a question, a marking key with a point value for each element, and
+  one student's answer. Award a mark out of the stated total. Show the award
+  element by element, then state the total. Apply the instructor's allocation
+  exactly as written -- do not add elements, re-weight them, or award goodwill
+  marks.
+scorer:
+  kind: llm_judge
+  rubric_id: conceptual-grading-partial-credit-v1
+rubric:
+  id: conceptual-grading-partial-credit-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: allocation-fidelity
+      description: |-
+        Does the response award marks using only the elements and point values
+        the instructor supplied?
+
+        1.0 -- every element awarded appears in the allocation, at the point
+               value the allocation states.
+        0.5 -- all elements are from the allocation, but one is awarded at a
+               different point value than stated.
+        0.0 -- the response invents an element, re-weights the allocation, or
+               awards a goodwill mark for effort, presentation or length.
+      weight: 3.0
+    - name: mark-is-defensible
+      description: |-
+        Given the coverage the response itself claims, is the total mark one an
+        instructor would uphold on appeal?
+
+        1.0 -- the total is exactly what the response's own element-by-element
+               awards sum to, and each award is supported by the answer text.
+        0.5 -- the total follows from the awards, but one award is generous or
+               harsh by one element relative to what the answer says.
+        0.0 -- the total does not follow from the awards shown, or two or more
+               awards contradict the answer text.
+      weight: 3.0
+    - name: arithmetic-is-correct
+      description: |-
+        Do the element awards actually sum to the stated total, and is the total
+        within the stated maximum?
+
+        1.0 -- the awards sum to the stated total and the total is within range.
+        0.5 -- the awards sum correctly but the total is reported out of the
+               wrong maximum.
+        0.0 -- the awards do not sum to the stated total, or the total exceeds
+               the maximum.
+      weight: 2.0
+    - name: justification-is-traceable
+      description: |-
+        Can the instructor see WHY each element was or was not awarded, without
+        re-reading the student's answer?
+
+        1.0 -- every element award names the part of the answer that earned it,
+               and every withheld element says what was missing.
+        0.5 -- awarded elements are justified but withheld ones are not
+               explained, or vice versa.
+        0.0 -- the response gives a mark with no element-level justification.
+      weight: 2.0
+    - name: no-student-facing-feedback
+      description: |-
+        Rung 2 produces a mark for the instructor. Feedback to the student is
+        rung 4, and mixing the two produces a document that can be handed to
+        neither.
+
+        1.0 -- addresses the instructor only.
+        0.5 -- mostly addresses the instructor but slips into second person.
+        0.0 -- is written as a message to the student.
+      weight: 1.0
+tags: [exemplar, conceptual-grading, ladder-l2, subjective, not-yet-scorable]
+samples:
+  - id: two-of-three-elements
+    input: >-
+      Question (6 marks): "Explain what randomisation accomplishes in a
+      controlled experiment."
+
+      Marking key: (a) 2 marks -- randomisation balances KNOWN confounders
+      across groups; (b) 2 marks -- it also balances UNKNOWN confounders, which
+      is what matching cannot do; (c) 2 marks -- it justifies attributing an
+      observed difference to the treatment.
+
+      Student answer: "Randomly assigning people means the groups start out
+      similar, so things like age or income are spread evenly between them. It
+      also handles factors nobody thought to measure, which is the real
+      advantage over trying to match people up by hand."
+    # Author's note: (a) and (b) are earned, (c) is not -- the answer never
+    # reaches the attribution claim. Correct mark: 4/6. A grader that awards 6
+    # because the answer "shows understanding" has failed allocation-fidelity.
+    metadata: { probe: clean-partial-credit, provenance: synthetic }
+
+  - id: right-idea-wrong-element
+    input: >-
+      Question (4 marks): "State two reasons a researcher might prefer a
+      stratified sample to a simple random sample."
+
+      Marking key: (a) 2 marks -- stratification guarantees representation of
+      small subgroups that a simple random sample might miss; (b) 2 marks -- it
+      reduces the variance of estimates when the strata differ from each other.
+
+      Student answer: "Stratified sampling is more organised and makes the data
+      easier to analyse afterwards. It is also cheaper because you can send
+      interviewers to fewer places."
+    # Author's note: neither element is earned. Both stated reasons are real
+    # considerations in survey design, and neither is in the allocation.
+    # Correct mark: 0/4. This sample exists to catch a grader that credits a
+    # sensible answer to a different question.
+    metadata: { probe: plausible-but-off-allocation, provenance: synthetic }
+
+  - id: element-partly-stated
+    input: >-
+      Question (6 marks): "Explain what the Central Limit Theorem says and why
+      it matters for inference."
+
+      Marking key: (a) 2 marks -- the sampling distribution of the MEAN
+      approaches normality as n grows; (b) 2 marks -- this holds regardless of
+      the population's own shape; (c) 2 marks -- it is what lets us use normal
+      based intervals and tests when the population distribution is unknown.
+
+      Student answer: "As you take bigger and bigger samples the distribution
+      gets more and more normal. That's useful because a lot of the formulas we
+      use assume normality, so we can still use them on real data."
+    # Author's note: (a) is at best half-earned -- the answer says "the
+    # distribution" gets normal without saying the sampling distribution OF THE
+    # MEAN, which is the conflation the element is testing. (b) is absent. (c)
+    # is earned. A defensible mark is 3/6 or 4/6; the rubric's
+    # mark-is-defensible criterion is what makes a 6/6 or a 0/6 fail, not the
+    # difference between 3 and 4. Rubrics for genuinely borderline items should
+    # grade the REASONING, not pin a single number.
+    metadata: { probe: borderline-element, provenance: synthetic }
+
+  - id: correct-and-complete
+    input: >-
+      Question (4 marks): "Explain the difference between the standard deviation
+      of a population and the standard error of the mean."
+
+      Marking key: (a) 2 marks -- the standard deviation describes the spread of
+      individual observations; (b) 2 marks -- the standard error describes the
+      spread of the SAMPLE MEAN across repeated samples and shrinks as n grows.
+
+      Student answer: "The standard deviation tells you how spread out the
+      individual data points are around the mean. The standard error is about
+      how much the sample mean itself would jump around if you drew the sample
+      again and again -- and it gets smaller the more observations you collect."
+    # Author's note: both elements earned. Correct mark: 4/4. A family whose
+    # samples are all partial teaches a grader to always deduct; this sample is
+    # here so full marks stays reachable.
+    metadata: { probe: full-marks, provenance: synthetic }

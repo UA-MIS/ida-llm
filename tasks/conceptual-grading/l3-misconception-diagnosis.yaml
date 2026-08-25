@@ -1,0 +1,164 @@
+# conceptual-grading, rung 3 of 5 -- naming the fault, not just finding it.
+#
+# EXEMPLAR. What this rung adds: rungs 1 and 2 asked WHAT the student did or did
+# not say. This rung asks WHY the wrong answer is wrong, at the level of the
+# specific belief that produced it. "The student is confused about p-values" is
+# not a diagnosis; "the student is reading the p-value as P(H0 | data) rather
+# than P(data at least this extreme | H0)" is.
+#
+# The rubric weights SPECIFICITY highest for a reason: a vague diagnosis is
+# always safe and always useless, and a rubric that does not punish it will be
+# maximised by hedging.
+version: 1
+id: conceptual-grading/l3-misconception-diagnosis
+title: Conceptual grading -- diagnosing the misconception behind a wrong answer
+description: >
+  Rung 3 of the conceptual-grading ladder. Given a question and a wrong student
+  answer, name the specific mistaken belief that produced it. The model must
+  identify a single, falsifiable misconception that accounts for the answer as
+  written -- not restate the error, not list every misconception a student could
+  hold, and not hedge across several at once.
+
+  Provenance: every question and student answer is SYNTHETIC, written for this
+  file. The misconceptions are ones any instructor of these courses will
+  recognise; none is transcribed from real student work or from published
+  research instruments.
+kind: subjective
+domain: assessment
+system_prompt: >-
+  You are assisting an instructor with diagnostic marking. You are given a
+  question and one student's incorrect answer. Name the single mistaken belief
+  that best explains the answer as written, state the evidence in the answer
+  that points to it, and say what the student would have written instead if they
+  held the correct belief. Do not write feedback to the student and do not
+  correct the answer.
+scorer:
+  kind: llm_judge
+  rubric_id: conceptual-grading-diagnosis-v1
+rubric:
+  id: conceptual-grading-diagnosis-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: diagnosis-is-specific
+      description: |-
+        Is the named misconception specific enough that a different student
+        could fail to hold it? A diagnosis that fits every wrong answer to this
+        question has diagnosed nothing.
+
+        1.0 -- names a particular mistaken belief, stated precisely enough that
+               one could write a second wrong answer that this diagnosis does
+               NOT explain.
+        0.5 -- names a topic-level confusion ("misunderstands conditional
+               probability") without saying which way it runs.
+        0.0 -- says only that the student is confused, guessed, or did not study
+               the material.
+      weight: 3.0
+    - name: diagnosis-explains-this-answer
+      description: |-
+        Would a student holding the named belief actually produce the answer
+        given? This is the falsifiability check, and it is what separates a
+        diagnosis from a plausible-sounding label.
+
+        1.0 -- the named belief accounts for the whole answer, including its
+               specific wording or numbers.
+        0.5 -- the named belief accounts for part of the answer; another part is
+               left unexplained.
+        0.0 -- the named belief would have produced a different answer than the
+               one given.
+      weight: 3.0
+    - name: commits-to-one-cause
+      description: |-
+        Does the response commit to a single diagnosis rather than hedging
+        across a list? Hedging is how a response scores well on specificity
+        without taking any risk.
+
+        1.0 -- one misconception is named as the diagnosis; alternatives, if
+               mentioned at all, are explicitly ruled out with reasons.
+        0.5 -- two candidates are offered without choosing between them.
+        0.0 -- three or more candidates are listed, or the response declines to
+               choose.
+      weight: 2.0
+    - name: goes-beyond-restating-the-error
+      description: |-
+        Does the response say what the student BELIEVES, rather than repeating
+        what the student WROTE with a negation attached?
+
+        1.0 -- states the underlying belief, and states what the student would
+               have written if they held the correct one.
+        0.5 -- states the underlying belief but not the contrast.
+        0.0 -- restates the error ("the student said X, but X is wrong") without
+               naming a belief.
+      weight: 2.0
+    - name: evidence-is-cited
+      description: |-
+        Is the diagnosis tied to specific words or numbers in the student's
+        answer?
+
+        1.0 -- quotes or points at the specific text that supports the
+               diagnosis.
+        0.5 -- refers to the answer in general terms.
+        0.0 -- cites nothing, or cites text the student did not write.
+      weight: 2.0
+tags: [exemplar, conceptual-grading, ladder-l3, subjective, not-yet-scorable]
+samples:
+  - id: p-value-inverted-conditional
+    input: >-
+      Question: "A study reports p = 0.03. In one sentence, say what that
+      means."
+
+      Student answer: "It means there is only a 3% chance that the null
+      hypothesis is true, so we can be 97% sure the effect is real."
+    # Author's note: the diagnosis is the INVERTED CONDITIONAL -- the student
+    # reads p as P(H0 | data) rather than P(data at least this extreme | H0).
+    # "Misunderstands p-values" is the vague answer this sample is designed to
+    # expose; so is "does not know what a null hypothesis is", which would not
+    # produce this particular sentence.
+    metadata: { probe: inverted-conditional, provenance: synthetic }
+
+  - id: correlation-magnitude-as-slope
+    input: >-
+      Question: "Two studies both report a positive linear relationship between
+      hours studied and exam score. Study A reports r = 0.4 and Study B reports
+      r = 0.8. In one sentence, compare what the two correlations tell you."
+
+      Student answer: "In Study B each extra hour of study raises the exam score
+      twice as much as it does in Study A."
+    # Author's note: the student is reading the correlation coefficient as the
+    # SLOPE of the regression line -- a magnitude of effect -- rather than as a
+    # measure of how tightly the points cluster around it. The "twice as much"
+    # is the tell: r = 0.8 being double r = 0.4 has been carried straight over
+    # to the effect size. Note that a diagnosis of "does not understand
+    # correlation" would fit any wrong answer here and earns 0.5 at best.
+    metadata: { probe: r-read-as-slope, provenance: synthetic }
+
+  - id: sample-size-and-variability
+    input: >-
+      Question: "A hospital records about 15 births a day; a larger one records
+      about 45. Which is more likely to have a day where more than 60% of the
+      babies born are boys?"
+
+      Student answer: "They are equally likely, because the chance of a boy is
+      about 50% at both hospitals so the percentages should behave the same
+      way."
+    # Author's note: the student believes the SPREAD of a sample proportion does
+    # not depend on n -- they have correctly identified that the expected value
+    # is the same at both hospitals and concluded the whole distribution is.
+    # The evidence is the phrase "so the percentages should behave the same
+    # way", which is the inference from equal means to equal variability.
+    metadata: { probe: expectation-conflated-with-variance, provenance: synthetic }
+
+  - id: causal-language-from-observational-data
+    input: >-
+      Question: "A survey finds that adults who eat breakfast weigh less than
+      adults who skip it. In one sentence, state what can be concluded."
+
+      Student answer: "Eating breakfast causes weight loss, and the survey shows
+      it works for adults."
+    # Author's note: the diagnosis to reach for is that the student treats the
+    # DIRECTION of a reported comparison as the direction of causation, and does
+    # not register that assignment to the two groups was not controlled. A
+    # response that says only "the student confuses correlation with causation"
+    # restates the error rather than naming the belief, and should lose the
+    # goes-beyond-restating-the-error criterion while keeping specificity.
+    metadata: { probe: observational-to-causal, provenance: synthetic }

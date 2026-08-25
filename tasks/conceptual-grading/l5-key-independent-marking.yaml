@@ -1,0 +1,181 @@
+# conceptual-grading, rung 5 of 5 -- the top of the subjective ladder.
+#
+# EXEMPLAR. What this rung adds: every earlier rung gave the model an answer
+# that was wrong in a recognisable way. Here the answers are CORRECT but arrive
+# by a route the marking key did not anticipate -- different notation, a
+# different valid method, a counterexample instead of a proof, an answer to the
+# question that was actually asked rather than the one the key expected.
+#
+# This is the hardest thing to ask of an automated marker and the most damaging
+# thing to get wrong: penalising a correct answer for being unfamiliar is the
+# failure that would end an instructor's trust in the tool on first contact.
+# The rubric weights it accordingly, and pairs it with a criterion that stops a
+# grader from scoring well by simply accepting everything.
+version: 1
+id: conceptual-grading/l5-key-independent-marking
+title: Conceptual grading -- marking correct answers the key did not anticipate
+description: >
+  Rung 5 of the conceptual-grading ladder, and the top of it. Each sample pairs
+  a marking key with a student answer that is correct but does not match the
+  key's route: a different valid method, unfamiliar notation, a counterexample
+  in place of an explanation, or a correct answer to a question the key read
+  differently. The model must judge the MATHEMATICS AND REASONING rather than
+  the resemblance to the key -- while still catching the sample that only looks
+  unconventional and is in fact wrong.
+
+  Provenance: every marking key and student answer is SYNTHETIC, written for
+  this file. No real student work appears anywhere in this family.
+kind: subjective
+domain: assessment
+system_prompt: >-
+  You are assisting an instructor with marking. You are given a question, the
+  instructor's marking key, and one student's answer. Decide whether the answer
+  is correct on its own terms, even if it takes a different route from the key.
+  State CORRECT, PARTIALLY CORRECT or INCORRECT, then justify the verdict by
+  reference to the student's reasoning -- not by how closely it resembles the
+  key. If the answer uses a method the key does not mention, say whether that
+  method is valid for this question and why.
+scorer:
+  kind: llm_judge
+  rubric_id: conceptual-grading-key-independence-v1
+rubric:
+  id: conceptual-grading-key-independence-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: verdict-is-right
+      description: |-
+        Is the CORRECT / PARTIALLY CORRECT / INCORRECT verdict the one an expert
+        instructor would give after reading the answer on its own terms?
+
+        1.0 -- the verdict matches what the reasoning in the answer supports.
+        0.5 -- the verdict is off by one band (correct marked partial, or
+               partial marked incorrect).
+        0.0 -- a correct answer is marked INCORRECT, or an incorrect answer is
+               marked CORRECT.
+      weight: 4.0
+    - name: judges-reasoning-not-resemblance
+      description: |-
+        Is the justification about whether the student's reasoning WORKS, rather
+        than about whether it looks like the key?
+
+        1.0 -- the justification engages with the student's actual method and
+               says why it does or does not establish the result.
+        0.5 -- the justification reaches the right verdict but argues from
+               similarity to or difference from the key.
+        0.0 -- the response treats deviation from the key as itself a defect, or
+               says the answer is wrong because it is "not what was asked for"
+               when it answers the question.
+      weight: 3.0
+    - name: names-the-alternative-method
+      description: |-
+        When the student uses a method the key does not mention, does the
+        response identify it and rule on its validity?
+
+        1.0 -- names the method the student used and states whether it is valid
+               for this question, with a reason.
+        0.5 -- notices the answer is unconventional but does not name the method
+               or rule on it.
+        0.0 -- does not register that a different method was used.
+      weight: 2.0
+    - name: not-uniformly-generous
+      description: |-
+        Does the response still catch an answer that is unconventional AND
+        wrong? A grader that scores well on this rung by accepting everything
+        has not learned key-independence, it has learned to stop marking.
+
+        1.0 -- the flawed answer is caught, and the specific step that fails is
+               named.
+        0.5 -- the flawed answer is caught but the failing step is not
+               identified.
+        0.0 -- the flawed answer is accepted because it is unconventional.
+      weight: 3.0
+tags: [exemplar, conceptual-grading, ladder-l5, subjective, not-yet-scorable]
+samples:
+  - id: valid-alternative-method
+    input: >-
+      Question: "A fair coin is tossed four times. What is the probability of
+      getting at least one head? Show your reasoning."
+
+      Marking key: enumerate or reason that P(at least one head) = 1 - P(no
+      heads) = 1 - (1/2)^4 = 15/16.
+
+      Student answer: "There are 16 equally likely sequences of four tosses. I
+      counted the ones with no heads at all and there is only one, TTTT. So 15
+      of the 16 sequences have at least one head, and the probability is 15/16."
+    # Author's note: CORRECT. The student has used direct enumeration of the
+    # sample space rather than the complement rule; both are valid and both give
+    # 15/16. A grader that marks this down for "not using the complement rule"
+    # has failed judges-reasoning-not-resemblance.
+    metadata: { probe: alternative-valid-method, provenance: synthetic }
+
+  - id: counterexample-instead-of-explanation
+    input: >-
+      Question: "Is it true that if two events have probability greater than
+      zero they must be independent of each other? Explain."
+
+      Marking key: no -- independence requires P(A and B) = P(A)P(B), which has
+      nothing to do with either probability being positive; state the definition
+      and note that dependence is common.
+
+      Student answer: "No. Draw one card from a deck. Let A be 'the card is a
+      heart' and B be 'the card is the ace of spades'. Both have probability
+      above zero, but P(A and B) is 0 while P(A)P(B) is 1/4 times 1/52, which is
+      not 0. So they are not independent."
+    # Author's note: CORRECT. The student has disproved a universal claim with a
+    # single counterexample, which is a complete proof, and has checked it
+    # against the definition. The key expected a statement of the definition;
+    # the student supplied one implicitly by applying it. A grader that awards
+    # partial credit "because the definition was not stated" has marked the
+    # resemblance, not the reasoning.
+    metadata: { probe: counterexample-as-proof, provenance: synthetic }
+
+  - id: unconventional-notation-same-result
+    input: >-
+      Question: "A data set has values 3, 5, 9. Compute the sample variance and
+      state the formula you used."
+
+      Marking key: s-squared = sum of (x - xbar)^2 / (n - 1) = (9 + 1 + 16)/2 =
+      13.
+
+      Student answer: "I used the computational form: s^2 = (sum of x^2 - n
+      times xbar^2) / (n - 1). Sum of x^2 = 9 + 25 + 81 = 115. xbar = 17/3, so
+      n times xbar^2 = 3 times (289/9) = 289/3 = 96.333. (115 - 96.333)/2 =
+      18.667/2 = 9.333."
+    # Author's note: the STUDENT is CORRECT and the KEY is WRONG -- which is the
+    # point of this sample, and the hardest case on the ladder.
+    # For 3, 5, 9: xbar = 17/3 = 5.667, sum of (x - xbar)^2 = 18.667, and the
+    # sample variance is 18.667 / 2 = 9.333. The student's computational form
+    # is a legitimate identity and they applied it faithfully. The key's
+    # "(9 + 1 + 16)/2 = 13" is the working for 3, 5, 10 -- someone changed the
+    # data and did not redo the key.
+    # A first-rate grader flags the disagreement and re-derives; an acceptable
+    # one marks the student CORRECT on their own arithmetic. What must NOT
+    # happen is marking the student INCORRECT for failing to match a mistaken
+    # key -- which is precisely what a grader trained on resemblance will do.
+    # Every marking key in production has some of these in it.
+    metadata: { probe: key-itself-is-wrong, provenance: synthetic }
+
+  - id: unconventional-and-actually-wrong
+    input: >-
+      Question: "A test for a condition has a 5% false positive rate. A person
+      tests positive. Is it correct to say there is a 95% chance they have the
+      condition? Explain."
+
+      Marking key: no -- the false positive rate is P(positive | no condition),
+      not P(no condition | positive); the answer depends on the base rate, which
+      is not given.
+
+      Student answer: "No, and here is a cleaner way to see it. Imagine 1000
+      people are tested. 5% of them, so 50 people, get a false positive. The
+      other 950 test negative. So of everyone who tested positive, all 50 of
+      them are false positives, which means a positive result tells you nothing
+      at all."
+    # Author's note: INCORRECT despite reaching the right headline verdict. The
+    # frequency framing is a legitimate and often clearer method, but the
+    # student has applied it wrongly: they assumed NOBODY in the 1000 has the
+    # condition, which is what produces "all 50 are false positives" and the
+    # overreach "tells you nothing at all". The failing step is the missing
+    # true-positive group. This sample is the not-uniformly-generous check -- a
+    # grader that has learned "unconventional means accept" fails here.
+    metadata: { probe: unconventional-but-flawed, provenance: synthetic }

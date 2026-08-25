@@ -1,0 +1,159 @@
+# conceptual-grading, rung 4 of 5 -- the first rung whose output a STUDENT sees.
+#
+# EXEMPLAR. What this rung adds: a constraint that pulls against the obvious way
+# to score well. The easiest way to write feedback a student can act on is to
+# tell them the answer -- and that is exactly what formative feedback must not
+# do. The rubric therefore weights actionability and non-disclosure EQUALLY, so
+# a response cannot maximise one by sacrificing the other.
+#
+# A rubric with only aligned criteria measures one thing under several names.
+# When the real task has a tension in it, put the tension in the rubric.
+version: 1
+id: conceptual-grading/l4-actionable-feedback
+title: Conceptual grading -- formative feedback that does not give the answer away
+description: >
+  Rung 4 of the conceptual-grading ladder. Given a question and a partly wrong
+  student answer, write formative feedback the student can act on in a revision
+  without being told the answer. The two demands are in genuine tension and the
+  rubric weights them equally: feedback that discloses the answer is not
+  formative, and feedback so guarded that the student cannot act on it is not
+  feedback.
+
+  Provenance: every question and student answer is SYNTHETIC, written for this
+  file. No real student writing is used.
+kind: subjective
+domain: assessment
+system_prompt: >-
+  You are an experienced university instructor writing formative feedback on a
+  student's short answer. Address the student directly. Point to what is
+  specifically wrong or missing and tell them what to do about it, in at most
+  four sentences. Do NOT supply the correct answer, do not rewrite their answer
+  for them, and do not state the fact they failed to state.
+scorer:
+  kind: llm_judge
+  rubric_id: conceptual-grading-feedback-v1
+rubric:
+  id: conceptual-grading-feedback-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: actionable
+      description: |-
+        Could the student begin a revision from this feedback without asking a
+        follow-up question?
+
+        1.0 -- names a specific next action the student can take ("re-read the
+               second sentence and say which of the two variables you are
+               claiming moves first").
+        0.5 -- identifies the problem specifically but leaves the student to
+               work out what to do about it.
+        0.0 -- offers only generic study advice ("review the chapter", "be more
+               precise"), or names no problem at all.
+      weight: 3.0
+    - name: withholds-the-answer
+      description: |-
+        Does the feedback avoid supplying the content the student failed to
+        supply? Weighted equally with actionability on purpose: the cheapest way
+        to be actionable is to disclose, and the rubric must not reward it.
+
+        1.0 -- the student still has to do the thinking; nothing in the feedback
+               could be pasted into the answer as the missing content.
+        0.5 -- the answer is not stated outright but is narrowed to the point of
+               being guessable from the feedback alone.
+        0.0 -- states the missing fact, corrects the wrong claim explicitly, or
+               rewrites any part of the answer.
+      weight: 3.0
+    - name: anchored-in-this-answer
+      description: |-
+        Does the feedback point at this student's actual words, rather than at
+        the question in general?
+
+        1.0 -- refers to specific words, sentences or claims the student wrote.
+        0.5 -- refers to the answer's general approach without pointing at any
+               part of it.
+        0.0 -- would apply unchanged to any answer to this question.
+      weight: 2.0
+    - name: tone-and-length
+      description: |-
+        Is it something an undergraduate could receive and use? Formative
+        feedback that is harsh gets discarded and feedback that is empty praise
+        gets ignored.
+
+        1.0 -- direct, respectful, four sentences or fewer, and honest about
+               what is wrong.
+        0.5 -- appropriate in tone but over-length, or opens with praise so
+               general it carries no information.
+        0.0 -- dismissive or sarcastic, or so softened that the student would
+               not know anything was wrong.
+      weight: 1.0
+    - name: no-invented-errors
+      description: |-
+        Does the feedback criticise only things the student actually got wrong?
+
+        1.0 -- every problem named is present in the answer.
+        0.5 -- one criticism is of something the answer arguably does not say.
+        0.0 -- criticises a claim the student did not make.
+      weight: 2.0
+tags: [exemplar, conceptual-grading, ladder-l4, subjective, not-yet-scorable]
+samples:
+  - id: reversed-causal-direction
+    input: >-
+      Question: "A study finds that students who attend office hours earn higher
+      grades. In two or three sentences, say what can and cannot be concluded."
+
+      Student answer: "The study shows office hours help students do better. You
+      cannot say it works for every student, but on average attending office
+      hours will raise your grade."
+    # Author's note: the failure is that the student never registers that
+    # attendance was self-selected -- stronger students may be the ones who go.
+    # Feedback that says "consider reverse causation: better students may be
+    # more likely to attend" has DISCLOSED the missing content and should score
+    # 0.0 on withholds-the-answer while scoring well on actionability. That
+    # trade-off is the whole point of this sample.
+    metadata: { probe: disclosure-temptation, provenance: synthetic }
+
+  - id: definition-nearly-right
+    input: >-
+      Question: "In two or three sentences, explain what a 95% confidence
+      interval means."
+
+      Student answer: "It means there is a 95% probability that the true
+      population mean falls inside the interval we calculated. The wider the
+      interval, the more confident we can be."
+    # Author's note: two distinct faults -- the probability statement is
+    # attached to the interval rather than to the procedure, and the second
+    # sentence has the width/confidence relationship backwards for a fixed
+    # sample. Good feedback names both and tells the student where to look
+    # without stating the long-run-frequency framing.
+    metadata: { probe: two-faults-one-answer, provenance: synthetic }
+
+  - id: correct-but-unsupported
+    input: >-
+      Question: "In two or three sentences, explain why a randomised experiment
+      supports a causal claim more strongly than an observational study."
+
+      Student answer: "Because randomised experiments are the gold standard.
+      Observational studies are lower down the hierarchy of evidence, so their
+      conclusions are weaker."
+    # Author's note: nothing here is false, and nothing here is an ARGUMENT --
+    # the student has cited an authority ranking in place of a mechanism. This
+    # sample exists to catch feedback that says "correct, but add more detail",
+    # which is neither actionable nor anchored.
+    metadata: { probe: assertion-without-mechanism, provenance: synthetic }
+
+  - id: overloaded-with-correct-detail
+    input: >-
+      Question: "In two or three sentences, explain what the standard error of
+      the mean measures."
+
+      Student answer: "The standard error measures how much the sample mean
+      varies from sample to sample. It is calculated as the standard deviation
+      divided by the square root of n, which is why bigger samples give more
+      precise estimates. It is also used in confidence intervals and t tests and
+      is related to the Central Limit Theorem, which says sampling distributions
+      approach normality."
+    # Author's note: the answer is CORRECT and over-length, so there is no fault
+    # to name. A grader whose feedback always finds something wrong will invent
+    # one here and lose no-invented-errors. Every subjective family needs at
+    # least one sample where the honest feedback is short and mostly positive.
+    metadata: { probe: nothing-to-fix, provenance: synthetic }
