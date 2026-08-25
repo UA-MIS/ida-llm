@@ -71,7 +71,40 @@ class TestStackHealth:
     def test_api_reports_every_dependency_healthy(self, api: httpx.Client) -> None:
         body = api.get("/health").json()
         assert body["status"] == "ok"
-        assert body["checks"] == {"database": True, "queue": True}
+        # Pinned as a SUPERSET check, not equality: what matters is that each of
+        # these three is genuinely reachable across real containers. Adding a
+        # fourth dependency later should not fail this test -- reporting one of
+        # these as down, or dropping it from the report entirely, should.
+        assert {"database", "queue", "artifacts"} <= set(body["checks"])
+        assert all(body["checks"].values()), body["checks"]
+
+    def test_the_probe_contract_holds_against_the_real_container(
+        self, api: httpx.Client
+    ) -> None:
+        """/healthz and /readyz are what the CHART probes.
+
+        The unit suite proves the split in-process; this proves the paths
+        actually answer on the port the Deployment exposes. A liveness probe
+        pointed at a 404 fails every pod, forever, and does it only in the
+        cluster -- which is the most expensive place to find out.
+        """
+        liveness = api.get("/healthz")
+        assert liveness.status_code == 200
+        assert liveness.json()["status"] == "ok"
+        # Liveness must not report dependencies -- it must not have LOOKED.
+        assert liveness.json()["checks"] == {}
+
+        readiness = api.get("/readyz")
+        assert readiness.status_code == 200
+        assert readiness.json()["checks"], "readiness must actually check something"
+
+    def test_metrics_is_scrapeable_from_outside_the_container(
+        self, api: httpx.Client
+    ) -> None:
+        """ServiceMonitor `ida-llm-api` scrapes this path on the `http` port."""
+        response = api.get("/metrics")
+        assert response.status_code == 200
+        assert "ida_llm_api_requests_total" in response.text
 
     def test_registry_and_catalog_loaded_in_the_container(self, api: httpx.Client) -> None:
         assert [m["key"] for m in api.get("/models").json()] == ["mock"]
