@@ -53,7 +53,7 @@ from ida_core.contracts import (
     RunStatus,
 )
 from ida_core.db import make_engine, make_session_factory, session_scope, utcnow
-from ida_core.gitmeta import current_git_sha
+from ida_core.gitmeta import build_identity, current_git_sha
 from ida_core.ids import new_id, new_run_id
 from ida_core.queue import RedisQueue, RunQueue
 from ida_core.registry import load_registry
@@ -64,7 +64,6 @@ from ida_core.repositories import (
     list_ungraded_subjective_results,
     models_with_any_run,
 )
-from ida_harness import __version__ as harness_version
 from ida_harness.runner import unscorable_reason
 from ida_harness.tasks import TaskCatalog
 
@@ -394,7 +393,7 @@ def enqueue_candidates(
                 sweep_id=sweep_id,
                 task_git_sha=git_sha,
                 task_content_sha=candidate.content_sha,
-                harness_version=harness_version,
+                harness_version=build_identity(),
                 sample_count=candidate.sample_count,
                 created_at=now,
             )

@@ -58,6 +58,53 @@ def _correct_answers(request: httpx.Request) -> httpx.Response:
     return httpx.Response(200, json=_body(f"Let me compute.\n{answer}"))
 
 
+class TestProvenance:
+    """The log must be able to name the build that produced it (D-1).
+
+    THE BUG THIS CLOSES. ``EvalLog.harness_version`` -- copied verbatim onto
+    ``runs.harness_version`` for every run -- was ``ida_harness.__version__``, a
+    hardcoded ``"0.1.0"`` no release step has ever written to. A benchmark number
+    whose provenance field is the same string on every build, forever, cannot be
+    traced to the code that produced it, which is the one thing D-1 asks of it.
+    """
+
+    def test_the_log_carries_the_build_sha(self, monkeypatch, verifiable_task, model_entry) -> None:
+        monkeypatch.setenv("IDA_GIT_SHA", "f" * 40)
+        with _client(model_entry, _correct_answers) as client:
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
+        assert log.harness_version == "f" * 40
+
+    def test_it_is_never_the_old_hardcoded_constant(
+        self, monkeypatch, tmp_path, verifiable_task, model_entry
+    ) -> None:
+        """Even with nothing to go on, the answer is honest rather than invented.
+
+        ⚠ Run from ``tmp_path``, which is outside any git checkout: this is the
+        genuinely-unknowable case, and it is exactly the one a "restore the old
+        fallback" refactor would fill back in with ``"0.1.0"``.
+        """
+        monkeypatch.delenv("IDA_GIT_SHA", raising=False)
+        monkeypatch.chdir(tmp_path)
+        with _client(model_entry, _correct_answers) as client:
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
+        assert log.harness_version == "unknown"
+        assert log.harness_version != "0.1.0"
+
+    def test_it_is_not_the_package_version(self, monkeypatch, verifiable_task, model_entry) -> None:
+        """``__version__`` still exists and still means something else.
+
+        Keeping BOTH is the point: the packaging version answers "which
+        distribution is installed", the SHA answers "which build ran". Collapsing
+        them back together is how this bug happened the first time.
+        """
+        import ida_harness
+
+        monkeypatch.setenv("IDA_GIT_SHA", "1" * 40)
+        with _client(model_entry, _correct_answers) as client:
+            log = run_task(task=verifiable_task, entry=model_entry, run_id=RUN_ID, client=client)
+        assert log.harness_version != ida_harness.__version__
+
+
 class TestHappyPath:
     def test_one_result_per_sample(self, verifiable_task, model_entry) -> None:
         with _client(model_entry, _correct_answers) as client:

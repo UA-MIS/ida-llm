@@ -8,6 +8,16 @@ Loop: ``BLPOP`` a :class:`~ida_core.contracts.RunJobMessage` -> claim the run ->
 :func:`ida_harness.runner.run_task` -> persist results + rollup -> repeat.
 """
 
-__version__ = "0.1.0"
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _dist_version
+
+# `__version__` is the DISTRIBUTION version, read from `services/runner/pyproject.toml` -- NOT an answer
+# to "which build is running?". See the full note in `ida_core/__init__.py`; the
+# identifier that is right by construction is the git SHA
+# (`ida_core.gitmeta.build_identity()`, `IDA_GIT_SHA`).
+try:
+    __version__ = _dist_version("ida-runner")
+except PackageNotFoundError:  # pragma: no cover -- only outside an install
+    __version__ = "0+unknown"
 
 __all__ = ["__version__"]

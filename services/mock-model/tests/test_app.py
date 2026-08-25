@@ -190,3 +190,85 @@ class TestProbeContract:
         from ida_mock_model.main import main
 
         assert callable(main)
+
+
+class TestHealthIdentifiesTheBuild:
+    """/healthz must say which build is answering, and must not make it up.
+
+    THE BUG THIS CLOSES. ``version`` was ``ida_mock_model.__version__``, a
+    hardcoded ``"0.1.0"`` that no release step has ever written to -- so every
+    image ever built, including 0.1.1, introduced itself as 0.1.0. A health
+    endpoint that disagrees with the release it is running is worse than one that
+    says nothing: it is what convinces an operator a deploy did not land.
+
+    Same shape as the api's /healthz on purpose. ``version`` is whatever the
+    release process was told to say (``IDA_VERSION``, baked in by
+    ``Dockerfile.python``); ``git_sha`` is the authority, baked in at build time
+    and correct by construction.
+    """
+
+    def test_it_reports_the_baked_in_git_sha(self, monkeypatch) -> None:
+        monkeypatch.setenv("IDA_GIT_SHA", "a" * 40)
+        body = TestClient(create_app()).get("/healthz").json()
+        assert body["git_sha"] == "a" * 40
+
+    def test_an_unknown_sha_is_null_not_a_placeholder(self, monkeypatch) -> None:
+        monkeypatch.delenv("IDA_GIT_SHA", raising=False)
+        assert TestClient(create_app()).get("/healthz").json()["git_sha"] is None
+
+    @pytest.mark.parametrize("bogus", ["HEAD", "$GITHUB_SHA", "abc1234", "A" * 40, ""])
+    def test_a_lie_from_the_pipeline_is_reported_as_null(self, monkeypatch, bogus) -> None:
+        """A wrong SHA looks like a real one -- ``ida_core.gitmeta``'s rule.
+
+        A pipeline that forgets to substitute a variable exports the literal
+        ``$GITHUB_SHA``; a repository with no commits makes git print ``HEAD``.
+        Serving either would be worse than serving nothing.
+        """
+        monkeypatch.setenv("IDA_GIT_SHA", bogus)
+        assert TestClient(create_app()).get("/healthz").json()["git_sha"] is None
+
+    def test_it_never_shells_out_to_git(self, monkeypatch) -> None:
+        """⚠ A STUB MODEL SERVER MUST NOT FORK A SUBPROCESS.
+
+        The chart probes this path for BOTH liveness and readiness. Unlike
+        ``ida_core.gitmeta``, this resolver is env-only by design -- proven by
+        making ``subprocess.run`` explode for the duration.
+        """
+        import subprocess
+
+        monkeypatch.delenv("IDA_GIT_SHA", raising=False)
+
+        def _explode(*args, **kwargs):
+            raise AssertionError("/healthz shelled out to git")
+
+        monkeypatch.setattr(subprocess, "run", _explode)
+        assert TestClient(create_app()).get("/healthz").status_code == 200
+
+    def test_the_release_can_tell_it_the_truth(self, monkeypatch) -> None:
+        """``IDA_VERSION`` is the ONE place the release process says what it shipped."""
+        monkeypatch.setenv("IDA_VERSION", "0.1.2")
+        assert TestClient(create_app()).get("/healthz").json()["version"] == "0.1.2"
+
+    def test_an_unset_release_falls_back_to_the_packaging_version(self, monkeypatch) -> None:
+        """Not a fake release -- the version this distribution actually declares."""
+        import ida_mock_model
+
+        monkeypatch.delenv("IDA_VERSION", raising=False)
+        body = TestClient(create_app()).get("/healthz").json()
+        assert body["version"] == ida_mock_model.__version__
+
+    def test_a_blank_release_var_does_not_report_an_empty_version(self, monkeypatch) -> None:
+        """``ENV IDA_VERSION=${IDA_VERSION}`` with no --build-arg yields "".
+
+        That is the DEFAULT for any local `docker build`, so it is the case most
+        likely to be hit -- and reporting `"version": ""` would read as a broken
+        endpoint rather than an unstamped build.
+        """
+        monkeypatch.setenv("IDA_VERSION", "   ")
+        assert TestClient(create_app()).get("/healthz").json()["version"] != ""
+
+    def test_health_and_healthz_still_agree(self, monkeypatch) -> None:
+        """Two paths, ONE body -- the existing contract, re-checked with new fields."""
+        monkeypatch.setenv("IDA_GIT_SHA", "b" * 40)
+        client = TestClient(create_app())
+        assert client.get("/health").json() == client.get("/healthz").json()

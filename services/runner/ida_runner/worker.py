@@ -58,6 +58,7 @@ from ida_core.contracts import (
     RunStatus,
 )
 from ida_core.db import session_scope, utcnow
+from ida_core.gitmeta import build_identity
 from ida_core.queue import NackOutcome, RunQueue
 from ida_core.registry import resolve_api_key
 from ida_core.repositories import (
@@ -69,7 +70,6 @@ from ida_core.repositories import (
     requeue_run,
     run_row_to_record,
 )
-from ida_harness import __version__ as harness_version
 from ida_harness.cache import CompletionCache
 from ida_harness.runner import effective_serving_config, run_task
 from ida_harness.tasks import TaskCatalog
@@ -162,7 +162,7 @@ def execute_job(
     # is what reported a run of four failed API calls as a success (B5).
     record.status = eval_log.status
     record.serving_config = eval_log.serving_config
-    record.harness_version = eval_log.harness_version or harness_version
+    record.harness_version = eval_log.harness_version or build_identity()
     record.task_content_sha = eval_log.task_content_sha or record.task_content_sha
     record.sample_count = len(eval_log.results)
     record.scored_count = eval_log.scored_count
