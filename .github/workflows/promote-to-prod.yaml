@@ -1,0 +1,91 @@
+# promote-to-prod — THE production gate.
+#
+# A human clicking "Run workflow" IS the approval. This workflow reads the image
+# tag CURRENTLY LIVE in <from>'s overlay and writes that SAME tag into prod's
+# overlay. No rebuild. No new git tag. No code edit. The bytes that ran in staging
+# are the bytes that run in prod.
+#
+# Both components move together: promote.sh refuses outright if <from>'s overlay
+# entries disagree on a tag, so a half-bumped or hand-edited source can never be
+# promoted into an inconsistent prod.
+#
+# ── `to` IS NOT AN INPUT. IT IS ALWAYS prod (platform-infra #531). ───────────
+# An earlier shape let a human promote INTO staging, which conflated "deploy to
+# staging" with "prod candidate" and made prod's desired state effectively
+# "whatever tag was pushed last". Staging is now reached ONLY by cutting a
+# `vX.Y.Z` tag; this button exists for one transition.
+#
+# `from: [dev, staging]` stays. staging -> prod is the normal path. dev -> prod is
+# a deliberate emergency hatch: it skips the tag and staging rungs, so the tag it
+# leaves in prod's overlay is a raw git-describe string rather than a semver —
+# which is what makes an emergency promotion visually obvious when reading prod's
+# overlay history later.
+#
+# Why prod's ArgoCD gate is `auto` and not `manual`: the human checkpoint moved
+# HERE. The git commit this workflow makes IS the approved state, so ArgoCD is a
+# pure executor of it — prod sits Synced/green normally and is OutOfSync only for
+# the brief window between this commit and the next reconcile.
+name: promote-to-prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: "Promote FROM this environment (whatever tag is live there)"
+        required: true
+        type: choice
+        default: staging
+        options:
+          - staging
+          - dev
+
+permissions:
+  contents: write
+
+concurrency:
+  group: promote-prod
+  cancel-in-progress: false     # never cancel a promotion mid-flight
+
+jobs:
+  promote:
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    # FULL node image, NOT -slim: this job git-commits and pushes, and -slim ships
+    # no git (`git: not found`, exit 127 — live-confirmed on this platform).
+    container:
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie
+    env:
+      GIT_AUTHOR_NAME: ua-mis-ci
+      GIT_AUTHOR_EMAIL: ci@capstone.uamishub.com
+      GIT_COMMITTER_NAME: ua-mis-ci
+      GIT_COMMITTER_EMAIL: ci@capstone.uamishub.com
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Promote — read ${{ inputs.from }}'s live tag, write it to prod, commit
+        # `bash`, NOT `sh`. promote.sh declares `#!/usr/bin/env bash` and uses
+        # `set -euo pipefail`; /bin/sh on this Debian image is dash, which rejects
+        # `-o pipefail` and exits 2 before doing any work. Calling the interpreter
+        # the script actually declares makes it behave identically everywhere.
+        run: |
+          set -eu
+          COMMIT=1 bash .devops/ci/promote.sh "${{ inputs.from }}" prod
+          git push origin HEAD:main
+
+      - name: Summary
+        run: |
+          set -eu
+          TAG="$(grep -m1 -E '^[[:space:]]*newTag:' .devops/chart/overlays/prod/kustomization.yaml \
+                 | sed -E 's/^[[:space:]]*newTag:[[:space:]]*//; s/^"(.*)"$/\1/')"
+          {
+            echo "### Promoted \`${{ inputs.from }}\` → \`prod\`"
+            echo ""
+            echo "Both components now pinned at \`${TAG}\` in prod."
+            echo "No image was rebuilt — this is the same artifact that ran in ${{ inputs.from }}."
+            echo ""
+            echo "ArgoCD will reconcile \`ida-llm-prod\` on its next sync."
+          } >> "$GITHUB_STEP_SUMMARY"

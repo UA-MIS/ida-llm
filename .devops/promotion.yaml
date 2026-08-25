@@ -1,0 +1,62 @@
+apiVersion: platform.capstone/v1
+# promotion.yaml — THE canonical single source of truth for the trigger→env→tag
+# mapping (D-011/ADR-008). Read by BOTH consumers:
+#   - the CI seam (.devops/ci/resolve-image.sh, bump-image.sh, promote.sh), and
+#   - the platform's `ida-llm-envs` ApplicationSet, via an ArgoCD git-files
+#     generator pointed at THIS file. Its top-level keys land at the template
+#     root and `missingkey=error` is set — so dev/staging/prod must each define
+#     `overlay` and `gate` or the whole ApplicationSet errors and NOTHING renders.
+#
+# ⚠ THIS FILE MUST EXIST ON HEAD BEFORE THE TENANT CAN RENDER. The env
+# ApplicationSet reads it from this repo at HEAD; without it dev has no source.
+#
+# Registry = this team's own Harbor project. Each component pushes
+#   harbor.capstone.uamishub.com/ida-llm/<image>:<tag>
+# (`registry` + the per-component `image` from components.yaml + the shared tag).
+registry: harbor.capstone.uamishub.com/ida-llm
+app: ida-llm
+
+# BUILD ONCE, PROMOTE THE SAME IMAGE.
+#
+# Both images always carry the IDENTICAL tag: bump-image.sh writes
+# `.images[].newTag` for every entry in one pass, and promote.sh REFUSES to
+# promote if they disagree. Promotion is a tag copy between overlays — never a
+# rebuild, never a new git tag, never a code edit.
+#
+#   push to main    → :<git-describe>  → dev        (continuous)
+#   push tag vX.Y.Z → :X.Y.Z           → staging    (one immutable image)
+#   promote-to-prod → the SAME :X.Y.Z  → prod       (human clicks; no build runs)
+#
+# prod's `gate: auto` is NOT auto-promotion. Nothing git-triggered ever writes
+# prod's overlay — `trigger: manual:promote-to-prod` says the only writer is a
+# human running .github/workflows/promote-to-prod.yaml. `gate` controls ArgoCD's
+# SYNC policy only: auto means ArgoCD executes the already-human-approved commit
+# instead of sitting OutOfSync waiting for a second click.
+environments:
+  dev:
+    trigger: "branch:main"
+    tagConvention: "git-describe"
+    overlay: ".devops/chart/overlays/dev"
+    gate: auto
+  staging:
+    trigger: "tag:v*"
+    tagConvention: "semver"
+    overlay: ".devops/chart/overlays/staging"
+    gate: auto
+  prod:
+    trigger: "manual:promote-to-prod"
+    tagConvention: "semver"
+    overlay: ".devops/chart/overlays/prod"
+    gate: auto
+  # PREVIEW IS PRESENT AND CURRENTLY DORMANT — deliberately, not accidentally.
+  # The overlay and the CI legs are complete and tested by chart-render.test.sh,
+  # but the tenant claim carries `previewEnabled: false` because the PLATFORM
+  # cannot fence a preview namespace yet (no quota/netpol, Vault auth bound to
+  # the wrong namespace, no harbor-pull → ImagePullBackOff). See
+  # .devops/README.md § "Preview environments". When those close, flipping ONE
+  # field on the claim turns this on with no change in this repo.
+  preview:
+    trigger: "pull_request"
+    tagConvention: "pull-<sha>"
+    overlay: ".devops/chart/overlays/preview"
+    gate: auto

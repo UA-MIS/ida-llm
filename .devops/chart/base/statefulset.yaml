@@ -1,0 +1,113 @@
+# Redis — the queue broker between `api` (enqueues runs) and `runner` (claims
+# them), plus a cache.
+#
+# ⚠ THIS KIND ONLY BECAME DEPLOYABLE IN platform-infra #532. The tenant
+# AppProject's namespaceResourceWhitelist carried no StatefulSet, so ArgoCD
+# refused this object outright ("resource StatefulSet is not permitted in project
+# ida-llm"). If you are reading this because sync is failing with that message,
+# the fix is in platform-infra, not here.
+#
+# ── WHY A StatefulSet AND NOT A Deployment+PVC ───────────────────────────────
+# Stable network identity. Workers dial `ida-llm-redis` and must reach the SAME
+# instance across rescheduling; a StatefulSet's ordinal pod name plus the headless
+# Service give that, and `volumeClaimTemplates` binds the volume to the ordinal
+# rather than to whichever pod grabs it first. A Deployment + RWO PVC races on
+# reschedule: the new pod cannot attach until the old one releases, so a node
+# drain can wedge. (The object store next door IS a Deployment+PVC — it needs
+# durability, not identity. The two choices are deliberate, not inconsistent.)
+#
+# ── DURABILITY, HONESTLY STATED ──────────────────────────────────────────────
+# `appendonly yes` means an in-flight queue survives a restart. It does NOT make
+# Redis a system of record: benchmark RESULTS belong in Postgres and transcripts
+# in MinIO. If a redis volume is ever lost, queued-but-unstarted work is lost and
+# nothing else should be.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ida-llm-redis
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: redis
+spec:
+  # The HEADLESS Service (services.yaml) — required by a StatefulSet, and it is
+  # what gives each ordinal a resolvable DNS name.
+  serviceName: ida-llm-redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ida-llm
+      app.kubernetes.io/component: redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ida-llm
+        app.kubernetes.io/component: redis
+    spec:
+      serviceAccountName: ida-llm
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        # fsGroup so the ceph-block volume is group-writable by the non-root UID
+        # this upstream image runs as. Without it Redis cannot create its
+        # append-only file and crash-loops on boot.
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: redis
+          # Pulled through the platform's Harbor pull-through cache, which is what
+          # keeps Docker Hub rate limits and the runners' :443-only egress out of
+          # the deploy path. Minor-pinned, never `latest`.
+          image: harbor.capstone.uamishub.com/dockerhub-proxy/library/redis:7.4-alpine
+          args:
+            - "redis-server"
+            - "--appendonly"
+            - "yes"
+            - "--dir"
+            - "/data"
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          app.kubernetes.io/name: ida-llm
+          app.kubernetes.io/component: redis
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: ceph-block
+        resources:
+          requests:
+            # Small on purpose: this is a QUEUE, not a datastore. It counts
+            # against the same requests.storage quota the object store draws
+            # from (dev/staging 5Gi total, prod 20Gi), so it stays modest in
+            # every env and is NOT patched per-overlay.
+            #
+            # ⚠ volumeClaimTemplates are IMMUTABLE after creation. Changing this
+            # value on a live StatefulSet is rejected by the API server; you must
+            # delete the StatefulSet with --cascade=orphan, edit, and re-apply.
+            # Pick it deliberately now rather than discovering that later.
+            storage: 1Gi

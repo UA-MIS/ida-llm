@@ -1,0 +1,462 @@
+# FIVE Deployments from TWO built images, plus the off-the-shelf object store.
+#
+#   frontend      ida-llm-frontend    public UI                         (Next.js)
+#   api           ida-llm-python-app  `ida-api`       — internal only
+#   runner        ida-llm-python-app  `ida-runner`    — queue workers
+#   mock-model    ida-llm-python-app  `ida-mock-model`— the safety switch
+#   object-store  upstream MinIO      run artifacts on a PVC
+#
+# ONE IMAGE, THREE COMMANDS. api/runner/mock-model are the SAME artifact with a
+# different `command`. That is what makes "build once, promote the same image"
+# hold across all of them — a promotion is a tag copy, and the tag is shared, so
+# the three can never drift apart mid-promotion.
+#
+# ── Reloader ─────────────────────────────────────────────────────────────────
+# Every Deployment that reads an ESO-materialized Secret carries
+# `secret.reloader.stakater.com/reload`. Without it, a pod that starts BEFORE ESO
+# writes the Secret keeps its unresolved env for the LIFE of the container and
+# runs silently mis-configured while reporting Ready — the env-injection race.
+# Named-secret form (not `reloader.stakater.com/auto`) so a restart is triggered
+# only by the Secrets that pod's env actually reads.
+#
+# ── Probes ───────────────────────────────────────────────────────────────────
+# api uses /healthz for LIVENESS and /readyz for READINESS, and they are NOT the
+# same check. /healthz never touches the database; /readyz does. A liveness probe
+# that checks a dependency turns a brief DB blip into a rolling restart of every
+# replica, which is how a small outage becomes a large one.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ida-llm-frontend
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: frontend
+  annotations:
+    secret.reloader.stakater.com/reload: "ida-llm-secret"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ida-llm
+      app.kubernetes.io/component: frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ida-llm
+        app.kubernetes.io/component: frontend
+    spec:
+      serviceAccountName: ida-llm
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: frontend
+          image: ida-llm-frontend:latest
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: ida-llm-config
+          env:
+            - name: PORT
+              value: "3000"
+            # Next's standalone server reads HOSTNAME (not HOST) for its bind
+            # address; the shared ConfigMap's HOST key is for the Python services.
+            - name: HOSTNAME
+              value: "0.0.0.0"
+          readinessProbe:
+            httpGet: { path: /api/healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/healthz, port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: "100m", memory: "192Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            # ⚠ NOT readOnlyRootFilesystem. Next.js writes its ISR/image cache
+            # under .next/cache at runtime; a read-only root crash-loops the
+            # standalone server on the first cache write. Tightening this (an
+            # emptyDir mounted over the cache dir) is a tracked follow-up — the
+            # Python services below DO run read-only.
+            readOnlyRootFilesystem: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ida-llm-api
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: api
+  annotations:
+    # Reads BOTH the app secret and the auto-provisioned DB secret.
+    secret.reloader.stakater.com/reload: "ida-llm-secret,ida-llm-db"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ida-llm
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ida-llm
+        app.kubernetes.io/component: api
+    spec:
+      serviceAccountName: ida-llm
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Alembic migrations.
+        #
+        # ⚠ ON THE api DEPLOYMENT ONLY, deliberately. `Job` is now whitelisted
+        # (platform-infra #532) so a PreSync hook Job is possible — it is not used
+        # here because ArgoCD hook-only Applications have bitten this platform
+        # before, and an initContainer needs no hook machinery to be correct.
+        # Putting it on `runner` too would have four replicas racing the same
+        # migration on every rollout; Alembic takes a lock, so they would serialise
+        # rather than corrupt, but three of the four would just be slow startup
+        # noise. One owner is clearer.
+        #
+        # Idempotent: alembic records applied revisions in alembic_version, so
+        # re-running on every rollout is a no-op after the first. Same image and
+        # therefore the same schema version as the server it gates.
+        - name: migrate
+          image: ida-llm-python-app:latest
+          command: ["alembic", "upgrade", "head"]
+          workingDir: /app
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ida-llm-db
+                  key: DATABASE_URL
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits: { cpu: "500m", memory: "384Mi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+      containers:
+        - name: api
+          image: ida-llm-python-app:latest
+          command: ["ida-api"]
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: ida-llm-config
+          env:
+            - name: PORT
+              value: "8000"
+            # NOT `optional: true`. A missing Secret must keep the pod in
+            # CreateContainerConfigError — loud and correct — rather than letting
+            # it boot with the variable unset and serve wrong results while
+            # reporting Ready.
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ida-llm-db
+                  key: DATABASE_URL
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ida-llm-secret
+                  key: MINIO_ACCESS_KEY
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ida-llm-secret
+                  key: MINIO_SECRET_KEY
+          readinessProbe:
+            # /readyz DOES check the database — a pod that cannot reach Postgres
+            # is pulled from the Service and left running, which is correct.
+            httpGet: { path: /readyz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            # /healthz does NOT — see the file header.
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ida-llm-runner
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: runner
+  annotations:
+    secret.reloader.stakater.com/reload: "ida-llm-secret,ida-llm-db"
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ida-llm
+      app.kubernetes.io/component: runner
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ida-llm
+        app.kubernetes.io/component: runner
+    spec:
+      serviceAccountName: ida-llm
+      automountServiceAccountToken: false
+      # A worker mid-benchmark should finish its item, not be killed. The code
+      # handles SIGTERM and stops claiming new work; this is the time it gets.
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: runner
+          image: ida-llm-python-app:latest
+          command: ["ida-runner"]
+          envFrom:
+            - configMapRef:
+                name: ida-llm-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ida-llm-db
+                  key: DATABASE_URL
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ida-llm-secret
+                  key: MINIO_ACCESS_KEY
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ida-llm-secret
+                  key: MINIO_SECRET_KEY
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ida-llm-secret
+                  key: ANTHROPIC_API_KEY
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ida-llm-secret
+                  key: OPENAI_API_KEY
+            - name: SPARKS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ida-llm-secret
+                  key: SPARKS_API_KEY
+          # NO Service and NO HTTP probes: this is a queue consumer with no
+          # listener. An exec probe on the process would add failure modes
+          # without adding information — the pod is alive iff the process is, and
+          # the kubelet already knows that.
+          resources:
+            # ⚠ 256Mi, not 512Mi, and this is load-bearing. Prod's namespace
+            # quota caps requests.memory at 4Gi ACROSS THE WHOLE APP (unchanged by
+            # #532 — only the pod COUNT was raised). Four runners at 512Mi would
+            # eat half of it and leave a RollingUpdate surge no headroom, which is
+            # the exact shape of the D-176 crimson-copies incident. This workload
+            # is network-bound — it blocks on remote LLM APIs, it does not
+            # compute — so 256Mi is right on the merits, not just on the budget.
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "1", memory: "1Gi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+# ── mock-model: THE CREDIT/HARDWARE SAFETY SWITCH ────────────────────────────
+# A deterministic stub model endpoint, same image as the runner. It is what makes
+# "no pull request burns provider credits or reaches campus hardware" true by
+# construction: dev and preview point MOCK_MODEL_BASE_URL here, and CI runs
+# against the same code path.
+#
+# ⚠ replicas: 0 IN BASE. Base carries the PROD shape, and prod must exercise real
+# models — a mock quietly answering in production would invalidate every stored
+# result. The dev and preview overlays scale it to 1. Scaled to zero rather than
+# omitted so the object still exists in prod and can be scaled up for a
+# same-shape debugging session without editing the chart.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ida-llm-mock-model
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: mock-model
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ida-llm
+      app.kubernetes.io/component: mock-model
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ida-llm
+        app.kubernetes.io/component: mock-model
+    spec:
+      serviceAccountName: ida-llm
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mock-model
+          image: ida-llm-python-app:latest
+          command: ["ida-mock-model"]
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: ida-llm-config
+          env:
+            - name: PORT
+              value: "8000"
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits: { cpu: "300m", memory: "256Mi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+---
+# ── object-store: MinIO on a PVC ─────────────────────────────────────────────
+# Run artifacts (transcripts, judge outputs, eval logs) survive a pod restart.
+# See pvc.yaml for why a PVC here and a StatefulSet for redis.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ida-llm-object-store
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: object-store
+  annotations:
+    # MinIO's root credentials ARE the app's MINIO_ACCESS_KEY/MINIO_SECRET_KEY, so
+    # this pod must restart when they rotate or every client locks itself out.
+    secret.reloader.stakater.com/reload: "ida-llm-secret"
+spec:
+  # ⚠ replicas MUST stay 1 and strategy MUST stay Recreate. An RWO PVC cannot be
+  # attached to two pods, so a RollingUpdate DEADLOCKS: the new pod waits forever
+  # for a volume the old pod will not release until the new one is Ready. This is
+  # the specific failure a well-meaning "make it zero-downtime" edit produces.
+  # The cost is a brief object-store outage on every deploy of this component;
+  # acceptable, because it deploys rarely (an upstream image bump) and writes
+  # retry.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ida-llm
+      app.kubernetes.io/component: object-store
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ida-llm
+        app.kubernetes.io/component: object-store
+    spec:
+      serviceAccountName: ida-llm
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        # fsGroup so the ceph-block volume is group-writable by the non-root UID
+        # this upstream image is being forced to run as. Without it MinIO cannot
+        # create its own .minio.sys metadata directory and crash-loops on boot.
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: minio
+          image: harbor.capstone.uamishub.com/dockerhub-proxy/minio/minio:RELEASE.2025-09-07T16-13-09Z
+          args: ["server", "/data", "--address", ":9000"]
+          env:
+            # The app creates the `run-artifacts` bucket itself on first write, so
+            # no provisioning Job is needed.
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ida-llm-secret
+                  key: MINIO_ACCESS_KEY
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ida-llm-secret
+                  key: MINIO_SECRET_KEY
+          ports:
+            - name: s3
+              containerPort: 9000
+          readinessProbe:
+            httpGet: { path: /minio/health/ready, port: s3 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /minio/health/live, port: s3 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - name: object-store-data
+              mountPath: /data
+      volumes:
+        - name: object-store-data
+          persistentVolumeClaim:
+            claimName: ida-llm-object-store

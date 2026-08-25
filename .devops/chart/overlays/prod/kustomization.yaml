@@ -1,0 +1,37 @@
+# prod overlay.
+#
+# ⚠ NOTHING GIT-TRIGGERED WRITES THIS FILE. The only writer is a human running
+# .github/workflows/promote-to-prod.yaml, which copies the tag currently running
+# in staging. There is no build step in that path — promotion is a tag copy, so
+# what reaches prod is the byte-identical artifact staging proved.
+#
+# Base already carries the prod shape (prod hosts, prod replicas, 10Gi PVC,
+# mock-model at 0), so this overlay is deliberately THIN: the fewer patches prod
+# has, the fewer ways prod can differ from what was reviewed.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ida-llm-prod
+
+resources:
+  - ../../base
+  - app-secret.externalsecret.yaml
+  - database.externalsecret.yaml
+
+labels:
+  - pairs:
+      platform.capstone/env: prod
+      platform.capstone/semester: "2026-fall"
+    includeSelectors: false
+
+images:
+  - name: ida-llm-frontend
+    newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-frontend
+    newTag: "v0.0.0"
+  - name: ida-llm-python-app
+    newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-python-app
+    newTag: "v0.0.0"
+
+# No `patches:`. Every prod value lives in base, where it is read by anyone
+# reviewing the chart rather than reconstructed from a diff. Hosts, replicas,
+# storage and the mock-model-off setting are all base defaults.

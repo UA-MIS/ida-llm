@@ -1,0 +1,60 @@
+# components.yaml — the deployable components in THIS repo (multi-component
+# contract, platform.capstone/v1). One repo → N images, ONE shared tag.
+#
+# Two consumers:
+#   - .devops/ci/resolve-components.sh → the CI build matrix (one Kaniko leg per
+#     entry), consumed by .github/workflows/build-and-push.yaml
+#   - .devops/chart/base/* → the Deployments and Services that reference them
+#
+# ⚠ TWO IMAGES, SIX WORKLOADS. This file lists what is BUILT, not what RUNS. The
+# python image serves four roles by argv (api, runner, mock-model, and the three
+# CronJobs); the chart is where that fan-out lives. Adding a Deployment that
+# reuses an existing image does NOT belong here — adding a new *build* does.
+#
+# ⚠ EVERY component's `context` is the REPO ROOT (`.`). The python distributions
+# depend on each other across packages/ and services/, and the frontend build is
+# kept on the same root so ONE .dockerignore governs both and a future shared
+# package is reachable without moving anything. `dockerfile` is therefore the
+# full repo-relative path.
+#
+# `path` is the Ingress path this component serves. ONLY the frontend is routed
+# publicly; api, runner, mock-model, redis and the object store are
+# cluster-internal and carry `path: ""` — the chart gives them no Ingress rule.
+# That is a deliberate boundary: the api has no public route at all, so its
+# surface is reachable only from inside the namespace.
+apiVersion: platform.capstone/v1
+components:
+  # frontend — the public results UI (Next.js 15 standalone).
+  - name: frontend
+    kind: frontend
+    context: .
+    dockerfile: frontend/Dockerfile
+    image: ida-llm-frontend
+    port: 3000
+    path: /
+    needsDb: false
+    buildType: container
+
+  # python-app — ONE build, FOUR runtime roles (ida-api / ida-runner /
+  # ida-mock-model / ida-sweep). `port` is the api role's listener, which is what
+  # the chart probes for that Deployment; the other roles set their own.
+  #
+  # needsDb: true — the api role reads DATABASE_URL and the migration
+  # initContainer runs Alembic from this same image, so schema and code can never
+  # be out of step.
+  - name: python-app
+    kind: backend
+    context: .
+    dockerfile: Dockerfile.python
+    image: ida-llm-python-app
+    port: 8000
+    path: ""
+    needsDb: true
+    buildType: container
+
+  # ── RESERVED: `agile` — the ADO-style sprint board. ────────────────────────
+  # A third component is being built concurrently by another agent and will land
+  # here as its own entry (own image, own Deployment, prod only, explicit host
+  # ida-agile.capstone.uamishub.com). Do NOT invent its fields — see
+  # .devops/README.md § "Adding the agile component" for the exact five-file
+  # change, written so it drops in without touching anything above.

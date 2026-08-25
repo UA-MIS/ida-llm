@@ -1,0 +1,11 @@
+# Dev/CI-only tooling. Runtime dependencies live in each distribution's own
+# pyproject.toml so the container image installs ONLY what it runs.
+#
+# Pinned, not floated: an unpinned linter turns an unrelated PR red on the day
+# upstream adds a rule. Bump deliberately, in its own PR.
+ruff==0.13.1
+pytest==8.4.2
+pytest-asyncio==1.2.0
+httpx==0.28.1
+alembic==1.16.5
+psycopg[binary]==3.2.10

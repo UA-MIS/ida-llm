@@ -1,0 +1,84 @@
+# syntax=docker/dockerfile:1
+# ida-llm-python-app — ONE image, FOUR runtime roles.
+#
+# The `api` Deployment, the `runner` Deployment, the `mock-model` Deployment and
+# all three CronJobs run THIS image with a different command:
+#
+#   ida-api           FastAPI (services/api)
+#   ida-runner        queue worker (services/runner)
+#   ida-mock-model    the deterministic stub endpoint (services/runner)
+#   ida-sweep <name>  the three nightly CronJobs (services/runner)
+#
+# That is what makes "build once, promote the same image" hold across all of
+# them: staging and prod run the byte-identical artifact dev proved, and a
+# promotion is a tag copy, never a rebuild.
+#
+# ⚠ CONTEXT IS THE REPO ROOT (`.`) — the four distributions live in packages/ and
+# services/ and depend on each other, so a narrower context cannot resolve them.
+ARG PYTHON_IMAGE=harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
+
+# ---- build: compile wheels, keep the toolchain OUT of the runtime ----------
+FROM ${PYTHON_IMAGE} AS build
+WORKDIR /src
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
+
+# build-essential is needed for any sdist that has no manylinux wheel. It stays
+# in THIS stage only; the runtime image below never sees a compiler.
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y build-essential \
+ && rm -rf /var/lib/apt/lists/*
+
+# Manifests first so the dependency layer survives a source-only edit.
+COPY packages/core/pyproject.toml     packages/core/
+COPY packages/harness/pyproject.toml  packages/harness/
+COPY services/api/pyproject.toml      services/api/
+COPY services/runner/pyproject.toml   services/runner/
+
+COPY packages/ packages/
+COPY services/ services/
+COPY tools/    tools/
+COPY alembic.ini ./
+COPY migrations/ migrations/
+
+# A venv rather than --user or system site-packages: it copies to the runtime
+# stage as one self-contained directory with no path surprises.
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
+RUN pip install --upgrade pip setuptools wheel \
+ && pip install \
+      ./packages/core \
+      ./packages/harness \
+      ./services/api \
+      ./services/runner \
+      alembic==1.16.5
+
+# ---- runtime ---------------------------------------------------------------
+FROM ${PYTHON_IMAGE} AS runtime
+ENV PATH="/opt/venv/bin:${PATH}" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    HOST=0.0.0.0 \
+    PORT=8000
+
+# 65532 matches the chart's securityContext runAsUser. Keep them in lockstep.
+RUN groupadd --gid 65532 nonroot && useradd --uid 65532 --gid 65532 --no-create-home nonroot
+
+COPY --from=build --chown=65532:65532 /opt/venv /opt/venv
+# Migrations + tasks + the model registry ship IN the image on purpose: the
+# migration initContainer and the CronJobs must run the schema and the task suite
+# that belong to the SAME commit as the code. Reading them from a mounted volume
+# would let code and data drift apart, which is exactly what the tasks_sha /
+# models_sha citation exists to prevent.
+WORKDIR /app
+COPY --from=build --chown=65532:65532 /src/alembic.ini  /app/alembic.ini
+COPY --from=build --chown=65532:65532 /src/migrations   /app/migrations
+COPY --chown=65532:65532 tasks/      /app/tasks/
+COPY --chown=65532:65532 models.yaml /app/models.yaml
+COPY --chown=65532:65532 tools/      /app/tools/
+
+USER 65532:65532
+EXPOSE 8000
+# No default CMD that guesses a role. Every workload names its command
+# explicitly in the chart, so a manifest that forgets one fails loudly at start
+# instead of silently running the wrong process.
+CMD ["ida-api"]

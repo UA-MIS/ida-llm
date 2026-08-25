@@ -1,0 +1,245 @@
+# build-and-push — the GitOps build seam.
+#
+# Four jobs:
+#   1. resolve  — ONE tag + the 2-component build matrix, from .devops/*.yaml
+#   2. checks   — the same five gates ci.yml runs on PRs, as the gate in front of
+#                 the build (so nothing unvalidated is ever pushed to Harbor)
+#   3. build    — 2 parallel Kaniko legs, BOTH pushed at that ONE tag
+#   4. bump-dev — rewrite dev's overlay to the built tag; seed staging/prod once
+#
+# BUILD ONCE, PROMOTE THE SAME IMAGE. Both components always carry the identical
+# tag; staging→prod is a tag copy performed by promote-to-prod.yaml, never a
+# rebuild. See .devops/promotion.yaml.
+#
+# ── PRs ARE NOT TRIGGERED HERE, AND THAT IS CURRENT-STATE, NOT PERMANENT ─────
+# ci.yml owns pull_request validation. A PR does not publish an image because
+# previews are disabled for this tenant (a pull-<sha> image would have no
+# namespace to deploy into and would just put untrusted PR-built content in the
+# team's Harbor project). When the platform's preview blockers close, add
+# `pull_request:` to the trigger list and resolve-image.sh already maps it to
+# `preview` / `pull-<sha>` with no other change here.
+name: build-and-push
+
+on:
+  push:
+    branches: [main]     # -> dev, tag = git-describe
+    tags: ["v*"]         # -> the ONE immutable :X.Y.Z image staging and prod share
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  resolve:
+    # LOOP PREVENTION: skip the whole run — and by `needs:` cascade every job
+    # below — when the head commit of a BRANCH push was authored by our own bump
+    # identity. Deliberately not `[skip ci]`: GitHub's skip-ci detection is
+    # commit-level, not ref-level, so it would permanently suppress any later
+    # `git tag vX.Y.Z` pointing at that same commit — which is exactly the
+    # natural release flow.
+    if: >-
+      !(github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') &&
+        github.event.head_commit.author.email == 'ci@capstone.uamishub.com')
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    container:
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie-slim
+    outputs:
+      REGISTRY: ${{ steps.img.outputs.REGISTRY }}
+      TAG: ${{ steps.img.outputs.TAG }}
+      PUSH: ${{ steps.img.outputs.PUSH }}
+      matrix: ${{ steps.components.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          # Load-bearing: resolve-image.sh's git-describe needs full tag history.
+          # Without it describe degrades to a bare sha via --always.
+          fetch-depth: 0
+
+      - name: Resolve the image tag for this git event
+        id: img
+        run: sh .devops/ci/resolve-image.sh | tee -a "$GITHUB_OUTPUT"
+
+      - name: Discover the component build matrix
+        id: components
+        run: |
+          set -eu
+          ARR="$(sh .devops/ci/resolve-components.sh)"
+          echo "resolve-components.sh -> $ARR"
+          echo "matrix={\"include\":${ARR}}" >> "$GITHUB_OUTPUT"
+
+  checks-python:
+    needs: resolve
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    container:
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
+    env:
+      ANTHROPIC_API_KEY: ci-mock-not-a-real-key
+      OPENAI_API_KEY: ci-mock-not-a-real-key
+      SPARKS_API_KEY: ci-mock-not-a-real-key
+      MOCK_MODEL_BASE_URL: http://127.0.0.1:8099
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Install
+        run: |
+          set -eu
+          python -m pip install --upgrade pip
+          pip install -e packages/core -e packages/harness -e services/api -e services/runner
+          pip install -r requirements-dev.txt
+      - name: Lint
+        run: ruff check packages services tools
+      - name: Format check
+        run: ruff format --check packages services tools
+      - name: Test
+        run: pytest
+      - name: Validate tasks/** and models.yaml
+        run: python tools/validate_tasks.py
+
+  checks-frontend:
+    needs: resolve
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    container:
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie-slim
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Install
+        run: |
+          set -eu
+          if [ -f package-lock.json ]; then npm ci --no-audit --no-fund
+          else echo "::warning::no package-lock.json yet -- using npm install"; npm install --no-audit --no-fund; fi
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+
+  checks-migrations:
+    needs: resolve
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    container:
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
+    services:
+      postgres:
+        image: harbor.capstone.uamishub.com/dockerhub-proxy/library/postgres:17-alpine
+        env:
+          POSTGRES_USER: ida
+          POSTGRES_PASSWORD: ci-throwaway
+          POSTGRES_DB: ida_llm_ci
+        options: >-
+          --health-cmd "pg_isready -U ida"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://ida:ci-throwaway@postgres:5432/ida_llm_ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Install
+        run: |
+          set -eu
+          python -m pip install --upgrade pip
+          pip install -e packages/core
+          pip install alembic==1.16.5 "psycopg[binary]==3.2.10"
+      - name: Upgrade, downgrade, upgrade
+        run: |
+          set -eu
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+
+  build-and-push:
+    needs: [resolve, checks-python, checks-frontend, checks-migrations]
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.resolve.outputs.matrix) }}
+    container:
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie-slim
+    env:
+      DOCKER_CONFIG_DIR: /kaniko/.docker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Wait for the Harbor push credential
+        # The `harbor-push` k8s Secret is injected into the Kaniko step pod by the
+        # runner's container hook, but it is provisioned ASYNCHRONOUSLY by the
+        # CapstoneTenant chain (Harbor robot -> Crossplane connection secret ->
+        # PushSecret -> Vault -> ESO). On a brand-new tenant the first build can
+        # genuinely outrun it. Poll, then fail CLOSED rather than pushing
+        # unauthenticated.
+        run: |
+          set -eu
+          for i in $(seq 1 30); do
+            [ -s "${DOCKER_CONFIG_DIR}/config.json" ] && { echo "harbor-push present"; exit 0; }
+            echo "waiting for ${DOCKER_CONFIG_DIR}/config.json ($i/30)..."; sleep 10
+          done
+          echo "::error::Harbor push credential never appeared at ${DOCKER_CONFIG_DIR}/config.json"
+          exit 1
+
+      - name: Build + push '${{ matrix.name }}' with Kaniko
+        uses: docker://gcr.io/kaniko-project/executor@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e # v1.23.2-debug
+        with:
+          entrypoint: /busybox/sh
+          args: >-
+            -c '
+            set -eu;
+            /kaniko/executor
+            --context=dir://${GITHUB_WORKSPACE}/${CONTEXT}
+            --dockerfile=${DOCKERFILE}
+            --destination=${IMAGE}
+            --reproducible
+            --snapshot-mode=redo
+            --use-new-run
+            --verbosity=info
+            '
+        env:
+          IMAGE: ${{ needs.resolve.outputs.REGISTRY }}/${{ matrix.image }}:${{ needs.resolve.outputs.TAG }}
+          CONTEXT: ${{ matrix.context }}
+          DOCKERFILE: ${{ matrix.dockerfile }}
+          DOCKER_CONFIG_DIR: ${{ env.DOCKER_CONFIG_DIR }}
+
+  bump-dev:
+    needs: [resolve, build-and-push]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.resolve.outputs.PUSH == 'true' }}
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    container:
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.resolve.outputs.TAG }}
+      GIT_AUTHOR_NAME: ua-mis-ci
+      GIT_AUTHOR_EMAIL: ci@capstone.uamishub.com
+      GIT_COMMITTER_NAME: ua-mis-ci
+      GIT_COMMITTER_EMAIL: ci@capstone.uamishub.com
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Bump dev, and seed staging/prod on the very first deploy
+        run: |
+          set -eu
+          # 1) dev — continuous: every push to main points dev at the just-built tag.
+          COMMIT=1 bash .devops/ci/bump-image.sh dev "${TAG}"
+          # 2) FIRST DEPLOY ONLY — staging and prod ship the v0.0.0 sentinel, which
+          #    no build ever produces. This points them at the same image so a brand
+          #    new tenant is green in all three envs immediately. It is a permanent
+          #    no-op afterwards, leaving staging/prod promotion-gated.
+          COMMIT=1 bash .devops/ci/seed-initial-envs.sh "${TAG}"
+          # 3) ONE push. Authored by GIT_AUTHOR_EMAIL, which the `resolve` guard
+          #    above recognises and skips — no bump loop, and unlike [skip ci] a
+          #    later tag on this commit still triggers normally.
+          git push origin HEAD:main

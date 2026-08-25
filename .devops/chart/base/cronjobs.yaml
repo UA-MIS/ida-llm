@@ -1,0 +1,272 @@
+# THREE scheduled sweeps, all running the SAME python image as the runner with a
+# different argv (`ida-sweep <name>`).
+#
+# ⚠ THIS KIND ONLY BECAME DEPLOYABLE IN platform-infra #532. The tenant
+# AppProject's namespaceResourceWhitelist carried neither CronJob nor Job. Job
+# matters as much as CronJob: a CronJob CREATES Jobs, so whitelisting only the
+# former would let these schedules exist and refuse every firing — a worse failure
+# than refusing them outright, because it looks configured.
+#
+# ── THE FOUR SETTINGS THAT MATTER, AND WHY ───────────────────────────────────
+# concurrencyPolicy: Forbid   A sweep that overruns its window must NOT stack a
+#                             second copy on top. Two re-benchmarks writing the
+#                             same run rows is corruption, not throughput. Forbid
+#                             skips the firing instead.
+# startingDeadlineSeconds     If the controller was down (or the namespace was at
+#                             its pod quota) at fire time, a missed run is skipped
+#                             once the deadline passes rather than fired late in a
+#                             thundering herd when capacity returns.
+# successfulJobsHistoryLimit  Retained Jobs hold retained PODS, which count
+# failedJobsHistoryLimit      against the namespace `pods` quota. Unbounded
+#                             history slowly consumes the ceiling until unrelated
+#                             deploys start failing — with the CronJob nowhere in
+#                             the error message. Kept deliberately small.
+# backoffLimit: 1             These are idempotent but expensive (a sweep can burn
+#                             real provider credits). One retry, then fail loudly.
+#
+# ── SCHEDULES ARE STAGGERED ON PURPOSE ───────────────────────────────────────
+# 02:00 / 03:30 / 05:00 UTC. All three at once would need three concurrent pod
+# sets plus whatever else is rolling, which is exactly the surge the pods quota
+# raise in #532 was sized for — but staggering means the quota is headroom rather
+# than the thing standing between the app and a stalled nightly run.
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ida-llm-rebenchmark
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: sweep
+spec:
+  schedule: "0 2 * * *"
+  timeZone: "Etc/UTC"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      # A sweep that hangs must not hold a pod slot forever.
+      activeDeadlineSeconds: 21600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: ida-llm
+            app.kubernetes.io/component: sweep
+        spec:
+          restartPolicy: Never
+          serviceAccountName: ida-llm
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: sweep
+              image: ida-llm-python-app:latest
+              command: ["ida-sweep", "rebenchmark"]
+              envFrom:
+                - configMapRef:
+                    name: ida-llm-config
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: ida-llm-db
+                      key: DATABASE_URL
+                - name: MINIO_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ida-llm-secret
+                      key: MINIO_ACCESS_KEY
+                - name: MINIO_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ida-llm-secret
+                      key: MINIO_SECRET_KEY
+                - name: ANTHROPIC_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ida-llm-secret
+                      key: ANTHROPIC_API_KEY
+                - name: OPENAI_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ida-llm-secret
+                      key: OPENAI_API_KEY
+              resources:
+                requests: { cpu: "100m", memory: "256Mi" }
+                limits: { cpu: "1", memory: "1Gi" }
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities: { drop: ["ALL"] }
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ida-llm-model-sweep
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: sweep
+spec:
+  schedule: "30 3 * * *"
+  timeZone: "Etc/UTC"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 21600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: ida-llm
+            app.kubernetes.io/component: sweep
+        spec:
+          restartPolicy: Never
+          serviceAccountName: ida-llm
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: sweep
+              image: ida-llm-python-app:latest
+              command: ["ida-sweep", "model-sweep"]
+              envFrom:
+                - configMapRef:
+                    name: ida-llm-config
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: ida-llm-db
+                      key: DATABASE_URL
+                - name: MINIO_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ida-llm-secret
+                      key: MINIO_ACCESS_KEY
+                - name: MINIO_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ida-llm-secret
+                      key: MINIO_SECRET_KEY
+                - name: ANTHROPIC_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ida-llm-secret
+                      key: ANTHROPIC_API_KEY
+                - name: OPENAI_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ida-llm-secret
+                      key: OPENAI_API_KEY
+              resources:
+                requests: { cpu: "100m", memory: "256Mi" }
+                limits: { cpu: "1", memory: "1Gi" }
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities: { drop: ["ALL"] }
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ida-llm-judge-calibration
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: sweep
+spec:
+  schedule: "0 5 * * *"
+  timeZone: "Etc/UTC"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 21600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: ida-llm
+            app.kubernetes.io/component: sweep
+        spec:
+          restartPolicy: Never
+          serviceAccountName: ida-llm
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: sweep
+              image: ida-llm-python-app:latest
+              command: ["ida-sweep", "judge-calibration"]
+              envFrom:
+                - configMapRef:
+                    name: ida-llm-config
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: ida-llm-db
+                      key: DATABASE_URL
+                - name: MINIO_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ida-llm-secret
+                      key: MINIO_ACCESS_KEY
+                - name: MINIO_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ida-llm-secret
+                      key: MINIO_SECRET_KEY
+                - name: ANTHROPIC_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ida-llm-secret
+                      key: ANTHROPIC_API_KEY
+                - name: OPENAI_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ida-llm-secret
+                      key: OPENAI_API_KEY
+              resources:
+                requests: { cpu: "100m", memory: "256Mi" }
+                limits: { cpu: "1", memory: "1Gi" }
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities: { drop: ["ALL"] }
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}

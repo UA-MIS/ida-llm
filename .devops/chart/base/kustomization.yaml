@@ -1,0 +1,26 @@
+# ida-llm base chart. Each env overlay (.devops/chart/overlays/{dev,staging,prod,
+# preview}) sets the namespace, the image tags (the promotion seam), replica
+# counts, hosts, and the env's ExternalSecrets.
+#
+# Base carries the PROD shape (prod hosts, prod-sized PVC). Every overlay patches
+# down from it rather than up, so a forgotten patch degrades to prod's settings —
+# loud and safe — instead of silently shipping dev's to production.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - serviceaccount.yaml
+  - configmap.yaml
+  - pvc.yaml
+  - statefulset.yaml
+  - deployments.yaml
+  - cronjobs.yaml
+  - services.yaml
+  - ingress.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: ida-llm
+      app.kubernetes.io/managed-by: argocd
+      platform.capstone/team: ida-llm
+    includeSelectors: false

@@ -1,0 +1,51 @@
+# Public Ingress — the frontend ONLY.
+#
+# api, runner, mock-model, redis and object-store never appear here. The api in
+# particular is internal by design: the browser talks to the frontend, and the
+# frontend's server side dials `http://ida-llm-api` in-cluster.
+#
+# ⚠ metadata.name MUST stay `ida-llm`. The platform's `ida-llm-envs`
+# ApplicationSet applies a templatePatch targeting `kind: Ingress, name: ida-llm`
+# to attach the non-prod SSO forwardAuth middleware. Rename this and dev/staging
+# silently lose their auth gate — no error, just an open app.
+#
+# ── HOST DEPTH IS LOAD-BEARING ────────────────────────────────────────────────
+# Public TLS terminates at the Cloudflare edge on a Universal SSL wildcard that
+# covers ONE label: *.capstone.uamishub.com. A two-level host like
+# ida-llm.dev.capstone.uamishub.com would need a paid Cloudflare Advanced
+# Certificate and does NOT resolve to valid public TLS today. That is why the env
+# folds into the SAME label (`ida-llm-dev`), not a new one.
+#
+# ── ⚠ THE MIDDLEWARE ANNOTATION IS PER-INGRESS-OBJECT, NOT PER-RULE ──────────
+# Traefik's `router.middlewares` annotation lives on the Ingress OBJECT. Every
+# host on this Ingress therefore shares one auth posture per environment. That is
+# fine today (one host) and it is the thing to think about when the `agile`
+# component adds its own host — see .devops/README.md, which explains why sharing
+# this object is still the right call for a prod-only component.
+#
+# No ingressClassName (Traefik is the cluster default class) and no tls.secretName
+# / cert-manager annotation (Traefik's default TLSStore serves the platform
+# wildcard on the in-cluster leg; the public cert is Cloudflare's).
+#
+# Base carries the PROD host; each overlay JSON6902-patches in its own.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ida-llm
+  labels:
+    app.kubernetes.io/name: ida-llm
+spec:
+  rules:
+    - host: ida-llm.capstone.uamishub.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ida-llm-frontend
+                port:
+                  name: http
+  tls:
+    - hosts:
+        - ida-llm.capstone.uamishub.com

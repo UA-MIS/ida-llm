@@ -1,0 +1,6 @@
+# actionlint config. The per-team ARC scale set label is not one actionlint knows
+# about, so declare it rather than have every workflow flagged.
+self-hosted-runner:
+  labels:
+    - ida-llm-kaniko
+    - ua-mis-kaniko

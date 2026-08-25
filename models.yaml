@@ -1,0 +1,61 @@
+# models.yaml — THE model registry. Every benchmark result cites a model id from
+# this file plus the git SHA of the file itself, so a result is reproducible
+# without trusting anybody's memory of "which model was that, again".
+#
+# ⚠ SCHEMA-VALIDATED IN CI. tools/validate_tasks.py checks this file on every PR
+# (`ida-validate-tasks`). A malformed entry fails the PR rather than failing a
+# benchmark run three hours in. The schema lives in tasks/SCHEMA.md.
+#
+# NO SECRETS HERE. `api_key_env` names the ENVIRONMENT VARIABLE the runner reads;
+# the value arrives from Vault via ESO at runtime (see .devops/README.md). A key
+# pasted into this file would be committed to a repo the whole team can read.
+#
+# `base_url_env` is the escape hatch that makes CI and PR previews safe: when it
+# is set and that variable is populated, the runner calls THAT endpoint instead of
+# the provider's. CI sets it to the in-repo mock (`ida-mock-model`), which is why
+# no pull request can burn credits or touch campus hardware.
+apiVersion: ida.capstone/v1
+models:
+  - id: mock-echo
+    provider: mock
+    # The in-repo stub. Deterministic, free, offline — the DEFAULT everywhere the
+    # answer does not need to be real (CI, PR previews, local dev).
+    model: mock-echo-v1
+    base_url_env: MOCK_MODEL_BASE_URL
+    api_key_env: MOCK_MODEL_API_KEY
+    max_tokens: 1024
+    temperature: 0.0
+    tags: [mock, ci]
+
+  - id: claude-sonnet
+    provider: anthropic
+    # Pin the dated model id, never a floating alias: a result that says "sonnet"
+    # is not reproducible six months later. Update deliberately, in its own PR.
+    model: claude-sonnet-4-5-20250929
+    api_key_env: ANTHROPIC_API_KEY
+    max_tokens: 4096
+    temperature: 0.0
+    tags: [cloud, frontier]
+
+  - id: gpt-4o
+    provider: openai
+    model: gpt-4o-2024-11-20
+    api_key_env: OPENAI_API_KEY
+    max_tokens: 4096
+    temperature: 0.0
+    tags: [cloud, frontier]
+
+  # Campus-hosted vLLM ("Sparks"). PRESENT BUT NOT REACHABLE YET — deliberately.
+  # The cluster egress policy does not open a route to it (deferred by owner
+  # decision; platform-infra/platform-services/ida-llm-egress/netpol.yaml carries
+  # the exact one-block change and the traps). Until SPARKS_BASE_URL is populated
+  # AND that egress block is added, selecting this model fails fast with a clear
+  # error rather than hanging on a dropped connection.
+  - id: sparks-local
+    provider: openai-compatible
+    model: PLACEHOLDER-set-when-sparks-is-reachable
+    base_url_env: SPARKS_BASE_URL
+    api_key_env: SPARKS_API_KEY
+    max_tokens: 4096
+    temperature: 0.0
+    tags: [local, sparks, deferred]

@@ -1,0 +1,219 @@
+# ci.yml — PULL REQUESTS ONLY. Pushes to main and vX.Y.Z tags are handled by
+# build-and-push.yaml, whose `checks` jobs run this same suite as the gate in
+# front of the image build; triggering here on push too would run everything
+# twice for every merge.
+#
+# FIVE independent gates, deliberately parallel so one slow leg does not hide the
+# others' results:
+#
+#   python        ruff + pytest over packages/ and services/
+#   frontend      lint + typecheck + build
+#   task-schema   schema-validate tasks/** and models.yaml  (a malformed rubric
+#                 fails the PR, not a benchmark run three hours in)
+#   migrations    alembic upgrade head against a THROWAWAY Postgres, then
+#                 downgrade back -- catches a migration that only works forward
+#   chart         render all four overlays and assert the deploy invariants
+#
+# ── NO REAL MODEL IS EVER CALLED HERE ────────────────────────────────────────
+# CI gets MOCK KEYS ONLY. MOCK_MODEL_BASE_URL points at the in-repo stub and the
+# provider key variables are set to obviously-fake literals, so a test that
+# accidentally reaches for a live provider fails with an auth error instead of
+# quietly spending money. No pull request can burn credits or touch campus
+# hardware -- that is a property of this file AND of the preview overlay, not of
+# anyone remembering.
+#
+# RUNNER: the per-team ARC scale set created by the CapstoneTenant Composition
+# (the Helm releaseName IS the runs-on label). Falls back to the org-wide pool.
+#
+# CONTAINER-MODE REQUIREMENT: the ARC scale set is containerMode:kubernetes --
+# every job MUST declare a `container:` or the runner hard-fails at "Set up job"
+# ("Jobs without a job container are forbidden on this runner").
+name: ci
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    container:
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
+    env:
+      # Obviously-fake. A test that reaches a real provider fails on auth rather
+      # than succeeding and billing someone.
+      ANTHROPIC_API_KEY: ci-mock-not-a-real-key
+      OPENAI_API_KEY: ci-mock-not-a-real-key
+      SPARKS_API_KEY: ci-mock-not-a-real-key
+      MOCK_MODEL_BASE_URL: http://127.0.0.1:8099
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install the workspace (editable) + dev tooling
+        run: |
+          set -eu
+          python -m pip install --upgrade pip
+          # Same four distributions, same order, as Dockerfile.python -- so a
+          # dependency problem surfaces here rather than at image build.
+          pip install -e packages/core -e packages/harness -e services/api -e services/runner
+          pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check packages services tools
+
+      - name: Format check (ruff)
+        run: ruff format --check packages services tools
+
+      - name: Test (pytest)
+        run: pytest
+
+  frontend:
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    container:
+      # ⚠ 24.16 PINNED. Node 24.17 shipped a keepAlive regression that broke
+      # in-cluster loopback HTTP on this platform. Keep this in lockstep with
+      # frontend/Dockerfile's NODE_IMAGE.
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie-slim
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install
+        # `npm ci` when a lockfile exists (reproducible); `npm install` on the
+        # very first push, before one has been committed. Remove the fallback
+        # once package-lock.json is in git -- an unlocked install in CI is a
+        # different dependency tree than the image builds.
+        run: |
+          set -eu
+          if [ -f package-lock.json ]; then npm ci --no-audit --no-fund
+          else echo "::warning::no package-lock.json yet -- using npm install"; npm install --no-audit --no-fund; fi
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+  task-schema:
+    # THE data gate. tasks/** and models.yaml are versioned DATA: every benchmark
+    # result cites the git SHA of the task that produced it, and that citation is
+    # worthless if the file was malformed. Cheap, fast, and it fails the PR.
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    container:
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install PyYAML
+        run: pip install --upgrade pip && pip install pyyaml==6.0.2
+
+      - name: Validate tasks/** and models.yaml
+        run: python tools/validate_tasks.py
+
+  migrations:
+    # Alembic against a THROWAWAY Postgres 17 -- the same major version the
+    # platform's tenant DB tier runs, so a dialect incompatibility is caught here
+    # instead of at first ArgoCD sync.
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    container:
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
+    services:
+      postgres:
+        image: harbor.capstone.uamishub.com/dockerhub-proxy/library/postgres:17-alpine
+        env:
+          POSTGRES_USER: ida
+          POSTGRES_PASSWORD: ci-throwaway
+          POSTGRES_DB: ida_llm_ci
+        options: >-
+          --health-cmd "pg_isready -U ida"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      # Service containers are siblings on the same network and reachable by
+      # their service label as hostname.
+      DATABASE_URL: postgresql://ida:ci-throwaway@postgres:5432/ida_llm_ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install
+        run: |
+          set -eu
+          python -m pip install --upgrade pip
+          pip install -e packages/core
+          pip install alembic==1.16.5 "psycopg[binary]==3.2.10"
+
+      - name: Upgrade to head
+        run: alembic upgrade head
+
+      - name: Verify the schema is actually there
+        run: |
+          set -eu
+          python - <<'PY'
+          import os
+          import psycopg
+          with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+              rows = conn.execute(
+                  "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
+              ).fetchall()
+          names = {r[0] for r in rows}
+          missing = {"runs", "results"} - names
+          assert not missing, f"missing tables after upgrade: {missing} (present: {names})"
+          print("schema OK:", sorted(names))
+          PY
+
+      - name: Downgrade to base, then back up
+        # A migration that only works FORWARD is a migration you cannot roll back
+        # at 2am. Exercising the round trip in CI is the cheapest possible time to
+        # find out.
+        run: |
+          set -eu
+          alembic downgrade base
+          alembic upgrade head
+
+  chart:
+    # Renders all four overlays and asserts the deploy invariants a JSON6902
+    # patch can silently break -- pod budget vs quota WITH rollout surge, TLS
+    # hosts matching rule hosts, and the mock-model safety switch being ON in
+    # dev/preview and OFF in staging/prod.
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    container:
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install kubectl (for `kubectl kustomize`) + PyYAML
+        run: |
+          set -eu
+          apt-get update && apt-get install --no-install-recommends -y curl ca-certificates
+          KUBECTL_VERSION=v1.31.1
+          curl -fsSLo /usr/local/bin/kubectl \
+            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          chmod +x /usr/local/bin/kubectl
+          pip install --upgrade pip && pip install pyyaml==6.0.2
+
+      - name: Render every overlay and assert the invariants
+        run: bash .devops/ci/chart-render.test.sh
+
+      - name: Unit-test the CI seam scripts
+        run: |
+          set -eu
+          for suite in resolve-image resolve-components bump-image promote seed-initial-envs; do
+            echo "::group::${suite}"
+            bash ".devops/ci/${suite}.test.sh"
+            echo "::endgroup::"
+          done

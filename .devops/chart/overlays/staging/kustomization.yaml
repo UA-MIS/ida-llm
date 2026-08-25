@@ -1,0 +1,70 @@
+# staging overlay — the rehearsal for prod, so it uses REAL models.
+#
+# That is the deliberate difference from dev: dev's default is the mock (free,
+# offline), staging's is the real provider. A staging that mocked its models
+# would prove the deploy path and nothing about the thing the app exists to do,
+# and the first real inference call would then happen in production.
+#
+# Written by the promotion seam: a `vX.Y.Z` tag build points BOTH images here at
+# the same immutable tag. Nothing else writes this file.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ida-llm-staging
+
+resources:
+  - ../../base
+  - app-secret.externalsecret.yaml
+  - database.externalsecret.yaml
+
+labels:
+  - pairs:
+      platform.capstone/env: staging
+      platform.capstone/semester: "2026-fall"
+    includeSelectors: false
+
+images:
+  - name: ida-llm-frontend
+    newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-frontend
+    newTag: "v0.0.0"
+  - name: ida-llm-python-app
+    newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-python-app
+    newTag: "v0.0.0"
+
+patches:
+  - target: { kind: Deployment, name: ida-llm-frontend }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target: { kind: Deployment, name: ida-llm-api }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  # Two runners, not prod's four: enough to exercise real concurrency (two
+  # workers CAN race the same queue item, which one cannot) without doubling the
+  # provider spend of every rehearsal.
+  - target: { kind: Deployment, name: ida-llm-runner }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+  # mock-model stays at base's replicas: 0 and MOCK_MODEL_BASE_URL stays "" —
+  # staging deliberately inherits prod's behaviour here. Not patched, on purpose:
+  # an explicit no-op patch would invite someone to "fix" it to match dev.
+  - target: { kind: Ingress, name: ida-llm }
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: ida-llm-staging.capstone.uamishub.com
+      - op: replace
+        path: /spec/tls/0/hosts
+        value:
+          - ida-llm-staging.capstone.uamishub.com
+  # Same 5Gi total storage quota as dev.
+  - target: { kind: PersistentVolumeClaim, name: ida-llm-object-store }
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 2Gi

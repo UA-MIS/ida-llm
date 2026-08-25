@@ -1,0 +1,52 @@
+# Shared NON-SECRET runtime config. Every workload does
+# `envFrom: configMapRef: ida-llm-config` and ignores the keys it doesn't use —
+# simpler than six near-identical ConfigMaps. Secrets never appear here; they
+# arrive via ESO (see the overlays' ExternalSecrets).
+#
+# In-cluster service DNS: short Service names resolve within the namespace, so
+# `ida-llm-api` etc. need no FQDN.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ida-llm-config
+data:
+  LOG_LEVEL: "info"
+
+  # Every listener must bind 0.0.0.0, NOT the app defaults (127.0.0.1) — a
+  # loopback bind is invisible to both kube-proxy and the kubelet's probes.
+  HOST: "0.0.0.0"
+
+  # --- datastores (in-namespace) ---
+  REDIS_URL: "redis://ida-llm-redis:6379/0"
+
+  # --- object store (in-namespace MinIO on a PVC) ---
+  MINIO_ENDPOINT: "ida-llm-object-store"
+  MINIO_PORT: "9000"
+  MINIO_USE_SSL: "false"
+  MINIO_BUCKET: "run-artifacts"
+
+  # --- service-to-service ---
+  API_URL: "http://ida-llm-api"
+
+  # ── THE CREDIT/HARDWARE SAFETY SWITCH ───────────────────────────────────────
+  # MOCK_MODEL_BASE_URL points the harness at the in-namespace deterministic stub
+  # instead of a paid provider. Base carries the PROD value, which is EMPTY — prod
+  # is the one environment that must use real models. The dev and preview overlays
+  # patch it to the mock Service.
+  #
+  # Set here rather than only in CI on purpose: "no PR burns credits" is a
+  # property of the DEPLOYED environment as much as of the pipeline, and a rule
+  # that lives in one workflow file is a rule somebody's next workflow forgets.
+  MOCK_MODEL_BASE_URL: ""
+
+  # ── SPARKS: WIRED, UNSET, AND THAT IS THE CURRENT DESIGN ────────────────────
+  # The campus-hosted vLLM endpoint. Deliberately empty: the cluster's egress
+  # policy opens :443 to the internet but NOT a route to Sparks (deferred by owner
+  # decision — platform-infra/platform-services/ida-llm-egress/netpol.yaml carries
+  # the exact one-block change and the three traps).
+  #
+  # Leaving the key PRESENT and empty rather than absent is the point: the
+  # `sparks-local` model in models.yaml then fails fast with a clear message
+  # instead of hanging until a connection times out, and turning Sparks on later
+  # is a value change here plus that one netpol block — no manifest surgery.
+  SPARKS_BASE_URL: ""

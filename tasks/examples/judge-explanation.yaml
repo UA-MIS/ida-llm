@@ -1,0 +1,26 @@
+# EXAMPLE of the `judge` rubric — the one rubric kind with no single reference
+# answer, and therefore the one whose `judge_model` reference the validator has to
+# check against models.yaml. If someone renames a model id in models.yaml and
+# forgets this file, CI fails the PR instead of a benchmark run failing at 3am
+# after an hour of paid inference.
+apiVersion: ida.capstone/v1
+kind: Task
+id: judge-explanation
+version: 1
+title: Explain why the sky appears blue
+category: examples
+prompt: |
+  In two or three sentences, explain why the sky appears blue to an observer on
+  the ground during the day.
+rubric:
+  kind: judge
+  # Must resolve to an `id` in models.yaml. `mock-echo` keeps this task runnable
+  # offline and in CI; point it at a real judge model when the suite goes live.
+  judge_model: mock-echo
+  criteria:
+    - Mentions scattering of light by the atmosphere
+    - Explains that shorter (blue) wavelengths scatter more than longer ones
+    - Does not assert that the sky is blue because it reflects the ocean
+# No `gold` — a judge rubric has no single reference answer. The validator
+# enforces that distinction in both directions.
+tags: [example, judge]

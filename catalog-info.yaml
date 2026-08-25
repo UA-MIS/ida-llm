@@ -1,0 +1,27 @@
+# Backstage catalog entry. The platform's GitHub discovery ingests repos carrying
+# the `capstone-tenant` topic; this file is what makes the entry meaningful rather
+# than a bare repo name.
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ida-llm
+  title: IDA-LLM
+  description: LLM benchmark harness and results platform.
+  annotations:
+    github.com/project-slug: UA-MIS/ida-llm
+    argocd/app-name: ida-llm-dev
+  tags:
+    - python
+    - typescript
+    - llm
+    - benchmark
+  links:
+    - url: https://ida-llm.capstone.uamishub.com
+      title: Production
+    - url: https://ida-llm-dev.capstone.uamishub.com
+      title: Dev
+spec:
+  type: service
+  lifecycle: experimental
+  owner: group:default/ida-llm
+  system: capstone-2026-fall

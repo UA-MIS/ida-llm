@@ -1,0 +1,89 @@
+# dev overlay. This is the file the promotion seam WRITES: bump-image.sh and
+# promote.sh rewrite every `images[].newTag` below in one pass, so both
+# components always move together. promote.sh refuses outright if they ever
+# disagree, which is what makes "promote what is running in staging" atomic.
+#
+# newTag starts at the v0.0.0 SENTINEL. No build ever produces v0.0.0 — it marks
+# "never deployed". seed-initial-envs.sh replaces it on the FIRST main build so
+# staging and prod come up green out of the box, then becomes a permanent no-op,
+# leaving them promotion-gated from that point on.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ida-llm-dev
+
+resources:
+  - ../../base
+  - app-secret.externalsecret.yaml
+  - database.externalsecret.yaml
+
+labels:
+  - pairs:
+      platform.capstone/env: dev
+      platform.capstone/semester: "2026-fall"
+    includeSelectors: false
+
+images:
+  - name: ida-llm-frontend
+    newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-frontend
+    newTag: "v0.0.0"
+  - name: ida-llm-python-app
+    newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-python-app
+    newTag: "v0.0.0"
+
+patches:
+  # Replicas are JSON6902 patches, NOT the kustomize builtin `replicas:`
+  # transformer — the builtin errors on non-Deployment workload GVKs, and this
+  # chart contains a StatefulSet and (later) possibly a Rollout.
+  - target: { kind: Deployment, name: ida-llm-frontend }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target: { kind: Deployment, name: ida-llm-api }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target: { kind: Deployment, name: ida-llm-runner }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  # ── THE SAFETY SWITCH, ON ────────────────────────────────────────────────
+  # dev runs the mock model endpoint and POINTS AT IT. Real provider keys still
+  # exist in dev's Vault path, so a developer can deliberately switch a run to a
+  # cloud model — but the DEFAULT costs nothing and touches no campus hardware.
+  # Both halves are required: scaling the pod up without setting the URL leaves
+  # the mock idle, and setting the URL without the pod gives connection refused.
+  - target: { kind: Deployment, name: ida-llm-mock-model }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target: { kind: ConfigMap, name: ida-llm-config }
+    patch: |-
+      - op: replace
+        path: /data/MOCK_MODEL_BASE_URL
+        value: http://ida-llm-mock-model
+  # Public host for this env. Single-label under capstone.uamishub.com — the
+  # Cloudflare Universal SSL wildcard covers exactly one level (see
+  # base/ingress.yaml). Both the rule AND the tls.hosts list must be patched or
+  # the cert/SNI and the router disagree.
+  - target: { kind: Ingress, name: ida-llm }
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: ida-llm-dev.capstone.uamishub.com
+      - op: replace
+        path: /spec/tls/0/hosts
+        value:
+          - ida-llm-dev.capstone.uamishub.com
+  # dev's `requests.storage` quota is 5Gi TOTAL and the redis volumeClaimTemplate
+  # already takes 1Gi of it, so the prod-sized 10Gi claim in base would leave
+  # redis unable to bind — with the confusing symptom being redis, not this.
+  - target: { kind: PersistentVolumeClaim, name: ida-llm-object-store }
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 2Gi

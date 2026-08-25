@@ -1,0 +1,22 @@
+# A deliberately trivial EXAMPLE task. It exists so that the validator, the
+# harness and the CI schema gate all have something real to operate on from the
+# first commit — an empty tasks/ directory would let the gate pass vacuously,
+# which is the failure mode where a "green" check proves nothing.
+#
+# Replace or delete once real tasks land; keep at least one valid task so the
+# gate keeps meaning something.
+apiVersion: ida.capstone/v1
+kind: Task
+id: sum-two-numbers
+version: 1
+title: Sum two small integers
+category: examples
+prompt: |
+  What is 17 + 25? Reply with the number only.
+rubric:
+  kind: numeric
+  # Tolerance 0 — this is arithmetic, not estimation. A non-zero tolerance on an
+  # exact-answer task is the classic way a rubric silently stops discriminating.
+  tolerance: 0
+gold: 42
+tags: [example, arithmetic]

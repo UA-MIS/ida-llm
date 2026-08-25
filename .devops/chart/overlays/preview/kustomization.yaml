@@ -1,0 +1,114 @@
+# preview overlay — ephemeral per-PR environment.
+#
+# ⚠ CURRENTLY DORMANT, AND THAT IS A PLATFORM LIMIT, NOT AN OMISSION HERE.
+# The tenant claim carries `previewEnabled: false` because the platform cannot
+# fence a preview namespace yet: `<team>-pr-<n>` namespaces get no quota,
+# LimitRange or NetworkPolicy from the Composition (so a preview would have MORE
+# network reach than prod), the Vault AuthBackendRole binds the literal
+# `ida-llm-preview` rather than `ida-llm-pr-<n>` so ESO 403s, and `harbor-pull` is
+# explicitly not rendered for preview so every pod ImagePullBackOffs.
+#
+# This overlay is COMPLETE and render-tested anyway (chart-render.test.sh covers
+# it) so that closing those platform gaps is a ONE-FIELD FLIP on the claim with
+# ZERO changes in this repo. Do not delete it as dead code — it is the half of
+# the contract this repo owns, already done.
+#
+# ⚠ THE `namespace:` BELOW IS A STAND-IN. The preview ApplicationSet overrides it
+# per PR via `kustomize.namespace: ida-llm-pr-<n>`. The literal value here only
+# makes the overlay renderable standalone (which is what lets CI test it).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ida-llm-pr-1
+
+resources:
+  - ../../base
+  # ⚠ preview ships its OWN SecretStore + eso-tenant SA — unlike dev/staging/prod,
+  # where the Composition creates them. It has to: a per-PR namespace is created
+  # by ArgoCD, not by Crossplane, so nothing else puts them there. (This is also
+  # exactly why preview is blocked today: the SA exists but the Vault role does
+  # not bind its namespace.)
+  - secretstore.yaml
+  - app-secret.externalsecret.yaml
+  - database.externalsecret.yaml
+
+labels:
+  - pairs:
+      platform.capstone/env: preview
+      platform.capstone/semester: "2026-fall"
+    includeSelectors: false
+
+# Preview tracks the PR head build: promotion.yaml maps preview → pull-<sha>, and
+# the preview ApplicationSet sets each component's tag at sync time.
+images:
+  - name: ida-llm-frontend
+    newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-frontend
+    newTag: preview
+  - name: ida-llm-python-app
+    newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-python-app
+    newTag: preview
+
+patches:
+  # Smallest possible footprint — one of everything.
+  - target: { kind: Deployment, name: ida-llm-frontend }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target: { kind: Deployment, name: ida-llm-api }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target: { kind: Deployment, name: ida-llm-runner }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  # ── THE SAFETY SWITCH, ON — NON-NEGOTIABLE FOR PREVIEWS ──────────────────
+  # A preview runs UNTRUSTED PR code. It must never be able to spend provider
+  # credits or reach campus hardware, so the mock is up and it is the target.
+  - target: { kind: Deployment, name: ida-llm-mock-model }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target: { kind: ConfigMap, name: ida-llm-config }
+    patch: |-
+      - op: replace
+        path: /data/MOCK_MODEL_BASE_URL
+        value: http://ida-llm-mock-model
+  # ⚠ THE NIGHTLY SWEEPS ARE SUSPENDED IN PREVIEWS. Left running, every open PR
+  # would fire three benchmark sweeps a night, against a namespace with no quota.
+  # This is the single most expensive thing a preview could do by accident.
+  - target: { kind: CronJob, name: ida-llm-rebenchmark }
+    patch: |-
+      - op: add
+        path: /spec/suspend
+        value: true
+  - target: { kind: CronJob, name: ida-llm-model-sweep }
+    patch: |-
+      - op: add
+        path: /spec/suspend
+        value: true
+  - target: { kind: CronJob, name: ida-llm-judge-calibration }
+    patch: |-
+      - op: add
+        path: /spec/suspend
+        value: true
+  # Preview host carries the PR number; the ApplicationSet substitutes <n>.
+  - target: { kind: Ingress, name: ida-llm }
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: ida-llm-pr-1.capstone.uamishub.com
+      - op: replace
+        path: /spec/tls/0/hosts
+        value:
+          - ida-llm-pr-1.capstone.uamishub.com
+  # Tiny volumes — a preview stores nothing worth keeping.
+  - target: { kind: PersistentVolumeClaim, name: ida-llm-object-store }
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: 1Gi

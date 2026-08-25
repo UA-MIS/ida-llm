@@ -1,0 +1,39 @@
+# Root tooling config ONLY. The four installable distributions live under
+# packages/ and services/ and each carry their own pyproject.toml; this file
+# configures ruff + pytest once for all of them so a contributor runs one command
+# at the repo root and gets the same result CI gets.
+#
+# Deliberately NOT a workspace/monorepo build backend. `pip install -e` over the
+# four paths is boring, needs no extra resolver in the CI container, and is
+# exactly what the Dockerfile does -- so local, CI and image builds agree.
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = [
+  "packages/core/src",
+  "packages/harness/src",
+  "services/api/src",
+  "services/runner/src",
+  "tools",
+]
+
+[tool.ruff.lint]
+# E/F pycodestyle+pyflakes, I import sorting, UP pyupgrade, B bugbear,
+# S bandit-style security. S is the one worth keeping loud in a repo that handles
+# API keys.
+select = ["E", "F", "I", "UP", "B", "S"]
+ignore = [
+  "E501",  # line length is formatter territory; ruff-format handles it
+]
+
+[tool.ruff.lint.per-file-ignores]
+# assert is the entire point of a test file.
+"**/tests/**" = ["S101"]
+"**/test_*.py" = ["S101"]
+
+[tool.pytest.ini_options]
+# `-q` keeps CI logs readable; `--strict-markers` turns a typo'd marker into an
+# error instead of a silently-skipped test.
+addopts = "-q --strict-markers"
+testpaths = ["packages", "services", "tools"]
+pythonpath = ["tools"]

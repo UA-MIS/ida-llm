@@ -1,0 +1,117 @@
+# FIVE Services. The tenant ResourceQuota caps `services` at 15, so there is real
+# headroom — the topology below is chosen on the merits, not squeezed to fit.
+#
+#   1 frontend      Ingress backend (the ONLY public one)
+#   2 api           dialled by the frontend's server side; NO public Ingress
+#   3 mock-model    dialled by runners in dev/preview (the safety switch)
+#   4 redis         HEADLESS — required by the StatefulSet, gives stable DNS
+#   5 object-store  MinIO S3 endpoint
+#
+# `runner` has NO Service: it is a queue consumer with no listener. Giving it one
+# would advertise reachability that does not exist.
+#
+# The app Services expose :80 → the container's `http` port, so every consumer URL
+# is a bare `http://ida-llm-<component>` with no port. redis and object-store are
+# the exceptions: their ports are protocol-specific.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ida-llm-frontend
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: frontend
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+# api is CLUSTER-INTERNAL. It never appears in ingress.yaml — the browser talks to
+# the frontend, and the frontend's server side talks to this. That boundary is the
+# reason the api needs no public auth story of its own.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ida-llm-api
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: api
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+# The mock model endpoint. Its Service exists in EVERY env even though the
+# Deployment is scaled to 0 in staging/prod — a Service with no endpoints is
+# harmless, and keeping it means enabling the mock for a debugging session is a
+# replica bump rather than a chart edit.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ida-llm-mock-model
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: mock-model
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: mock-model
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+# ⚠ HEADLESS (clusterIP: None) — this is REQUIRED, not a preference. A
+# StatefulSet's `serviceName` must reference a headless Service; that is what
+# gives each ordinal its stable DNS name. Setting a ClusterIP here would load
+# balance across replicas and silently break the identity guarantee the
+# StatefulSet exists to provide.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ida-llm-redis
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: redis
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ida-llm-object-store
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: object-store
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: object-store
+  ports:
+    - name: s3
+      port: 9000
+      targetPort: s3
+      protocol: TCP

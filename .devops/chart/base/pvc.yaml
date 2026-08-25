@@ -1,0 +1,45 @@
+# Durable object storage for run artifacts — transcripts, judge outputs, eval logs.
+#
+# ── WHY A TENANT-OWNED MinIO AND NOT THE PLATFORM ONE ────────────────────────
+# The platform `minio` namespace holds Velero backups of EVERY namespace's
+# Secrets; its own netpol header calls it the "crown jewels". Routing tenant
+# application traffic into the DR tier would couple this app to the backup
+# substrate and widen the blast radius of the most sensitive store on the
+# cluster. Rejected on the merits, not on cost. (Same conclusion crimson-copies
+# reached; this is that precedent copied deliberately, not re-litigated.)
+#
+# ── WHY A PVC AND NOT A StatefulSet ──────────────────────────────────────────
+# Note this differs from redis next door, which IS a StatefulSet — the two are
+# not inconsistent. Redis needs a STABLE IDENTITY (a fixed DNS name and an
+# ordinal that survives rescheduling) because it is a queue broker workers dial
+# by name. MinIO here is a single replica reached through a Service; it needs
+# durable storage and nothing else. A Deployment + explicit PVC is the smaller
+# object that expresses exactly that.
+#
+# ── SIZING ───────────────────────────────────────────────────────────────────
+# Base carries the PROD size (10Gi against prod's 20Gi requests.storage quota,
+# leaving room for redis's claim and half the budget free). The dev/staging/
+# preview overlays patch this DOWN — dev's whole storage quota is 5Gi, so a
+# prod-sized claim there would consume the environment's entire budget and the
+# redis PVC would then fail to bind, with the confusing symptom being redis
+# rather than this.
+#
+# ⚠ A PVC IS AVAILABILITY, NOT BACKUP. ceph-block is CSI-snapshot capable and
+# Velero is deployed, so adding this to a Velero schedule is a small follow-up —
+# flagged, not v1. What IS v1 is a retention policy on run artifacts: transcripts
+# accumulate every night the CronJobs fire, so an unbounded bucket will hit the
+# quota eventually. Bound it before it bites.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ida-llm-object-store
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: object-store
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ceph-block
+  resources:
+    requests:
+      storage: 10Gi
