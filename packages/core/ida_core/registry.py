@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from ida_core.contracts import ModelEntry, ModelRegistry
 from ida_core.validation import load_yaml, validate_models_document
@@ -75,8 +76,33 @@ def resolve_api_key(entry: ModelEntry, env: dict[str, str] | None = None) -> str
     return value
 
 
+def _as_openai_base(url: str) -> str:
+    """Ensure an ORIGIN becomes an OpenAI-compatible BASE.
+
+    THE TWO CONVENTIONS DO NOT MATCH, AND NEITHER SIDE IS WRONG.
+
+    * ``models.yaml`` writes a full OpenAI base, ``/v1`` included -- that is what
+      the client appends ``/chat/completions`` to, and what every provider's docs
+      hand you.
+    * The platform writes a bare SERVICE ORIGIN. The ConfigMap's
+      ``MOCK_MODEL_BASE_URL`` is ``http://ida-llm-mock-model`` in dev and preview,
+      and CI sets ``http://127.0.0.1:8099``. Those are k8s Service addresses, not
+      API bases -- and ``.devops/ci/chart-render.test.sh`` asserts that EXACT
+      string, so the chart is not the thing that changes here, and should not be:
+      an origin is the right shape for a value the platform owns.
+
+    Reconciled at the boundary rather than in either contract: a resolved URL with
+    no path (or just ``/``) gains ``/v1``; anything carrying a real path is left
+    alone. Without this the harness requests ``/chat/completions`` at the Service
+    ROOT and gets 404 on every call -- reported as "mock returned HTTP 404", which
+    points nowhere near the ConfigMap that caused it.
+    """
+    trimmed = url.rstrip("/")
+    return trimmed if urlsplit(trimmed).path else f"{trimmed}/v1"
+
+
 def resolve_base_url(entry: ModelEntry, env: dict[str, str] | None = None) -> str:
-    """Return the endpoint for ``entry``.
+    """Return the endpoint for ``entry``, as an OpenAI-compatible base.
 
     Resolution order, and each step is deliberate:
 
@@ -87,15 +113,18 @@ def resolve_base_url(entry: ModelEntry, env: dict[str, str] | None = None) -> st
     2. ``base_url``, the committed literal -- correct for docker-compose.
     3. :class:`MissingBaseUrlError`, naming the variable.
 
+    Whichever wins is normalised by :func:`_as_openai_base`, because the platform
+    supplies origins while this codebase speaks in ``/v1`` bases.
+
     Mirrors :func:`resolve_api_key` exactly, including raising at use time.
     """
     environ = os.environ if env is None else env
     if entry.base_url_env:
         value = (environ.get(entry.base_url_env) or "").strip()
         if value:
-            return value
+            return _as_openai_base(value)
     if entry.base_url:
-        return entry.base_url
+        return _as_openai_base(entry.base_url)
     raise MissingBaseUrlError(
         f"model {entry.key!r} has no base_url and env var {entry.base_url_env!r} is unset or empty"
     )

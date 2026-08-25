@@ -194,8 +194,8 @@ class TestResolveBaseUrl:
 
     def test_the_variable_wins_when_set(self) -> None:
         entry = self._entry(base_url_env="MOCK_MODEL_BASE_URL")
-        resolved = resolve_base_url(entry, env={"MOCK_MODEL_BASE_URL": "http://in-cluster"})
-        assert resolved == "http://in-cluster"
+        resolved = resolve_base_url(entry, env={"MOCK_MODEL_BASE_URL": "http://in-cluster/v1"})
+        assert resolved == "http://in-cluster/v1"
 
     def test_an_empty_variable_falls_back_to_the_literal(self) -> None:
         """THE safety switch, in the shape the overlays actually use.
@@ -247,3 +247,65 @@ class TestResolveBaseUrl:
         assert sparks.enabled is False
         assert sparks.base_url_env == "SPARKS_BASE_URL"
         assert sparks.base_url == "", "no fallback: fail loudly rather than guess"
+
+
+class TestOpenAIBaseNormalisation:
+    """The platform writes ORIGINS; this codebase speaks in `/v1` BASES.
+
+    `MOCK_MODEL_BASE_URL` is `http://ida-llm-mock-model` in the dev and preview
+    overlays and `http://127.0.0.1:8099` in CI -- k8s Service addresses, not API
+    bases. `.devops/ci/chart-render.test.sh` asserts those exact strings, so the
+    reconciliation belongs in the app, at the boundary.
+
+    Without it the harness requests `/chat/completions` at the Service ROOT and
+    gets 404 on every single call, reported as "mock returned HTTP 404" -- a
+    message that points nowhere near the ConfigMap that caused it. That is
+    precisely how this was found: it passed locally (where compose supplies a
+    `/v1` literal) and failed in CI.
+    """
+
+    @staticmethod
+    def _entry(**overrides) -> ModelEntry:
+        base = {
+            "key": "probe",
+            "display_name": "Probe",
+            "base_url": "http://literal:8000/v1",
+            "serving": {"model_id": "m", "serving_stack": "mock"},
+        }
+        base.update(overrides)
+        return ModelEntry.model_validate(base)
+
+    @pytest.mark.parametrize(
+        ("supplied", "expected"),
+        [
+            # what the dev/preview overlays actually set
+            ("http://ida-llm-mock-model", "http://ida-llm-mock-model/v1"),
+            # what both workflows actually set
+            ("http://127.0.0.1:8099", "http://127.0.0.1:8099/v1"),
+            # a trailing slash is still an origin
+            ("http://ida-llm-mock-model/", "http://ida-llm-mock-model/v1"),
+            # already a base: left ALONE, not doubled
+            ("http://mock-model:8000/v1", "http://mock-model:8000/v1"),
+            ("https://api.anthropic.com/v1", "https://api.anthropic.com/v1"),
+            # a non-/v1 path is somebody's deliberate mount point; do not touch it
+            ("http://gw.internal/llm/openai", "http://gw.internal/llm/openai"),
+        ],
+    )
+    def test_origins_gain_v1_and_bases_are_untouched(self, supplied: str, expected: str) -> None:
+        entry = self._entry(base_url_env="MOCK_MODEL_BASE_URL")
+        assert resolve_base_url(entry, env={"MOCK_MODEL_BASE_URL": supplied}) == expected
+
+    def test_the_literal_is_normalised_too(self) -> None:
+        """Same rule both sides of the switch -- a difference here would mean dev
+        and local dev hit different paths, which is the whole class of bug this
+        function exists to close."""
+        entry = self._entry(base_url="http://mock-model:8000")
+        assert resolve_base_url(entry, env={}) == "http://mock-model:8000/v1"
+
+    def test_the_ci_environment_resolves_to_a_working_base(self) -> None:
+        """A regression guard on the EXACT value both workflows set."""
+        registry = load_registry(repo_root() / "models.yaml")
+        resolved = resolve_base_url(
+            registry.get("mock"), env={"MOCK_MODEL_BASE_URL": "http://127.0.0.1:8099"}
+        )
+        assert resolved.endswith("/v1"), resolved
