@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { config } from '@/lib/env';
 import { SESSION_COOKIE, unsealSession, type SessionPayload } from './session';
-import { isStillOnTeam } from './revalidate';
+import { sessionStillValid } from './revalidate';
 
 /**
  * Reads the current session, or null. Never throws for an anonymous visitor.
@@ -21,7 +21,7 @@ export async function requireSession(returnTo = '/'): Promise<SessionPayload> {
   if (!session) {
     redirect(`/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
-  if (!(await isStillOnTeam(session.login, session.token))) {
+  if (!(await sessionStillValid(session))) {
     redirect(`/denied?reason=not-a-member&login=${encodeURIComponent(session.login)}`);
   }
   return session;
@@ -44,7 +44,7 @@ export async function requireApiSession(): Promise<
       ),
     };
   }
-  if (!(await isStillOnTeam(session.login, session.token))) {
+  if (!(await sessionStillValid(session))) {
     return {
       ok: false,
       response: Response.json(

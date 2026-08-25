@@ -54,7 +54,13 @@ export interface WorkItemRow {
   branch_name: string | null;
   branch_repo: string | null;
   branch_url: string | null;
+  branch_created_at: Date | string | null;
   last_activity_at: Date | string | null;
+  repo_full_name: string | null;
+  wave: string | null;
+  merged_pr_count: number | string | null;
+  dep_override_by: string | null;
+  dep_override_reason: string | null;
 }
 
 export function mapWorkItem(row: WorkItemRow): WorkItem {
@@ -85,7 +91,13 @@ export function mapWorkItem(row: WorkItemRow): WorkItem {
     branchName: row.branch_name,
     branchRepo: row.branch_repo,
     branchUrl: row.branch_url,
+    branchCreatedAt: toIsoOrNull(row.branch_created_at),
     lastActivityAt: toIso(row.last_activity_at ?? row.updated_at),
+    repoFullName: row.repo_full_name,
+    wave: row.wave,
+    mergedPrCount: Number(row.merged_pr_count ?? 0),
+    depOverrideBy: row.dep_override_by,
+    depOverrideReason: row.dep_override_reason,
   };
 }
 
@@ -181,6 +193,8 @@ export interface SprintRow {
   goal: string;
   starts_on: Date | string;
   ends_on: Date | string;
+  position: number;
+  item_count?: number | string | null;
 }
 
 export function mapSprint(row: SprintRow): Sprint {
@@ -190,6 +204,10 @@ export function mapSprint(row: SprintRow): Sprint {
     goal: row.goal,
     startsOn: toDateString(row.starts_on),
     endsOn: toDateString(row.ends_on),
+    position: Number(row.position ?? 0),
+    ...(row.item_count !== undefined && row.item_count !== null
+      ? { itemCount: Number(row.item_count) }
+      : {}),
   };
 }
 

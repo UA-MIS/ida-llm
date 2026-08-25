@@ -32,8 +32,15 @@ export interface SessionPayload {
   login: string;
   name: string;
   avatarUrl: string;
-  /** GitHub OAuth access token, used for member/PR lookups on the user's behalf. */
+  /**
+   * Upstream GitHub token, when the provider supplies one. Empty for OIDC,
+   * where the board never receives a GitHub credential.
+   */
   token: string;
+  /** Groups asserted at sign-in, e.g. ["UA-MIS:ida-llm"]. */
+  groups: string[];
+  /** Which provider issued this session. */
+  provider: 'oidc' | 'github';
   /** Unix seconds. */
   exp: number;
 }
@@ -43,7 +50,11 @@ function deriveKey(secret: string): Buffer {
 }
 
 export function sealSession(
-  payload: Omit<SessionPayload, 'exp'> & { exp?: number },
+  payload: Omit<SessionPayload, 'exp' | 'groups' | 'provider'> & {
+    exp?: number;
+    groups?: string[];
+    provider?: 'oidc' | 'github';
+  },
   secret: string,
   nowSeconds: number = Math.floor(Date.now() / 1000),
 ): string {
@@ -52,6 +63,8 @@ export function sealSession(
     name: payload.name,
     avatarUrl: payload.avatarUrl,
     token: payload.token,
+    groups: payload.groups ?? [],
+    provider: payload.provider ?? 'github',
     exp: payload.exp ?? nowSeconds + SESSION_TTL_SECONDS,
   };
   const iv = randomBytes(IV_BYTES);
@@ -118,6 +131,8 @@ export function unsealSession(
     name: p.name,
     avatarUrl: p.avatarUrl,
     token: p.token,
+    groups: Array.isArray(p.groups) ? p.groups.filter((g): g is string => typeof g === 'string') : [],
+    provider: p.provider === 'oidc' ? 'oidc' : 'github',
     exp: p.exp,
   };
 }

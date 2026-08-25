@@ -2,12 +2,14 @@ import { query, queryOne, withTransaction } from '@/lib/db/pool';
 import { config } from '@/lib/env';
 import {
   assertTransition,
+  createWorkItemSchema,
   toActor,
   type Actor,
   type ActorLike,
   type Attachment,
   type CreateWorkItemInput,
   type UpdateWorkItemInput,
+  sprintSchema,
   type SprintInput,
   type WorkItem,
   type WorkItemState,
@@ -43,6 +45,7 @@ const ITEM_SELECT = `
          COALESCE(p.prs, '[]'::json)        AS pull_requests,
          COALESCE(c.commits, '[]'::json)    AS commits,
          COALESCE(c.commit_count, 0)        AS commit_count,
+         COALESCE(p.merged_pr_count, 0)     AS merged_pr_count,
          GREATEST(
            wi.updated_at,
            COALESCE(c.last_commit_at, wi.updated_at),
@@ -55,7 +58,10 @@ const ITEM_SELECT = `
     ) t ON true
     LEFT JOIN LATERAL (
       SELECT json_agg(row_to_json(pl) ORDER BY pl.pr_number) AS prs,
-             max(pl.created_at) AS last_pr_at
+             max(pl.created_at) AS last_pr_at,
+             -- Merged PRs are the trunk-based progress signal; commits are
+             -- activity and are deliberately NOT counted as progress.
+             count(*) FILTER (WHERE pl.merged) AS merged_pr_count
         FROM pull_request_links pl WHERE pl.item_id = wi.id
     ) p ON true
     LEFT JOIN LATERAL (
@@ -78,6 +84,8 @@ export interface WorkItemFilters {
   itemType?: string;
   search?: string;
   tag?: string;
+  wave?: string;
+  repoFullName?: string;
   includeRemoved?: boolean;
   limit?: number;
   offset?: number;
@@ -106,6 +114,14 @@ export async function listWorkItems(filters: WorkItemFilters = {}): Promise<Work
   } else if (typeof filters.sprintId === 'number') {
     params.push(filters.sprintId);
     where.push(`wi.sprint_id = $${params.length}`);
+  }
+  if (filters.wave) {
+    params.push(filters.wave);
+    where.push(`wi.wave = $${params.length}`);
+  }
+  if (filters.repoFullName) {
+    params.push(filters.repoFullName);
+    where.push(`wi.repo_full_name = $${params.length}`);
   }
   if (filters.tag) {
     params.push(filters.tag);
@@ -190,10 +206,13 @@ async function logActivity(
 }
 
 export async function createWorkItem(
-  input: CreateWorkItemInput,
+  raw: CreateWorkItemInput,
   actorLike: ActorLike,
 ): Promise<WorkItem> {
   const actor = toActor(actorLike);
+  // Parse here so defaults are applied exactly once, wherever the call
+  // originated (UI, API, bulk seed, tests).
+  const input = createWorkItemSchema.parse(raw);
   return withTransaction(async (client) => {
     const { rows: rankRows } = await client.query<{ min: number | null }>(
       'SELECT MIN(board_rank) AS min FROM work_items WHERE instance_key = $1 AND state = $2',
@@ -205,8 +224,8 @@ export async function createWorkItem(
       `INSERT INTO work_items
          (instance_key, title, description, item_type, state, assignee_login,
           assignee_avatar_url, story_points, priority, sprint_id, board_rank,
-          created_by, closed_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,
+          created_by, repo_full_name, wave, closed_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,
                CASE WHEN $5 = 'Closed' THEN now() ELSE NULL END)
        RETURNING id`,
       [
@@ -222,6 +241,8 @@ export async function createWorkItem(
         input.sprintId,
         rank,
         actor.login,
+        input.repoFullName ?? defaultRepoForItem(),
+        input.wave,
       ],
     );
     const id = rows[0]!.id;
@@ -237,6 +258,14 @@ export async function createWorkItem(
   });
 }
 
+/**
+ * A single-repo board leaves the item's repo implicit rather than nagging the
+ * user with a picker they do not need; a multi-repo board requires it.
+ */
+function defaultRepoForItem(): string | null {
+  return config.githubRepos.length === 1 ? config.githubRepos[0]! : null;
+}
+
 const UPDATABLE: Record<string, string> = {
   title: 'title',
   description: 'description',
@@ -247,6 +276,8 @@ const UPDATABLE: Record<string, string> = {
   storyPoints: 'story_points',
   priority: 'priority',
   sprintId: 'sprint_id',
+  repoFullName: 'repo_full_name',
+  wave: 'wave',
 };
 
 export async function updateWorkItem(
@@ -456,7 +487,12 @@ export async function countItemCommits(itemId: number): Promise<number> {
 
 export async function listSprints(): Promise<Sprint[]> {
   const rows = await query<SprintRow>(
-    'SELECT * FROM sprints WHERE instance_key = $1 ORDER BY starts_on ASC, id ASC',
+    `SELECT s.*,
+            (SELECT COUNT(*) FROM work_items wi
+              WHERE wi.sprint_id = s.id AND wi.state <> 'Removed') AS item_count
+       FROM sprints s
+      WHERE s.instance_key = $1
+      ORDER BY s.position ASC, s.starts_on ASC, s.id ASC`,
     [instance()],
   );
   return rows.map(mapSprint);
@@ -470,20 +506,26 @@ export async function getSprint(id: number): Promise<Sprint | null> {
   return row ? mapSprint(row) : null;
 }
 
-export async function createSprint(input: SprintInput): Promise<Sprint> {
+export async function createSprint(raw: SprintInput): Promise<Sprint> {
+  const input = sprintSchema.parse(raw);
   const row = await queryOne<SprintRow>(
-    `INSERT INTO sprints (instance_key, name, goal, starts_on, ends_on)
-     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-    [instance(), input.name, input.goal, input.startsOn, input.endsOn],
+    `INSERT INTO sprints (instance_key, name, goal, starts_on, ends_on, position)
+     VALUES ($1,$2,$3,$4,$5,
+             COALESCE(NULLIF($6, 0),
+                      (SELECT COALESCE(MAX(position), 0) + 1 FROM sprints WHERE instance_key = $1)))
+     RETURNING *`,
+    [instance(), input.name, input.goal, input.startsOn, input.endsOn, input.position],
   );
   return mapSprint(row!);
 }
 
-export async function updateSprint(id: number, input: SprintInput): Promise<Sprint | null> {
+export async function updateSprint(id: number, raw: SprintInput): Promise<Sprint | null> {
+  const input = sprintSchema.parse(raw);
   const row = await queryOne<SprintRow>(
-    `UPDATE sprints SET name=$1, goal=$2, starts_on=$3, ends_on=$4, updated_at=now()
-      WHERE id=$5 AND instance_key=$6 RETURNING *`,
-    [input.name, input.goal, input.startsOn, input.endsOn, id, instance()],
+    `UPDATE sprints SET name=$1, goal=$2, starts_on=$3, ends_on=$4,
+                        position=COALESCE(NULLIF($5, 0), position), updated_at=now()
+      WHERE id=$6 AND instance_key=$7 RETURNING *`,
+    [input.name, input.goal, input.startsOn, input.endsOn, input.position, id, instance()],
   );
   return row ? mapSprint(row) : null;
 }

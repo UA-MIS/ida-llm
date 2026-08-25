@@ -8,18 +8,11 @@ import { runMigrations } from '@/lib/db/migrate';
  * the runner takes a Postgres advisory lock.
  */
 let started: Promise<void> | null = null;
-let ready = false;
-
-export function schemaReady(): boolean {
-  return ready;
-}
 
 export function ensureSchema(): Promise<void> {
   if (!started) {
     started = runMigrations()
-      .then(() => {
-        ready = true;
-      })
+      .then(() => undefined)
       .catch((err) => {
         // Reset so the next request retries rather than caching the failure.
         started = null;

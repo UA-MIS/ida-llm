@@ -4,45 +4,71 @@ A work-item board (Azure-DevOps style) with a full REST API. **The web UI calls
 exactly these endpoints** — there is no privileged internal surface, so anything
 a person can do in the browser, a script or an agent can do with a token.
 
-If you are an LLM driving this board: this document is the interface. You need
-a base URL and a token, and nothing else.
+If you are an LLM driving this board: this document is the interface. You need a
+base URL and a token, and nothing else.
 
 - **Base URL**: your deployment's origin, e.g. `https://ida-agile.capstone.uamishub.com`
-- **All endpoints** are under `/api/v1`
+- **All endpoints** live under `/api/v1`
 - **Machine-readable spec**: `GET /api/v1/openapi.json` (no auth required)
+
+```sh
+export AGILE=https://ida-agile.capstone.uamishub.com
+```
 
 ---
 
 ## Authentication
 
-Send a board-issued token as a bearer token:
+Two credentials are accepted. Both resolve to the same identity and the same
+authorization rule (membership of the configured GitHub team).
 
-```
-Authorization: Bearer iag_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
+### 1. A GitHub token — the zero-setup path
 
-Get one from the board UI → **Tokens** → *Create token*. It is shown once and
-stored only as a hash.
-
-Three things worth knowing:
-
-- A token **acts as the human who created it**. Everything it does is attributed
-  to that person in the item history (`source: "api"`), so the audit trail stays
-  honest.
-- A token **cannot outlive its owner's team membership**. If they leave the
-  GitHub team, the token is revoked automatically on next use.
-- **GitHub tokens are not accepted** as board credentials, and board tokens
-  carry no GitHub privileges.
-
-A few operations need a *browser session* rather than a token, because they act
-on GitHub as you: creating a branch (`/start-work`) and linking a pull request
-(which reads the PR from GitHub). They return a clear `400`/`403` explaining
-this rather than failing obscurely.
+If you have `gh` installed and are a member of the team, you are already
+authenticated. This is the fastest way to drive the board from a script or a
+Claude session:
 
 ```sh
-export AGILE=https://ida-agile.capstone.uamishub.com
-export TOKEN=iag_...      # keep this out of source control
+curl -H "Authorization: Bearer $(gh auth token)" "$AGILE/api/v1/items"
 ```
+
+The token needs the **`read:org`** scope, which is what the team-membership check
+uses. (`gh auth login -s read:org` if yours predates that scope.)
+
+The board **never stores your GitHub token**. It validates it, derives your
+identity, and caches only that derived identity — keyed by a hash of the token —
+for five minutes.
+
+### 2. A board-issued token — for anything long-lived
+
+Create one in the UI under **Tokens**. It is shown once and stored only as a
+hash.
+
+```sh
+export TOKEN=iag_...
+curl -H "Authorization: Bearer $TOKEN" "$AGILE/api/v1/items"
+```
+
+### Which to use
+
+| | GitHub token | Board token |
+|---|---|---|
+| Setup | none (`gh auth token`) | create in the UI |
+| Scope | **broad** — grants everything your GitHub account can do | this board only |
+| Revocation | revoke in GitHub (affects everything) | revoke in the UI |
+| Best for | interactive/ad-hoc use from your own machine | CI, shared automation, anything long-lived |
+
+**Prefer a board token for anything shared or long-lived.** A GitHub token is a
+much broader credential; leaking one is a bigger problem than leaking a board
+token.
+
+Both are attributed to you in item history, and the two are distinguishable —
+a board token records *"via API"*, a GitHub token records *"via API (github
+token)"*.
+
+A few operations need a **browser session** rather than a token, because they act
+on GitHub as you: creating a branch (`/start-work`) and linking a PR. They return
+a clear error explaining this.
 
 ---
 
@@ -59,125 +85,138 @@ Every error has the same shape. Branch on `code`; show `message` to a human.
 | Code | Status | Meaning |
 |---|---|---|
 | `anonymous` | 401 | No credential supplied. |
-| `bad_token` | 401 | Token unknown, malformed, expired or revoked. |
-| `not_on_team` | 403 | The token's owner is no longer on the GitHub team. |
+| `bad_token` | 401 | Token unknown, malformed, expired, revoked, or rejected by GitHub. |
+| `not_on_team` | 403 | You are not a member of the configured team. |
 | `session_required` | 403 | Needs a browser session, not a token. |
 | `not_found` | 404 | No such item/sprint/link. |
 | `illegal_transition` | 409 | That state move is not allowed — see **States**. |
+| `blocked_by_dependencies` | 409 | Unmet dependencies; the body lists them. |
+| `dependency_cycle` | 409 | The edge would create a loop; the message names it. |
 | `idempotency_conflict` | 409 | `Idempotency-Key` reused with a different body. |
 | `validation_failed` | 422 | Body invalid; `fields` says which field and why. |
 | `rate_limited` | 429 | Slow down; the message says for how long. |
-| `database_unavailable` | 503 | Board is starting or the database is unreachable. |
 
-Rate limits are generous (a burst of ~240 requests, refilling ~8/second, per
-user). Seeding a sprint's worth of stories will not hit them.
+Rate limits are generous (~240 burst, refilling ~8/s, per user). Seeding a
+semester will not hit them.
+
+---
+
+## Seed a semester — the headline flow
+
+`POST /api/v1/seed` creates **sprints, work items, their sprint assignments, and
+the dependency graph between them, in one call**.
+
+Items reference each other by a **client-supplied `key`** (ids do not exist yet),
+and reference sprints by `sprintKey`. Keys are local to the request and are not
+stored.
+
+```sh
+cat > backlog.json <<'JSON'
+{
+  "sprints": [
+    {"key":"s1","name":"Sprint 1","goal":"Foundations","startsOn":"2026-08-25","endsOn":"2026-09-07"},
+    {"key":"s2","name":"Sprint 2","goal":"Runner + schema","startsOn":"2026-09-08","endsOn":"2026-09-21"},
+    {"key":"s3","name":"Sprint 3","goal":"Results UI","startsOn":"2026-09-22","endsOn":"2026-10-05"}
+  ],
+  "items": [
+    {"key":"core",   "title":"Harness core",       "sprintKey":"s1","wave":"Wave 1","storyPoints":8,"priority":1},
+    {"key":"schema", "title":"Task schema",        "sprintKey":"s1","wave":"Wave 1","storyPoints":3},
+    {"key":"mock",   "title":"Mock model service", "sprintKey":"s1","wave":"Wave 1","storyPoints":2},
+
+    {"key":"runner", "title":"Runner",             "sprintKey":"s2","wave":"Wave 2","storyPoints":5,
+     "dependsOn":["core","schema"]},
+    {"key":"store",  "title":"Results store",      "sprintKey":"s2","wave":"Wave 2","storyPoints":5,
+     "dependsOn":["schema"]},
+
+    {"key":"ui",     "title":"Results UI",         "sprintKey":"s3","wave":"Wave 3","storyPoints":8,
+     "dependsOn":["runner","store"]}
+  ],
+  "currentSprintKey": "s1"
+}
+JSON
+
+curl -X POST "$AGILE/api/v1/seed" \
+  -H "Authorization: Bearer $(gh auth token)" \
+  -H 'content-type: application/json' \
+  -H 'Idempotency-Key: semester-2026-fall-v1' \
+  -d @backlog.json
+```
+
+Response:
+
+```json
+{
+  "sprints": [{ "key": "s1", "id": 1, "name": "Sprint 1", ... }],
+  "items":   [{ "key": "core", "id": 1, "title": "Harness core", ... }],
+  "counts":  { "sprints": 3, "items": 6, "dependencies": 5 },
+  "currentSprintId": 1
+}
+```
+
+Notes that matter:
+
+- **The whole dependency graph is validated for cycles before any edge is
+  written.** A cyclic plan is rejected with the loop named, not half-applied.
+- `dependsOn` also accepts **numeric ids** of items that already exist, so you can
+  extend an existing backlog.
+- `currentSprintKey` sets the **shared** current sprint (see below) in the same call.
+- With `Idempotency-Key`, re-running the exact same seed is a no-op that replays
+  the original response — safe to retry, safe to run from a script twice.
+
+Limits: 50 sprints and 500 items per call.
 
 ---
 
 ## Work items
 
-A work item has: `title`, `description` (markdown), `itemType`
+Fields: `title`, `description` (markdown), `itemType`
 (`Story`/`Task`/`Bug`/`Spike`), `state`, `assigneeLogin`, `storyPoints`,
-`priority` (1 = highest … 4), `sprintId`, and `tags`.
+`priority` (1 = highest … 4), `sprintId`, `tags`, `wave`, `repoFullName`.
 
 ### List / query
 
 ```sh
-curl -s -H "Authorization: Bearer $TOKEN" "$AGILE/api/v1/items"
+curl -H "Authorization: Bearer $TOKEN" "$AGILE/api/v1/items?state=Active&assignee=me"
 ```
-
-Filters (combine freely):
 
 | Param | Example | Notes |
 |---|---|---|
 | `state` | `?state=Active` | |
 | `type` | `?type=Bug` | |
-| `assignee` | `?assignee=me` | `me` resolves to the token's owner |
-| `sprintId` | `?sprintId=3` · `?sprintId=none` · `?sprintId=all` | |
+| `assignee` | `?assignee=me` | `me` resolves to the caller |
+| `sprintId` | `?sprintId=3` · `none` · `all` | |
+| `wave` | `?wave=Wave%201` | |
 | `tag` | `?tag=backend` | |
 | `q` | `?q=ingest` | free text over title + description |
 | `limit` / `offset` | `?limit=50&offset=50` | |
-| `includeRemoved` | `?includeRemoved=true` | `Removed` items are hidden by default |
+| `includeRemoved` | `?includeRemoved=true` | `Removed` hidden by default |
 
-**My open items:**
+Each item comes back with a `readiness` object: `{ ready, blockers[], overridden }`.
 
-```sh
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "$AGILE/api/v1/items?assignee=me&state=Active"
-```
-
-Response: `{ "items": [ ... ], "count": 12 }`
-
-### Create one
+### Create
 
 ```sh
-curl -s -X POST "$AGILE/api/v1/items" \
+curl -X POST "$AGILE/api/v1/items" \
   -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{
-        "title": "Refresh judge calibration set",
-        "description": "## Why\nDrift since the last run.\n\n## Acceptance\n- [ ] regenerate\n- [ ] compare",
-        "itemType": "Story",
-        "storyPoints": 5,
-        "priority": 2,
-        "assigneeLogin": "octocat",
-        "tags": ["eval", "backend"]
-      }'
+  -d '{"title":"Refresh judge calibration set","itemType":"Story","storyPoints":5,
+       "wave":"Wave 2","tags":["eval"]}'
 ```
 
-Only `title` is required. Response: `{ "item": { "id": 42, ... } }`.
+Only `title` is required. For many at once use `/seed` (above), or
+`{"items":[ ... ]}` on this endpoint when you do not need sprints or dependencies.
 
-### Bulk create (seed a plan in one call)
-
-Send `{ "items": [ ... ] }` with up to 100 entries:
+### Update / delete
 
 ```sh
-curl -s -X POST "$AGILE/api/v1/items" \
-  -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -H "Idempotency-Key: sprint-3-seed-v1" \
-  -d '{"items":[
-        {"title":"Ingest transcripts","itemType":"Story","storyPoints":5},
-        {"title":"Chunking strategy spike","itemType":"Spike","storyPoints":3},
-        {"title":"Fix token overflow","itemType":"Bug","priority":1}
-      ]}'
+curl -X PATCH "$AGILE/api/v1/items/42" -H "Authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -d '{"assigneeLogin":"octocat","sprintId":3}'
+
+curl -X DELETE "$AGILE/api/v1/items/42" -H "Authorization: Bearer $TOKEN"
 ```
 
-Response: `{ "items": [ ... ], "count": 3 }`.
+Prefer state `Removed` over deletion — it keeps the history.
 
-### Idempotency (make retries safe)
-
-Add `Idempotency-Key: <your-unique-string>` to any create. If the call is
-retried with the **same key and the same body**, the original response is
-replayed and nothing is created twice. The same key with a *different* body is a
-`409 idempotency_conflict` rather than a silent overwrite.
-
-Use it whenever a retry is possible — which, for an agent, is always.
-
-### Read one
-
-```sh
-curl -s -H "Authorization: Bearer $TOKEN" "$AGILE/api/v1/items/42"
-```
-
-Returns the item plus its `comments`, `activity` (full history) and
-`attachments`.
-
-### Update
-
-`PATCH` with only the fields you want to change:
-
-```sh
-curl -s -X PATCH "$AGILE/api/v1/items/42" \
-  -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{"assigneeLogin":"octocat","storyPoints":8,"sprintId":3}'
-```
-
-### Delete
-
-```sh
-curl -s -X DELETE "$AGILE/api/v1/items/42" -H "Authorization: Bearer $TOKEN"
-```
-
-Prefer moving to state `Removed` instead — it keeps the history.
+**Move an item to another sprint** by patching `sprintId` (`null` = backlog).
 
 ---
 
@@ -187,8 +226,8 @@ Prefer moving to state `Removed` instead — it keeps the history.
 New ──▶ Active ──▶ Resolved ──▶ Closed
  │        │  ▲         │           │
  │        │  └─────────┘           │
- │        ▼                        │
- └──▶ Removed ──▶ New       Active ◀┘  (reactivate)
+ ▼        ▼                        │
+Removed ──▶ New            Active ◀┘  (reactivate)
 ```
 
 | From | May move to |
@@ -199,62 +238,98 @@ New ──▶ Active ──▶ Resolved ──▶ Closed
 | `Closed` | `Active` |
 | `Removed` | `New` |
 
-Anything else returns `409 illegal_transition` with a message listing what *is*
-allowed. Notably you cannot jump `New → Closed`; go via `Active` and `Resolved`.
-
-### Move an item
+Anything else returns `409 illegal_transition` listing what *is* allowed.
 
 ```sh
-curl -s -X POST "$AGILE/api/v1/items/42/move" \
-  -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{"toState":"Active"}'
+curl -X POST "$AGILE/api/v1/items/42/move" -H "Authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -d '{"toState":"Active"}'
 ```
-
-`orderedIds` is optional and only affects card order within the board column.
 
 ---
 
-## Pull requests
+## Dependencies and the Ready queue
+
+An item can be blocked by others. **Blocked work cannot be started** — the board
+enforces it, so nobody has to read a doc to know what is safe to pick up.
 
 ```sh
-curl -s -X POST "$AGILE/api/v1/items/42/links" \
+# #42 is blocked by #12
+curl -X POST "$AGILE/api/v1/items/42/dependencies" \
   -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{"reference":"https://github.com/UA-MIS/ida-llm/pull/123"}'
+  -d '{"dependsOn":12}'
+
+# What blocks it, what it blocks, and whether it is ready
+curl -H "Authorization: Bearer $TOKEN" "$AGILE/api/v1/items/42/dependencies"
+
+# Remove an edge
+curl -X DELETE "$AGILE/api/v1/items/42/dependencies?dependsOn=12" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
-`reference` accepts a PR URL, `owner/repo#123`, or a bare `123` (which uses the
-board's primary repo). Linking posts a backlink comment on the PR.
+A dependency is **satisfied** once the blocker is `Resolved` or `Closed`. Cycles
+are rejected at creation with the loop named:
+`That dependency would create a cycle: #1 → #4 → #1.`
 
-Unlink with `DELETE /api/v1/items/42/links?linkId=<id>`.
+### The Ready queue — the self-serve pickup list
 
-**Most linking is automatic** — see *Git integration* below. You rarely need
-this endpoint.
+```sh
+curl -H "Authorization: Bearer $TOKEN" "$AGILE/api/v1/ready?wave=Wave%202"
+```
+
+Returns unassigned items whose dependencies are **all** satisfied, plus a
+`blocked` summary explaining what everything else is waiting on. This is the most
+useful endpoint for "what should I work on next?".
+
+### Override — the logged escape hatch
+
+A hard block with no way through gets worked around outside the tool, so there is
+an explicit one. It **requires a reason** and is written to item history.
+
+```sh
+curl -X POST "$AGILE/api/v1/items/42/override" \
+  -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"reason":"Spiking the UI shell ahead of the runner, agreed in standup"}'
+```
+
+`DELETE` the same path to withdraw the override and re-apply the gate.
 
 ---
 
 ## Sprints
 
 ```sh
-# List, with points/complete stats
-curl -s -H "Authorization: Bearer $TOKEN" "$AGILE/api/v1/sprints"
+curl -H "Authorization: Bearer $TOKEN" "$AGILE/api/v1/sprints"
 
-# Create
-curl -s -X POST "$AGILE/api/v1/sprints" \
-  -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{"name":"Sprint 4","goal":"Ship retrieval","startsOn":"2026-09-01","endsOn":"2026-09-14"}'
+curl -X POST "$AGILE/api/v1/sprints" -H "Authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"name":"Sprint 4","goal":"Ship retrieval","startsOn":"2026-10-06","endsOn":"2026-10-19"}'
 ```
 
-Assign an item to a sprint by `PATCH`ing its `sprintId`. Deleting a sprint
-returns its items to the backlog rather than deleting them.
+### The current sprint is SHARED
+
+One sprint is the board's **current** sprint. It lives in the database, not in
+anyone's session — when you set it, **every visitor lands on that sprint by
+default**.
+
+```sh
+# Read it (includes who set it, and when)
+curl -H "Authorization: Bearer $TOKEN" "$AGILE/api/v1/sprints/current"
+
+# Advance the whole team to Sprint 2
+curl -X PUT "$AGILE/api/v1/sprints/current" -H "Authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -d '{"sprintId":2}'
+```
+
+In the UI, *browsing* another sprint is a local view change; *setting* the
+current sprint is a separate, explicitly-labelled action.
 
 ---
 
 ## Comments
 
 ```sh
-curl -s -X POST "$AGILE/api/v1/items/42/comments" \
-  -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{"body":"Blocked on the eval harness."}'
+curl -X POST "$AGILE/api/v1/items/42/comments" -H "Authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -d '{"body":"Blocked on the eval harness."}'
 ```
 
 ---
@@ -263,70 +338,59 @@ curl -s -X POST "$AGILE/api/v1/items/42/comments" \
 
 | Endpoint | Purpose |
 |---|---|
+| `GET /api/v1/ready` | Unblocked, unassigned work |
 | `GET /api/v1/members` | Team members (valid `assigneeLogin` values). Session only. |
-| `GET /api/v1/prs` | Open PRs, annotated with the item ids they mention. Session only. |
-| `GET /api/v1/tokens` | Your tokens (never their values). |
-| `DELETE /api/v1/tokens/{id}` | Revoke one. |
-| `GET /api/healthz` | Liveness. No auth, no DB. |
-| `GET /api/readyz` | Readiness — DB reachable and migrated. No auth. |
+| `GET /api/v1/prs` | Open PRs annotated with the item ids they mention. Session only. |
+| `POST /api/v1/items/{id}/links` | Attach a PR (URL, `owner/repo#123`, or `123`) |
+| `POST /api/v1/items/{id}/start-work` | Activate + create the branch. Session only. |
+| `GET`/`DELETE /api/v1/tokens` | Manage your board tokens |
+| `GET /api/healthz` · `GET /api/readyz` | Liveness · readiness. No auth. |
 
 ---
 
-## Git integration (mostly automatic)
+## Git integration (automatic)
 
-Once a work item has a branch, the board tracks it without being asked:
+Delivery here is **trunk-based**, so a board-created branch is short-lived by
+design. The board reflects that:
 
-- Commits pushed to the branch appear on the item.
-- A commit message or PR title/body containing `AB#42` attaches to item 42 —
-  from *any* branch. (A bare `#42` is deliberately ignored: in a PR body that
-  almost always means a GitHub issue.)
-- **First commit** on a `New` item → `Active`.
-- **PR opened** → `Active`, and auto-linked.
-- **PR merged** → `Resolved`. Never `Closed` — accepting work stays a human
-  decision.
-- **PR closed unmerged** → no state change, but the item shows a warning.
+- **Merged PRs are progress.** Commits are shown as *activity* and never count
+  toward progress or burndown.
+- A branch open too long, or too far behind the default branch, gets a
+  **"branch stale"** badge.
 
-Every automatic move is recorded in the item history as *"moved by GitHub (PR
-#123 merged)"*, so a human can always see why something moved. All of this can
-be turned off per-rule (see the README's configuration table).
+| Event | Effect |
+|---|---|
+| Commit pushed to the item's branch | Recorded; first commit moves `New` → `Active` |
+| Commit message or PR text contains `AB#42` | Attaches to item 42 (scoped to that repo) |
+| PR opened from the item's branch | Auto-linked; item ensured `Active` |
+| PR merged | Item → `Resolved` (**never** `Closed` — accepting stays human) |
+| PR closed unmerged | No state change; item shows a warning |
 
-To create a branch for an item (browser session required):
+Every automatic move is recorded as *"moved by GitHub (PR #123 merged)"*.
 
-```
-POST /api/v1/items/42/start-work
-```
-
-Branches are named from `BRANCH_PATTERN`, by default
-`{type}/{id}-{slug}` → `story/42-refresh-judge-calibration-set`.
+Linking a PR also maintains **one** comment on that PR pointing back at the work
+item, so the link is discoverable from GitHub.
 
 ---
 
-## A worked example: seed a sprint from a plan
+## Worked example: advance the semester
 
 ```sh
 export AGILE=https://ida-agile.capstone.uamishub.com
-export TOKEN=iag_...
+export GH="Authorization: Bearer $(gh auth token)"
 
-# 1. Create the sprint
-SPRINT=$(curl -s -X POST "$AGILE/api/v1/sprints" \
-  -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{"name":"Sprint 5","goal":"Retrieval quality","startsOn":"2026-09-15","endsOn":"2026-09-28"}' \
-  | python3 -c 'import sys,json; print(json.load(sys.stdin)["sprint"]["id"])')
+# What is unblocked right now?
+curl -s -H "$GH" "$AGILE/api/v1/ready" | python3 -m json.tool
 
-# 2. Seed the stories into it, idempotently
-curl -s -X POST "$AGILE/api/v1/items" \
-  -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -H "Idempotency-Key: sprint-5-seed" \
-  -d "{\"items\":[
-        {\"title\":\"Rerank candidate passages\",\"itemType\":\"Story\",\"storyPoints\":5,\"sprintId\":$SPRINT},
-        {\"title\":\"Measure recall@10\",\"itemType\":\"Task\",\"storyPoints\":2,\"sprintId\":$SPRINT},
-        {\"title\":\"Hybrid search spike\",\"itemType\":\"Spike\",\"storyPoints\":3,\"sprintId\":$SPRINT}
-      ]}"
+# Take something
+curl -s -X PATCH "$AGILE/api/v1/items/3" -H "$GH" \
+  -H 'content-type: application/json' -d '{"assigneeLogin":"'"$(gh api user --jq .login)"'"}'
 
-# 3. Check what landed
-curl -s -H "Authorization: Bearer $TOKEN" "$AGILE/api/v1/items?sprintId=$SPRINT" \
-  | python3 -m json.tool
+# Move it along
+curl -s -X POST "$AGILE/api/v1/items/3/move" -H "$GH" \
+  -H 'content-type: application/json' -d '{"toState":"Active"}'
+
+# End of sprint: advance the whole team
+curl -s -X PUT "$AGILE/api/v1/sprints/current" -H "$GH" \
+  -H 'content-type: application/json' -d '{"sprintId":2}'
 ```
-
-Re-running step 2 with the same `Idempotency-Key` creates nothing further and
-returns the original response.

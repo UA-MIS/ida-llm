@@ -4,6 +4,7 @@ import { lookupIdempotent, saveIdempotent } from '@/lib/api/idempotency';
 import { principalToActor } from '@/lib/auth/principal';
 import { createWorkItemSchema, type WorkItemState } from '@/lib/domain/workitem';
 import { createWorkItem, listWorkItems } from '@/lib/domain/queries';
+import { readinessMap } from '@/lib/domain/deps-queries';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,7 @@ export const GET = withApi(async ({ request, principal }) => {
     itemType: sp.get('type') || undefined,
     assignee: assignee === 'me' ? principal.login : assignee || undefined,
     tag: sp.get('tag') || undefined,
+    wave: sp.get('wave') || undefined,
     search: sp.get('q') || undefined,
     sprintId:
       sprintParam === null || sprintParam === '' || sprintParam === 'all'
@@ -35,7 +37,15 @@ export const GET = withApi(async ({ request, principal }) => {
     offset: sp.get('offset') ? Number(sp.get('offset')) : undefined,
   });
 
-  return ok({ items, count: items.length });
+  // Readiness is resolved in one query for the whole board, not per item.
+  const readiness = await readinessMap();
+  return ok({
+    items: items.map((i) => ({
+      ...i,
+      readiness: readiness.get(i.id) ?? { ready: true, blockers: [], overridden: false },
+    })),
+    count: items.length,
+  });
 });
 
 /**

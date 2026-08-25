@@ -1,8 +1,9 @@
 import { cookies } from 'next/headers';
 import { config } from '@/lib/env';
 import { SESSION_COOKIE, unsealSession } from './session';
-import { isStillOnTeam } from './revalidate';
-import { verifyApiToken } from './tokens';
+import { sessionStillValid } from './revalidate';
+import { verifyApiToken, TOKEN_PREFIX } from './tokens';
+import { authenticateGitHubToken, looksLikeGitHubToken } from './github-passthrough';
 import type { Actor, ActorSource } from '@/lib/domain/workitem';
 
 /**
@@ -13,9 +14,13 @@ import type { Actor, ActorSource } from '@/lib/domain/workitem';
  *   - `session`: a signed-in team member (encrypted cookie)
  *   - `api`:     a board-issued token acting AS the human who created it
  */
+/** How the caller proved who they are. Recorded in history. */
+export type CredentialKind = 'session' | 'board-token' | 'github-token';
+
 export interface Principal {
   login: string;
   source: ActorSource;
+  credential: CredentialKind;
   /** GitHub OAuth token, present only for cookie sessions. */
   githubToken: string | null;
   avatarUrl: string;
@@ -24,7 +29,16 @@ export interface Principal {
 }
 
 export function principalToActor(p: Principal, note?: string): Actor {
-  return { login: p.login, source: p.source, note };
+  // A GitHub token is a broader credential than a board token, so the two are
+  // distinguishable in item history rather than both reading as "via API".
+  const via =
+    p.credential === 'github-token'
+      ? 'via API (github token)'
+      : p.credential === 'board-token'
+        ? 'via API'
+        : undefined;
+  const combined = [via, note].filter(Boolean).join(' — ');
+  return { login: p.login, source: p.source, note: combined || undefined };
 }
 
 export type AuthFailure =
@@ -49,6 +63,33 @@ function bearerFrom(request: Request): string | null {
 export async function authenticate(request: Request): Promise<AuthResult> {
   const bearer = bearerFrom(request);
 
+  if (bearer && looksLikeGitHubToken(bearer)) {
+    // Passthrough: validate with GitHub, authorize with the same team rule as
+    // the web path, and never store the token.
+    const verdict = await authenticateGitHubToken(bearer);
+    if (!verdict.ok) {
+      return {
+        ok: false,
+        failure: {
+          reason: verdict.reason === 'not-on-team' ? 'not-on-team' : 'bad-token',
+          status: verdict.reason === 'not-on-team' ? 403 : 401,
+          message: verdict.message,
+        } as AuthFailure,
+      };
+    }
+    return {
+      ok: true,
+      principal: {
+        login: verdict.login,
+        source: 'api',
+        credential: 'github-token',
+        githubToken: bearer,
+        avatarUrl: '',
+        name: verdict.login,
+      },
+    };
+  }
+
   if (bearer) {
     const verdict = await verifyApiToken(bearer);
     if (!verdict.ok) {
@@ -59,7 +100,7 @@ export async function authenticate(request: Request): Promise<AuthResult> {
             ? 'That API token has been revoked.'
             : verdict.reason === 'expired'
               ? 'That API token has expired.'
-              : 'Invalid API token.';
+              : `Invalid API token. Send a board token (${TOKEN_PREFIX}...) or a GitHub token.`;
       return {
         ok: false,
         failure: { reason: verdict.reason === 'not-on-team' ? 'not-on-team' : 'bad-token', status: verdict.reason === 'not-on-team' ? 403 : 401, message } as AuthFailure,
@@ -70,6 +111,7 @@ export async function authenticate(request: Request): Promise<AuthResult> {
       principal: {
         login: verdict.ownerLogin,
         source: 'api',
+        credential: 'board-token',
         githubToken: null,
         avatarUrl: '',
         name: verdict.ownerLogin,
@@ -91,7 +133,7 @@ export async function authenticate(request: Request): Promise<AuthResult> {
     };
   }
 
-  if (!(await isStillOnTeam(session.login, session.token))) {
+  if (!(await sessionStillValid(session))) {
     return {
       ok: false,
       failure: {
@@ -107,6 +149,7 @@ export async function authenticate(request: Request): Promise<AuthResult> {
     principal: {
       login: session.login,
       source: 'user',
+      credential: 'session',
       githubToken: session.token,
       avatarUrl: session.avatarUrl,
       name: session.name,

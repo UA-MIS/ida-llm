@@ -2,6 +2,8 @@ import { withApi } from '@/lib/api/route';
 import { apiError, ok, parseId, readJson } from '@/lib/api/respond';
 import { principalToActor } from '@/lib/auth/principal';
 import { getWorkItem, updateWorkItem } from '@/lib/domain/queries';
+import { readinessFor } from '@/lib/domain/deps-queries';
+import { blockedMessage } from '@/lib/domain/dependencies';
 import { startWork, checkoutCommand } from '@/lib/github/branches';
 import { canTransition, InvalidTransitionError } from '@/lib/domain/workitem';
 
@@ -29,6 +31,27 @@ export const POST = withApi(async ({ request, params, principal }) => {
 
   const actor = principalToActor(principal);
   const warnings: string[] = [];
+
+  // 0. Dependency gate. Blocked work cannot be started, and the refusal names
+  //    the specific blockers so the caller knows what to chase.
+  const readiness = await readinessFor(id);
+  if (!readiness.ready) {
+    return Response.json(
+      {
+        error: {
+          code: 'blocked_by_dependencies',
+          message: `${blockedMessage(readiness.blockers)}. Resolve them, or override with a reason via POST /api/v1/items/${id}/override.`,
+          blockers: readiness.blockers,
+        },
+      },
+      { status: 409 },
+    );
+  }
+  if (readiness.overridden) {
+    warnings.push(
+      `Started despite ${readiness.blockers.length} unmet dependency/dependencies (override recorded).`,
+    );
+  }
 
   // 1. State first — this is the part that must not be lost.
   const shouldActivate = body.activate !== false && item.state === 'New';

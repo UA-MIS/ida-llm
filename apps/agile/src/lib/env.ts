@@ -162,6 +162,42 @@ export const config = {
     return integer('ONVIEW_REFRESH_SECONDS', 120);
   },
 
+  // ------------------------------------------------------------------ OIDC
+  /**
+   * Identity provider. `oidc` (Dex) is the default because a per-instance
+   * GitHub OAuth app cannot be provisioned zero-touch — GitHub allows one
+   * callback URL per app, so twelve teams would mean twelve manual
+   * registrations. `github` remains as a fallback implementation.
+   */
+  get authProvider(): 'oidc' | 'github' {
+    const explicit = optional('AUTH_PROVIDER', '').toLowerCase();
+    if (explicit === 'oidc' || explicit === 'github') return explicit;
+    return this.oidcIssuer ? 'oidc' : 'github';
+  },
+  get oidcIssuer(): string {
+    return optional('OIDC_ISSUER', '').replace(/\/+$/, '');
+  },
+  get oidcClientId(): string {
+    return required('OIDC_CLIENT_ID');
+  },
+  get oidcClientSecret(): string {
+    return optional('OIDC_CLIENT_SECRET', '');
+  },
+  get oidcRedirectUri(): string {
+    return optional('OIDC_REDIRECT_URI', `${this.appUrl}/api/auth/callback`);
+  },
+  get oidcScopes(): string {
+    return optional('OIDC_SCOPES', 'openid profile email groups');
+  },
+  /**
+   * The group that grants access, as it appears in the `groups` claim.
+   * Dex's GitHub connector emits `org:team`. Defaults to the configured
+   * org/team so a standard deployment needs no extra variable.
+   */
+  get requiredGroup(): string {
+    return optional('REQUIRED_GROUP', `${this.githubOrg}:${this.githubTeam}`);
+  },
+
   // ------------------------------------------------------------ automation
   get autoBranch(): boolean {
     return flag('AUTO_BRANCH', true);
@@ -189,6 +225,25 @@ export const config = {
   /** Publish a commit status on PRs showing the linked work item. */
   get prCommitStatus(): boolean {
     return flag('PR_COMMIT_STATUS', false);
+  },
+
+  // ------------------------------------------------- trunk-based signals
+  /**
+   * Delivery here is trunk-based, so a board branch is short-lived by
+   * definition. These thresholds drive a "branch stale" badge; 0 disables
+   * either check. Progress is always measured by merged PRs, never commits.
+   */
+  get staleBranchDays(): number {
+    return integer('STALE_BRANCH_DAYS', 5);
+  },
+  get staleBranchBehind(): number {
+    return integer('STALE_BRANCH_BEHIND', 20);
+  },
+
+  // ----------------------------------------------------------- dependencies
+  /** Allow an explicit, logged override of the dependency gate. */
+  get allowDependencyOverride(): boolean {
+    return flag('ALLOW_DEPENDENCY_OVERRIDE', true);
   },
 
   // ------------------------------------------------------------- attachments

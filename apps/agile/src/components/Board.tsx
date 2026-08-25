@@ -10,6 +10,9 @@ import {
   type WorkItemState,
 } from '@/lib/domain/workitem';
 import type { TeamMember } from '@/lib/github/client';
+import type { Readiness } from '@/lib/domain/dependencies';
+import { evaluateStaleness } from '@/lib/domain/dependencies';
+import { SprintBar, type CurrentSprintInfo } from './SprintBar';
 import { api, ApiError } from '@/lib/apiClient';
 import { useToast } from './Toast';
 import {
@@ -28,20 +31,32 @@ interface DragState {
   from: WorkItemState;
 }
 
+export interface BoardItem extends WorkItem {
+  readiness?: Readiness;
+}
+
 export function Board({
   initialItems,
   sprints,
   members,
   currentUser,
   autoBranch,
+  currentSprint,
+  now,
+  staleness,
 }: {
-  initialItems: WorkItem[];
+  initialItems: BoardItem[];
   sprints: Sprint[];
   members: TeamMember[];
   currentUser: string;
   autoBranch: boolean;
+  currentSprint: CurrentSprintInfo;
+  /** Server-supplied clock: reading it during render would be impure. */
+  now: number;
+  staleness: { maxAgeDays: number; maxBehind: number };
 }) {
-  const [items, setItems] = useState<WorkItem[]>(initialItems);
+  const [items, setItems] = useState<BoardItem[]>(initialItems);
+  const [current, setCurrent] = useState<CurrentSprintInfo>(currentSprint);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [hoverColumn, setHoverColumn] = useState<WorkItemState | null>(null);
   const [editing, setEditing] = useState<WorkItem | null>(null);
@@ -49,17 +64,27 @@ export function Board({
   const [busyItem, setBusyItem] = useState<number | null>(null);
   const toast = useToast();
 
-  const [sprintFilter, setSprintFilter] = useState('all');
+  // Everyone lands on the team's current sprint by default; changing this tab
+  // is local browsing only.
+  const [sprintFilter, setSprintFilter] = useState(
+    currentSprint.sprintId !== null ? String(currentSprint.sprintId) : 'all',
+  );
+  const [waveFilter, setWaveFilter] = useState('all');
   const [assigneeFilter, setAssigneeFilter] = useState('all');
   const [search, setSearch] = useState('');
 
-  const filtersActive = sprintFilter !== 'all' || assigneeFilter !== 'all' || search.trim() !== '';
+  const waves = useMemo(
+    () => [...new Set(items.map((i) => i.wave).filter((w): w is string => Boolean(w)))].sort(),
+    [items],
+  );
+  const filtersActive = assigneeFilter !== 'all' || search.trim() !== '' || waveFilter !== 'all';
 
   const visible = useMemo(
     () =>
       items.filter((i) => {
         if (sprintFilter === 'none' && i.sprintId !== null) return false;
         if (sprintFilter !== 'all' && sprintFilter !== 'none' && i.sprintId !== Number(sprintFilter)) return false;
+        if (waveFilter !== 'all' && i.wave !== waveFilter) return false;
         if (assigneeFilter === 'mine' && i.assigneeLogin !== currentUser) return false;
         if (assigneeFilter === 'unassigned' && i.assigneeLogin !== null) return false;
         if (
@@ -76,18 +101,18 @@ export function Board({
         }
         return true;
       }),
-    [items, sprintFilter, assigneeFilter, search, currentUser],
+    [items, sprintFilter, waveFilter, assigneeFilter, search, currentUser],
   );
 
   const byColumn = useMemo(() => {
-    const map = new Map<WorkItemState, WorkItem[]>();
+    const map = new Map<WorkItemState, BoardItem[]>();
     for (const col of BOARD_COLUMNS) map.set(col, []);
     for (const item of visible) map.get(item.state)?.push(item);
     for (const list of map.values()) list.sort((a, b) => a.boardRank - b.boardRank || a.id - b.id);
     return map;
   }, [visible]);
 
-  const upsert = useCallback((next: WorkItem) => {
+  const upsert = useCallback((next: BoardItem) => {
     setItems((prev) => {
       const idx = prev.findIndex((p) => p.id === next.id);
       if (idx === -1) return [next, ...prev];
@@ -119,11 +144,13 @@ export function Board({
     setItems((prev) => prev.map((i) => (i.id === active.itemId ? { ...i, state: toState, boardRank: -1 } : i)));
 
     try {
-      const { item: saved } = await api<{ item: WorkItem }>(`/items/${active.itemId}/move`, {
+      const { item: saved } = await api<{ item: BoardItem }>(`/items/${active.itemId}/move`, {
         method: 'POST',
         body: JSON.stringify({ toState, orderedIds }),
       });
-      upsert(saved);
+      // The move response carries the item without readiness; keep the value we
+      // already know so a blocked card does not briefly render as unblocked.
+      upsert({ ...saved, readiness: items.find((i) => i.id === saved.id)?.readiness });
 
       // Moving into Active is the natural moment to offer a branch.
       if (autoBranch && toState === 'Active' && !saved.branchName) {
@@ -143,7 +170,7 @@ export function Board({
     setBusyItem(itemId);
     try {
       const res = await api<{
-        item: WorkItem;
+        item: BoardItem;
         branch: { status: string; name?: string; url?: string; message?: string };
         warnings: string[];
       }>(`/items/${itemId}/start-work`, { method: 'POST', body: JSON.stringify({}) });
@@ -170,16 +197,42 @@ export function Board({
     }
   }
 
+  function blockedOf(item: BoardItem): boolean {
+    return item.readiness?.ready === false;
+  }
+  function blockedTitle(item: BoardItem): string {
+    const blockers = item.readiness?.blockers ?? [];
+    return blockers.length
+      ? `Blocked by ${blockers.map((b) => `#${b.id} ${b.title}`).join(', ')}`
+      : 'Blocked';
+  }
+  function staleOf(item: BoardItem): string | null {
+    const behind = item.pullRequests.find((p) => p.behindBy !== null)?.behindBy ?? null;
+    const s = evaluateStaleness(item.branchCreatedAt, behind, now, staleness);
+    return s.stale ? s.reason : null;
+  }
+
   return (
     <>
+      {sprints.length > 0 ? (
+        <SprintBar
+          sprints={sprints}
+          current={current}
+          viewing={sprintFilter}
+          onView={setSprintFilter}
+          onCurrentChanged={setCurrent}
+        />
+      ) : null}
+
       <div className="page-head">
         <h1>Board</h1>
         <div className="toolbar">
-          <select value={sprintFilter} onChange={(e) => setSprintFilter(e.target.value)} aria-label="Filter by sprint">
-            <option value="all">All sprints</option>
-            <option value="none">Backlog (no sprint)</option>
-            {sprints.map((s) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
-          </select>
+          {waves.length > 0 ? (
+            <select value={waveFilter} onChange={(e) => setWaveFilter(e.target.value)} aria-label="Filter by wave">
+              <option value="all">All waves</option>
+              {waves.map((w) => <option key={w} value={w}>{w}</option>)}
+            </select>
+          ) : null}
           <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} aria-label="Filter by assignee">
             <option value="all">Everyone</option>
             <option value="mine">My items</option>
@@ -197,6 +250,20 @@ export function Board({
         <span className="spacer" />
         <button className="btn btn-primary" onClick={() => setCreating(true)}>+ New item</button>
       </div>
+
+      {sprints.length === 0 ? (
+        <div className="panel" style={{ marginBottom: 'var(--s-4)' }}>
+          <div className="empty">
+            <div className="empty-title">No sprints yet</div>
+            <p style={{ maxWidth: 560, margin: '0 auto var(--s-3)' }}>
+              Create your first sprint on the <Link href="/sprints">Sprints</Link> page — or seed a
+              whole semester of sprints, stories and their dependencies in one API call with{' '}
+              <code>POST /api/v1/seed</code>.
+            </p>
+            <a className="btn btn-sm" href="/docs/api">Read the API guide</a>
+          </div>
+        </div>
+      ) : null}
 
       <div className="board">
         {BOARD_COLUMNS.map((col) => {
@@ -239,7 +306,9 @@ export function Board({
                 {list.map((item) => (
                   <article
                     key={item.id}
-                    className={`card${drag?.itemId === item.id ? ' dragging' : ''}`}
+                    className={`card${drag?.itemId === item.id ? ' dragging' : ''}${
+                      blockedOf(item) ? ' is-blocked' : ''
+                    }`}
                     draggable
                     tabIndex={0}
                     aria-label={`${item.itemType} ${item.id}: ${item.title}`}
@@ -262,6 +331,27 @@ export function Board({
                     </div>
 
                     <div className="card-title">{item.title}</div>
+
+                    {blockedOf(item) || item.wave || staleOf(item) ? (
+                      <div className="card-foot" style={{ marginBottom: 'var(--s-2)' }}>
+                        {blockedOf(item) ? (
+                          <span className="badge badge-blocked" title={blockedTitle(item)}>
+                            &#128274; Blocked
+                          </span>
+                        ) : null}
+                        {item.readiness?.overridden ? (
+                          <span className="badge badge-override" title="Started despite unmet dependencies">
+                            override
+                          </span>
+                        ) : null}
+                        {item.wave ? <span className="badge badge-wave">{item.wave}</span> : null}
+                        {staleOf(item) ? (
+                          <span className="badge badge-stale" title={staleOf(item)!}>
+                            {staleOf(item)}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
 
                     <div className="card-foot">
                       <Assignee login={item.assigneeLogin} avatarUrl={item.assigneeAvatarUrl} showName={false} />
@@ -287,7 +377,8 @@ export function Board({
                           <button
                             className="btn btn-sm btn-ghost"
                             style={{ marginLeft: 'auto' }}
-                            disabled={busyItem === item.id}
+                            disabled={busyItem === item.id || blockedOf(item)}
+                            title={blockedOf(item) ? blockedTitle(item) : 'Create the branch for this item'}
                             onClick={(e) => { e.stopPropagation(); void startWork(item.id); }}
                           >
                             {busyItem === item.id ? <span className="spinner" /> : <GitBranchIcon />}

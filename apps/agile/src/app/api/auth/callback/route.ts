@@ -1,71 +1,62 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { config } from '@/lib/env';
-import { exchangeCodeForToken, fetchAuthenticatedUser } from '@/lib/auth/github-oauth';
-import { checkTeamMembership } from '@/lib/auth/team';
+import { authProvider } from '@/lib/auth/providers';
 import {
   OAUTH_STATE_COOKIE,
   SESSION_COOKIE,
   SESSION_TTL_SECONDS,
   sealSession,
-  verifyOAuthState,
 } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * OAuth callback. This is the only place a session is ever minted, and it is
- * minted ONLY after an active team membership has been confirmed.
+ * Provider callback. This is the ONLY place a session is minted, and it is
+ * minted only after the provider has confirmed the caller belongs to the
+ * configured team/group.
  */
 export async function GET(request: NextRequest) {
-  const params = request.nextUrl.searchParams;
+  const provider = authProvider();
+  const stateCookie = request.cookies.get(OAUTH_STATE_COOKIE)?.value;
 
-  if (params.get('error')) {
-    return fail(`GitHub sign-in was cancelled (${params.get('error')}).`);
-  }
-
-  const code = params.get('code');
-  const state = params.get('state');
-  if (!code || !state) return fail('Malformed sign-in response from GitHub.');
-
-  // CSRF: the state must match the one we set, and must verify.
-  const cookieState = request.cookies.get(OAUTH_STATE_COOKIE)?.value;
-  if (!cookieState || cookieState !== state) {
-    return fail('Sign-in state did not match. Please try again.');
-  }
-  const verified = verifyOAuthState(state, config.sessionSecret);
-  if (!verified) return fail('Sign-in state was invalid or expired. Please try again.');
-
-  let token: string;
-  let user: Awaited<ReturnType<typeof fetchAuthenticatedUser>>;
+  let result: Awaited<ReturnType<typeof provider.callback>>;
   try {
-    token = await exchangeCodeForToken({
-      code,
-      clientId: config.githubClientId,
-      clientSecret: config.githubClientSecret,
-      redirectUri: `${config.appUrl}/api/auth/callback`,
-    });
-    user = await fetchAuthenticatedUser(token);
+    result = await provider.callback(request.nextUrl.searchParams, stateCookie);
   } catch (err) {
-    console.error('[auth] token exchange failed', err);
-    return fail('Could not complete GitHub sign-in. Please try again.');
+    console.error('[auth] callback failed', err);
+    result = {
+      ok: false,
+      reason: 'exchange-failed',
+      message: 'Could not complete sign-in. Please try again.',
+    };
   }
 
-  // THE authorization gate.
-  const decision = await checkTeamMembership(user.login, token);
-  if (!decision.allowed) {
-    const res = NextResponse.redirect(
-      new URL(`/denied?reason=${decision.reason}&login=${encodeURIComponent(user.login)}`, config.appUrl),
-    );
+  if (!result.ok) {
+    // A failed authorization goes to /denied; a broken handshake goes back to
+    // /login, because retrying is the right action there.
+    const target =
+      result.reason === 'not-a-member' || result.reason === 'invitation-pending'
+        ? `/denied?reason=${result.reason}${result.login ? `&login=${encodeURIComponent(result.login)}` : ''}`
+        : `/login?error=${encodeURIComponent(result.message)}`;
+
+    const res = NextResponse.redirect(new URL(target, config.appUrl));
     res.cookies.set(OAUTH_STATE_COOKIE, '', { path: '/', maxAge: 0 });
     return res;
   }
 
   const session = sealSession(
-    { login: user.login, name: user.name, avatarUrl: user.avatarUrl, token },
+    {
+      login: result.identity.login,
+      name: result.identity.name,
+      avatarUrl: result.identity.avatarUrl,
+      token: result.identity.githubToken ?? '',
+      groups: result.identity.groups,
+      provider: provider.id,
+    },
     config.sessionSecret,
   );
 
-  const res = NextResponse.redirect(new URL(verified.returnTo, config.appUrl));
+  const res = NextResponse.redirect(new URL(result.returnTo, config.appUrl));
   res.cookies.set(SESSION_COOKIE, session, {
     httpOnly: true,
     secure: config.isProduction,
@@ -75,10 +66,4 @@ export async function GET(request: NextRequest) {
   });
   res.cookies.set(OAUTH_STATE_COOKIE, '', { path: '/', maxAge: 0 });
   return res;
-}
-
-function fail(message: string) {
-  return NextResponse.redirect(
-    new URL(`/login?error=${encodeURIComponent(message)}`, config.appUrl),
-  );
 }

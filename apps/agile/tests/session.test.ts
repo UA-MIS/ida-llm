@@ -16,6 +16,8 @@ const identity = {
   name: 'Mona Lisa',
   avatarUrl: 'https://avatars.githubusercontent.com/u/1?v=4',
   token: 'gho_supersecrettoken',
+  groups: ['UA-MIS:ida-llm'],
+  provider: 'oidc' as const,
 };
 
 describe('session cookie', () => {
@@ -23,6 +25,22 @@ describe('session cookie', () => {
     const cookie = sealSession(identity, SECRET);
     const out = unsealSession(cookie, SECRET);
     expect(out).toMatchObject(identity);
+  });
+
+  it('carries the groups and provider that authorization depends on', () => {
+    const out = unsealSession(sealSession(identity, SECRET), SECRET);
+    expect(out?.groups).toEqual(['UA-MIS:ida-llm']);
+    expect(out?.provider).toBe('oidc');
+  });
+
+  it('defaults groups/provider when a caller omits them', () => {
+    const cookie = sealSession(
+      { login: 'a', name: 'a', avatarUrl: '', token: '' },
+      SECRET,
+    );
+    const out = unsealSession(cookie, SECRET);
+    expect(out?.groups).toEqual([]);
+    expect(out?.provider).toBe('github');
   });
 
   it('does NOT leak the GitHub token in the cookie text', () => {

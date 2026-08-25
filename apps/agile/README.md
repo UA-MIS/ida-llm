@@ -9,8 +9,9 @@ flowing back onto the board — plus a **full REST API** so the board can be dri
 by a script or an agent, not only by hand.
 
 > **Access is restricted to members of a configured GitHub team.**
-> Tenant apps on this platform are public by default, so this app performs its
-> own GitHub OAuth and team-membership check. See [Authentication](#authentication).
+> Tenant apps on this platform are public by default, so this app authenticates
+> and authorizes on its own — Dex OIDC, gated on the `groups` claim. See
+> [Authentication](#authentication).
 
 **Nothing about a particular org, team or repo is hardcoded.** A second instance
 for another class is a different set of environment variables and no code change —
@@ -20,9 +21,10 @@ see [Deploying another instance](#deploying-another-instance).
 
 ## Contents
 
-- [Stack](#stack) · [Configuration](#configuration) · [GitHub OAuth app](#github-oauth-app)
+- [Stack](#stack) · [Configuration](#configuration) · [Registering the Dex client](#registering-the-dex-client)
 - [Authentication](#authentication) · [API](#api)
-- [Git integration](#git-integration) · [Webhooks](#webhooks)
+- [Sprints](#sprints) · [Dependencies and the Ready queue](#dependencies-and-the-ready-queue)
+- [Git integration](#git-integration) · [Webhooks](#webhooks) · [Multiple repos](#multiple-repos)
 - [State, durability and backup](#state-durability-and-backup)
 - [Deploying another instance](#deploying-another-instance)
 - [Deployment on this platform](#deployment-on-this-platform)
@@ -36,13 +38,13 @@ see [Deploying another instance](#deploying-another-instance).
 |---|---|
 | Framework | Next.js 16 (App Router) + React 19, TypeScript 6 |
 | Database | PostgreSQL, in its own schema (default `agile`) |
-| Auth | GitHub OAuth + team membership; AES-256-GCM encrypted cookie; board-issued API tokens |
+| Auth | Dex OIDC (PKCE) gated on the `groups` claim; AES-256-GCM encrypted cookie; board tokens + GitHub-token passthrough for the API |
 | Files | Any S3-compatible object store (MinIO) — optional |
 | Tests | Vitest — unit + integration against real Postgres |
 
-Dependencies are deliberately lean: `pg`, `zod`, `marked`, `sanitize-html`. No
-ORM, no auth framework, no drag-and-drop library, no AWS SDK (SigV4 is signed
-directly).
+Dependencies are deliberately lean: `pg`, `zod`, `jose`, `marked`,
+`sanitize-html`. No ORM, no auth framework, no drag-and-drop library, no AWS SDK
+(SigV4 is signed directly).
 
 ---
 
@@ -55,13 +57,25 @@ Everything is an environment variable. Only four are required.
 | Variable | Secret | Description |
 |---|---|---|
 | `DATABASE_URL` | yes | PostgreSQL DSN. **Must be PostgreSQL**, not MySQL. |
-| `GITHUB_CLIENT_ID` | no | OAuth app client id. |
-| `GITHUB_CLIENT_SECRET` | **yes** | OAuth app client secret. |
+| `OIDC_CLIENT_ID` | no | Dex static client id (or `GITHUB_CLIENT_ID` when `AUTH_PROVIDER=github`). |
+| `OIDC_CLIENT_SECRET` | **yes** | Dex client secret (or `GITHUB_CLIENT_SECRET`). |
 | `SESSION_SECRET` | **yes** | ≥32 chars. `openssl rand -base64 48`. Rotating it signs everyone out and invalidates API tokens' stored GitHub credentials. |
 
 `APP_URL` is required in production (it builds the OAuth callback URL and the
 links in PR backlink comments): set it to the exact public origin, e.g.
 `https://ida-agile.capstone.uamishub.com`.
+
+### Web sign-in (Dex OIDC)
+
+| Variable | Default | Description |
+|---|---|---|
+| `AUTH_PROVIDER` | `oidc` when `OIDC_ISSUER` is set, else `github` | Identity provider. |
+| `OIDC_ISSUER` | — | e.g. `https://id.capstone.uamishub.com` |
+| `OIDC_CLIENT_ID` | — | Dex static client id. |
+| `OIDC_CLIENT_SECRET` | — | **secret** — Dex advertises only `client_secret_basic`/`_post`, so a confidential client is required even with PKCE. |
+| `OIDC_REDIRECT_URI` | `<APP_URL>/api/auth/callback` | Must match the Dex client exactly. |
+| `OIDC_SCOPES` | `openid profile email groups` | |
+| `REQUIRED_GROUP` | `<GITHUB_ORG>:<GITHUB_TEAM>` | The group that grants access, e.g. `UA-MIS:ida-llm`. |
 
 ### Identity — who this board is for
 
@@ -91,6 +105,14 @@ links in PR backlink comments): set it to the exact public origin, e.g.
 | `AUTO_PROGRESS_ON_PR_MERGE` | `true` | PR merged moves to `Resolved`. |
 | `PR_BACKLINK_COMMENTS` | `true` | Maintain one backlink comment per linked PR. |
 | `PR_COMMIT_STATUS` | `false` | Also publish a commit status showing the linked item. |
+
+### Dependencies and trunk-based signals
+
+| Variable | Default | Description |
+|---|---|---|
+| `ALLOW_DEPENDENCY_OVERRIDE` | `true` | Allow starting blocked work with a logged reason. |
+| `STALE_BRANCH_DAYS` | `5` | Badge a branch open longer than this. `0` disables. |
+| `STALE_BRANCH_BEHIND` | `20` | Badge a branch this far behind the default branch. `0` disables. |
 
 ### Webhooks and polling
 
@@ -125,61 +147,118 @@ repo's existing convention; `S3_*` are accepted as aliases.
 
 ---
 
-## GitHub OAuth app
+## Registering the Dex client
 
-Create an OAuth app **in the org** (Settings → Developer settings → OAuth Apps):
+A devops owner adds the client in `platform-infra`. Three coordinated edits, per
+`platform-services/dex/README.md`:
 
-- **Homepage URL**: your `APP_URL`
-- **Authorization callback URL**: `<APP_URL>/api/auth/callback`
+1. **`platform-services/dex/configmap.yaml`** — a new `staticClients` entry:
 
-Scopes requested are `read:user read:org` only — no write access. `read:org` is
-required to read team membership.
+   ```yaml
+     - id: ida-agile
+       name: IDA Agile
+       secretEnv: IDA_AGILE_CLIENT_SECRET
+       redirectURIs:
+         - https://ida-agile.capstone.uamishub.com/api/auth/callback
+   ```
 
-> ⚠️ If the org enforces OAuth app access restrictions, the app must be
-> **approved for the org**, or membership lookups return 404 and *everyone* is
-> locked out.
->
+2. **`platform-services/dex/deployment.yaml`** — an `env:` entry sourcing
+   `IDA_AGILE_CLIENT_SECRET` from the `dex-github` secret (mark `optional: true`
+   until the key is sealed, so Dex keeps booting).
+
+3. **Re-seal** `platform-services/dex/sealedsecret.yaml` with the new key, seal
+   the identical value for this app, then
+   `kubectl -n dex rollout restart deploy/dex` — a ConfigMap change does **not**
+   restart Dex on its own.
+
+What this app needs:
+
+| | |
+|---|---|
+| Redirect URI | `https://ida-agile.capstone.uamishub.com/api/auth/callback` (exact) |
+| Client type | **confidential** — Dex advertises only `client_secret_basic`/`_post`; `none` is not offered, so PKCE alone is not enough |
+| PKCE | S256, used by this app |
+| Scopes | `openid profile email groups` |
+| Wildcards | not supported by Dex — one redirect URI per instance |
+
+### Fallback: direct GitHub OAuth
+
+With `AUTH_PROVIDER=github`, register an OAuth app in the org with callback
+`<APP_URL>/api/auth/callback` and scopes `read:user read:org`, and set
+`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`.
+
 > ⚠️ Branch creation and PR comments act as the signed-in user, so that user
-> needs push/write access to the repo. Failures degrade gracefully — they never
+> needs push access to the repo. Those failures degrade gracefully — they never
 > block a state change.
 
 ---
 
 ## Authentication
 
-Two credentials, one authorization rule.
+**Web sign-in is OIDC against Dex** (authorization code + PKCE). Dex is the
+default rather than direct GitHub OAuth because a per-instance GitHub OAuth app
+cannot be provisioned zero-touch: GitHub allows one callback URL per app, so a
+wizard creating twelve team boards would need twelve manual app registrations.
+Dex already federates the GitHub org and is what Harbor/ArgoCD/Grafana use.
 
-**Browser (GitHub OAuth):**
+The provider is behind one interface (`src/lib/auth/providers/`), so swapping it
+is a config change (`AUTH_PROVIDER`), not a rewrite. `github` remains as a
+working fallback implementation.
 
-1. `/api/auth/login` redirects to GitHub with a signed, single-use `state`.
-2. `/api/auth/callback` verifies `state`, exchanges the code, reads the profile,
-   then calls `GET /orgs/{org}/teams/{team}/memberships/{login}`.
-3. A session is minted **only** on `state: "active"`. Everything else — 404, a
-   pending invite, a 5xx, a network error, an unparseable body — is a denial and
-   lands on `/denied`.
-4. The session cookie is **AES-256-GCM encrypted** (not merely signed),
-   HTTP-only, `SameSite=Lax`, 7-day TTL. Encryption is required because the
-   cookie carries the user's GitHub token, used for member and PR lookups.
-5. Membership is **re-checked at most every 10 minutes**, so removing someone
-   from the team revokes access in ~10 minutes rather than whenever their cookie
-   expires.
+### How authorization works
 
-**Machine (board API tokens):** see [`docs/api.md`](docs/api.md). A token acts as
-the human who issued it, is stored only as a SHA-256 hash, and is revoked
-automatically if that person leaves the team.
+Dex's GitHub connector is configured with `teamNameField: slug` and
+`orgs: [UA-MIS]`, so the `groups` claim contains entries of the form
+**`UA-MIS:<team-slug>`** — e.g. `UA-MIS:ida-llm`. Access is granted when the
+claim contains `REQUIRED_GROUP` (default `<GITHUB_ORG>:<GITHUB_TEAM>`).
 
-Failure policy is deliberately asymmetric:
+> Verified against the live Dex at `https://id.capstone.uamishub.com`. The bare
+> org (`UA-MIS`) is **never** emitted as a group, so "any org member" cannot be
+> expressed as a group — which is exactly why the check is on `org:team`.
 
-| Situation | Sign-in | Revalidating an existing session/token |
-|---|---|---|
-| Not a member / pending invite | deny | **revoke** |
-| GitHub 5xx, network error, bad body | deny (fail closed) | **keep** — the user already proved membership; a GitHub outage must not sign out the whole team |
+The ID token is verified properly: signature against Dex's JWKS, plus `issuer`
+and `audience`. `groups` is requested as an essential ID-token claim (the same
+approach ArgoCD uses against this Dex), with `/userinfo` as a fallback.
+
+### Sessions
+
+The session is an **AES-256-GCM encrypted**, HTTP-only, `SameSite=Lax` cookie
+(7-day TTL). Encryption rather than signing because on the GitHub path the
+cookie carries a GitHub token.
+
+Revalidation differs by provider, and the difference is deliberate rather than
+hidden:
+
+| Provider | Freshness of authorization |
+|---|---|
+| `github` | Membership re-read from GitHub every ~10 min, so removal revokes access within ~10 min. |
+| `oidc` | The groups claim is asserted at sign-in. It is re-checked against `REQUIRED_GROUP` on every request (so changing the required group takes effect immediately), but a user removed from the team **upstream** keeps access until their session expires. **Session TTL is the freshness bound.** Shorten `SESSION_TTL` expectations accordingly, or sign the user out. |
+
+Failure policy on the GitHub path: a provable denial revokes; an inconclusive
+lookup (5xx, network) keeps the session, because a GitHub outage must not sign
+out the whole team.
+
+### API authentication
+
+Two credentials, same authorization rule — full detail in [`docs/api.md`](docs/api.md):
+
+1. **Board-issued tokens** — created in the UI, shown once, stored only as a
+   SHA-256 hash, revocable, and auto-revoked if the owner leaves the team.
+   Recommended for CI and anything long-lived.
+2. **GitHub token passthrough** — `Authorization: Bearer $(gh auth token)`.
+   Validated against GitHub, authorized by the same team check. The token is
+   **never persisted**; only the derived identity is cached, keyed by a hash of
+   the token, for five minutes. Needs the `read:org` scope.
+
+   *Tradeoff, stated plainly:* a GitHub token is a far broader credential than a
+   board token. It is the right choice for ad-hoc use from your own machine, and
+   the wrong choice for anything shared or long-lived.
+
+Both are distinguishable in item history (`via API` vs `via API (github token)`).
 
 **The one exempt route** is `POST /api/webhooks/github`: GitHub cannot sign in,
-so that endpoint is authenticated by HMAC signature instead. The exemption is
-scoped to exactly that path; every other route goes through the team gate.
-
----
+so it is authenticated by HMAC signature instead. The exemption is scoped to
+exactly that path.
 
 ## API
 
@@ -247,6 +326,72 @@ re-run progression rules.
    reconcile unattended.
 
 So an unconfigured deployment converges when someone looks, rather than instantly.
+
+---
+
+## Sprints
+
+Sprints are shown as tabs across the top of the board, with dates and item counts.
+
+**One sprint is the board-wide `current` sprint, and it is shared server-side
+state** — not a per-user preference. When anyone sets it, every visitor lands on
+that sprint by default. Who set it and when is recorded and shown.
+
+Browsing and setting are deliberately different actions:
+
+- Clicking a sprint tab changes **only your view**.
+- **"Set as current sprint"** is a separate, explicitly-labelled control with a
+  confirmation, so a casual click cannot reassign the team's default.
+
+The API covers the whole lifecycle — create sprints, assign items, and advance
+the current sprint — so a semester can be seeded and driven programmatically.
+See the *seed a semester* example in [`docs/api.md`](docs/api.md).
+
+---
+
+## Dependencies and the Ready queue
+
+Work items can declare `depends_on` edges, and **the board enforces them** so the
+non-interference scheme is self-serve rather than something to read in a doc.
+
+- **Cycles are rejected** at creation, with the loop named:
+  `That dependency would create a cycle: #1 → #4 → #1.`
+- **"Start work" is disabled while any dependency is unmet**, and the refusal
+  names the specific blockers with links rather than just greying out.
+- A dependency counts as satisfied once the blocker is `Resolved` or `Closed`.
+  When the last blocker resolves, the item becomes visibly ready.
+- **Override, logged** — a hard block with no escape route gets worked around
+  outside the tool, so there is an explicit one. It requires a reason and is
+  written to item history. Disable with `ALLOW_DEPENDENCY_OVERRIDE=false`.
+- **`wave`** is a first-class field on every item, shown on each card and
+  filterable — the human-readable fallback so nobody grabs Wave-2 work early even
+  where dependencies are not fully encoded.
+
+**The Ready view** (`/ready`, `GET /api/v1/ready`) lists unassigned items whose
+dependencies are all satisfied — the self-serve pickup queue — alongside a
+blocked list showing what everything else is waiting on.
+
+Bulk seeding can declare the entire graph in the same call that creates the
+items, using client-supplied keys. That is the primary use case, and it is
+covered in [`docs/api.md`](docs/api.md).
+
+---
+
+## Multiple repos
+
+The data model is repo-aware from the start, because retrofitting it would touch
+every git-integration path:
+
+- `GITHUB_REPOS` is a **list**; a single-repo tenant is the one-element case.
+- A work item can carry a `repoFullName`. With one repo configured it is filled
+  in automatically and the UI never shows a repo picker.
+- Branch creation targets the item's repo.
+- **PR linking and webhook handling are repo-scoped** — a `push`/`pull_request`
+  event is routed only to items belonging to that repository, and `AB#42` in one
+  repo will not attach to item 42 if that item belongs to another.
+
+Only single-repo behaviour is exercised today; a maintainer-facing board tracking
+several repos is a later instance, not a feature of this one.
 
 ---
 
@@ -346,10 +491,20 @@ to `tls.hosts`) — see `.devops/README.md`, which already documents this.
 startup.
 
 **Secrets to seed in Vault** at `secret/tenants/ida-llm/prod/app`:
-`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SESSION_SECRET`,
-`GITHUB_WEBHOOK_SECRET` (optional), plus `APP_URL`. Only `APP_SECRET` and
-`DATABASE_URL` are pre-wired in `base/deployments.yaml`, so each new variable
-also needs an `env.valueFrom.secretKeyRef` entry.
+
+| Variable | Value for this deployment |
+|---|---|
+| `OIDC_ISSUER` | `https://id.capstone.uamishub.com` |
+| `OIDC_CLIENT_ID` | `ida-agile` |
+| `OIDC_CLIENT_SECRET` | **secret** — same value sealed into the Dex `dex-github` secret |
+| `SESSION_SECRET` | **secret** — `openssl rand -base64 48` |
+| `APP_URL` | `https://ida-agile.capstone.uamishub.com` |
+| `REQUIRED_GROUP` | `UA-MIS:ida-llm` (also the default) |
+| `GITHUB_WEBHOOK_SECRET` | optional; enables the webhook fast path |
+| `BOARD_TITLE` | `IDA Agile` |
+
+Only `APP_SECRET` and `DATABASE_URL` are pre-wired in `base/deployments.yaml`, so
+each variable above also needs an `env.valueFrom.secretKeyRef` entry.
 
 ---
 
@@ -389,6 +544,9 @@ application data.
 |---|---|
 | `auth-boundary` | **The authorization gate** — non-members, pending invites and every GitHub failure mode are denied |
 | `revalidate` | Access is revoked after leaving the team; a GitHub outage signs nobody out |
+| `oidc-auth` | Groups-claim authorization (exact `org:team`, no bare-org or prefix match), PKCE, GitHub-token passthrough incl. caching and non-member rejection |
+| `dependencies` | Cycle detection, the readiness gate, override semantics, branch staleness |
+| `deps-integration` | Gate blocks/opens against real Postgres, override logged, shared current sprint, one-call semester seeding |
 | `session` | Cookie encryption, tampering, expiry, open-redirect protection |
 | `api-tokens` | Issue/verify/revoke, hash-only storage, expiry, membership-linked revocation |
 | `idempotency` | Replay, conflict, per-user scoping, purge |

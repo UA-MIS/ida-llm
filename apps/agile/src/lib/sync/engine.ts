@@ -52,13 +52,26 @@ async function applyProgression(
   }
 }
 
-/** Items referenced by `AB#12` / `agile#12` in free text. */
-async function itemsFromText(...texts: Array<string | null | undefined>): Promise<WorkItem[]> {
+/**
+ * Items referenced by `AB#12` / `agile#12` in free text.
+ *
+ * Scoped to the repo the event came from: on a board following several repos,
+ * `AB#12` in repo A must not attach to item 12 if that item belongs to repo B.
+ * An item with no repo (the single-repo case) matches any configured repo.
+ */
+async function itemsFromText(
+  repoFullName: string,
+  ...texts: Array<string | null | undefined>
+): Promise<WorkItem[]> {
   const ids = extractWorkItemRefs(...texts);
   const items: WorkItem[] = [];
   for (const id of ids) {
     const item = await getWorkItem(id);
-    if (item) items.push(item);
+    if (!item) continue;
+    if (item.repoFullName && item.repoFullName.toLowerCase() !== repoFullName.toLowerCase()) {
+      continue;
+    }
+    items.push(item);
   }
   return items;
 }
@@ -84,7 +97,7 @@ export async function handlePush(payload: PushPayload): Promise<SyncOutcome> {
   const byBranch = await findItemByBranch(payload.repoFullName, payload.branch);
 
   // Secondary: commits on ANY branch can name an item in their message.
-  const byMessage = await itemsFromText(...payload.commits.map((c) => c.message));
+  const byMessage = await itemsFromText(payload.repoFullName, ...payload.commits.map((c) => c.message));
 
   const targets = new Map<number, WorkItem>();
   if (byBranch) targets.set(byBranch.id, byBranch);
@@ -143,7 +156,9 @@ export async function handlePullRequest(
   if (byBranch) targets.set(byBranch.id, byBranch);
 
   // 2. Explicit AB#<id> references in the title or body.
-  for (const item of await itemsFromText(pr.title, pr.body)) targets.set(item.id, item);
+  for (const item of await itemsFromText(pr.repoFullName, pr.title, pr.body)) {
+    targets.set(item.id, item);
+  }
 
   // 3. Anything already linked to this PR stays in sync.
   for (const item of await findItemsByPullRequest(pr.repoFullName, pr.number)) {

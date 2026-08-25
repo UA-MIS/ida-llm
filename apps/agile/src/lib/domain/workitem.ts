@@ -86,11 +86,18 @@ export const createWorkItemSchema = z.object({
   priority: z.number().int().min(1).max(4).default(2),
   sprintId: z.number().int().positive().nullable().default(null),
   tags: z.array(tagSchema).max(20).default([]),
+  /** Optional; only meaningful when the board follows more than one repo. */
+  repoFullName: z.string().regex(/^[\w.-]+\/[\w.-]+$/).nullable().default(null),
+  /** Free-form band, e.g. "Wave 1". Kept as text so teams pick their own scheme. */
+  wave: z.string().trim().max(40).nullable().default(null),
 });
 
 export const updateWorkItemSchema = createWorkItemSchema.partial();
 
-export type CreateWorkItemInput = z.infer<typeof createWorkItemSchema>;
+/** What a caller may pass — optional fields get their defaults on parse. */
+export type CreateWorkItemInput = z.input<typeof createWorkItemSchema>;
+/** Fully-defaulted shape after validation. */
+export type ParsedWorkItem = z.output<typeof createWorkItemSchema>;
 export type UpdateWorkItemInput = z.infer<typeof updateWorkItemSchema>;
 
 export const sprintSchema = z
@@ -99,13 +106,15 @@ export const sprintSchema = z
     goal: z.string().max(2000).default(''),
     startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD'),
     endsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD'),
+    position: z.number().int().min(0).default(0),
   })
   .refine((s) => s.endsOn >= s.startsOn, {
     message: 'Sprint end date must not be before its start date',
     path: ['endsOn'],
   });
 
-export type SprintInput = z.infer<typeof sprintSchema>;
+export type SprintInput = z.input<typeof sprintSchema>;
+export type ParsedSprint = z.output<typeof sprintSchema>;
 
 /** Who or what performed a change. */
 export type ActorSource = 'user' | 'api' | 'github' | 'system';
@@ -147,7 +156,16 @@ export interface WorkItem {
   branchName: string | null;
   branchRepo: string | null;
   branchUrl: string | null;
+  branchCreatedAt: string | null;
   lastActivityAt: string;
+  /** Repo this item belongs to. Null when the board follows a single repo. */
+  repoFullName: string | null;
+  /** Human-readable ordering band, shown on every card and filterable. */
+  wave: string | null;
+  /** Merged PR count — the trunk-based progress signal. Commits are activity. */
+  mergedPrCount: number;
+  depOverrideBy: string | null;
+  depOverrideReason: string | null;
 }
 
 export interface CommitRef {
@@ -196,6 +214,9 @@ export interface Sprint {
   goal: string;
   startsOn: string;
   endsOn: string;
+  position: number;
+  /** Filled in by list queries so the selector can show counts without N calls. */
+  itemCount?: number;
 }
 
 export interface Comment {
