@@ -32,6 +32,7 @@ import {
   type SprintRow,
   type WorkItemRow,
 } from './mappers';
+import type { LinkedPullRequest } from './board-prs';
 
 const instance = () => config.instanceKey;
 
@@ -610,6 +611,29 @@ export async function linkPullRequest(
     ],
   );
   return mapPullRequest(row!);
+}
+
+/**
+ * Every pull request attached to an item on this board, open and merged alike.
+ *
+ * This is the SAME source `boardSummary` counts (`pull_request_links`), which
+ * is the point: board bug AB#29 was `/api/v1/prs` reading GitHub's open-PR list
+ * instead, so the endpoint and the summary could not agree by construction.
+ *
+ * Scoped by `instance_key` through the item, exactly like the summary's merged
+ * count -- including items in `Removed`, because the summary counts those too
+ * and one endpoint quietly filtering differently is how the two drift again.
+ */
+export async function listLinkedPullRequests(): Promise<LinkedPullRequest[]> {
+  const rows = await query<PullRequestLinkRow & { item_title: string }>(
+    `SELECT pl.*, wi.title AS item_title
+       FROM pull_request_links pl
+       JOIN work_items wi ON wi.id = pl.item_id
+      WHERE wi.instance_key = $1
+      ORDER BY pl.last_synced_at DESC NULLS LAST, pl.repo_full_name ASC, pl.pr_number DESC`,
+    [instance()],
+  );
+  return rows.map((row) => ({ ...mapPullRequest(row), itemTitle: row.item_title }));
 }
 
 export async function recordPrLinkActivity(
