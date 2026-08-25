@@ -142,9 +142,16 @@ jobs:
           --health-cmd "pg_isready -U ida"
           --health-interval 5s --health-timeout 5s --health-retries 20
     env:
-      # Service containers are siblings on the same network and reachable by
-      # their service label as hostname.
-      DATABASE_URL: postgresql://ida:ci-throwaway@postgres:5432/ida_llm_ci
+      # ⚠ 127.0.0.1, NOT the service label `postgres`. On GitHub-hosted runners a
+      # `services:` container is a sibling on a Docker network, reachable by its
+      # label as a hostname. Under ARC `containerMode: kubernetes` it is instead an
+      # ADDITIONAL CONTAINER IN THE SAME POD, so it shares the pod's network
+      # namespace and is reachable on loopback — the label resolves to nothing and
+      # psycopg fails with `[Errno -2] Name or service not known`.
+      # Confirmed the hard way on this repo's first CI run (job 97647097184), and
+      # it matches what the other tenant on this platform actually uses (whose
+      # comment says "sibling" while its env says 127.0.0.1 — the env is right).
+      DATABASE_URL: postgresql://ida:ci-throwaway@127.0.0.1:5432/ida_llm_ci
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
