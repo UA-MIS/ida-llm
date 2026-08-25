@@ -219,13 +219,34 @@ PY
 # that can be answered by anything on the path.
 PY_PROBE='
 import os, urllib.error, urllib.request
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse every 3xx instead of following it.
+
+    ⚠ THIS IS A CREDENTIAL CONTAINMENT CONTROL, NOT A TIDINESS PREFERENCE.
+    urllib re-sends every header except Content-Length/Content-Type when it
+    follows a redirect, INCLUDING Authorization, and it does so ACROSS HOSTS.
+    So a same-host token realm answering 302 walks the harbor robot straight
+    past the same-host check in bearer_token_for -- reproduced end to end on
+    CPython 3.12. curl (the prod transport) never followed redirects here
+    because it is invoked without -L; this makes the CI transport agree.
+    Returning None turns the 3xx into an HTTPError, so it lands as a non
+    200/404 status and the caller classifies it inconclusive -> refuse.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 mode = os.environ.get("PROBE_MODE", "status")
 request = urllib.request.Request(os.environ["PROBE_URL"], method="GET")
 request.add_header("Accept", os.environ["PROBE_ACCEPT"])
 if os.environ.get("PROBE_AUTH"):
     request.add_header("Authorization", os.environ["PROBE_AUTH"])
 try:
-    response = urllib.request.urlopen(request, timeout=float(os.environ["PROBE_TIMEOUT_S"]))
+    opener = urllib.request.build_opener(NoRedirect)
+    response = opener.open(request, timeout=float(os.environ["PROBE_TIMEOUT_S"]))
     status, headers, body = response.status, response.headers, response.read()
 except urllib.error.HTTPError as exc:
     status, headers, body = exc.code, exc.headers, b""
@@ -247,6 +268,10 @@ http_get() {
   local url="$1" auth="${2:-}" mode="${3:-status}" out=""
   case "${HTTP_CLIENT}" in
     curl)
+      # ⚠ NO -L, DELIBERATELY. Following a redirect would forward the
+      # Authorization header off-host and defeat bearer_token_for's same-host
+      # check (see the NoRedirect handler in PY_PROBE for the same control on
+      # the other transport). A 3xx must stay a 3xx so it reads as inconclusive.
       local args=(-s --connect-timeout 5 -m "${PROBE_TIMEOUT}" -H "Accept: ${ACCEPT_MANIFESTS}")
       [ -n "${auth}" ] && args+=(-H "Authorization: ${auth}")
       case "${mode}" in
@@ -371,12 +396,21 @@ tag_state() {
 
 # The component image refs to check: every `newName` in <from>'s overlay, each at
 # LIVE_TAG (the block above already proved they all carry that one tag).
+# ⚠ `|| true` ON BOTH READS, AND IT IS LOAD-BEARING. Under `set -e -o pipefail`
+# a grep that matches NOTHING exits 1 and takes the whole script with it -- so
+# the "could not read any images[].newName" message three lines below could never
+# print, and an overlay with no newName entries showed up on the prod button as a
+# bare `exit 1` with no explanation. The empty-check IS the error path; let it run.
 if command -v yq >/dev/null 2>&1; then
-  IMAGE_NAMES="$(yq -r '.images[].newName' "${FROM_KUSTOMIZATION}")"
+  IMAGE_NAMES="$(yq -r '.images[].newName' "${FROM_KUSTOMIZATION}" 2>/dev/null || true)"
 else
   IMAGE_NAMES="$(grep -E '^[[:space:]]*newName:' "${FROM_KUSTOMIZATION}" \
-                 | sed -E 's/^[[:space:]]*newName:[[:space:]]*//; s/[[:space:]]*#.*$//; s/[[:space:]]*$//; s/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/')"
+                 | sed -E 's/^[[:space:]]*newName:[[:space:]]*//; s/[[:space:]]*#.*$//; s/[[:space:]]*$//; s/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/' || true)"
 fi
+# yq prints the literal `null` for an entry with no newName -- one line per entry,
+# so this is a filter, not an equality test. Blank lines go too: what remains is
+# exactly the set of real image names, and "nothing remains" is the error case below.
+IMAGE_NAMES="$(printf '%s\n' "${IMAGE_NAMES}" | sed '/^null$/d; /^[[:space:]]*$/d' || true)"
 if [ -z "${IMAGE_NAMES}" ]; then
   echo "could not read any images[].newName from ${FROM_KUSTOMIZATION} — refusing to promote a set of components I cannot verify" >&2
   exit 1

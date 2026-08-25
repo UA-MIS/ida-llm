@@ -276,6 +276,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 KNOWN = {t for t in os.environ.get("MOCK_TAGS", "").split(",") if t}
 AUTH_MODE = os.environ.get("MOCK_AUTH_MODE", "")
+# Hostile-registry knobs, used only by the credential-containment cases.
+REALM_HOST = os.environ.get("MOCK_REALM_HOST", "")      # advertise a realm HERE
+TOKEN_REDIRECT = os.environ.get("MOCK_TOKEN_REDIRECT", "")  # 302 the realm to HERE
+THIEF_LOG = os.environ.get("MOCK_THIEF_LOG", "")        # be the thief; log to HERE
 GOOD_TOKEN = "token-with-pull"
 ANON_TOKEN = "token-without-pull"
 
@@ -296,12 +300,29 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def _token_endpoint(self):
+        if TOKEN_REDIRECT:
+            # The redirect that defeats a naive same-host check: this realm IS on
+            # the registry host, so the guard passes -- and then hands the client
+            # somewhere else entirely.
+            return self._send(
+                302, headers=[("Location", "http://%s/service/token" % TOKEN_REDIRECT)]
+            )
         # A credential earns a token that can pull; anonymity earns one that cannot.
         got_credential = bool(self.headers.get("Authorization"))
         token = GOOD_TOKEN if got_credential else ANON_TOKEN
         self._send(200, json.dumps({"token": token}).encode())
 
     def _respond(self):
+        if THIEF_LOG:
+            # The hostile endpoint. It records whether the harbor credential
+            # reached it, and hands back a WORKING token -- so a leak does not
+            # merely log, it makes the promotion SUCCEED. That way the F-5 cases
+            # fail twice over if the containment ever regresses: on the refusal
+            # assertion and on the credential assertion.
+            with open(THIEF_LOG, "a") as handle:
+                handle.write("AUTH=%s\n" % (self.headers.get("Authorization") or "NONE"))
+            return self._send(200, json.dumps({"token": GOOD_TOKEN}).encode())
+
         path = self.path.split("?", 1)[0]
         if path == "/service/token":
             return self._token_endpoint()
@@ -313,7 +334,9 @@ class Handler(BaseHTTPRequestHandler):
             repo = ""
             if path.startswith("/v2/") and "/manifests/" in path:
                 repo = path[len("/v2/"):].split("/manifests/", 1)[0]
-            realm = "http://%s/service/token" % self.headers.get("Host", "127.0.0.1")
+            realm = "http://%s/service/token" % (
+                REALM_HOST or self.headers.get("Host", "127.0.0.1")
+            )
             challenge = 'Bearer realm="%s",service="mock-registry",scope="repository:%s:pull"' % (realm, repo)
             return self._send(401, headers=[("WWW-Authenticate", challenge)])
 
@@ -345,7 +368,9 @@ start_mock_registry() {
   # $2 = auth mode: "" (open), "basic", or "bearer" (what the real Harbor does).
   local tags="$1" mode="${2:-}" portfile i
   portfile="$(mktemp)"
-  MOCK_TAGS="${tags}" MOCK_AUTH_MODE="${mode}" python3 "${MOCK_REGISTRY_PY}" >"${portfile}" 2>/dev/null &
+  MOCK_TAGS="${tags}" MOCK_AUTH_MODE="${mode}" \
+    MOCK_REALM_HOST="${MOCK_REALM_HOST:-}" MOCK_TOKEN_REDIRECT="${MOCK_TOKEN_REDIRECT:-}" \
+    python3 "${MOCK_REGISTRY_PY}" >"${portfile}" 2>/dev/null &
   MOCK_PID=$!
   for i in $(seq 1 100); do
     MOCK_PORT="$(head -1 "${portfile}" 2>/dev/null | tr -dc '0-9')"
@@ -354,6 +379,33 @@ start_mock_registry() {
   done
   return 1
 }
+# The off-host endpoint the containment cases try to leak the credential to.
+THIEF_PID=""
+THIEF_PORT=""
+THIEF_LOG_FILE=""
+start_thief() {
+  local portfile i
+  portfile="$(mktemp)"
+  THIEF_LOG_FILE="$(mktemp)"
+  MOCK_THIEF_LOG="${THIEF_LOG_FILE}" python3 "${MOCK_REGISTRY_PY}" >"${portfile}" 2>/dev/null &
+  THIEF_PID=$!
+  for i in $(seq 1 100); do
+    THIEF_PORT="$(head -1 "${portfile}" 2>/dev/null | tr -dc '0-9')"
+    [ -n "${THIEF_PORT}" ] && return 0
+    sleep 0.1
+  done
+  return 1
+}
+stop_thief() {
+  [ -n "${THIEF_PID}" ] && kill "${THIEF_PID}" 2>/dev/null
+  wait "${THIEF_PID}" 2>/dev/null
+  THIEF_PID=""
+}
+# Did the harbor credential reach the off-host endpoint?
+thief_saw_credential() {
+  grep -q 'AUTH=Basic' "${THIEF_LOG_FILE}" 2>/dev/null && printf 'yes' || printf 'no'
+}
+
 stop_mock_registry() {
   [ -n "${MOCK_PID}" ] && kill "${MOCK_PID}" 2>/dev/null
   wait "${MOCK_PID}" 2>/dev/null
@@ -550,69 +602,166 @@ else
   FAIL=$((FAIL+1)); echo "FAIL [docker-config auth]: mock registry never started"
 fi
 
-# ── 14-16: THE REAL REGISTRY'S AUTH SHAPE ──────────────────────────────────
+# ── 14-18: THE REAL REGISTRY'S AUTH SHAPE, ON BOTH TRANSPORTS ──────────────
 # Verified against harbor.capstone.uamishub.com before these were written: an
 # anonymous manifest GET there returns
 #   401 WWW-Authenticate: Bearer realm="https://…/service/token",service="harbor-registry",…
 # NOT a Basic challenge. So the check has to exchange the credential at the realm
-# for a scoped token and retry. These three cases are the difference between a
-# guard that works in production and one that refuses every promotion forever --
-# a mode that "fails closed" and would therefore have looked fine in review.
+# for a scoped token and retry.
+#
+# ⚠ EVERY CASE BELOW RUNS ON BOTH CLIENTS, and that is the point of the loop.
+# Case 12 pins each transport but only against an OPEN registry, where the
+# anonymous GET returns 200 immediately and the challenge/token-exchange code
+# never executes. So the Bearer dance was only ever covered on whichever client
+# happened to be default -- python3 in CI, curl locally -- which left the CI gate
+# never touching the transport PRODUCTION uses. Pinning it per case fixes that,
+# and it is load-bearing for case 18, where the two transports differ.
+for BEARER_CLIENT in curl python3; do
+  if ! command -v "${BEARER_CLIENT}" >/dev/null 2>&1; then
+    echo "NOTE: ${BEARER_CLIENT} not available — skipping the Bearer-dance cases on that transport"
+    continue
+  fi
 
-# 14) Bearer challenge + a credential -> the token dance resolves, promote proceeds.
-if start_mock_registry "team-sample/myapp-frontend:1.2.3,team-sample/myapp-backend:1.2.3" bearer; then
-  R14="$(make_repo_at "127.0.0.1:${MOCK_PORT}/team-sample")"
-  PK14="${R14}/.devops/chart/overlays/prod/kustomization.yaml"
-  HARBOR_USERNAME=robot HARBOR_PASSWORD=secret \
-    bash "${R14}/.devops/ci/promote.sh" staging prod >/tmp/promote.log 2>&1; RC=$?
-  assert_eq "bearer promote rc"       "${RC}" "0"
-  assert_eq "bearer promote prod tag" "$(count_tag '1.2.3' "${PK14}")" "2"
-  stop_mock_registry
-else
-  FAIL=$((FAIL+1)); echo "FAIL [bearer promote]: mock registry never started"
-fi
+  # 14) Bearer challenge + a credential -> the token dance resolves, promote proceeds.
+  if start_mock_registry "team-sample/myapp-frontend:1.2.3,team-sample/myapp-backend:1.2.3" bearer; then
+    R14="$(make_repo_at "127.0.0.1:${MOCK_PORT}/team-sample")"
+    PK14="${R14}/.devops/chart/overlays/prod/kustomization.yaml"
+    HARBOR_USERNAME=robot HARBOR_PASSWORD=secret REGISTRY_HTTP_CLIENT="${BEARER_CLIENT}" \
+      bash "${R14}/.devops/ci/promote.sh" staging prod >/tmp/promote.log 2>&1; RC=$?
+    assert_eq "bearer promote rc (${BEARER_CLIENT})"       "${RC}" "0"
+    assert_eq "bearer promote prod tag (${BEARER_CLIENT})" "$(count_tag '1.2.3' "${PK14}")" "2"
+    stop_mock_registry
+  else
+    FAIL=$((FAIL+1)); echo "FAIL [bearer promote ${BEARER_CLIENT}]: mock registry never started"
+  fi
 
-# 15) ⚠ THE AB#34 REGRESSION, THROUGH THE REAL AUTH PATH. A guard that only ever
-#     resolves 200s is half a guard: the token dance has to surface a 404 too.
-#     This is case 9 again, but reached the way production reaches it.
-if start_mock_registry "team-sample/myapp-frontend:1.2.3" bearer; then
-  R15="$(make_repo_at "127.0.0.1:${MOCK_PORT}/team-sample")"
-  PK15="${R15}/.devops/chart/overlays/prod/kustomization.yaml"
-  BEFORE15="$(cat "${PK15}")"
-  HARBOR_USERNAME=robot HARBOR_PASSWORD=secret \
-    bash "${R15}/.devops/ci/promote.sh" staging prod >/tmp/promote.log 2>&1; RC=$?
-  assert_eq "bearer missing rc"           "${RC}" "1"
-  assert_eq "bearer missing wrote nothing" "$(cat "${PK15}")" "${BEFORE15}"
-  if grep -q 'myapp-backend:1\.2\.3' /tmp/promote.log; then
+  # 15) ⚠ THE AB#34 REGRESSION, THROUGH THE REAL AUTH PATH. A guard that only ever
+  #     resolves 200s is half a guard: the token dance has to surface a 404 too.
+  if start_mock_registry "team-sample/myapp-frontend:1.2.3" bearer; then
+    R15="$(make_repo_at "127.0.0.1:${MOCK_PORT}/team-sample")"
+    PK15="${R15}/.devops/chart/overlays/prod/kustomization.yaml"
+    BEFORE15="$(cat "${PK15}")"
+    HARBOR_USERNAME=robot HARBOR_PASSWORD=secret REGISTRY_HTTP_CLIENT="${BEARER_CLIENT}" \
+      bash "${R15}/.devops/ci/promote.sh" staging prod >/tmp/promote.log 2>&1; RC=$?
+    assert_eq "bearer missing rc (${BEARER_CLIENT})"            "${RC}" "1"
+    assert_eq "bearer missing wrote nothing (${BEARER_CLIENT})" "$(cat "${PK15}")" "${BEFORE15}"
+    if grep -q 'myapp-backend:1\.2\.3' /tmp/promote.log; then
+      PASS=$((PASS+1))
+    else
+      FAIL=$((FAIL+1)); echo "FAIL [bearer missing names the image (${BEARER_CLIENT})]: log did not cite myapp-backend:1.2.3"
+    fi
+    stop_mock_registry
+  else
+    FAIL=$((FAIL+1)); echo "FAIL [bearer missing ${BEARER_CLIENT}]: mock registry never started"
+  fi
+
+  # 16) No credential against a bearer registry. The realm hands out a token to
+  #     anyone, but an anonymous one carries no pull rights and the retry is 401
+  #     again -- live-confirmed behaviour. That must read as INCONCLUSIVE (refuse),
+  #     never as "missing", which would blame the image for a credential problem
+  #     and send someone rebuilding a tag that was fine.
+  if start_mock_registry "team-sample/myapp-frontend:1.2.3,team-sample/myapp-backend:1.2.3" bearer; then
+    R16="$(make_repo_at "127.0.0.1:${MOCK_PORT}/team-sample")"
+    PK16="${R16}/.devops/chart/overlays/prod/kustomization.yaml"
+    REGISTRY_HTTP_CLIENT="${BEARER_CLIENT}" \
+      bash "${R16}/.devops/ci/promote.sh" staging prod >/tmp/promote.log 2>&1; RC=$?
+    assert_eq "bearer anon rc (${BEARER_CLIENT})"            "${RC}" "1"
+    assert_eq "bearer anon wrote nothing (${BEARER_CLIENT})" "$(count_tag '1.2.3' "${PK16}")" "0"
+    if grep -qi 'could not confirm' /tmp/promote.log; then
+      PASS=$((PASS+1))
+    else
+      FAIL=$((FAIL+1)); echo "FAIL [bearer anon is inconclusive (${BEARER_CLIENT})]: expected a 'could not confirm' refusal, not a 'does not exist' one"
+    fi
+    stop_mock_registry
+  else
+    FAIL=$((FAIL+1)); echo "FAIL [bearer anon ${BEARER_CLIENT}]: mock registry never started"
+  fi
+
+  # ── 17-18: CREDENTIAL CONTAINMENT. THE HARBOR ROBOT MUST NOT LEAVE ITS HOST ──
+  #
+  # promote.sh sends the registry credential to the token realm named in the
+  # challenge -- and the challenge is ATTACKER-INFLUENCED DATA. Honouring an
+  # arbitrary realm would mail the harbor robot to whatever host a compromised or
+  # hostile registry named. The code guards against that; until these cases
+  # existed, DELETING that guard left the suite fully green, so it was prose.
+  #
+  # Both cases stand up a real off-host "thief" that logs whether the credential
+  # arrived AND returns a WORKING token -- so a containment failure does not merely
+  # get logged, it makes the promotion SUCCEED. Each case therefore reddens twice.
+
+  # 17) The blunt attempt: the challenge names a realm on a different host.
+  if start_thief; then
+    if MOCK_REALM_HOST="127.0.0.1:${THIEF_PORT}" \
+       start_mock_registry "team-sample/myapp-frontend:1.2.3,team-sample/myapp-backend:1.2.3" bearer; then
+      R17="$(make_repo_at "127.0.0.1:${MOCK_PORT}/team-sample")"
+      PK17="${R17}/.devops/chart/overlays/prod/kustomization.yaml"
+      HARBOR_USERNAME=robot HARBOR_PASSWORD=SUPERSECRET REGISTRY_HTTP_CLIENT="${BEARER_CLIENT}" \
+        bash "${R17}/.devops/ci/promote.sh" staging prod >/tmp/promote.log 2>&1; RC=$?
+      assert_eq "off-host realm refused (${BEARER_CLIENT})"      "${RC}" "1"
+      assert_eq "off-host realm wrote nothing (${BEARER_CLIENT})" "$(count_tag '1.2.3' "${PK17}")" "0"
+      assert_eq "off-host realm kept the credential (${BEARER_CLIENT})" "$(thief_saw_credential)" "no"
+      stop_mock_registry
+    else
+      FAIL=$((FAIL+1)); echo "FAIL [off-host realm ${BEARER_CLIENT}]: mock registry never started"
+    fi
+    stop_thief
+  else
+    FAIL=$((FAIL+1)); echo "FAIL [off-host realm ${BEARER_CLIENT}]: thief never started"
+  fi
+
+  # 18) ⚠ THE REDIRECT WALK-AROUND. The realm IS on the registry's host, so the
+  #     same-host check passes -- and then it answers 302 to somewhere else.
+  #     urllib re-sends Authorization across hosts when it follows a redirect, so
+  #     the python3 transport used to hand the robot credential to the thief
+  #     while satisfying every stated invariant. curl was never vulnerable (no -L).
+  #     This is the case that distinguishes the transports, which is why the loop
+  #     around it matters.
+  if start_thief; then
+    if MOCK_TOKEN_REDIRECT="127.0.0.1:${THIEF_PORT}" \
+       start_mock_registry "team-sample/myapp-frontend:1.2.3,team-sample/myapp-backend:1.2.3" bearer; then
+      R18="$(make_repo_at "127.0.0.1:${MOCK_PORT}/team-sample")"
+      PK18="${R18}/.devops/chart/overlays/prod/kustomization.yaml"
+      HARBOR_USERNAME=robot HARBOR_PASSWORD=SUPERSECRET REGISTRY_HTTP_CLIENT="${BEARER_CLIENT}" \
+        bash "${R18}/.devops/ci/promote.sh" staging prod >/tmp/promote.log 2>&1; RC=$?
+      assert_eq "redirected realm refused (${BEARER_CLIENT})"       "${RC}" "1"
+      assert_eq "redirected realm wrote nothing (${BEARER_CLIENT})" "$(count_tag '1.2.3' "${PK18}")" "0"
+      assert_eq "redirected realm kept the credential (${BEARER_CLIENT})" "$(thief_saw_credential)" "no"
+      stop_mock_registry
+    else
+      FAIL=$((FAIL+1)); echo "FAIL [redirected realm ${BEARER_CLIENT}]: mock registry never started"
+    fi
+    stop_thief
+  else
+    FAIL=$((FAIL+1)); echo "FAIL [redirected realm ${BEARER_CLIENT}]: thief never started"
+  fi
+done
+
+# 19) AN OVERLAY WITH NO newName MUST EXPLAIN ITSELF. Under `set -e -o pipefail` a
+#     grep that matched nothing killed the script BEFORE its own error message
+#     could print -- so this showed up on the prod button as a bare `exit 1` with
+#     no output at all. Asserting rc alone would not have caught it (it exited 1
+#     either way); the MESSAGE is the regression. Both the yq and no-yq reads are
+#     exercised, since the no-yq path is the one that was broken and the one prod
+#     actually takes (node:24-trixie ships no yq).
+for NONAME_MODE in yq noyq; do
+  if [ "${NONAME_MODE}" = "yq" ] && ! command -v yq >/dev/null 2>&1; then
+    echo "NOTE: yq not installed — skipping the yq no-newName read"
+    continue
+  fi
+  R19="$(make_repo_at "127.0.0.1:1/team-sample")"
+  sed -i '/newName:/d' "${R19}/.devops/chart/overlays/staging/kustomization.yaml"
+  if [ "${NONAME_MODE}" = "noyq" ]; then
+    PATH="${NOYQ_DIR}" bash "${R19}/.devops/ci/promote.sh" staging prod >/tmp/promote.log 2>&1; RC=$?
+  else
+    bash "${R19}/.devops/ci/promote.sh" staging prod >/tmp/promote.log 2>&1; RC=$?
+  fi
+  assert_eq "no-newName rc (${NONAME_MODE})" "${RC}" "1"
+  if grep -q 'newName' /tmp/promote.log; then
     PASS=$((PASS+1))
   else
-    FAIL=$((FAIL+1)); echo "FAIL [bearer missing names the image]: log did not cite myapp-backend:1.2.3"
+    FAIL=$((FAIL+1)); echo "FAIL [no-newName explains itself (${NONAME_MODE})]: refused silently, no message naming newName"
   fi
-  stop_mock_registry
-else
-  FAIL=$((FAIL+1)); echo "FAIL [bearer missing]: mock registry never started"
-fi
-
-# 16) No credential against a bearer registry. The realm hands out a token to
-#     anyone, but an anonymous one carries no pull rights and the retry is 401
-#     again -- live-confirmed behaviour. That must read as INCONCLUSIVE (refuse),
-#     never as "missing" (which would blame the image for a credential problem and
-#     send someone rebuilding a tag that was fine).
-if start_mock_registry "team-sample/myapp-frontend:1.2.3,team-sample/myapp-backend:1.2.3" bearer; then
-  R16="$(make_repo_at "127.0.0.1:${MOCK_PORT}/team-sample")"
-  PK16="${R16}/.devops/chart/overlays/prod/kustomization.yaml"
-  bash "${R16}/.devops/ci/promote.sh" staging prod >/tmp/promote.log 2>&1; RC=$?
-  assert_eq "bearer anon rc"           "${RC}" "1"
-  assert_eq "bearer anon wrote nothing" "$(count_tag '1.2.3' "${PK16}")" "0"
-  if grep -qi 'could not confirm' /tmp/promote.log; then
-    PASS=$((PASS+1))
-  else
-    FAIL=$((FAIL+1)); echo "FAIL [bearer anon is inconclusive]: expected a 'could not confirm' refusal, not a 'does not exist' one"
-  fi
-  stop_mock_registry
-else
-  FAIL=$((FAIL+1)); echo "FAIL [bearer anon]: mock registry never started"
-fi
+done
 
 fi
 
