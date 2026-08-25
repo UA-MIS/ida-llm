@@ -1173,7 +1173,22 @@ class RunRecord(BaseModel):
     :attr:`ResultRecord.task_content_sha` -- this is the comparability key."""
 
     harness_version: str
-    """``ida_harness.__version__`` that executed the run."""
+    """D-1: the git SHA of the build that executed the run, or ``"unknown"``.
+
+    Produced by :func:`ida_core.gitmeta.build_identity`, so it is the same
+    identifier ``task_git_sha`` uses and is right by construction inside an image
+    (``IDA_GIT_SHA`` is baked in at build time).
+
+    ⚠ IT IS NOT ``ida_harness.__version__``, which is what this used to be: a
+    hardcoded ``"0.1.0"`` that no release step ever wrote to, recorded on every
+    row as though it identified a build. ``"unknown"`` is the honest answer when
+    the build cannot be identified -- deliberately not version-shaped, so it can
+    never be mistaken for a release.
+
+    ⚠ Rows written before ``ida_0004_harness_build_identity`` still carry the old
+    literal. They were never truthful and cannot be made so retroactively; only
+    new runs get a real answer.
+    """
 
     serving_config: ServingConfig | None = None
     """Resolved at claim time; ``None`` while still ``queued``."""
@@ -1252,7 +1267,10 @@ class EvalLog(BaseModel):
     sweep_id: str | None = None
     model_key: str
     serving_config: ServingConfig
+
     harness_version: str
+    """The build that produced this log.  See :attr:`RunRecord.harness_version`."""
+
     status: RunStatus
     results: list[ResultRecord]
     transcripts: list[SampleTranscript]

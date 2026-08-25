@@ -1232,3 +1232,58 @@ class TestObjectStoreIsOptional:
 
         sweeps.build_context(Settings(), need_artifacts=True)
         assert built == [True]
+
+
+# ------------------------------------------------------------ provenance ----
+
+
+class TestEnqueuedRowsCarryTheBuildIdentity:
+    """A sweep's rows must name the build that will execute them (D-1).
+
+    THE BUG THIS CLOSES. ``harness_version`` was ``ida_harness.__version__``, a
+    hardcoded ``"0.1.0"`` no release step has ever written to -- so every row the
+    nightly CronJobs have ever written claims a version that identifies nothing.
+    The sweeps are the biggest single writer of run rows in the platform, which
+    makes them the biggest single source of that false provenance.
+
+    ⚠ The worker later OVERWRITES this field with the harness's own answer
+    (``worker.py``: ``eval_log.harness_version or build_identity()``). Both sides
+    call the same resolver, so they agree -- but the enqueue value is what a row
+    carries for as long as it sits ``queued``, and "wrong until something fixes
+    it" is not a standard worth keeping.
+    """
+
+    def _enqueued_rows(self, ctx):
+        report = run_rebenchmark(ctx)
+        assert report.enqueued > 0, "nothing enqueued -- the assertion below would be vacuous"
+        run_ids = []
+        while (message := ctx.queue.dequeue(timeout_s=0)) is not None:
+            run_ids.append(message.run_id)
+        with session_scope(ctx.session_factory) as session:
+            return [get_run(session, run_id) for run_id in run_ids]
+
+    def test_the_rows_carry_the_build_sha(self, ctx, monkeypatch) -> None:
+        monkeypatch.setenv("IDA_GIT_SHA", "9" * 40)
+        rows = self._enqueued_rows(ctx)
+        assert {r.harness_version for r in rows} == {"9" * 40}
+
+    def test_the_rows_never_carry_the_old_hardcoded_constant(
+        self, ctx, monkeypatch, tmp_path
+    ) -> None:
+        """Outside a build the answer is ``"unknown"`` -- honest, not invented."""
+        monkeypatch.delenv("IDA_GIT_SHA", raising=False)
+        monkeypatch.chdir(tmp_path)
+        rows = self._enqueued_rows(ctx)
+        assert {r.harness_version for r in rows} == {"unknown"}
+
+    def test_a_full_sha_survives_the_round_trip_through_the_column(self, ctx, monkeypatch) -> None:
+        """⚠ ``VARCHAR(32)`` COULD NOT HOLD THIS -- see migration 0004.
+
+        ``"0.1.0"`` fit in the old width; a 40-character SHA does not. SQLite
+        does not enforce VARCHAR lengths, so this asserts the LENGTH survives
+        rather than trusting the database to complain -- on Postgres it would
+        have been a rejected INSERT in production.
+        """
+        monkeypatch.setenv("IDA_GIT_SHA", "8" * 40)
+        rows = self._enqueued_rows(ctx)
+        assert all(len(r.harness_version) == 40 for r in rows)

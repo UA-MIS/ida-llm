@@ -282,12 +282,65 @@ is the test that keeps it honest.
 | `judge_serving_config` | result | which model produced the *grade* (D-1 applied to the judge, not just the model under test) |
 | `repeat_index` | result | which repetition — reserved for self-consistency / pass@k |
 | `cached` | result | whether this came from cache (so `cost_usd` and `latency_ms` are 0, not fabricated) |
+| `harness_version` | run | which **build** executed it — the git SHA, or `"unknown"` |
 
 `task_git_sha` is baked into the image at build time as `IDA_GIT_SHA` — a
 container has no `.git`. `Dockerfile.python` takes `ARG GIT_SHA` and the Kaniko
 step in `build-and-push.yaml` passes `--build-arg=GIT_SHA=${{ github.sha }}`.
 **Both halves are required**; with either missing, `gitmeta.is_sha()` refuses the
 value and every deployed result honestly records `null` rather than a fake SHA.
+
+#### `harness_version`: what it used to say, and what it says now
+
+`harness_version` is documented as "the version that executed the run" and is
+written onto **every** run row. Until `ida_0004_harness_build_identity` it
+carried `ida_harness.__version__` — a hardcoded `"0.1.0"` that no release step
+has ever written to. It did not identify a build; a row from the 0.1.1 image and
+a row from an unreleased branch were byte-identical, in the one field whose job
+is to tell them apart.
+
+It now carries `ida_core.gitmeta.build_identity()`: the same `IDA_GIT_SHA` the
+row above describes, through the same `is_sha()` shape guard, and the honest
+string `"unknown"` when the build genuinely cannot be identified (a local run
+outside git). `"unknown"` is deliberately **not** version-shaped — a reader who
+sees it learns this row is not reproducible, which is true; `"0.1.0"` taught them
+the opposite.
+
+**Migration note.** Rows written before that revision keep their old `"0.1.0"`.
+They are not rewritten: nobody can know today which build produced them, and
+inventing one would replace a visible lie with an invisible one. The two eras are
+distinguishable by shape — a version string means "pre-0004", a 40-hex SHA or
+`"unknown"` means "truthful". The migration itself only widens the column
+(`VARCHAR(32)` → `VARCHAR(64)`, matching `task_git_sha`), because a SHA does not
+fit in the width `"0.1.0"` lived in.
+
+### Which build is this? — `IDA_VERSION` and `/healthz`
+
+`__version__` in each of the five packages is now read from that distribution's
+`pyproject.toml` rather than typed out a second time, so "bump the version" is
+one edit instead of ten. It is a **packaging** number and answers nothing about
+what is deployed.
+
+The deployment question is answered by `/healthz`, on both the api and the
+mock-model, which reports two fields:
+
+| Field | Source | Trust |
+|---|---|---|
+| `version` | `IDA_VERSION`, baked in by `Dockerfile.python`; falls back to the packaging version | whatever the release process was told to say |
+| `git_sha` | `IDA_GIT_SHA`, baked in at build time | **the authority** — right by construction, needs no pipeline to remember anything |
+
+`IDA_VERSION` has the same both-halves wiring as `GIT_SHA`: `Dockerfile.python`
+declares `ARG IDA_VERSION` and exports it as `ENV IDA_VERSION`, and
+`build-and-push.yaml` passes `--build-arg=IDA_VERSION=<the resolved tag>` — the
+**same** string the overlays pin as `newTag`, so "what does `/healthz` say" and
+"what does prod's `kustomization.yaml` say" are directly comparable. A tag build
+reports `0.1.2`; a main build reports its git-describe. Empty is the honest
+default for a local `docker build`, and the code falls back to the packaging
+version rather than to a made-up release.
+
+`.devops/ci/build-provenance.test.sh` fails CI if either half of either wiring
+goes missing — the failure mode is silent in both cases, which is what makes a
+standing check worth its second.
 
 ### The taxonomy, and the three ways a score can be absent
 

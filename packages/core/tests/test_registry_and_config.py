@@ -225,6 +225,115 @@ class TestGitShaShapeChecking:
         assert current_git_sha() == "b" * 40
 
 
+class TestBuildIdentity:
+    """What ``runs.harness_version`` is allowed to say.
+
+    THE BUG THIS CLOSES. ``harness_version`` is documented as "the version that
+    executed the run" and is written onto EVERY persisted benchmark row. It
+    carried ``ida_harness.__version__`` -- a hardcoded ``"0.1.0"`` that no
+    release step has ever written to. So under D-1, whose whole premise is that a
+    result can be traced back to the code that produced it, every row in the
+    database carried a string that identified nothing and looked like it did: a
+    row from the 0.1.1 image and a row from an unreleased branch were
+    indistinguishable.
+
+    It now reports the build's git SHA -- the one identifier that is right by
+    construction, since ``IDA_GIT_SHA`` is baked into the image at build time --
+    and says ``"unknown"`` when it genuinely cannot know.
+    """
+
+    def test_reports_the_build_sha_when_it_is_baked_in(self, monkeypatch) -> None:
+        """The container case: IDA_GIT_SHA is set, and that IS the answer."""
+        from ida_core.gitmeta import build_identity
+
+        monkeypatch.setenv("IDA_GIT_SHA", "c" * 40)
+        assert build_identity() == "c" * 40
+
+    def test_absence_is_honest_and_not_version_shaped(self, monkeypatch, tmp_path) -> None:
+        """Outside a build, the answer is "unknown" -- deliberately not a number.
+
+        ⚠ The fallback must never be version-SHAPED. A reader who sees ``0.1.0``
+        concludes "this ran on release 0.1.0" and is wrong; a reader who sees
+        ``unknown`` concludes "this row is not reproducible" and is right. That
+        distinction is the entire fix, so it is asserted rather than assumed.
+        """
+        from ida_core.gitmeta import UNKNOWN_BUILD, build_identity
+
+        monkeypatch.delenv("IDA_GIT_SHA", raising=False)
+        assert build_identity(tmp_path) == UNKNOWN_BUILD == "unknown"
+
+    @pytest.mark.parametrize("bogus", ["HEAD", "$GITHUB_SHA", "abc1234", "A" * 40, ""])
+    def test_a_lie_from_the_pipeline_is_refused_not_stored(
+        self, monkeypatch, tmp_path, bogus
+    ) -> None:
+        """A wrong SHA looks like a real one -- gitmeta's rule, enforced here too.
+
+        A pipeline that forgets to substitute a variable exports the literal
+        ``$GITHUB_SHA``; a repository with no commits makes git print ``HEAD``.
+        Either would otherwise be persisted on every result as provenance.
+        """
+        from ida_core.gitmeta import build_identity
+
+        monkeypatch.setenv("IDA_GIT_SHA", bogus)
+        assert build_identity(tmp_path) == "unknown"
+
+    def test_it_is_never_the_old_hardcoded_constant(self, monkeypatch, tmp_path) -> None:
+        """The specific regression, pinned by value.
+
+        ``"0.1.0"`` is not merely "one possible wrong answer": it is the exact
+        string that shipped on every row for the life of the platform, and the
+        one a well-meaning "restore the fallback" refactor would reach for.
+        """
+        from ida_core.gitmeta import build_identity
+
+        monkeypatch.delenv("IDA_GIT_SHA", raising=False)
+        assert build_identity(tmp_path) != "0.1.0"
+
+        monkeypatch.setenv("IDA_GIT_SHA", "d" * 40)
+        assert build_identity() != "0.1.0"
+
+    def test_it_fits_the_column_that_stores_it(self, monkeypatch) -> None:
+        """⚠ VARCHAR(32) COULD NOT HOLD THIS, WHICH IS WHY 0004 EXISTS.
+
+        A 40-character SHA does not fit in the width ``"0.1.0"`` lived in. On
+        Postgres that is a rejected INSERT at runtime; on SQLite lengths are not
+        enforced, so the divergence would have surfaced only in production. Ties
+        the resolver's output to the schema that receives it.
+        """
+        from ida_core.db import RunRow
+        from ida_core.gitmeta import build_identity
+
+        monkeypatch.setenv("IDA_GIT_SHA", "e" * 40)
+        assert len(build_identity()) <= RunRow.__table__.c.harness_version.type.length
+
+
+class TestPackageVersionsAreDerivedNotTyped:
+    """Five packages hardcoded ``__version__ = "0.1.0"`` and nothing updated them.
+
+    "Bump the version" meant editing ten places -- five pyprojects and five
+    ``__init__`` files -- so it never happened: the 0.1.1 image still introduced
+    itself as 0.1.0 everywhere. Reading the installed distribution metadata makes
+    the pyproject the single source of truth, which is the only arrangement that
+    cannot drift.
+    """
+
+    @pytest.mark.parametrize(
+        ("module", "distribution"),
+        [
+            ("ida_core", "ida-core"),
+            ("ida_harness", "ida-harness"),
+            ("ida_api", "ida-api"),
+            ("ida_runner", "ida-runner"),
+            ("ida_mock_model", "ida-mock-model"),
+        ],
+    )
+    def test_version_matches_the_installed_distribution(self, module, distribution) -> None:
+        import importlib
+        from importlib.metadata import version as dist_version
+
+        assert importlib.import_module(module).__version__ == dist_version(distribution)
+
+
 class TestResolveBaseUrl:
     """The credit/hardware safety switch.
 

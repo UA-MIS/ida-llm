@@ -1157,3 +1157,122 @@ class TestAtLeastOnceIsSafe:
 
         assert record.status is RunStatus.SUCCEEDED, "the retry actually ran"
         assert record.sample_count == 4
+
+
+class TestExecutedRunsRecordTheBuildThatRanThem:
+    """⚠ THE MOST IMPORTANT WRITE IN THIS FILE WAS THE UNTESTED ONE.
+
+    ``worker.py``'s ``record.harness_version = ...`` produces the FINAL value on
+    every row a run ever completes -- the api and the sweeps only stamp what a
+    row carries while it is ``queued``. It is the number a reader of a finished
+    benchmark actually sees, and nothing asserted it: reverting that line to
+    ``eval_log.harness_version or "0.1.0"`` left the entire suite green.
+
+    That is the class of gap where the lie lives, so both halves are pinned here:
+    the value the happy path writes, AND the fallback branch that the ``or`` on
+    that line selects.
+
+    ⚠ THE SEEDED ROW ALREADY SAYS ``"0.1.0"`` (``_runner_helpers.seed_run``),
+    which is what makes these assertions adversarial rather than decorative. The
+    row starts life carrying the exact string this change exists to delete, so a
+    worker that silently failed to write the field would leave the lie in place
+    and be caught -- an assertion against a freshly-defaulted row could not tell
+    "wrote the right thing" from "wrote nothing".
+    """
+
+    def _persisted(self, run_id, session_factory):
+        with session_scope(session_factory) as session:
+            return run_row_to_record(get_run(session, run_id))
+
+    def _run(self, session_factory, registry, catalog, artifact_store, factory, **kwargs):
+        run_id = _seed_run(session_factory)
+        _execute(
+            _message(run_id),
+            session_factory=session_factory,
+            registry=registry,
+            catalog=catalog,
+            artifact_store=artifact_store,
+            client_factory=factory,
+            **kwargs,
+        )
+        return run_id
+
+    def test_the_finished_row_carries_the_build_sha(
+        self,
+        monkeypatch,
+        session_factory,
+        registry,
+        catalog,
+        artifact_store,
+        mock_transport_factory,
+    ) -> None:
+        """The value a reader of a completed benchmark actually sees."""
+        monkeypatch.setenv("IDA_GIT_SHA", "7" * 40)
+        run_id = self._run(
+            session_factory, registry, catalog, artifact_store, mock_transport_factory
+        )
+        stored = self._persisted(run_id, session_factory)
+        assert stored.status is RunStatus.SUCCEEDED, "a failed run would not exercise this write"
+        assert stored.harness_version == "7" * 40
+        assert stored.harness_version != "0.1.0", "the seeded value must have been overwritten"
+
+    def test_an_unidentifiable_build_is_recorded_honestly(
+        self,
+        monkeypatch,
+        tmp_path,
+        session_factory,
+        registry,
+        catalog,
+        artifact_store,
+        mock_transport_factory,
+    ) -> None:
+        """No build to name is written as ``"unknown"``, never as a fake release.
+
+        ⚠ Runs from ``tmp_path``, outside any git checkout -- the genuinely
+        unknowable case, and the one a "restore a sensible default" edit fills
+        back in with ``"0.1.0"``.
+        """
+        monkeypatch.delenv("IDA_GIT_SHA", raising=False)
+        monkeypatch.chdir(tmp_path)
+        run_id = self._run(
+            session_factory, registry, catalog, artifact_store, mock_transport_factory
+        )
+        stored = self._persisted(run_id, session_factory)
+        assert stored.harness_version == "unknown"
+
+    def test_the_fallback_branch_does_not_reinstate_the_hardcoded_lie(
+        self,
+        monkeypatch,
+        session_factory,
+        registry,
+        catalog,
+        artifact_store,
+        mock_transport_factory,
+    ) -> None:
+        """⚠ THE ``or`` ON THAT LINE, EXERCISED. Nothing else reaches it.
+
+        ``record.harness_version = eval_log.harness_version or build_identity()``
+        takes its right-hand branch only when the log arrives with an empty
+        version -- which the harness never produces, so the happy-path tests
+        above short-circuit past it and a mutation of the fallback stays green.
+        A defensive branch nothing can reach is a place for a wrong constant to
+        live undisturbed, which is exactly where ``"0.1.0"`` was found.
+
+        Forced here by handing the worker a log with the field blanked.
+        """
+        import ida_runner.worker as worker_module
+
+        real_run_task = worker_module.run_task
+
+        def _blank_the_version(*args, **kwargs):
+            return real_run_task(*args, **kwargs).model_copy(update={"harness_version": ""})
+
+        monkeypatch.setattr(worker_module, "run_task", _blank_the_version)
+        monkeypatch.setenv("IDA_GIT_SHA", "6" * 40)
+
+        run_id = self._run(
+            session_factory, registry, catalog, artifact_store, mock_transport_factory
+        )
+        stored = self._persisted(run_id, session_factory)
+        assert stored.harness_version == "6" * 40, "the fallback must resolve the build identity"
+        assert stored.harness_version != "0.1.0"

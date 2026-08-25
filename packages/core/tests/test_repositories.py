@@ -123,6 +123,59 @@ class TestRunRoundTrip:
         assert restored.total_cost_usd == 0.25
         assert restored.finished_at is not None
 
+    def test_finish_run_records_the_build_that_executed_it(self, session_factory) -> None:
+        """⚠ THIS WRITE WAS MISSING, AND ITS ABSENCE WAS INVISIBLE.
+
+        ``harness_version`` is documented as "the version that EXECUTED the run".
+        The worker computes it from the eval log and hands it here -- and this
+        function silently dropped it, so the value that survived on every
+        completed run was whatever the api or the sweep stamped at ENQUEUE time.
+
+        The two builds are usually the same, which is why nothing caught it: a
+        dropped write and a working write produce identical rows on a quiet
+        cluster. They differ exactly when it matters -- a rolling deploy has old
+        pods enqueueing and new pods executing, so every row credited the code
+        that merely queued the work.
+
+        Seeded with the old hardcoded ``"0.1.0"`` on purpose: the assertion has
+        to distinguish "wrote the right value" from "wrote nothing", and a row
+        that starts out already correct cannot.
+        """
+        record = _run()
+        record.harness_version = "0.1.0"
+        with session_scope(session_factory) as session:
+            create_run(session, record)
+
+        record.status = RunStatus.SUCCEEDED
+        record.harness_version = "d" * 40
+        with session_scope(session_factory) as session:
+            finish_run(session, record)
+
+        with session_scope(session_factory) as session:
+            restored = run_row_to_record(get_run(session, record.id))
+        assert restored.harness_version == "d" * 40
+
+    def test_finish_run_will_not_blank_a_recorded_build(self, session_factory) -> None:
+        """A missing answer must not ERASE a good one.
+
+        The column is NOT NULL and an empty string is not an improvement on a
+        real SHA, so the write is guarded -- the same idiom ``task_content_sha``
+        already uses one line above it.
+        """
+        record = _run()
+        record.harness_version = "c" * 40
+        with session_scope(session_factory) as session:
+            create_run(session, record)
+
+        record.status = RunStatus.FAILED
+        record.harness_version = ""
+        with session_scope(session_factory) as session:
+            finish_run(session, record)
+
+        with session_scope(session_factory) as session:
+            restored = run_row_to_record(get_run(session, record.id))
+        assert restored.harness_version == "c" * 40
+
 
 class TestListRuns:
     def test_newest_first(self, session_factory) -> None:

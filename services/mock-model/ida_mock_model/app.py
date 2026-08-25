@@ -16,11 +16,16 @@ Configuration (env)
                       well-formed), ``malformed`` or ``out_of_range``.  Lets a
                       failure drill point the harness at a *service* that
                       misbehaves rather than at a stub that pretends to.
+``IDA_GIT_SHA``       the commit this image was built from, baked in by
+                      ``Dockerfile.python``.  Reported by ``/healthz``.
+``IDA_VERSION``       the release string the build was told to claim, baked in
+                      by ``Dockerfile.python``.  Reported by ``/healthz``.
 """
 
 from __future__ import annotations
 
 import os
+import re
 import time
 from typing import Annotated, Literal
 
@@ -31,6 +36,34 @@ from ida_mock_model import __version__
 from ida_mock_model.responder import Responder, estimate_tokens
 
 DEFAULT_MODEL_ID = "mock-echo-1"
+
+_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+"""The same shape guard as :func:`ida_core.gitmeta.is_sha`, deliberately copied.
+
+⚠ THE COPY IS THE POINT, NOT AN OVERSIGHT.  This service depends on fastapi,
+uvicorn and pydantic and NOTHING from the platform (see the package docstring):
+that is what lets it stand in for a real model endpoint without dragging
+sqlalchemy, boto3 and redis behind it.  Importing ``ida_core`` for one regex
+would trade a four-line duplicate for a dependency on the entire contracts
+package.  If the rule ever changes, ``ida_core.gitmeta`` is canonical and this
+must follow it.
+"""
+
+
+def _build_git_sha() -> str | None:
+    """The commit this build was made from, or ``None`` when it cannot be known.
+
+    ENV ONLY -- it never shells out to ``git``, unlike ``ida_core.gitmeta``. A
+    stub model server has no business forking a subprocess, and outside an image
+    there is no build to identify anyway: ``None`` is the true answer there.
+
+    ⚠ A WRONG SHA LOOKS LIKE A REAL ONE. A pipeline that forgets to substitute a
+    variable exports the literal ``$GITHUB_SHA``; a repository with no commits
+    makes git print ``HEAD``. Both are rejected here, so ``/healthz`` reports
+    ``null`` rather than something SHA-shaped that resolves to nothing.
+    """
+    candidate = os.environ.get("IDA_GIT_SHA", "").strip()
+    return candidate if _SHA_RE.match(candidate) else None
 
 
 class _Message(BaseModel):
@@ -67,9 +100,28 @@ class MockState:
 
 def create_app() -> FastAPI:
     """Build the mock-model app.  One factory so tests and uvicorn agree."""
+    # ── WHAT THIS BUILD HONESTLY IS, RESOLVED ONCE ─────────────────────────
+    #
+    # `version` used to be `ida_mock_model.__version__` -- a hardcoded "0.1.0"
+    # that no release step ever wrote to, so every image ever built introduced
+    # itself as 0.1.0. A health endpoint that disagrees with the release it is
+    # running is not cosmetic: it is what convinces someone a deploy did not land.
+    #
+    # Same shape as the api's /healthz, deliberately: `version` is whatever the
+    # release process was told to say (IDA_VERSION, baked in by Dockerfile.python,
+    # falling back to the packaging version), and `git_sha` is the authority --
+    # baked in at build time and correct by construction, needing no pipeline to
+    # remember anything.
+    #
+    # Resolved HERE, at app construction: /healthz is what the chart probes for
+    # both liveness and readiness on this Deployment, and per-probe environment
+    # reads for a value that cannot change are work for nothing.
+    build_version = os.environ.get("IDA_VERSION", "").strip() or __version__
+    build_git_sha = _build_git_sha()
+
     app = FastAPI(
         title="ida-mock-model",
-        version=__version__,
+        version=build_version,
         description="Deterministic OpenAI-compatible endpoint for Capstone-IDA.",
     )
     app.state.mock = MockState()
@@ -89,7 +141,12 @@ def create_app() -> FastAPI:
         must not touch them. This service has none, so there is nothing to split
         -- and inventing a difference would only invite someone to "fix" it.
         """
-        return {"status": "ok", "service": "mock-model", "version": __version__}
+        return {
+            "status": "ok",
+            "service": "mock-model",
+            "version": build_version,
+            "git_sha": build_git_sha,
+        }
 
     @app.get("/v1/models")
     def list_models() -> dict:

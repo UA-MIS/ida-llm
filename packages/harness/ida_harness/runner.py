@@ -55,8 +55,8 @@ from ida_core.contracts import (
     terminal_status,
 )
 from ida_core.db import utcnow
+from ida_core.gitmeta import build_identity
 from ida_core.ids import new_result_id
-from ida_harness import __version__ as harness_version
 from ida_harness.cache import CachedCompletion, CompletionCache, NullCache, cache_key
 from ida_harness.client import ModelClient
 from ida_harness.errors import ModelError, ScoringError
@@ -303,7 +303,7 @@ def run_task(
         sweep_id=sweep_id,
         model_key=entry.key,
         serving_config=serving,
-        harness_version=harness_version,
+        harness_version=build_identity(),
         # NOT hardcoded SUCCEEDED. A run where every sample errored measured
         # nothing and must not claim otherwise (B5).
         status=terminal_status(sample_count=len(results), error_count=error_count),

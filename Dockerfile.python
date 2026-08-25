@@ -85,12 +85,35 @@ FROM ${PYTHON_IMAGE} AS runtime
 # The tag is for humans and promotion; this is the citation. Do not collapse them.
 ARG GIT_SHA=""
 
+# RELEASE IDENTITY — the human half of the pair above, and it needs the SAME
+# both-halves wiring to be worth anything.
+#
+# /healthz reports `version` so an operator can confirm which release is serving.
+# It used to report a hardcoded `__version__ = "0.1.0"` that no release step ever
+# wrote to, so the 0.1.1 image cheerfully answered "0.1.0" — and a health endpoint
+# that disagrees with the release it is running is worse than one that says
+# nothing: it is what convinces someone a deploy did not land and gets a good
+# release rolled back.
+#
+# build-and-push.yaml passes `--build-arg=IDA_VERSION=<the resolved tag>`, which
+# is the SAME string the overlays pin, so "what does /healthz say" and "what does
+# kustomization.yaml say" are answerable against each other. A tag build gets
+# `0.1.2`; a main build gets the git-describe (`v0.1.1-3-gabc1234`). Both are
+# true; neither is invented here.
+#
+# Empty is the honest default (a local `docker build` with no --build-arg), and
+# the code falls back to the packaging version rather than to a made-up release.
+# ⚠ NOT provenance — GIT_SHA above is. A release string is a number a human types;
+# every branch between two releases shares it. Do not collapse them either.
+ARG IDA_VERSION=""
+
 ENV PATH="/opt/venv/bin:${PATH}" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     HOST=0.0.0.0 \
     PORT=8000 \
     IDA_GIT_SHA=${GIT_SHA} \
+    IDA_VERSION=${IDA_VERSION} \
     IDA_REPO_ROOT=/app
 
 # 65532 matches the chart's securityContext runAsUser. Keep them in lockstep.

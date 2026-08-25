@@ -888,3 +888,55 @@ class TestPartialEnqueue:
         ).json()
         assert body["queued"] == 0
         assert client.get("/runs").json()["total"] == 1, "the run is visible and queued"
+
+
+class TestEnqueuedRunsCarryTheBuildIdentity:
+    """``POST /runs`` must not stamp a row with a version that identifies nothing.
+
+    THE BUG THIS CLOSES. ``harness_version`` was ``ida_harness.__version__`` -- a
+    hardcoded ``"0.1.0"`` that no release step has ever written to -- and the api
+    wrote it onto every row it enqueued. On a platform whose D-1 premise is that
+    a result can be traced back to the code that produced it, that was wrong
+    provenance on every row, in a field whose docstring promised the opposite.
+
+    ⚠ WHY THIS IS ASSERTED AT THE API AND NOT ONLY AT THE HARNESS. The worker
+    overwrites the field when the run finishes, so a reader could reasonably ask
+    whether the enqueue value matters. It does: it is what the row carries for as
+    long as it sits ``queued``, and for a run that never completes it is the only
+    value the row ever has.
+
+    ⚠ ``ida_api.app.HARNESS_VERSION`` is resolved AT IMPORT (see its docstring --
+    /healthz and the enqueue path must not fork a subprocess per call), so
+    monkeypatching ``IDA_GIT_SHA`` here would not change it. These tests assert
+    the property that actually matters -- it is the build identity and never the
+    dead constant -- rather than re-testing the resolver, which
+    ``TestBuildIdentity`` in ida_core already pins.
+    """
+
+    def test_the_row_carries_the_resolved_build_identity(self, client: TestClient) -> None:
+        from ida_api.app import HARNESS_VERSION
+
+        client.post("/runs", json={"task_ids": [VERIFIABLE_TASK], "model_keys": ["mock"]})
+        runs = client.get("/runs").json()["runs"]
+        assert runs and {r["harness_version"] for r in runs} == {HARNESS_VERSION}
+
+    def test_it_is_a_build_sha_or_an_honest_unknown_never_a_fake_release(self) -> None:
+        """The two shapes allowed, stated as the whole permitted set.
+
+        ``"0.1.0"`` is pinned by value rather than merely implied: it is the
+        exact string that shipped on every row for the life of the platform, and
+        the one a well-meaning "restore the fallback" edit would reach for.
+        """
+        from ida_api.app import HARNESS_VERSION
+        from ida_core.gitmeta import is_sha
+
+        assert HARNESS_VERSION != "0.1.0"
+        assert is_sha(HARNESS_VERSION) or HARNESS_VERSION == "unknown"
+
+    def test_it_is_not_the_packaging_version(self) -> None:
+        """Keeping the two apart is the fix; collapsing them is how this happened."""
+        import ida_api
+        import ida_harness
+        from ida_api.app import HARNESS_VERSION
+
+        assert HARNESS_VERSION not in {ida_api.__version__, ida_harness.__version__}

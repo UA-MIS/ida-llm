@@ -138,6 +138,9 @@ export interface RunRecord {
   /** SHA-256 of this task's canonicalised text. Finer-grained than the repo
    *  SHA, which changes on every unrelated commit. */
   task_content_sha: string | null;
+  /** D-1: the git SHA of the build that executed this run, or `"unknown"`.
+   *  Rows written before that change still carry the old hardcoded `"0.1.0"`;
+   *  see `formatBuildIdentity` in lib/format.ts. */
   harness_version: string;
   /** Null while the run is still queued (no runner has claimed it). */
   serving_config: ServingConfig | null;

@@ -53,7 +53,7 @@ from ida_core.contracts import (
     RunStatus,
 )
 from ida_core.db import make_engine, make_session_factory, session_scope, utcnow
-from ida_core.gitmeta import current_git_sha
+from ida_core.gitmeta import build_identity, current_git_sha
 from ida_core.ids import new_id, new_run_id
 from ida_core.queue import RedisQueue, RunQueue
 from ida_core.registry import load_registry
@@ -64,7 +64,6 @@ from ida_core.repositories import (
     list_ungraded_subjective_results,
     models_with_any_run,
 )
-from ida_harness import __version__ as harness_version
 from ida_harness.runner import unscorable_reason
 from ida_harness.tasks import TaskCatalog
 
@@ -378,6 +377,15 @@ def enqueue_candidates(
     # Without it, "show me what last night's rebenchmark did" is a timestamp
     # range guess rather than a filter the API already supports.
     sweep_id = new_id("swp")
+    # ⚠ RESOLVED ONCE PER FIRING, NOT PER CANDIDATE. With IDA_GIT_SHA unset
+    # `build_identity()` shells out to `git`, and a rebenchmark plans hundreds of
+    # candidates -- so calling it inside the loop below would fork a subprocess
+    # per row for a value that cannot change mid-sweep. Same rule `ctx.git_sha`
+    # already follows (resolved once in `build_context`) and the same rule
+    # `ida_api.app.HARNESS_VERSION` follows. Deliberately a LOCAL and not a module
+    # constant: the sweep must read the environment as it is when it FIRES, which
+    # is also what keeps it honest under a test that changes directory.
+    harness_version = build_identity()
     report.sweep_id = sweep_id
 
     records: list[RunRecord] = []

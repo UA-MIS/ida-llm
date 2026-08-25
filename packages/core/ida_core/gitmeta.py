@@ -74,3 +74,56 @@ def current_git_sha(cwd: Path | str | None = None) -> str | None:
         return None
     sha = proc.stdout.strip()
     return sha if is_sha(sha) else None
+
+
+UNKNOWN_BUILD = "unknown"
+"""What :func:`build_identity` returns when the build cannot be identified.
+
+A STRING, not ``None``, because ``runs.harness_version`` is ``NOT NULL`` and
+every consumer down to the UI types it as a plain ``str``.  It is chosen to be
+unmistakable: nobody reads ``"unknown"`` as a release.
+"""
+
+
+def build_identity(cwd: Path | str | None = None) -> str:
+    """The identity of the build executing right now: its git SHA, or ``"unknown"``.
+
+    THIS IS WHAT ``harness_version`` MEANS.  The field is documented as "the
+    version that executed the run" and is written onto **every** persisted
+    benchmark row, so under D-1 (reproducibility) it has exactly one job: let a
+    reader fetch the code that produced the number.
+
+    It used to be ``ida_harness.__version__`` -- a hardcoded ``"0.1.0"`` that no
+    release step has ever written to.  It did not identify a build; it identified
+    the day someone typed it.  Worse, it *looked* like provenance, so a row from
+    the 0.1.1 image and a row from an unreleased branch were indistinguishable.
+
+    The git SHA is right by construction: ``IDA_GIT_SHA`` is baked into every
+    image at build time (``Dockerfile.python``) and, outside a container,
+    ``git rev-parse`` answers for the checkout.  Both go through
+    :func:`current_git_sha`, so the same shape guard applies -- an unsubstituted
+    ``$GITHUB_SHA``, the literal ``HEAD`` git prints in an empty repository, or
+    an abbreviated SHA all fail :func:`is_sha` and yield ``"unknown"`` rather
+    than being stored as though they were provenance.
+
+    ⚠ HONEST ABSENCE, NEVER A PLACEHOLDER.  ``"unknown"`` is the answer when the
+    build cannot be identified (a local run outside git, a sdist with no
+    ``.git``).  It is deliberately NOT a version-shaped string: a reader who
+    sees it learns that this row is not reproducible, which is the truth.  The
+    old ``"0.1.0"`` taught them the opposite.
+
+    ⚠ NOT the package version.  ``ida_harness.__version__`` still exists and
+    still means "the version declared in ``packages/harness/pyproject.toml``".
+    That is a distribution number, not a claim about what is deployed; keep the
+    two apart (see the note in :mod:`ida_harness`).
+
+    ⚠ Calls out to ``git`` when ``IDA_GIT_SHA`` is unset.  Resolve it once per
+    process (module import, app construction) rather than per request -- see
+    ``ida_api.app``, which does exactly that for ``/healthz``.
+
+    Examples, as prose rather than a doctest because both branches depend on the
+    ambient environment:  with ``IDA_GIT_SHA=a...a`` (40 hex) this returns that
+    SHA; with ``IDA_GIT_SHA`` set to ``HEAD``, ``$GITHUB_SHA``, ``abc1234`` or
+    ``""``, and with it unset outside a git checkout, it returns ``"unknown"``.
+    """
+    return current_git_sha(cwd) or UNKNOWN_BUILD

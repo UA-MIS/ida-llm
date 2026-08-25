@@ -8,6 +8,7 @@ import {
   formatLatency,
   formatScore,
   formatTimestamp,
+  formatBuildIdentity,
   shortSha,
 } from "@/lib/format";
 import { classifyRun, classifySample } from "@/lib/outcome";
@@ -160,8 +161,10 @@ function RunSummary({ run }: { run: RunRecord }) {
           </dd>
         </div>
         <div>
-          <dt>Harness</dt>
-          <dd className="mono">v{run.harness_version}</dd>
+          <dt>Harness build</dt>
+          <dd className="mono" title={run.harness_version}>
+            {formatBuildIdentity(run.harness_version)}
+          </dd>
         </div>
         <div>
           <dt>Created</dt>

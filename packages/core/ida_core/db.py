@@ -80,7 +80,21 @@ class RunRow(Base):
     """SHA-256 of the task's canonicalised content (B8).  Indexed because
     "every run of *this exact task text*" is the comparability query."""
 
-    harness_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    harness_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    """D-1: the git SHA of the build that executed this run, or ``"unknown"``.
+
+    ⚠ 64, NOT 32 (widened in ``ida_0004_harness_build_identity``). It used to
+    hold ``ida_harness.__version__`` -- a hardcoded ``"0.1.0"``, which fit in
+    anything. It now holds what :func:`ida_core.gitmeta.build_identity` returns,
+    and a full 40-character SHA does not fit in ``VARCHAR(32)``. Same width as
+    :attr:`task_git_sha` on purpose: both are SHAs, and a reader comparing them
+    should not have to wonder whether one was truncated.
+
+    ⚠ NOT NULL, so the honest absence is the string ``"unknown"`` rather than
+    NULL -- see :data:`ida_core.gitmeta.UNKNOWN_BUILD`. Rows written before that
+    revision keep their old literal (``"0.1.0"``); the migration does NOT rewrite
+    history, because nobody can know now which build produced them.
+    """
     serving_config: Mapped[dict | None] = mapped_column(JSON)
     """D-1 payload, by value.  NULL only while the run is still ``queued``."""
 

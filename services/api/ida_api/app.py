@@ -50,7 +50,7 @@ from ida_core.contracts import (
     RunStatus,
 )
 from ida_core.db import session_scope, utcnow
-from ida_core.gitmeta import current_git_sha
+from ida_core.gitmeta import build_identity, current_git_sha
 from ida_core.ids import new_id, new_run_id
 from ida_core.repositories import (
     count_results_for_run,
@@ -62,10 +62,24 @@ from ida_core.repositories import (
     result_row_to_record,
     run_row_to_record,
 )
-from ida_harness import __version__ as harness_version
 from ida_harness.runner import unscorable_reason
 
 log = logging.getLogger(__name__)
+
+HARNESS_VERSION = build_identity()
+"""What goes into ``runs.harness_version`` on the rows this process enqueues.
+
+⚠ RESOLVED ONCE, AT IMPORT, NOT PER REQUEST. With ``IDA_GIT_SHA`` unset
+:func:`build_identity` shells out to ``git``, and this value is read on the
+``POST /runs`` path -- a fork per enqueue would be a real cost for a value that
+cannot change while the process lives. Inside the image ``IDA_GIT_SHA`` is baked
+in, so no subprocess runs at all.
+
+It used to be ``ida_harness.__version__``, a hardcoded ``"0.1.0"`` that no
+release step ever wrote to. See :func:`ida_core.gitmeta.build_identity`. The
+runner overwrites this field with the harness's own answer when the run
+finishes; the two agree because both call the same resolver.
+"""
 
 MAX_PAGE_SIZE = 200
 """Hard cap on ``GET /runs?limit=``.  Prevents an accidental full-table scan."""
@@ -358,7 +372,7 @@ def create_app(context: AppContext | None = None) -> FastAPI:
                         sweep_id=sweep_id,
                         task_git_sha=ctx.git_sha,
                         task_content_sha=spec.content_sha or None,
-                        harness_version=harness_version,
+                        harness_version=HARNESS_VERSION,
                         sample_count=len(spec.samples),
                         created_at=now,
                     )

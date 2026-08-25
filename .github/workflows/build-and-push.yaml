@@ -218,6 +218,7 @@ jobs:
             --dockerfile=${DOCKERFILE}
             --destination=${IMAGE}
             --build-arg=GIT_SHA=${GIT_SHA}
+            --build-arg=IDA_VERSION=${IDA_VERSION}
             --reproducible
             --snapshot-mode=redo
             --use-new-run
@@ -244,6 +245,27 @@ jobs:
           # gitmeta.is_sha() accepts only 40 lowercase hex, so an unsubstituted
           # or empty value yields an honest null rather than a fake SHA.
           GIT_SHA: ${{ github.sha }}
+          # RELEASE IDENTITY — the OTHER half of the /healthz `version` wiring.
+          #
+          # Dockerfile.python takes ARG IDA_VERSION and exports it as ENV
+          # IDA_VERSION, which the api's and mock-model's /healthz report. Without
+          # this build-arg the ARG defaults to "" and every image falls back to the
+          # packaging version — which is how the 0.1.1 image came to answer
+          # "0.1.0" on /healthz, i.e. exactly the bug this closes.
+          #
+          # It is the SAME string as the image TAG, and that is deliberate: the
+          # overlays pin `newTag: <TAG>`, so "what does /healthz say" and "what
+          # does prod's kustomization.yaml say" become directly comparable. A tag
+          # build yields `0.1.2`; a main build yields the git-describe
+          # (`v0.1.1-3-gabc1234`) — readable, monotonic and never empty, because
+          # resolve-image.sh's `--always` degrades to a short SHA rather than to
+          # nothing. NOT a substitute for GIT_SHA above: a release string is
+          # human-assigned and shared by every branch between two releases.
+          #
+          # Harmless on the frontend and agile legs, which declare no such ARG —
+          # Kaniko warns about an unused build-arg and carries on, exactly as it
+          # already does for GIT_SHA on those two Dockerfiles.
+          IDA_VERSION: ${{ needs.resolve.outputs.TAG }}
           CONTEXT: ${{ matrix.context }}
           DOCKERFILE: ${{ matrix.dockerfile }}
           DOCKER_CONFIG_DIR: ${{ env.DOCKER_CONFIG_DIR }}
