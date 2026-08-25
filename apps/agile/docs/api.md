@@ -388,13 +388,54 @@ appear elsewhere as activity and are deliberately excluded.
 |---|---|
 | `GET /api/v1/ready` | Unblocked, unassigned work |
 | `GET /api/v1/members` | Team members (valid `assigneeLogin` values). Session only. |
-| `GET /api/v1/prs` | Open PRs annotated with the item ids they mention. Session only. |
+| `GET /api/v1/prs` | Pull requests attached to items — open and merged. Any credential. |
 | `POST /api/v1/items/{id}/links` | Attach a PR (URL, `owner/repo#123`, or `123`) |
 | `POST /api/v1/items/{id}/start-work` | Activate + create the branch. Session only. |
 | `GET`/`PUT /api/v1/pages/home` | The living README |
 | `GET /api/v1/summary` | Generated board state |
 | `GET`/`DELETE /api/v1/tokens` | Manage your board tokens |
 | `GET /api/healthz` · `GET /api/readyz` | Liveness · readiness. No auth. |
+
+### Pull requests
+
+`GET /api/v1/prs` lists the pull requests **attached to board items**, read from
+the board's own records — the same source `/api/v1/summary` counts, so the two
+never disagree. Both open and merged PRs appear; merged ones are the board's
+progress signal and were the whole reason the endpoint exists.
+
+```sh
+curl -H "Authorization: Bearer $TOKEN" "$AGILE/api/v1/prs"
+```
+
+```json
+{
+  "prs": [
+    {
+      "repoFullName": "UA-MIS/ida-llm", "prNumber": 29,
+      "url": "https://github.com/UA-MIS/ida-llm/pull/29",
+      "title": "Fix the board AB#29", "prState": "merged",
+      "merged": true, "draft": false,
+      "checksState": "success", "behindBy": null,
+      "headRef": "story/29", "baseRef": "main",
+      "lastSyncedAt": "2026-08-25T14:02:11.000Z",
+      "items": [{ "id": 29, "title": "GET /api/v1/prs returns empty" }],
+      "suggestedItemIds": [29]
+    }
+  ]
+}
+```
+
+- **`items`** is what the PR is really attached to. **`suggestedItemIds`** is
+  only what the PR *title* mentions with `AB#<id>` — a hint, not an attachment.
+- One entry per pull request. A PR attached to three items appears once, with
+  three entries in `items`.
+- No GitHub call is made, so this endpoint works without a GitHub credential and
+  never spends the org's API budget.
+- Filter client-side on `merged` / `prState` if you want only one of the two.
+
+The picker on an item page is a different thing: it lists repo PRs that are
+**open on GitHub** so you can attach one that the board does not know about yet.
+That list is not this endpoint.
 
 ---
 
