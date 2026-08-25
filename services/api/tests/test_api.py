@@ -474,6 +474,130 @@ class TestRunDetail:
         assert client.get("/runs/run_nope").status_code == 404
 
 
+class TestRunDetailPagination:
+    """`GET /runs/{id}` returns a bounded page, and says how much it did not send.
+
+    A run holds one result per (sample, repetition) and nothing bounds that
+    product, so the endpoint used to let authored data decide the response size.
+    """
+
+    def _seed(self, context: AppContext, sample_count: int) -> str:
+        run_id = new_run_id()
+        serving = ServingConfig(
+            model_id="mock-echo-1", registry_key="mock", serving_stack=ServingStack.MOCK
+        )
+        with session_scope(context.session_factory) as session:
+            create_run(
+                session,
+                RunRecord(
+                    id=run_id,
+                    status=RunStatus.SUCCEEDED,
+                    task_id=VERIFIABLE_TASK,
+                    model_key="mock",
+                    harness_version="0.1.0",
+                    serving_config=serving,
+                    sample_count=sample_count,
+                    scored_count=sample_count,
+                    mean_score=1.0,
+                ),
+            )
+            insert_results(
+                session,
+                [
+                    ResultRecord(
+                        id=new_result_id(),
+                        run_id=run_id,
+                        task_id=VERIFIABLE_TASK,
+                        # zero-padded so lexical order == numeric order, which is
+                        # what lets the offset assertions below name exact rows.
+                        sample_id=f"s{i:03d}",
+                        model_key="mock",
+                        serving_config=serving,
+                        score=Score(
+                            scorer=ScorerKind.NUMERIC_MATCH,
+                            value=1.0,
+                            passed=True,
+                            explanation="ok",
+                        ),
+                        usage=TokenUsage(prompt_tokens=1, completion_tokens=1),
+                    )
+                    for i in range(sample_count)
+                ],
+            )
+        return run_id
+
+    def test_defaults_return_everything_a_real_run_has(
+        self, client: TestClient, context: AppContext
+    ) -> None:
+        """The default page must not silently truncate an existing client."""
+        run_id = self._seed(context, 25)
+        body = client.get(f"/runs/{run_id}").json()
+        assert len(body["results"]) == 25
+        assert body["results_total"] == 25
+        assert body["results_offset"] == 0
+
+    def test_limit_bounds_the_page_and_total_still_reports_the_truth(
+        self, client: TestClient, context: AppContext
+    ) -> None:
+        run_id = self._seed(context, 25)
+        body = client.get(f"/runs/{run_id}?limit=10").json()
+        assert len(body["results"]) == 10
+        assert body["results_total"] == 25, "total must ignore the page"
+        assert body["results_limit"] == 10
+
+    def test_offset_walks_the_run_without_repeating_or_skipping(
+        self, client: TestClient, context: AppContext
+    ) -> None:
+        """The ordering is total, so paging over it is exact rather than roughly right."""
+        run_id = self._seed(context, 25)
+        seen: list[str] = []
+        for offset in range(0, 30, 10):
+            page = client.get(f"/runs/{run_id}?limit=10&offset={offset}").json()
+            seen.extend(r["sample_id"] for r in page["results"])
+        assert seen == [f"s{i:03d}" for i in range(25)]
+        assert len(seen) == len(set(seen)), "a row was served twice"
+
+    def test_a_page_past_the_end_is_empty_but_not_a_lie(
+        self, client: TestClient, context: AppContext
+    ) -> None:
+        """The case that makes `results_total` load-bearing.
+
+        `frontend/src/lib/outcome.ts` classifies a run with zero results as
+        *all errored*. Without a total, a caller that paged past the end could
+        not tell that apart from a run where nothing was measured -- and would
+        report a successful run as a total failure.
+        """
+        run_id = self._seed(context, 5)
+        body = client.get(f"/runs/{run_id}?offset=500").json()
+        assert body["results"] == []
+        assert body["results_total"] == 5, "an empty page must still report the real count"
+        assert body["run"]["status"] == "succeeded"
+
+    def test_a_run_with_no_results_reports_zero(
+        self, client: TestClient, context: AppContext
+    ) -> None:
+        """The genuinely-empty case, which must stay distinguishable from the one above."""
+        run_id = self._seed(context, 0)
+        body = client.get(f"/runs/{run_id}").json()
+        assert body["results"] == []
+        assert body["results_total"] == 0
+
+    @pytest.mark.parametrize(
+        ("query", "why"),
+        [
+            ("limit=0", "a zero-size page is meaningless"),
+            ("limit=-1", "negative page"),
+            ("offset=-1", "negative offset"),
+            ("limit=100000", "above the cap the API sets on itself"),
+        ],
+    )
+    def test_nonsense_pagination_is_rejected(
+        self, client: TestClient, context: AppContext, query: str, why: str
+    ) -> None:
+        run_id = self._seed(context, 3)
+        assert client.get(f"/runs/{run_id}?{query}").status_code == 422, why
+
+
 class TestTranscriptEndpoint:
     def test_serves_an_archived_transcript(self, client: TestClient, context: AppContext) -> None:
         from ida_core.artifacts import sample_key

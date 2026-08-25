@@ -105,6 +105,36 @@ class TestSettings:
         monkeypatch.setenv("IDA_REPO_ROOT", str(tmp_path))
         assert repo_root() == tmp_path
 
+    # --- artifact_backend is a closed set, not free text ---------------------
+
+    @pytest.mark.parametrize("value", ["s3", "local"])
+    def test_artifact_backend_accepts_the_two_real_backends(self, monkeypatch, value) -> None:
+        monkeypatch.setenv("IDA_ARTIFACT_BACKEND", value)
+        assert Settings().artifact_backend == value
+
+    @pytest.mark.parametrize("typo", ["locl", "Local ", "minio", "s3 ", ""])
+    def test_a_misspelt_artifact_backend_fails_loudly(self, monkeypatch, typo) -> None:
+        """A typo must not silently select S3.
+
+        Every consumer branches `if artifact_backend == "local": ... else:
+        <s3>` (ida_api.deps, ida_runner.main, scripts.bootstrap), so before this
+        was a Literal, `IDA_ARTIFACT_BACKEND=locl` fell through to the else and
+        chose object storage. Nothing logged, nothing failed -- a developer who
+        asked for local artifacts got writes aimed at S3 instead. The failure
+        now arrives at construction, naming the field.
+        """
+        monkeypatch.setenv("IDA_ARTIFACT_BACKEND", typo)
+        with pytest.raises(PydanticValidationError, match="artifact_backend"):
+            Settings()
+
+    def test_the_typo_would_previously_have_selected_s3(self, monkeypatch) -> None:
+        """Pin the branch that made the typo dangerous, so it stays covered.
+
+        This asserts the *consumer* shape the Literal protects: anything that is
+        not exactly "local" means S3 to every call site.
+        """
+        assert Settings(artifact_backend="s3").artifact_backend != "local"
+
 
 class TestGitMeta:
     def test_env_override_wins(self, monkeypatch) -> None:

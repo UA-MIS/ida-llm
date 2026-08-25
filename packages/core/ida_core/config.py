@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Literal
 
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -132,8 +133,22 @@ class Settings(BaseSettings):
 
     # ── app-internal (IDA_-only: no ConfigMap entry, correct default in-image) ──
 
-    artifact_backend: str = "s3"
-    """``s3`` (MinIO) or ``local``.  ``local`` uses :attr:`artifact_local_root`."""
+    artifact_backend: Literal["s3", "local"] = "s3"
+    """``s3`` (MinIO) or ``local``.  ``local`` uses :attr:`artifact_local_root`.
+
+    A ``Literal``, not a ``str``, and the difference is a data-loss bug rather
+    than a style preference.  Every consumer branches ``if artifact_backend ==
+    "local": ... else: <s3>`` (``ida_api.deps``, ``ida_runner.main``,
+    ``scripts.bootstrap``), so a typo -- ``IDA_ARTIFACT_BACKEND=locl`` -- did
+    not fail: it fell through to the ``else`` and silently selected S3.  A
+    developer who asked for local artifacts got writes attempted against
+    object storage, and a deployment that meant to use S3 could be typo'd into
+    the same silence in the other direction.
+
+    Pydantic now rejects an unknown value at construction, so the process dies
+    at startup naming the offending field instead of running with a backend
+    nobody chose.
+    """
 
     artifact_local_root: str = "/tmp/ida-artifacts"  # noqa: S108
 
