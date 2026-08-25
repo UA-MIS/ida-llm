@@ -1,4 +1,4 @@
-"""HTTP clients for model endpoints, and the contract they all satisfy (**D-1**).
+"""HTTP clients for model endpoints, and the contract they all satisfy (**D-13**).
 
 One protocol, one retry loop, one error taxonomy
 ------------------------------------------------
@@ -14,10 +14,11 @@ supplies four things and nothing else:
 ``_build_payload``  how a request body is shaped
 ``_parse``          how content + usage are read back out
 
-**This is not a relaxation of D-1.**  D-1's invariant is "adding a model is a
+**This is not a relaxation of D-13** (the reproducibility decision, logged as
+D-13; the D-1..D-12 stubs are empty, so cite D-13).  Its invariant is "adding a model is a
 YAML edit, not a code change", and it still holds: ``serving_stack`` in
 ``models.yaml`` selects the client (see :mod:`ida_harness.factory`), and there
-is no ``if provider == ...`` inside any client.  What D-1's original comment
+is no ``if provider == ...`` inside any client.  What the original comment
 assumed -- that one OpenAI-shaped body reaches every provider -- turned out not
 to survive contact with Anthropic's Messages API, which is a genuinely different
 wire format (``system`` hoisted out of ``messages``, ``content`` as a block
@@ -121,7 +122,7 @@ def backoff_delay(
     *,
     base_s: float = DEFAULT_BACKOFF_BASE_S,
     max_s: float = DEFAULT_BACKOFF_MAX_S,
-    jitter: Callable[[float], float] = random.uniform,
+    jitter: Callable[[float, float], float] = random.uniform,
 ) -> float:
     """Full-jitter exponential backoff for a 1-based ``attempt``.
 
@@ -381,7 +382,15 @@ class OpenAICompatibleClient(BaseChatClient):
                 f"{self.entry.key} returned non-string content of type {type(content).__name__}"
             )
 
+        # Mirrors the Anthropic client: a flaky local server (vLLM, llama.cpp)
+        # returning a non-dict `usage` must land in the same
+        # PermanentModelError bucket as every other malformed shape, not
+        # escape as a bare AttributeError the runner does not catch.
         raw_usage = body.get("usage") or {}
+        if not isinstance(raw_usage, dict):
+            raise PermanentModelError(
+                f"{self.entry.key} returned a non-object usage of type {type(raw_usage).__name__}"
+            )
         usage = TokenUsage(
             prompt_tokens=int(raw_usage.get("prompt_tokens", 0) or 0),
             completion_tokens=int(raw_usage.get("completion_tokens", 0) or 0),

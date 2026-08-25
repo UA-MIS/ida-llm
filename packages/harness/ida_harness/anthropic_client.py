@@ -30,7 +30,7 @@ sitting at Anthropic's default is omitted from the body.
 
 That is not a silent drop.  The value we omit is exactly the value the endpoint
 then uses, so the :class:`~ida_core.contracts.ServingConfig` stamped on every
-result still describes what actually happened -- which is the whole of D-1.  A
+result still describes what actually happened -- which is the whole of D-13.  A
 *non-default* value is always sent: if the target model rejects it, the operator
 gets Anthropic's own 400 text naming the parameter, not a benchmark quietly run
 at a temperature nobody chose.
@@ -74,7 +74,7 @@ class AnthropicMessagesClient(BaseChatClient):
         if sampling.seed is not None:
             # The Messages API has no seed parameter. Dropping it silently would
             # leave a stored result claiming a seeded, reproducible run that was
-            # never seeded -- the exact fabricated-measurement failure D-1
+            # never seeded -- the exact fabricated-measurement failure D-13
             # exists to prevent.
             raise PermanentModelError(
                 f"model {self.entry.key!r} sets sampling.seed={sampling.seed}, which the "

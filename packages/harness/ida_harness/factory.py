@@ -1,6 +1,7 @@
 """Pick a client for a registry entry.  The one place providers are named.
 
-This is the seam that keeps **D-1** true.  D-1's invariant is *"adding a model is
+This is the seam that keeps **D-13** true (the reproducibility decision; the
+D-1..D-12 stubs are empty, so the real record is D-13).  Its invariant is *"adding a model is
 an edit to ``models.yaml``, not a code change"*, and it survives intact: the
 entry's ``serving.serving_stack`` -- a field the registry author already had to
 write, because it is part of the reproducibility record -- selects the client.

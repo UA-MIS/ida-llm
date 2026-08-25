@@ -21,6 +21,7 @@ import pytest
 from ida_core.contracts import ModelEntry, ServingStack
 from ida_core.validation import validate_models_document
 from ida_harness.factory import client_class_for
+from ida_harness.preflight import check_entry, check_registry, errors
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 MODELS_YAML = REPO_ROOT / "models.yaml"
@@ -69,6 +70,9 @@ def _parse(text: str) -> ModelEntry:
     return ModelEntry.model_validate(document["models"][0])
 
 
+ANTHROPIC_EXAMPLES = [(k, t) for k, t in EXAMPLES if "serving_stack: anthropic_compat" in t]
+
+
 def test_the_file_actually_contains_examples() -> None:
     """Guards the parser above: a regex that silently matches nothing would make
     every parametrised test below vacuously pass."""
@@ -76,6 +80,13 @@ def test_the_file_actually_contains_examples() -> None:
     keys = [key for key, _ in EXAMPLES]
     assert "claude-opus-5" in keys, "the Anthropic example is the point of this story"
     assert "gpt-5" in keys, "so is the OpenAI one"
+
+
+def test_the_anthropic_filter_actually_matches_something() -> None:
+    """Guards the FILTERED source below, which `EXAMPLES`' own guard does not
+    cover: delete every Anthropic example and those tests would silently pass
+    on an empty parametrisation instead of failing."""
+    assert ANTHROPIC_EXAMPLES, "no anthropic_compat examples -- the tests below are vacuous"
 
 
 @pytest.mark.parametrize("key,text", EXAMPLES, ids=[k for k, _ in EXAMPLES])
@@ -111,11 +122,7 @@ class TestAnthropicExamplesRespectTheMessagesApi:
     """The two constraints an author is most likely to get wrong, and which cost
     a real 400 (or a fabricated reproducibility record) to discover."""
 
-    @pytest.mark.parametrize(
-        "key,text",
-        [(k, t) for k, t in EXAMPLES if "serving_stack: anthropic_compat" in t],
-        ids=[k for k, t in EXAMPLES if "serving_stack: anthropic_compat" in t],
-    )
+    @pytest.mark.parametrize("key,text", ANTHROPIC_EXAMPLES, ids=[k for k, _ in ANTHROPIC_EXAMPLES])
     def test_no_seed_is_declared(self, key: str, text: str) -> None:
         assert _parse(text).serving.sampling.seed is None, (
             f"{key}: the Messages API has no seed parameter and the client refuses to run "
@@ -145,3 +152,40 @@ class TestLiveFileIsUnchangedInSpirit:
         entry = load_registry(MODELS_YAML).get("mock")
         assert entry.serving.serving_stack is ServingStack.MOCK
         assert client_class_for(entry).__name__ == "OpenAICompatibleClient"
+
+
+class TestPreflightOverAuthoredEntries:
+    """Review B1 wired to the file authors actually edit.
+
+    `check_entry` is the authoring-time guard for the trap where an
+    `anthropic_compat` entry omits its `sampling:` block, inherits
+    temperature 0.0, and 400s on every current model. Running it here means the
+    python CI gate fails the PR that introduces such an entry -- which is the
+    only moment it is cheap to fix.
+    """
+
+    @pytest.mark.parametrize("key,text", EXAMPLES, ids=[k for k, _ in EXAMPLES])
+    def test_no_example_carries_a_configuration_error(self, key: str, text: str) -> None:
+        found = errors(check_entry(_parse(text)))
+        assert not found, "\n".join(str(p) for p in found)
+
+    def test_the_live_registry_is_error_free(self) -> None:
+        from ida_core.registry import load_registry
+
+        found = errors(check_registry(load_registry(MODELS_YAML)))
+        assert not found, "\n".join(str(p) for p in found)
+
+    def test_the_flagship_anthropic_example_is_warning_free_too(self) -> None:
+        """Opus 5 rejects non-default sampling outright, so the example we hand
+        people must be clean at BOTH severities, not merely non-erroring."""
+        text = next(t for k, t in EXAMPLES if k == "claude-opus-5")
+        assert check_entry(_parse(text)) == []
+
+    def test_the_sonnet_4_6_example_warns_and_that_is_correct(self) -> None:
+        """It deliberately sets temperature 0.0 because 4.6 still accepts
+        sampling. A warning is the honest signal: right here, wrong if the
+        model_id is ever bumped to a model that rejects it."""
+        text = next(t for k, t in EXAMPLES if k == "claude-sonnet-4-6")
+        problems = check_entry(_parse(text))
+        assert [p.severity for p in problems] == ["warning"]
+        assert errors(problems) == []

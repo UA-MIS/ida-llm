@@ -38,7 +38,7 @@ no code change and no new file.
 Adding a genuinely new *wire format* is a new `BaseChatClient` subclass plus one
 row in `CLIENT_BY_SERVING_STACK`.
 
-## Why two clients (the D-1 resolution)
+## Why two clients (the D-13 resolution)
 
 The scaffold asserted "there is no per-provider code anywhere", and `models.yaml`
 carried a commented example claiming Anthropic "exposes an OpenAI-compatible
@@ -63,7 +63,7 @@ have preserved the single-client story. It was rejected: the shim is a
 translation layer in front of the real API, so every stored number would describe
 a surface we did not choose, cannot version, and cannot cite. For a project whose
 entire premise is that a result is worthless unless you can say exactly what
-produced it (D-1), that is the wrong trade. Two subclasses of one base is the
+produced it (D-13), that is the wrong trade. Two subclasses of one base is the
 smaller cost.
 
 **Known wart.** `ServingStack.ANTHROPIC_COMPAT` (`"anthropic_compat"`) now selects
@@ -88,10 +88,29 @@ true. A non-default value is always sent, and if the model rejects it the
 operator gets Anthropic's own 400 text naming the field — never a benchmark
 quietly run at a temperature nobody chose.
 
+**Anthropic — the dangerous default.** `SamplingParams.temperature` defaults to
+`0.0` (the *benchmark* default), and current Claude models reject a non-default
+`temperature` with a 400. An `anthropic_compat` entry that simply omits its
+`sampling:` block therefore inherits `0.0` and fails every call — a mistake that
+is invisible in the YAML, because it is a line nobody wrote.
+
+`ida_harness.preflight.check_entry()` catches this at **authoring** time, and the
+test suite runs it over every entry in `models.yaml`, so a bad entry fails the PR
+rather than the benchmark. It is deliberately *not* a runtime guard: `seed` can be
+refused in the client forever because the Messages API has no such parameter,
+whereas `temperature` merely happens to be restricted on today's models — a hard
+raise would be wrong the day one accepts it again. Severities follow that logic:
+
+| | |
+|---|---|
+| `seed` set | **error** — no Anthropic model has ever had one |
+| both `temperature` and `top_p` non-default | **error** — no Claude model accepts the pair |
+| one of them non-default | **warning** — correct against Sonnet 4.6 / Haiku 4.5, wrong against Opus 5 |
+
 **Anthropic — no seed.** The Messages API has no seed parameter. Rather than drop
 a declared one, the client refuses to run: a stored result claiming a seeded,
 reproducible run that was never seeded is precisely the fabricated measurement
-D-1 exists to prevent. Set `serving.sampling.seed: null` on Anthropic entries.
+D-13 exists to prevent. Set `serving.sampling.seed: null` on Anthropic entries.
 
 **Anthropic — cache tokens.** `usage.input_tokens` excludes
 `cache_creation_input_tokens` and `cache_read_input_tokens`, which bill at

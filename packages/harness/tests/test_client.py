@@ -9,7 +9,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from ida_core.contracts import ChatMessage, ModelEntry, SamplingParams
+from ida_core.contracts import ChatMessage, ModelEntry, SamplingParams, ServingStack
 from ida_core.registry import MissingApiKeyError
 from ida_harness.client import (
     TRANSIENT_STATUS_CODES,
@@ -584,3 +584,50 @@ class TestDocumentedOpenAIShape:
             pytest.raises(PermanentModelError, match="Use 'max_completion_tokens' instead"),
         ):
             client.complete(MESSAGES, SAMPLING)
+
+
+class TestMalformedUsageIsAPermanentError:
+    """Review B3: the two clients must agree on what a broken body is.
+
+    A flaky OpenAI-compatible server (vLLM, llama.cpp) returning a non-dict
+    `usage` used to escape as a bare AttributeError, which the runner's
+    `except ModelError` does not catch -- so one malformed response killed the
+    whole run instead of degrading one sample.
+    """
+
+    @pytest.mark.parametrize("usage", ["none", 0.5, ["prompt_tokens", 1], True])
+    def test_a_non_object_usage_degrades_the_sample_not_the_run(
+        self, model_entry: ModelEntry, usage
+    ) -> None:
+        body = {"choices": [{"message": {"content": "42"}}], "usage": usage}
+        with (
+            _client(model_entry, lambda r: httpx.Response(200, json=body)) as client,
+            pytest.raises(PermanentModelError, match="non-object usage"),
+        ):
+            client.complete(MESSAGES, SAMPLING)
+
+    @pytest.mark.parametrize("usage", [None, {}])
+    def test_a_falsy_usage_still_means_honest_zeros(self, model_entry: ModelEntry, usage) -> None:
+        """`usage: null` and `usage: {}` are omission, not corruption -- they
+        must keep taking the documented zeros path, not the new error path."""
+        body = {"choices": [{"message": {"content": "42"}}], "usage": usage}
+        with _client(model_entry, lambda r: httpx.Response(200, json=body)) as client:
+            assert client.complete(MESSAGES, SAMPLING).usage.total_tokens == 0
+
+    def test_the_anthropic_client_already_tolerates_it(self, model_entry: ModelEntry) -> None:
+        """Documents the surviving asymmetry: Anthropic COERCES a non-dict usage
+        to zeros rather than raising. Left as-is deliberately -- changing it
+        would alter shipped behaviour for a case neither client has ever seen,
+        and this test pins which way each one goes."""
+        from ida_harness.anthropic_client import AnthropicMessagesClient
+
+        entry = model_entry.model_copy(deep=True)
+        entry.serving.serving_stack = ServingStack.ANTHROPIC_COMPAT
+        body = {"content": [{"type": "text", "text": "42"}], "usage": "nope"}
+        client = AnthropicMessagesClient(
+            entry, transport=httpx.MockTransport(lambda r: httpx.Response(200, json=body))
+        )
+        with client:
+            # No seed: this client refuses one outright (that is a different test).
+            seedless = SamplingParams(temperature=0.0, max_tokens=64)
+            assert client.complete(MESSAGES, seedless).usage.total_tokens == 0

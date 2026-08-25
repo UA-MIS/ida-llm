@@ -1,4 +1,5 @@
-# The model registry (D-1).
+# The model registry (D-13 -- the reproducibility decision;
+# the D-1..D-12 entries in the decision log are empty stubs).
 #
 # Every model -- a hosted commercial API, a campus vLLM deployment, a laptop
 # llama.cpp server -- is described by a base URL, the NAME of an env var holding

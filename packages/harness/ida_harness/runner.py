@@ -22,7 +22,7 @@ Guarantees this function makes
 * **Paid-for work is not discarded.**  If object storage refuses a transcript,
   the result is still recorded (with ``archive_error``); the completion was
   bought and scored, and only the evidence pointer is missing.
-* **The serving config is stamped on every record** (D-1), including the
+* **The serving config is stamped on every record** (D-13), including the
   *effective* sampling params after any per-run override.
 * **Subjective tasks do not call a scorer.**  They yield ``scorable=False``,
   ``score=None`` records, so they appear in the UI as "not yet scorable"
