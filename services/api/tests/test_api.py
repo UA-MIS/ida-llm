@@ -182,9 +182,16 @@ class TestModelsEndpoint:
 
 
 class TestTasksEndpoint:
-    def test_lists_both_demo_tasks(self, client: TestClient) -> None:
-        tasks = client.get("/tasks").json()
-        assert [t["id"] for t in tasks] == [VERIFIABLE_TASK, SUBJECTIVE_TASK]
+    def test_lists_the_shipped_tasks(self, client: TestClient) -> None:
+        """The endpoint serves the whole catalog, in the catalog's order.
+
+        Asserted as a superset plus an ordering check rather than an exact list:
+        `tasks/` grows every time someone authors a family, and a test that has
+        to be edited for each one stops being read.
+        """
+        ids = [t["id"] for t in client.get("/tasks").json()]
+        assert {VERIFIABLE_TASK, SUBJECTIVE_TASK} <= set(ids)
+        assert ids == sorted(ids), "TaskCatalog.ids() is sorted; the wire order must match"
 
     def test_verifiable_task_is_scorable(self, client: TestClient) -> None:
         task = next(t for t in client.get("/tasks").json() if t["id"] == VERIFIABLE_TASK)

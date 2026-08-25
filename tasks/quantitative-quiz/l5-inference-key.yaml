@@ -1,0 +1,130 @@
+# quantitative-quiz, rung 5 of 7 -- inference statistics.
+#
+# EXEMPLAR. What this rung measures: multi-step keys where an intermediate
+# quantity (a standard error, a pooled variance, a degrees-of-freedom count) has
+# to be computed before the reported answer. Rung 4's items were one or two
+# steps; these are three, and the failure modes compound.
+#
+# Every critical value the item needs is supplied, for the reason set out in the
+# design note at the top of l4-distribution-key.yaml.
+version: 1
+id: quantitative-quiz/l5-inference-key
+title: Quiz key -- test statistics, intervals and degrees of freedom
+description: >
+  Rung 5 of the quantitative-quiz ladder. One-sample t statistics, one-proportion
+  z statistics, confidence-interval half-widths and bounds, degrees of freedom
+  and pooled variance. Each item needs an intermediate quantity computed before
+  the answer, so a model can execute every individual step correctly and still
+  produce a wrong key by reporting the intermediate.
+
+  Provenance: every scenario is synthetic, authored for this file. Critical
+  values quoted in the prompts are standard constants.
+kind: verifiable
+domain: statistics
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory-statistics
+  quiz. Use only the critical values the item supplies. Round to two decimal
+  places unless the item says otherwise, and report the quantity the item asks
+  for -- not an intermediate step. Put the final numeric answer alone on the
+  last line, with no units, no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  # Two decimal places -> 0.005 worst-case rounding error; 0.01 admits it.
+  # Smallest distance to a wrong-method answer below is 0.04
+  # (one-proportion-z-statistic) -- see that item's comment.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [exemplar, quantitative-quiz, ladder-l5, inference, hypothesis-testing]
+samples:
+  - id: one-sample-t-statistic
+    input: >-
+      A quiz item reads: "A sample of 16 observations has sample mean 52.4 and
+      sample standard deviation 6.0. Test the null hypothesis that the
+      population mean is 50. Compute the t test statistic." Produce the value
+      for the answer key.
+    # standard error = 6.0 / sqrt(16) = 1.5 ; t = (52.4 - 50) / 1.5 = 1.6
+    # Using s rather than the standard error gives 0.40 -- 1.20 away.
+    target: "1.6"
+    metadata: { skill: one-sample-t, provenance: synthetic }
+
+  - id: one-proportion-z-statistic
+    input: >-
+      A quiz item reads: "In a sample of 400 respondents, 58% agreed. Test the
+      null hypothesis that the population proportion is 0.50. Compute the z test
+      statistic, using the standard error evaluated under the null hypothesis
+      and without a continuity correction." Produce the value for the answer
+      key.
+    # SE under H0 = sqrt(0.5*0.5/400) = sqrt(0.000625) = 0.025
+    # z = (0.58 - 0.50) / 0.025 = 0.08 / 0.025 = 3.2
+    # This item NAMES its standard-error convention because three forms are
+    # taught in introductory courses and they disagree:
+    #   Wald SE (sample proportion): sqrt(0.58*0.42/400) = 0.02468 -> 3.24
+    #   continuity-corrected:        (0.08 - 1/800) / 0.025      -> 3.15
+    # Those sit 0.04 and 0.05 from the key -- four and five times the tolerance,
+    # the thinnest margins in the family, so they are correctly rejected. But
+    # naming the null-hypothesis SE is what makes this a single-answer item at
+    # all: "compute the z test statistic" alone has three defensible keys, and
+    # the guide is explicit that such an item is invalid, not hard. See "pin
+    # every convention the item depends on".
+    target: "3.2"
+    metadata: { skill: one-proportion-z, provenance: synthetic }
+
+  - id: confidence-interval-half-width
+    input: >-
+      A quiz item reads: "A population has standard deviation 20. A sample of
+      100 observations is drawn. Using the critical value z* = 1.96, compute the
+      half-width (the margin of error) of a 95% confidence interval for the
+      population mean." Produce the value for the answer key.
+    # standard error = 20 / sqrt(100) = 2 ; half-width = 1.96 * 2 = 3.92
+    # Forgetting sqrt(n) gives 1.96 * 0.2 = 0.39 -- 3.53 away.
+    target: "3.92"
+    metadata: { skill: margin-of-error, provenance: synthetic }
+
+  - id: confidence-interval-upper-bound
+    input: >-
+      A quiz item reads: "A sample of 25 observations has sample mean 48.2 and
+      sample standard deviation 5.0. Using the critical value t* = 2.064,
+      compute the UPPER bound of the 95% confidence interval for the population
+      mean. Give three decimal places." Produce the value for the answer key.
+    # standard error = 5.0 / sqrt(25) = 1.0 ; half-width = 2.064 * 1.0 = 2.064
+    # upper bound = 48.2 + 2.064 = 50.264
+    # Reporting the LOWER bound gives 46.136 -- 4.128 away.
+    # Reporting the half-width gives 2.064 -- 48.2 away.
+    target: "50.264"
+    metadata: { skill: confidence-interval-bound, provenance: synthetic }
+
+  - id: df-pooled-t
+    input: >-
+      A quiz item reads: "Two independent samples have sizes 12 and 15. For a
+      pooled two-sample t test, how many degrees of freedom are there?" Produce
+      the value for the answer key.
+    # df = n1 + n2 - 2 = 12 + 15 - 2 = 25
+    # Forgetting one subtraction gives 26 -- 1.00 away.
+    # Using the smaller sample's df alone gives 11 -- 14.00 away.
+    target: "25"
+    metadata: { skill: degrees-of-freedom, provenance: synthetic }
+
+  - id: pooled-variance
+    input: >-
+      A quiz item reads: "Two independent samples have sizes 10 and 14 with
+      sample standard deviations 4.0 and 6.0 respectively. Compute the pooled
+      variance." Produce the value for the answer key.
+    # ((10-1)*16 + (14-1)*36) / (10 + 14 - 2) = (144 + 468) / 22
+    #   = 612 / 22 = 27.8181... -> 27.82
+    # Averaging the two variances unweighted gives 26.00 -- 1.82 away.
+    # Reporting the pooled standard deviation gives 5.27 -- 22.55 away.
+    target: "27.82"
+    metadata: { skill: pooled-variance, provenance: synthetic }
+
+  - id: chi-square-expected-count
+    input: >-
+      A quiz item reads: "In a contingency table the row total is 60, the column
+      total is 90, and the grand total is 300. Compute the expected count for
+      that cell under independence." Produce the value for the answer key.
+    # 60 * 90 / 300 = 5400 / 300 = 18
+    # Adding the marginals instead gives 150/300 = 0.5 -- 17.50 away.
+    target: "18"
+    metadata: { skill: expected-count, provenance: synthetic }
