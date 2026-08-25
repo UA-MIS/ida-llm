@@ -26,7 +26,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
 
   const session = await requireSession(`/items/${rawId}`);
   await ensureSchema();
-  const ghToken = githubReadToken({ githubToken: session.token || null });
+  const ghToken = await githubReadToken({ githubToken: session.token || null });
 
   const existing = await getWorkItem(id);
   if (!existing) notFound();

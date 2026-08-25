@@ -203,57 +203,68 @@ describe('GitHub credential selection', () => {
   beforeEach(() => {
     delete process.env.GITHUB_POLL_TOKEN;
     delete process.env.AUTH_PROVIDER;
+    delete process.env.GITHUB_APP_ID;
+    delete process.env.GITHUB_APP_PRIVATE_KEY;
+    delete process.env.GITHUB_APP_INSTALLATION_ID;
   });
 
   it('prefers the acting user’s own token for reads', async () => {
     const { githubReadToken } = await import('@/lib/github/credential');
     process.env.GITHUB_POLL_TOKEN = 'gho_shared';
-    expect(githubReadToken({ githubToken: 'gho_mine' })).toBe('gho_mine');
+    expect(await githubReadToken({ githubToken: 'gho_mine' })).toBe('gho_mine');
   });
 
   it('falls back to the shared token for READS when the session has none (OIDC)', async () => {
     const { githubReadToken } = await import('@/lib/github/credential');
     process.env.GITHUB_POLL_TOKEN = 'gho_shared';
-    expect(githubReadToken({ githubToken: null })).toBe('gho_shared');
+    expect(await githubReadToken({ githubToken: null })).toBe('gho_shared');
   });
 
   it('returns null for reads when nothing is configured', async () => {
     const { githubReadToken } = await import('@/lib/github/credential');
-    expect(githubReadToken({ githubToken: null })).toBeNull();
-    expect(githubReadToken(null)).toBeNull();
+    expect(await githubReadToken({ githubToken: null })).toBeNull();
+    expect(await githubReadToken(null)).toBeNull();
   });
 
-  it('prefers the user for writes, but falls back to the app credential', async () => {
+  it('prefers the user for writes, but falls back to the board credential', async () => {
     const { githubActionCredential } = await import('@/lib/github/credential');
     process.env.GITHUB_POLL_TOKEN = 'gho_app';
 
-    expect(githubActionCredential({ githubToken: 'gho_mine' })).toEqual({
+    expect(await githubActionCredential({ githubToken: 'gho_mine' })).toEqual({
       token: 'gho_mine',
       source: 'user',
     });
-    // A Dex user has no token of their own; the feature still works.
-    expect(githubActionCredential({ githubToken: null })).toEqual({
+    // A Dex user has no token of their own; the feature still works. The source
+    // is `poll-token` rather than `app` because the credential IS the static
+    // token here — `app` now means a real GitHub App installation token, and
+    // conflating the two would hide which one a board is actually running on.
+    expect(await githubActionCredential({ githubToken: null })).toEqual({
       token: 'gho_app',
-      source: 'app',
+      source: 'poll-token',
     });
   });
 
   it('reports "none" for writes when nothing at all is configured', async () => {
     const { githubActionCredential } = await import('@/lib/github/credential');
-    expect(githubActionCredential({ githubToken: null })).toEqual({ token: null, source: 'none' });
+    expect(await githubActionCredential({ githubToken: null })).toEqual({
+      token: null,
+      source: 'none',
+    });
   });
 
-  it('marks app-credential actions in history so attribution stays truthful', async () => {
+  it('marks board-credential actions in history so attribution stays truthful', async () => {
     const { attributionNote } = await import('@/lib/github/credential');
     expect(attributionNote('user')).toBeUndefined();
     expect(attributionNote('app')).toContain('board');
+    expect(attributionNote('poll-token')).toContain('board');
   });
 
-  it('names the variable an owner must set when no credential exists', async () => {
+  it('names the variables an owner must set when no credential exists', async () => {
     const { missingCredentialMessage } = await import('@/lib/github/credential');
     process.env.AUTH_PROVIDER = 'oidc';
     process.env.OIDC_ISSUER = 'https://id.example.test';
     const msg = missingCredentialMessage('Creating a branch');
+    expect(msg).toContain('GITHUB_APP_ID');
     expect(msg).toContain('GITHUB_POLL_TOKEN');
     expect(msg).toContain('Dex');
     expect(msg).toContain('Creating a branch');

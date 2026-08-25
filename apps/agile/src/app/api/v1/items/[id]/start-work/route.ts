@@ -67,7 +67,7 @@ export const POST = withApi(async ({ request, params, principal }) => {
   }
 
   // 2. Branch second, and never fatally.
-  const branch = await startWork(item, actor, githubActionCredential(principal), body.repo);
+  const branch = await startWork(item, actor, await githubActionCredential(principal), body.repo);
   if (branch.status === 'created' || branch.status === 'existing') item = branch.item;
   else warnings.push(branch.message);
 

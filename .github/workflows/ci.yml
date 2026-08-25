@@ -107,6 +107,49 @@ jobs:
       - name: Build
         run: npm run build
 
+  agile:
+    # The sprint board (apps/agile) has its own test suite and, until this job
+    # existed, NOTHING ran it — the component is built and shipped by
+    # build-and-push.yaml, but no workflow ever executed its 280 assertions. A
+    # test suite that never runs in CI is documentation, not a gate.
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    container:
+      # Same 24.16 pin and the same reason as `frontend` above.
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie-slim
+    defaults:
+      run:
+        working-directory: apps/agile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        # No DATABASE_URL on purpose: the db-integration suites detect its
+        # absence and skip, so this job needs no Postgres service. Everything
+        # that does not touch a database — including the whole GitHub credential
+        # seam — runs here.
+        run: npm test
+
+      - name: Build
+        # `next build` evaluates the config module, so the REQUIRED vars must be
+        # present. These are throwaway values that never leave the runner; the
+        # build only needs them to be well-formed.
+        env:
+          DATABASE_URL: postgres://agile:ci-throwaway@127.0.0.1:5432/agile
+          SESSION_SECRET: ci-throwaway-session-secret-at-least-32-chars
+          APP_URL: http://localhost:3000
+          OIDC_CLIENT_ID: ida-agile
+        run: npm run build
+
   task-schema:
     # THE data gate. tasks/** and models.yaml are versioned DATA: every benchmark
     # result cites the git SHA of the task that produced it, and that citation is

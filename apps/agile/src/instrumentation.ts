@@ -11,6 +11,10 @@ export async function register(): Promise<void> {
   // Skip during `next build`, which imports the app without a live database.
   if (process.env.NEXT_PHASE === 'phase-production-build') return;
 
+  // Said BEFORE the database work, so it is printed even if migrations fail.
+  const { credentialSummary } = await import('@/lib/github/credential');
+  console.log(`[startup] GitHub credential: ${credentialSummary()}`);
+
   const { ensureSchema } = await import('@/lib/bootstrap');
   try {
     await ensureSchema();

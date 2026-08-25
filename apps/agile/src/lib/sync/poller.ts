@@ -1,4 +1,5 @@
 import { config } from '@/lib/env';
+import { backgroundCredential } from '@/lib/github/credential';
 import { query, queryOne } from '@/lib/db/pool';
 import { listBranchCommits, fetchPullRequest, compareWithDefault } from '@/lib/github/client';
 import { getWorkItem, linkPullRequest, listWorkItems } from '@/lib/domain/queries';
@@ -149,7 +150,10 @@ export async function pollOnce(): Promise<SyncOutcome> {
   const outcome = emptyOutcome();
   if (!config.backgroundPollEnabled) return outcome;
 
-  const token = config.githubPollToken;
+  // Whatever credential the board has: the App installation token when the
+  // platform App is configured, otherwise the legacy static token.
+  const token = await backgroundCredential();
+  if (!token) return outcome;
   const candidates = [
     ...(await listWorkItems({ state: 'Active', limit: 50 })),
     ...(await listWorkItems({ state: 'New', limit: 50 })),

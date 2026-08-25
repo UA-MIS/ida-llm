@@ -48,7 +48,7 @@ export const POST = withApi(async ({ request, params, principal }) => {
   }
 
   // Reading the PR is a read, so the shared token is an acceptable fallback.
-  const readToken = githubReadToken(principal);
+  const readToken = await githubReadToken(principal);
   if (!readToken) {
     return apiError(
       'github_credential_required',
@@ -92,7 +92,7 @@ export const POST = withApi(async ({ request, params, principal }) => {
     fresh,
     pr.repoFullName,
     pr.number,
-    githubActionCredential(principal),
+    await githubActionCredential(principal),
   );
 
   return ok({ link, item: fresh, backlink }, 201);
