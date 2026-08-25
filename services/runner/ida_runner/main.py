@@ -19,6 +19,7 @@ from ida_core.queue import RedisQueue
 from ida_core.registry import load_registry
 from ida_harness.tasks import TaskCatalog
 from ida_runner import metrics
+from ida_runner.reaper import Reaper
 from ida_runner.worker import Worker
 
 log = logging.getLogger("ida_runner")
@@ -41,14 +42,33 @@ def build_worker() -> Worker:
         )
     store.ensure_bucket()
 
+    # ONE queue object, shared by the loop, the depth metric and the reaper.
+    # Building a second connection from the same settings would look equivalent
+    # and would silently stop being equivalent the moment anything reconfigures
+    # one of them -- and a reaper pointed at a different Redis than the loop it
+    # is reconciling would "recover" nothing while reporting success.
+    queue = RedisQueue.from_url(
+        settings.redis_url,
+        max_attempts=settings.queue_max_attempts,
+        heartbeat_ttl_s=settings.runner_heartbeat_ttl_s,
+    )
+    session_factory = make_session_factory(engine)
+
     return Worker(
-        queue=RedisQueue.from_url(settings.redis_url),
-        session_factory=make_session_factory(engine),
+        queue=queue,
+        session_factory=session_factory,
         registry=load_registry(settings.resolved_models_file()),
         catalog=TaskCatalog.from_directory(settings.resolved_tasks_dir()),
         artifact_store=store,
         git_sha=current_git_sha(settings.resolved_tasks_dir()),
         poll_timeout_s=settings.runner_poll_timeout_s,
+        reaper=Reaper(
+            queue=queue,
+            session_factory=session_factory,
+            stale_run_ttl_s=settings.stale_run_ttl_s,
+        ),
+        reaper_interval_s=settings.reaper_interval_s,
+        heartbeat_interval_s=settings.runner_heartbeat_interval_s,
     )
 
 

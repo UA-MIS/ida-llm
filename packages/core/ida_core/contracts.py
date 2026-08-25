@@ -87,8 +87,12 @@ class RunStatus(StrEnum):
     """Lifecycle of a :class:`RunRecord`.
 
     ``queued`` -> ``running`` -> (``succeeded`` | ``partial`` | ``failed``).
-    A run that the runner claims but never finishes stays ``running``; reaping
-    stale runs is deliberately out of scope for the skeleton.
+    A run whose runner dies before finishing does **not** stay ``running``: its
+    queue claim is recovered and the row goes back to ``queued`` for another
+    attempt, or -- once attempts are spent, or if no claim survives at all --
+    it is closed out ``failed`` with a reason.  See
+    :class:`ida_runner.reaper.Reaper`.  ``running`` therefore means a runner is
+    genuinely working on it, which is what makes the status worth showing.
 
     The three terminal states are decided by :attr:`RunRecord.error_count`
     against :attr:`RunRecord.sample_count` and are **not** interchangeable.
@@ -118,6 +122,15 @@ class RunStatus(StrEnum):
 
     FAILED = "failed"
     """The run measured nothing: setup failed, or every sample errored."""
+
+
+TERMINAL_RUN_STATUSES = frozenset({RunStatus.SUCCEEDED, RunStatus.PARTIAL, RunStatus.FAILED})
+"""The statuses from which a run never moves again.
+
+Named once so "is this run finished?" cannot be spelled three slightly different
+ways.  Load-bearing for at-least-once delivery: a re-delivered message must be
+recognisable as work already done.
+"""
 
 
 def terminal_status(*, sample_count: int, error_count: int) -> RunStatus:
@@ -640,11 +653,11 @@ class RunJobMessage(BaseModel):
     """**The queue contract.**  api -> Redis -> runner.  Versioned; JSON on the wire.
 
     Transport: a Redis list used as a FIFO queue.  The API ``RPUSH``es the JSON
-    body onto :data:`ida_core.queue.RUN_QUEUE_KEY`; runners ``BLPOP`` it.  There
-    is no ack/retry in the skeleton -- a runner that dies loses its message, and
-    the run stays ``running``.  That is a known, documented gap (see
-    ``ida_core.queue`` module docstring) and the first thing a durability pass
-    should fix.
+    body onto :data:`ida_core.queue.RUN_QUEUE_KEY`; a runner ``BLMOVE``s it onto
+    its own processing list and removes it only once the run is terminal and
+    persisted.  Delivery is therefore **at-least-once**: a runner that dies
+    mid-job has its claim recovered and re-delivered rather than losing it.  See
+    the ``ida_core.queue`` module docstring for the claim/ack/nack contract.
 
     Compatibility rule: ``schema_version`` is bumped on any change that is not
     additive-with-default.  A runner **must** refuse a message whose
@@ -671,7 +684,15 @@ class RunJobMessage(BaseModel):
     sampling_override: SamplingParams | None = None
     enqueued_at: datetime
     attempt: Annotated[int, Field(ge=1)] = 1
-    """1-based.  Reserved for a future retry policy; always 1 in the skeleton."""
+    """1-based delivery counter.  ``1`` on the first delivery; incremented each
+    time the message is returned to the queue, by an explicit ``nack`` or by
+    recovery of a dead runner's claim.
+
+    The retry policy was built on this field precisely because it already
+    existed with a default: bounding retries needed **no** ``schema_version``
+    bump, so a runner replica that predates the durability pass still parses a
+    retried message instead of refusing it mid-rollout.  Compare
+    ``queue_max_attempts`` to decide whether a further delivery is allowed."""
 
     def to_wire(self) -> str:
         """Serialise to the exact bytes that go on the queue."""
