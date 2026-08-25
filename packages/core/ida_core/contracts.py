@@ -36,6 +36,7 @@ Every task is exactly one of:
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal
@@ -479,6 +480,98 @@ def content_sha_of(document: Any) -> str:
     return hashlib.sha256(blob.encode()).hexdigest()
 
 
+_METADATA_NUMBER = re.compile(r"(?<![0-9A-Za-z._-])[-+]?\d+(?:\.\d+)?(?![0-9A-Za-z])")
+"""A number in a metadata string, ignoring digits that are part of a word.
+
+The lookarounds are the whole point.  Sample metadata is full of identifiers
+that contain digits -- ``ladder-l3``, ``interest-v2``, ``mirrors:
+l4-distribution-key`` -- and a bare ``\d+`` would read the ``4`` out of
+``l4-distribution-key`` and report a task whose target is ``4`` as leaking.  A
+digit glued to a letter is part of a name, not a value.
+"""
+
+
+def _metadata_scalars(value: Any) -> list[Any]:
+    """Every scalar reachable from a metadata value, including dict keys."""
+    if isinstance(value, dict):
+        out: list[Any] = []
+        for key, item in value.items():
+            out.append(key)
+            out.extend(_metadata_scalars(item))
+        return out
+    if isinstance(value, (list, tuple, set)):
+        return [scalar for item in value for scalar in _metadata_scalars(item)]
+    return [value]
+
+
+def _target_leaks_into_metadata(target: str, metadata: dict[str, Any]) -> str | None:
+    """Return a human-readable reason if ``target`` is recoverable from ``metadata``.
+
+    **Why this rule exists.**  ``GET /tasks/{id}`` redacts every ``target``
+    unless the caller holds the ``author`` role -- publishing the answer key is
+    both an integrity risk (anyone can tune against it) and a contamination one
+    (a scraped key reaches a future training corpus).  But that same endpoint
+    returns ``sample.metadata`` **verbatim, to everyone, unauthenticated**
+    (``ida_api.schemas.SampleView``).  An author who writes the derivation into
+    ``metadata`` therefore hands out exactly what the redaction exists to
+    protect, and nothing used to say so.  Derivations belong in YAML comments,
+    which are not parsed, not part of ``content_sha``, and never served.
+
+    **What this catches**: the target as a standalone value or token in any
+    metadata scalar (recursively, keys included), and -- for numeric targets --
+    the same value written in another format (``7.50`` for ``7.5``, ``+3`` for
+    ``3``).
+
+    **What this does NOT catch, honestly.**  It is a tripwire, not a proof:
+
+    * a derivation that yields the answer without stating it
+      (``{working: "sum=70, n=5"}`` for a target of ``14``);
+    * the answer in words (``{note: "forty-two"}``);
+    * the answer in a *different* sample's metadata, or in ``description``,
+      ``title`` or ``tags``;
+    * an answer a reader can infer from a hint (``{note: "answer is negative"}``).
+
+    Passing this check is not evidence that a task keeps its key secret.  The
+    rule exists to make the common, mechanical mistake impossible to commit.
+    """
+    scalars = _metadata_scalars(metadata)
+    stripped = target.strip()
+    if not stripped:
+        return None
+    folded = stripped.casefold()
+
+    for scalar in scalars:
+        if isinstance(scalar, str) and scalar.strip().casefold() == folded:
+            return f"a metadata value is exactly the target ({stripped!r})"
+
+    try:
+        wanted = float(stripped)
+    except ValueError:
+        # Non-numeric target (exact_match): a standalone-token match is a leak.
+        pattern = re.compile(rf"(?<![0-9A-Za-z_]){re.escape(stripped)}(?![0-9A-Za-z_])", re.I)
+        for scalar in scalars:
+            if isinstance(scalar, str) and pattern.search(scalar):
+                return f"a metadata value contains the target {stripped!r}"
+        return None
+
+    for scalar in scalars:
+        if isinstance(scalar, bool):
+            continue
+        if isinstance(scalar, (int, float)) and float(scalar) == wanted:
+            return f"a metadata value is numerically the target ({stripped!r})"
+        if isinstance(scalar, str):
+            for found in _METADATA_NUMBER.findall(scalar):
+                try:
+                    if float(found) == wanted:
+                        return (
+                            f"a metadata value contains the target as a number "
+                            f"({found!r} == {stripped!r})"
+                        )
+                except ValueError:  # pragma: no cover - regex guarantees parseability
+                    continue
+    return None
+
+
 class TaskSpec(BaseModel):
     """A parsed task YAML.  The unit of benchmarking work.
 
@@ -559,6 +652,37 @@ class TaskSpec(BaseModel):
         dupes = {i for i in sample_ids if sample_ids.count(i) > 1}
         if dupes:
             raise ValueError(f"task {self.id!r} has duplicate sample ids: {sorted(dupes)}")
+        return self
+
+    @model_validator(mode="after")
+    def _targets_do_not_leak_into_metadata(self) -> TaskSpec:
+        """A gold answer must not be recoverable from its own sample's metadata.
+
+        Targets are redacted by ``GET /tasks/{id}``; ``metadata`` is not.  A
+        derivation written into ``metadata`` therefore publishes the answer key
+        the redaction exists to protect -- see
+        :func:`_target_leaks_into_metadata` for what this does and does not
+        catch.  Put derivations in YAML comments instead.
+
+        Enforced here rather than in the JSON Schema because it is a
+        data-dependent cross-field rule the schema cannot express, and enforced
+        in ``ida_core`` rather than in ``tools/validate_tasks.py`` so that it
+        binds everywhere a task is loaded -- the CI ``task-schema`` job, the
+        harness catalog, and API startup -- not only when someone runs the CLI.
+        """
+        leaks = []
+        for sample in self.samples:
+            if sample.target is None or not sample.metadata:
+                continue
+            reason = _target_leaks_into_metadata(sample.target, sample.metadata)
+            if reason is not None:
+                leaks.append(f"{sample.id}: {reason}")
+        if leaks:
+            raise ValueError(
+                f"task {self.id!r} leaks gold answers through sample metadata "
+                f"(metadata is served unauthenticated while targets are redacted; "
+                f"move the derivation into a YAML comment): " + "; ".join(leaks)
+            )
         return self
 
     @classmethod

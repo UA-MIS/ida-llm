@@ -362,6 +362,20 @@ nobody can check is a key nobody will trust.
 Keep in `metadata` only things that are safe to publish and useful to a
 consumer: `skill`, `difficulty`, `template`, `provenance`, `scenario`.
 
+**This rule is enforced, not advisory.** `make lint-tasks` and the `task-schema`
+CI job reject a verifiable sample whose target is recoverable from its own
+`metadata` — the exact string, and for numeric targets the same value in another
+format (`7.50` for `7.5`, `+3` for `3`), including nested dicts and lists. It
+does not fire on digits inside identifiers, so `mirrors: l4-distribution-key`
+next to a target of `4` is fine.
+
+Be clear about what that buys you, though. It is a **tripwire for the mechanical
+mistake, not proof that your key is secret.** It cannot see a derivation that
+yields the answer without stating it (`{working: "sum=70, n=5"}` for a target of
+`14`), the answer written in words, a hint (`{note: "answer is negative"}`), or
+the answer sitting in a *different* sample's metadata or in `description`. Use a
+comment and the question does not arise.
+
 ### Scorers
 
 #### `exact_match`
@@ -714,6 +728,11 @@ publish into `metadata`. Use a YAML comment. This is restated here because it is
 the mistake most likely to be made by someone who has understood everything
 else.
 
+The obvious form of it is now caught by the validator (see
+[above](#derivations-go-in-comments-never-in-metadata)), so you will find out in
+CI rather than after publication — but the check is a tripwire, not a guarantee,
+and the non-obvious forms are still yours to avoid.
+
 ---
 
 ## Running it locally
@@ -864,7 +883,8 @@ Verifiable tasks:
 - [ ] Every sample has a `target`; no `rubric` anywhere in the file.
 - [ ] A `numeric_match` target contains exactly one number, no units, no symbols.
 - [ ] **Every target carries its derivation in a YAML comment** — and nothing
-      answer-shaped is in `metadata`.
+      answer-shaped is in `metadata`. (The obvious form is enforced by
+      `make lint-tasks`; the subtle forms are not.)
 - [ ] The target is not liftable from the prompt — in particular it is not the
       last number in the `input`. (Coinciding with a supplied data value is
       fine: a mode always does.)
