@@ -47,6 +47,7 @@ from ida_harness import __version__ as harness_version
 from ida_harness.cache import CompletionCache
 from ida_harness.runner import effective_serving_config, run_task
 from ida_harness.tasks import TaskCatalog
+from ida_runner import metrics
 
 log = logging.getLogger(__name__)
 
@@ -199,6 +200,17 @@ class Worker:
         """Times a queue read raised.  Should be 0; non-zero means the queue
         implementation broke its no-raise contract and is worth alerting on."""
 
+    @property
+    def queue(self) -> RunQueue:
+        """The queue this worker consumes.
+
+        Exposed so the metrics exporter can report `ida_llm_runner_queue_depth`
+        from the SAME queue object the loop reads -- a second connection built
+        from settings could point somewhere else after a config change and
+        report a depth nobody is draining.
+        """
+        return self._queue
+
     def stop(self) -> None:
         """Ask the loop to exit after its current job.  Idempotent."""
         self._stop.set()
@@ -229,6 +241,7 @@ class Worker:
             except Exception:
                 log.exception("queue read failed; discarding and continuing")
                 self.dequeue_failures += 1
+                metrics.DEQUEUE_FAILURES.inc()
                 continue
 
             if message is None:
@@ -241,7 +254,7 @@ class Worker:
     def _process(self, message: RunJobMessage) -> None:
         """Run one job, containing any exception so the loop survives it."""
         try:
-            execute_job(
+            record = execute_job(
                 message,
                 session_factory=self._session_factory,
                 registry=self._registry,
@@ -252,4 +265,7 @@ class Worker:
                 client_factory=self._client_factory,
             )
         except Exception:
+            metrics.JOBS.labels(outcome="crashed").inc()
             log.exception("unhandled error processing run %s", message.run_id)
+        else:
+            metrics.JOBS.labels(outcome=record.status.value).inc()

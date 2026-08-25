@@ -27,7 +27,15 @@ from ida_core.db import Base
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # ⚠ disable_existing_loggers=False IS REQUIRED, and its default is True.
+    # fileConfig() otherwise DISABLES every logger that already exists in the
+    # process -- silently. Alembic is usually its own process, where that is
+    # harmless, but this env.py is also driven in-process by
+    # packages/core/tests/test_migrations.py, and a `logging.Logger.disabled`
+    # flag set halfway through a test session is an extremely confusing way to
+    # find out (it presents as "my log assertion sees nothing", nowhere near
+    # the cause).
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 

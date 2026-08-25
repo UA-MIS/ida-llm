@@ -18,6 +18,7 @@ from ida_core.gitmeta import current_git_sha
 from ida_core.queue import RedisQueue
 from ida_core.registry import load_registry
 from ida_harness.tasks import TaskCatalog
+from ida_runner import metrics
 from ida_runner.worker import Worker
 
 log = logging.getLogger("ida_runner")
@@ -58,6 +59,14 @@ def main() -> int:
         level=settings.log_level, format="%(asctime)s %(levelname)s %(name)s %(message)s"
     )
     worker = build_worker()
+
+    # The runner's ONLY listening socket. It serves the ServiceMonitor scrape and
+    # nothing else -- no probes, no API. Started AFTER build_worker() so a
+    # misconfigured runner crashes on its real problem rather than answering
+    # scrapes while unable to work. See ida_runner.metrics for why port 9100 and
+    # why the container port is named `http`.
+    metrics.bind_queue_depth(worker.queue)
+    metrics.serve(port=settings.runner_metrics_port)
 
     def _handle_signal(signum: int, _frame: object) -> None:
         log.info("received signal %s; finishing current job then exiting", signum)
