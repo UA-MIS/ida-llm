@@ -11,6 +11,7 @@ is yours, and [`.devops/README.md`](../.devops/README.md) for the deploy contrac
 | the deploy path, secrets, previews, adding a component | [`.devops/README.md`](../.devops/README.md) |
 | every environment variable | [`.env.example`](../.env.example) |
 | the model registry | [`models.yaml`](../models.yaml) |
+| **provider clients** -- which client answers for which entry, the Anthropic/OpenAI gotchas, retry and `Retry-After`, why there is no mock fallback | [`docs/model-clients.md`](model-clients.md) |
 | off-cluster inference (Sparks) | [`infra/inference/README.md`](../infra/inference/README.md) |
 
 ## Suggested first tasks
@@ -19,9 +20,12 @@ The walking skeleton has landed: the harness runs, the runner consumes the
 queue, results persist, and the frontend renders them. What is left is depth,
 not scaffolding.
 
-1. **Fill in a real provider client.** `packages/harness/ida_harness/client.py`
-   fixes the OpenAI-compatible surface and the mock proves it end to end. Add
-   `anthropic` and keep it interchangeable with the mock.
+1. **Verify the provider clients against a real endpoint.** Anthropic
+   (Messages API) and OpenAI (chat completions) are implemented and covered by
+   mocked-HTTP tests -- see [`docs/model-clients.md`](model-clients.md). What is
+   still parked is one real call per provider, which needs credits and a tag.
+   The documented gotchas (OpenAI's `max_completion_tokens`, Anthropic's
+   sampling rejections) are the likeliest first failures.
 2. **Make `subjective` tasks scorable.** The schema loads and validates them
    today (`tasks/SCHEMA.md`), but the LLM-as-judge scorer is still an interface.
 3. **Fill in the three sweeps.** `services/runner/ida_runner/sweeps.py` is

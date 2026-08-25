@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from ida_core.contracts import ChatMessage, SamplingParams, TaskSample, TaskSpec
-from ida_harness.client import ChatCompletion, OpenAICompatibleClient
+from ida_harness.client import ChatCompletion, ModelClient
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ class Solver(Protocol):
         self,
         task: TaskSpec,
         sample: TaskSample,
-        client: OpenAICompatibleClient,
+        client: ModelClient,
         sampling: SamplingParams,
     ) -> SolveOutcome:
         """Produce an answer.  May call the client more than once."""
@@ -54,7 +54,7 @@ class SingleTurnSolver:
         self,
         task: TaskSpec,
         sample: TaskSample,
-        client: OpenAICompatibleClient,
+        client: ModelClient,
         sampling: SamplingParams,
     ) -> SolveOutcome:
         messages: list[ChatMessage] = []

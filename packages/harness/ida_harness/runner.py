@@ -50,8 +50,9 @@ from ida_core.db import utcnow
 from ida_core.ids import new_result_id
 from ida_harness import __version__ as harness_version
 from ida_harness.cache import CachedCompletion, CompletionCache, NullCache, cache_key
-from ida_harness.client import OpenAICompatibleClient
+from ida_harness.client import ModelClient
 from ida_harness.errors import ModelError, ScoringError
+from ida_harness.factory import build_client
 from ida_harness.scoring import build_scorer
 from ida_harness.solver import SingleTurnSolver, Solver
 
@@ -84,8 +85,8 @@ def run_task(
     artifact_store: ArtifactStore | None = None,
     solver: Solver | None = None,
     completion_cache: CompletionCache | None = None,
-    client: OpenAICompatibleClient | None = None,
-    client_factory: Callable[[], OpenAICompatibleClient] | None = None,
+    client: ModelClient | None = None,
+    client_factory: Callable[[], ModelClient] | None = None,
 ) -> EvalLog:
     """Execute ``task`` against ``entry`` and return a structured eval log.
 
@@ -111,7 +112,10 @@ def run_task(
         if client_factory is not None:
             client = client_factory()
         else:
-            client = OpenAICompatibleClient(entry, api_key=api_key)
+            # The factory, not a hardcoded class: which client answers is a
+            # models.yaml decision (serving_stack), so the runner SERVICE gets
+            # provider selection without knowing providers exist.
+            client = build_client(entry, api_key=api_key)
         owns_client = True
 
     results: list[ResultRecord] = []
