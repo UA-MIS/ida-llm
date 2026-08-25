@@ -6,6 +6,8 @@ schema version, update the docs) or a bug.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from pydantic import ValidationError
 
@@ -280,6 +282,49 @@ class TestTargetsDoNotLeakIntoMetadata:
         worse than no test.
         """
         TaskSpec.model_validate(self._with({"working": "sum=70, n=5"}, "14"))
+
+    @pytest.mark.parametrize(
+        ("metadata", "expected_field"),
+        [
+            ({"n_samples": 5}, "metadata.n_samples"),
+            ({"note": "= 5 exactly"}, "metadata.note"),
+            ({"outer": {"inner": "= 5"}}, "metadata.outer.inner"),
+            ({"steps": ["a", "then 5"]}, "metadata.steps[1]"),
+        ],
+    )
+    def test_the_error_names_the_offending_field(self, metadata, expected_field) -> None:
+        """A gate the author cannot act on is a gate that gets switched off.
+
+        "Something in metadata matches" leaves them hunting; the path does not.
+        """
+        with pytest.raises(ValidationError, match=re.escape(expected_field)):
+            TaskSpec.model_validate(self._with(metadata, "5"))
+
+    def test_a_numeric_collision_is_not_misdiagnosed_as_a_derivation(self) -> None:
+        """`{n_samples: 5}` beside a target of "5" trips the rule with nothing to move.
+
+        The tripwire is deliberately blunt, so this false positive is accepted --
+        but the message must not tell the author to "move the derivation into a
+        comment" when there is no derivation. Misdiagnosis is what turns a gate
+        into something people disable rather than satisfy.
+        """
+        with pytest.raises(ValidationError) as exc:
+            TaskSpec.model_validate(self._with({"n_samples": 5}, "5"))
+        message = str(exc.value)
+        assert "metadata.n_samples is numerically the target" in message
+        assert "if this field is not a derivation, rename it or move it" in message
+
+    def test_a_zero_target_collides_too(self) -> None:
+        """`{error_count: 0}` beside a target of "0" -- the other reported shape."""
+        with pytest.raises(ValidationError, match=re.escape("metadata.error_count")):
+            TaskSpec.model_validate(self._with({"error_count": 0}, "0"))
+
+    def test_booleans_are_not_read_as_numbers(self) -> None:
+        """`True == 1` in Python. Without the bool guard `{verified: true}` would
+        trip every task whose target is `1`, which is the commonest metadata
+        field there is."""
+        TaskSpec.model_validate(self._with({"verified": True}, "1"))
+        TaskSpec.model_validate(self._with({"verified": False}, "0"))
 
     def test_the_shipped_tasks_all_pass(self) -> None:
         """The corpus students copy must itself be clean."""

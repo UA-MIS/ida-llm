@@ -376,6 +376,21 @@ yields the answer without stating it (`{working: "sum=70, n=5"}` for a target of
 the answer sitting in a *different* sample's metadata or in `description`. Use a
 comment and the question does not arise.
 
+It also errs the other way once in a while, and it is better to know that in
+advance than to meet it in CI. A plain **numeric metadata field that happens to
+equal a small-integer target** trips it — `{n_samples: 5}` beside a target of
+`"5"`, `{error_count: 0}` beside `"0"`. There is no derivation there to move, and
+the error says so and names the field:
+
+```
+s1: metadata.n_samples is numerically the target (5 == '5')
+```
+
+Rename the field, or move it out of `metadata`. A blunt rule that occasionally
+asks that question is the right trade for one guarding an answer key — but note
+that booleans are excluded deliberately, because `True == 1` in Python and
+`{verified: true}` beside a target of `"1"` would otherwise fire constantly.
+
 ### Scorers
 
 #### `exact_match`

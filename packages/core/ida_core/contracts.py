@@ -481,7 +481,7 @@ def content_sha_of(document: Any) -> str:
 
 
 _METADATA_NUMBER = re.compile(r"(?<![0-9A-Za-z._-])[-+]?\d+(?:\.\d+)?(?![0-9A-Za-z])")
-"""A number in a metadata string, ignoring digits that are part of a word.
+r"""A number in a metadata string, ignoring digits that are part of a word.
 
 The lookarounds are the whole point.  Sample metadata is full of identifiers
 that contain digits -- ``ladder-l3``, ``interest-v2``, ``mirrors:
@@ -491,17 +491,25 @@ digit glued to a letter is part of a name, not a value.
 """
 
 
-def _metadata_scalars(value: Any) -> list[Any]:
-    """Every scalar reachable from a metadata value, including dict keys."""
+def _metadata_scalars(value: Any, path: str = "") -> list[tuple[str, Any]]:
+    """Every scalar reachable from a metadata value, paired with where it lives.
+
+    The path is carried so the error can NAME the offending field.  A gate that
+    says only "something in metadata matches" leaves the author hunting, and an
+    author who cannot find the problem switches the gate off.
+    """
     if isinstance(value, dict):
-        out: list[Any] = []
+        out: list[tuple[str, Any]] = []
         for key, item in value.items():
-            out.append(key)
-            out.extend(_metadata_scalars(item))
+            here = f"{path}.{key}" if path else str(key)
+            out.append((here, key))
+            out.extend(_metadata_scalars(item, here))
         return out
     if isinstance(value, (list, tuple, set)):
-        return [scalar for item in value for scalar in _metadata_scalars(item)]
-    return [value]
+        return [
+            pair for i, item in enumerate(value) for pair in _metadata_scalars(item, f"{path}[{i}]")
+        ]
+    return [(path, value)]
 
 
 def _target_leaks_into_metadata(target: str, metadata: dict[str, Any]) -> str | None:
@@ -533,6 +541,16 @@ def _target_leaks_into_metadata(target: str, metadata: dict[str, Any]) -> str | 
 
     Passing this check is not evidence that a task keeps its key secret.  The
     rule exists to make the common, mechanical mistake impossible to commit.
+
+    **It also has one false positive, by design.**  A plain numeric metadata
+    field that happens to equal a small-integer target trips it --
+    ``{n_samples: 5}`` beside a target of ``"5"``, ``{error_count: 0}`` beside
+    ``"0"``.  There is no derivation there to move, so the message says so and
+    names the field: the honest fix is to rename the field or drop it, and a
+    blunt tripwire that occasionally asks that question is the right trade for a
+    rule protecting an answer key.  What is NOT acceptable is a message that
+    misdiagnoses the situation, because that is what gets a gate switched off
+    rather than satisfied.
     """
     scalars = _metadata_scalars(metadata)
     stripped = target.strip()
@@ -540,31 +558,31 @@ def _target_leaks_into_metadata(target: str, metadata: dict[str, Any]) -> str | 
         return None
     folded = stripped.casefold()
 
-    for scalar in scalars:
+    for path, scalar in scalars:
         if isinstance(scalar, str) and scalar.strip().casefold() == folded:
-            return f"a metadata value is exactly the target ({stripped!r})"
+            return f"metadata.{path} is exactly the target ({stripped!r})"
 
     try:
         wanted = float(stripped)
     except ValueError:
         # Non-numeric target (exact_match): a standalone-token match is a leak.
         pattern = re.compile(rf"(?<![0-9A-Za-z_]){re.escape(stripped)}(?![0-9A-Za-z_])", re.I)
-        for scalar in scalars:
+        for path, scalar in scalars:
             if isinstance(scalar, str) and pattern.search(scalar):
-                return f"a metadata value contains the target {stripped!r}"
+                return f"metadata.{path} contains the target {stripped!r}"
         return None
 
-    for scalar in scalars:
+    for path, scalar in scalars:
         if isinstance(scalar, bool):
             continue
         if isinstance(scalar, (int, float)) and float(scalar) == wanted:
-            return f"a metadata value is numerically the target ({stripped!r})"
+            return f"metadata.{path} is numerically the target ({scalar!r} == {stripped!r})"
         if isinstance(scalar, str):
             for found in _METADATA_NUMBER.findall(scalar):
                 try:
                     if float(found) == wanted:
                         return (
-                            f"a metadata value contains the target as a number "
+                            f"metadata.{path} contains the target as a number "
                             f"({found!r} == {stripped!r})"
                         )
                 except ValueError:  # pragma: no cover - regex guarantees parseability
@@ -680,8 +698,10 @@ class TaskSpec(BaseModel):
         if leaks:
             raise ValueError(
                 f"task {self.id!r} leaks gold answers through sample metadata "
-                f"(metadata is served unauthenticated while targets are redacted; "
-                f"move the derivation into a YAML comment): " + "; ".join(leaks)
+                f"(GET /tasks/{{id}} redacts targets but serves metadata "
+                f"unauthenticated). Move the derivation into a YAML comment -- "
+                f"or, if this field is not a derivation, rename it or move it "
+                f"out of metadata: " + "; ".join(leaks)
             )
         return self
 
