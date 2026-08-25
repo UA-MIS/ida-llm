@@ -27,10 +27,11 @@ import time
 from typing import Any
 
 from fastapi import FastAPI, Response
-from ida_core.settings import get_settings
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from sqlalchemy import create_engine, text
 from starlette.requests import Request
+
+from ida_core.settings import get_settings
 
 app = FastAPI(title="IDA-LLM API", version="0.1.0")
 

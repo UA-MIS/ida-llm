@@ -1,22 +1,36 @@
 # syntax=docker/dockerfile:1
 #
+# ⚠ BASE IMAGES COME THROUGH THE PLATFORM'S HARBOR PULL-THROUGH CACHE
+# (`dockerhub-proxy`), not straight from Docker Hub. Two reasons, both load-bearing
+# on this platform:
+#   1. Docker Hub anonymous rate limits are shared across the whole cluster's
+#      egress, so a direct `node:24.16-alpine` pull fails intermittently under
+#      load -- and it fails INSIDE Kaniko, where the error reads as a build
+#      problem rather than a registry quota.
+#   2. Every other image in this repo is already pulled this way, so leaving one
+#      component on the direct path makes the build's reliability depend on which
+#      component happens to build first.
+# Pinned via ARG so a local `docker build --build-arg NODE_IMAGE=node:24.16-alpine`
+# still works off-cluster with no edit.
+ARG NODE_IMAGE=harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-alpine
+#
 # Build context is the REPO ROOT (matches .devops/components.yaml `context: .`),
 # so every path below is repo-relative. Build locally with:
 #   docker build -f apps/agile/Dockerfile -t ida-llm-agile .
 
-FROM node:24.16-alpine AS deps
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 COPY apps/agile/package.json apps/agile/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
-FROM node:24.16-alpine AS builder
+FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY apps/agile/ ./
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-FROM node:24.16-alpine AS runner
+FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
