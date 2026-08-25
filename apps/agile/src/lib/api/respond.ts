@@ -23,9 +23,25 @@ export function apiError(
   return Response.json(body, { status });
 }
 
+/**
+ * Turns a Zod failure into the API's one error shape.
+ *
+ * Unrecognised keys are unpacked deliberately. Zod reports them as a SINGLE
+ * issue with an EMPTY path, so the default `path.join('.')` filed every one of
+ * them under `_` — a client that sent `{"branchName": null}` would be told
+ * "the request body is not valid" without being told which key. Naming the
+ * offending field is the whole point of answering 422 instead of 200.
+ */
 export function validationError(err: z.ZodError): Response {
   const fields: Record<string, string[]> = {};
   for (const issue of err.issues) {
+    if (issue.code === 'unrecognized_keys') {
+      for (const key of issue.keys) {
+        const path = [...issue.path, key].join('.');
+        (fields[path] ??= []).push(`Unrecognized field "${key}" — it is not writable here.`);
+      }
+      continue;
+    }
     const key = issue.path.length ? issue.path.join('.') : '_';
     (fields[key] ??= []).push(issue.message);
   }

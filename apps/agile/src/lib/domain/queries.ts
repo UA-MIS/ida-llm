@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg';
 import { query, queryOne, withTransaction } from '@/lib/db/pool';
 import { config } from '@/lib/env';
 import {
@@ -32,6 +33,7 @@ import {
   type SprintRow,
   type WorkItemRow,
 } from './mappers';
+import type { LinkedPullRequest } from './board-prs';
 
 const instance = () => config.instanceKey;
 
@@ -336,6 +338,10 @@ export async function updateWorkItem(
       await logActivity(client, id, actor, field, oldValue, newValue);
     }
 
+    if (input.state !== undefined) {
+      await clearUnusedBranchOnReset(client, id, existing.state as WorkItemState, input.state, actor);
+    }
+
     const { rows } = await client.query<WorkItemRow>(`${ITEM_SELECT} WHERE wi.id = $1`, [id]);
     return rows[0] ? mapWorkItem(rows[0]) : null;
   });
@@ -376,6 +382,7 @@ export async function moveWorkItem(
         [toState, id],
       );
       await logActivity(client, id, actor, 'state', from, toState);
+      await clearUnusedBranchOnReset(client, id, from, toState, actor);
     }
 
     const ids = orderedIds.filter((n) => Number.isInteger(n));
@@ -439,6 +446,110 @@ export async function setItemBranch(
     const { rows: out } = await client.query<WorkItemRow>(`${ITEM_SELECT} WHERE wi.id = $1`, [itemId]);
     return out[0] ? mapWorkItem(out[0]) : null;
   });
+}
+
+/**
+ * Drops an item's branch metadata (repo, name, url, created-at).
+ *
+ * `branchName` is not a writable PATCH field — deliberately, it is owned by the
+ * Start-work flow — which meant that once a branch was deleted NOTHING could
+ * clear the item's copy of it. `PATCH {"branchName": null}` answered 200 and did
+ * nothing, so item AB#25 kept advertising a branch that 404s. The two callers
+ * that legitimately need this are the branch-delete webhook and an item being
+ * sent back to New with nothing on its branch.
+ *
+ * Idempotent: an item with no branch is returned unchanged and logs nothing.
+ * The item's commits and PR links are NOT touched — those are the durable
+ * record of what happened, and only the pointer at a now-dead ref is stale.
+ */
+export async function clearItemBranch(
+  itemId: number,
+  actorLike: ActorLike,
+): Promise<WorkItem | null> {
+  const actor = toActor(actorLike);
+  return withTransaction(async (client) => {
+    const { rows } = await client.query<{ branch_name: string | null }>(
+      'SELECT branch_name FROM work_items WHERE id = $1 AND instance_key = $2 FOR UPDATE',
+      [itemId, instance()],
+    );
+    if (!rows[0]) return null;
+
+    if (rows[0].branch_name !== null) {
+      await client.query(
+        `UPDATE work_items
+            SET branch_repo = NULL, branch_name = NULL, branch_url = NULL,
+                branch_created_at = NULL, updated_at = now()
+          WHERE id = $1`,
+        [itemId],
+      );
+      await logActivity(client, itemId, actor, 'branch', rows[0].branch_name, null);
+    }
+
+    const { rows: out } = await client.query<WorkItemRow>(`${ITEM_SELECT} WHERE wi.id = $1`, [itemId]);
+    return out[0] ? mapWorkItem(out[0]) : null;
+  });
+}
+
+/**
+ * Clears branch metadata when an item is sent BACK to New, but only when the
+ * branch has nothing on it.
+ *
+ * "Nothing on it" is strict — no linked pull request, and no commit recorded
+ * against that branch name — because an item bounced back to New for rework
+ * still owns the branch its real work is sitting on, and losing that pointer
+ * would be worse than keeping a stale one. What this does catch is the shape
+ * that actually happens: work started, a branch cut, nobody pushed, the card
+ * dragged back to New, and the empty ref deleted a week later.
+ *
+ * Runs inside the caller's transaction so the state change and the clear are
+ * one atomic move.
+ */
+async function clearUnusedBranchOnReset(
+  client: PoolClient,
+  itemId: number,
+  from: WorkItemState,
+  to: WorkItemState,
+  actor: Actor,
+): Promise<void> {
+  if (to !== 'New' || from === 'New') return;
+
+  const { rows } = await client.query<{
+    branch_name: string | null;
+    pr_count: string;
+    commit_count: string;
+  }>(
+    `SELECT wi.branch_name,
+            (SELECT count(*) FROM pull_request_links pl WHERE pl.item_id = wi.id) AS pr_count,
+            (SELECT count(*) FROM item_commits ic
+              WHERE ic.item_id = wi.id AND ic.branch = wi.branch_name)            AS commit_count
+       FROM work_items wi
+      WHERE wi.id = $1`,
+    [itemId],
+  );
+  const row = rows[0];
+  if (!row?.branch_name) return;
+  if (Number(row.pr_count) > 0 || Number(row.commit_count) > 0) return;
+
+  await client.query(
+    `UPDATE work_items
+        SET branch_repo = NULL, branch_name = NULL, branch_url = NULL,
+            branch_created_at = NULL
+      WHERE id = $1`,
+    [itemId],
+  );
+  await logActivity(
+    client,
+    itemId,
+    {
+      ...actor,
+      note: [actor.note, `branch ${row.branch_name} released — sent back to New with no work on it`]
+        .filter(Boolean)
+        .join(' — '),
+    },
+    'branch',
+    row.branch_name,
+    null,
+  );
 }
 
 // ----------------------------------------------------------------- commits
@@ -610,6 +721,29 @@ export async function linkPullRequest(
     ],
   );
   return mapPullRequest(row!);
+}
+
+/**
+ * Every pull request attached to an item on this board, open and merged alike.
+ *
+ * This is the SAME source `boardSummary` counts (`pull_request_links`), which
+ * is the point: board bug AB#29 was `/api/v1/prs` reading GitHub's open-PR list
+ * instead, so the endpoint and the summary could not agree by construction.
+ *
+ * Scoped by `instance_key` through the item, exactly like the summary's merged
+ * count -- including items in `Removed`, because the summary counts those too
+ * and one endpoint quietly filtering differently is how the two drift again.
+ */
+export async function listLinkedPullRequests(): Promise<LinkedPullRequest[]> {
+  const rows = await query<PullRequestLinkRow & { item_title: string }>(
+    `SELECT pl.*, wi.title AS item_title
+       FROM pull_request_links pl
+       JOIN work_items wi ON wi.id = pl.item_id
+      WHERE wi.instance_key = $1
+      ORDER BY pl.last_synced_at DESC NULLS LAST, pl.repo_full_name ASC, pl.pr_number DESC`,
+    [instance()],
+  );
+  return rows.map((row) => ({ ...mapPullRequest(row), itemTitle: row.item_title }));
 }
 
 export async function recordPrLinkActivity(

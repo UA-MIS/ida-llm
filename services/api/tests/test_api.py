@@ -90,6 +90,85 @@ class TestHealth:
         assert response.status_code == 200
         assert response.json()["status"] == "ok"
 
+    # ── THE DEPLOYED BUILD HAS TO BE IDENTIFIABLE FROM /healthz ────────────
+    #
+    # `version` came from a HARDCODED `__version__ = "0.1.0"` in ida_api, which
+    # nothing in the release process ever updated. The 0.1.1 image therefore
+    # served `"version":"0.1.0"` -- and a health endpoint that disagrees with the
+    # release it is running is worse than one that says nothing: it is exactly
+    # what makes someone conclude a deploy did not land and roll back a good one.
+    #
+    # IDA_GIT_SHA is already baked into every image at build time
+    # (Dockerfile.python, from the GIT_SHA build-arg) and is the ONE identifier
+    # that is correct by construction, so /healthz reports it.
+
+    def test_healthz_reports_the_build_git_sha(self, monkeypatch, context: AppContext) -> None:
+        """The field that answers "which build is actually running?"."""
+        from ida_api.app import create_app
+
+        monkeypatch.setenv("IDA_GIT_SHA", "a" * 40)
+        response = TestClient(create_app(context)).get("/healthz")
+        assert response.status_code == 200
+        assert response.json()["git_sha"] == "a" * 40
+
+    def test_healthz_never_reports_a_fake_sha(self, monkeypatch, context: AppContext) -> None:
+        """A wrong SHA looks like a real one -- gitmeta's rule, enforced here too.
+
+        A pipeline that forgets to substitute a variable exports the literal
+        ``$GITHUB_SHA``; a repo with no commits makes git print ``HEAD``. Either
+        would otherwise be served as though it were provenance.
+        """
+        from ida_api.app import create_app
+
+        for bogus in ("HEAD", "$GITHUB_SHA", "abc1234", ""):
+            monkeypatch.setenv("IDA_GIT_SHA", bogus)
+            body = TestClient(create_app(context)).get("/healthz").json()
+            assert body["git_sha"] != bogus or body["git_sha"] is None, bogus
+
+    def test_healthz_resolves_the_sha_once_not_per_request(
+        self, monkeypatch, context: AppContext
+    ) -> None:
+        """⚠ LIVENESS MUST NOT FORK A SUBPROCESS.
+
+        With IDA_GIT_SHA unset, ``current_git_sha()`` shells out to ``git``. On
+        the liveness path that would be a fork every 20s per replica, forever --
+        so the SHA is resolved ONCE when the app is built. Proving it: make the
+        subprocess call explode AFTER the app exists; /healthz must still answer.
+        """
+        import ida_core.gitmeta as gitmeta
+        from ida_api.app import create_app
+
+        monkeypatch.delenv("IDA_GIT_SHA", raising=False)
+        client = TestClient(create_app(context))
+
+        def _explode(*args, **kwargs):
+            raise AssertionError("/healthz shelled out to git on the request path")
+
+        monkeypatch.setattr(gitmeta.subprocess, "run", _explode)
+        assert client.get("/healthz").status_code == 200
+        assert client.get("/healthz").status_code == 200
+
+    def test_version_can_be_told_the_truth_by_the_release(
+        self, monkeypatch, context: AppContext
+    ) -> None:
+        """One knob the release process can set, instead of a constant nobody bumps.
+
+        Unset, this stays the packaged ``__version__`` -- see the module comment
+        in app.py for why that is a floor and ``git_sha`` is the authority.
+        """
+        from ida_api.app import create_app
+
+        monkeypatch.setenv("IDA_VERSION", "9.9.9")
+        assert TestClient(create_app(context)).get("/healthz").json()["version"] == "9.9.9"
+
+    def test_readyz_identifies_the_build_too(self, monkeypatch, context: AppContext) -> None:
+        """Whoever is debugging a degraded pod needs to know which build it is."""
+        from ida_api.app import create_app
+
+        monkeypatch.setenv("IDA_GIT_SHA", "b" * 40)
+        body = TestClient(create_app(context)).get("/readyz").json()
+        assert body["git_sha"] == "b" * 40
+
     def test_readyz_returns_503_when_a_dependency_is_down(self, context: AppContext) -> None:
         """503, not 200-with-a-sad-body.
 

@@ -210,6 +210,10 @@ curl -X POST "$AGILE/api/v1/items" \
 Only `title` is required. For many at once use `/seed` (above), or
 `{"items":[ ... ]}` on this endpoint when you do not need sprints or dependencies.
 
+Like PATCH below, **create rejects unrecognized fields with 422** rather than
+dropping them — a mistyped key in a 500-item seed is a bug you want to hear
+about, not one that leaves the board quietly wrong.
+
 ### Update / delete
 
 ```sh
@@ -222,6 +226,33 @@ curl -X DELETE "$AGILE/api/v1/items/42" -H "Authorization: Bearer $TOKEN"
 Prefer state `Removed` over deletion — it keeps the history.
 
 **Move an item to another sprint** by patching `sprintId` (`null` = backlog).
+
+PATCH is a **JSON merge patch over the writable fields**, and nothing else:
+
+| Body | Result |
+|---|---|
+| key with a value | that field is updated |
+| key set to `null` | that field is deliberately cleared (`{"sprintId": null}` → backlog) |
+| key absent | that field is left alone |
+| **key that is not writable** | **422 `validation_failed`**, naming the key |
+
+The writable set is exactly: `title`, `description`, `itemType`, `state`,
+`assigneeLogin`, `assigneeAvatarUrl`, `storyPoints`, `priority`, `sprintId`,
+`tags`, `repoFullName`, `wave`.
+
+Anything else is rejected rather than ignored, so a client can never be told
+`200` for a change that did not happen:
+
+```sh
+curl -X PATCH "$AGILE/api/v1/items/42" -H "Authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -d '{"branchName":null}'
+# 422 {"error":{"code":"validation_failed", ...
+#      "fields":{"branchName":["Unrecognized field \"branchName\" — it is not writable here."]}}}
+```
+
+Branch metadata is not writable here on purpose — it is owned by the
+Start-work flow, cleared automatically when GitHub reports the branch deleted,
+and released when an item with nothing on its branch is sent back to `New`.
 
 ---
 
@@ -382,19 +413,114 @@ appear elsewhere as activity and are deliberately excluded.
 
 ---
 
+## Start work
+
+```sh
+curl -X POST "$AGILE/api/v1/items/42/start-work" -H "Authorization: Bearer $TOKEN"
+```
+
+Moves the item to `Active` (when that is legal), claims it for you if nobody
+owns it, and creates its branch. **The state change is applied first and is
+never rolled back by a branch failure** — a GitHub outage must not block the
+board, so the response is still `200` with `branch.status` set to `"failed"`
+and a message saying what to do.
+
+| Option | Default | Effect |
+|---|---|---|
+| `activate` | `true` | Move `New` → `Active` |
+| `assign` | `true` | Claim the item, if nobody owns it already |
+| `branch` | by item type | Force branch creation on or off |
+| `repo` | primary repo | Branch in another repo the board follows |
+
+Starting a card on someone else's behalf: `{"assign": false}`.
+
+**A branch is only created for the types whose work lives in git.**
+
+| Item type | Start work does |
+|---|---|
+| `Story`, `Bug` | Active + claim + **branch** (`branch.status`: `created` / `existing`) |
+| `Task`, `Spike` | Active + claim, **no branch** (`branch.status`: `skipped`) |
+
+A spike is research and a task is often coordination; neither ends in a commit,
+so branching them produced a ref nobody would ever push to. Override the
+default in either direction when a particular item needs it:
+
+```sh
+# a spike that does want a scratch branch
+curl -X POST "$AGILE/api/v1/items/25/start-work" -H "Authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' -d '{"branch":true}'
+
+# a story you want to start without one
+... -d '{"branch":false}'
+```
+
+`branch.status` is one of `created`, `existing`, `skipped` (this type does not
+branch), `disabled` (`AUTO_BRANCH=false`) or `failed`. Only `failed` is an
+error worth showing as one.
+
+### Commit counts
+
+`commitCount` counts the commits **ahead of the repo's default branch** — the
+work done on that branch. A branch that has just been cut reads `0`, not the
+base branch's history. The board stores the most recent 50 of them; the count
+you see is over what it has stored.
+
+---
+
 ## Other endpoints
 
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/v1/ready` | Unblocked, unassigned work |
 | `GET /api/v1/members` | Team members (valid `assigneeLogin` values). Session only. |
-| `GET /api/v1/prs` | Open PRs annotated with the item ids they mention. Session only. |
+| `GET /api/v1/prs` | Pull requests attached to items — open and merged. Any credential. |
 | `POST /api/v1/items/{id}/links` | Attach a PR (URL, `owner/repo#123`, or `123`) |
-| `POST /api/v1/items/{id}/start-work` | Activate + create the branch. Session only. |
+| `POST /api/v1/items/{id}/start-work` | Activate + claim; branches Story/Bug only. Session only. |
 | `GET`/`PUT /api/v1/pages/home` | The living README |
 | `GET /api/v1/summary` | Generated board state |
 | `GET`/`DELETE /api/v1/tokens` | Manage your board tokens |
 | `GET /api/healthz` · `GET /api/readyz` | Liveness · readiness. No auth. |
+
+### Pull requests
+
+`GET /api/v1/prs` lists the pull requests **attached to board items**, read from
+the board's own records — the same source `/api/v1/summary` counts, so the two
+never disagree. Both open and merged PRs appear; merged ones are the board's
+progress signal and were the whole reason the endpoint exists.
+
+```sh
+curl -H "Authorization: Bearer $TOKEN" "$AGILE/api/v1/prs"
+```
+
+```json
+{
+  "prs": [
+    {
+      "repoFullName": "UA-MIS/ida-llm", "prNumber": 29,
+      "url": "https://github.com/UA-MIS/ida-llm/pull/29",
+      "title": "Fix the board AB#29", "prState": "merged",
+      "merged": true, "draft": false,
+      "checksState": "success", "behindBy": null,
+      "headRef": "story/29", "baseRef": "main",
+      "lastSyncedAt": "2026-08-25T14:02:11.000Z",
+      "items": [{ "id": 29, "title": "GET /api/v1/prs returns empty" }],
+      "suggestedItemIds": [29]
+    }
+  ]
+}
+```
+
+- **`items`** is what the PR is really attached to. **`suggestedItemIds`** is
+  only what the PR *title* mentions with `AB#<id>` — a hint, not an attachment.
+- One entry per pull request. A PR attached to three items appears once, with
+  three entries in `items`.
+- No GitHub call is made, so this endpoint works without a GitHub credential and
+  never spends the org's API budget.
+- Filter client-side on `merged` / `prState` if you want only one of the two.
+
+The picker on an item page is a different thing: it lists repo PRs that are
+**open on GitHub** so you can attach one that the board does not know about yet.
+That list is not this endpoint.
 
 ---
 

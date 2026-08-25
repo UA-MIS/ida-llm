@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   BOARD_COLUMNS,
   canTransition,
+  typeCreatesBranch,
   type Sprint,
   type WorkItem,
   type WorkItemState,
@@ -152,8 +153,10 @@ export function Board({
       // already know so a blocked card does not briefly render as unblocked.
       upsert({ ...saved, readiness: items.find((i) => i.id === saved.id)?.readiness });
 
-      // Moving into Active is the natural moment to offer a branch.
-      if (autoBranch && toState === 'Active' && !saved.branchName) {
+      // Moving into Active is the natural moment to offer a branch — but only
+      // for the types whose work lives in git. Offering one for a Spike is
+      // what taught the board that every item owes you a branch (AB#25).
+      if (autoBranch && toState === 'Active' && !saved.branchName && typeCreatesBranch(saved.itemType)) {
         toast.push({
           tone: 'info',
           text: `#${saved.id} is now Active. Create its branch?`,
@@ -186,6 +189,10 @@ export function Board({
               : `Branch ${res.branch.name} already existed — linked it.`,
           action: res.branch.url ? { label: 'Open', href: res.branch.url } : undefined,
         });
+      } else if (res.branch.status === 'skipped') {
+        // Not a degradation: this type does not use a branch, and the item is
+        // genuinely started.
+        toast.push({ tone: 'ok', text: `#${itemId} is Active. ${res.branch.message ?? ''}`.trim() });
       } else {
         // The state change still succeeded; only the branch failed.
         toast.push({ tone: 'error', text: res.branch.message ?? 'Could not create the branch.' });
@@ -195,6 +202,19 @@ export function Board({
     } finally {
       setBusyItem(null);
     }
+  }
+
+  /**
+   * Whether this card should offer to create a branch: branching is enabled,
+   * the item's type branches, it is in flight, and it has none yet.
+   */
+  function canOfferBranch(item: BoardItem): boolean {
+    return (
+      autoBranch &&
+      typeCreatesBranch(item.itemType) &&
+      item.state === 'Active' &&
+      !item.branchName
+    );
   }
 
   function blockedOf(item: BoardItem): boolean {
@@ -372,7 +392,14 @@ export function Board({
                       {item.pullRequests.slice(0, 3).map((pr) => <PrChip key={pr.id} pr={pr} />)}
                     </div>
 
-                    {(item.branchName || item.commitCount > 0 || (autoBranch && item.state === 'Active')) ? (
+                    {/*
+                      * The branch button belongs only to types that branch —
+                      * a Spike showing "Start work" here promised a ref it
+                      * would never use (AB#25). It is also part of the
+                      * card-signals visibility test, so a Spike with no branch
+                      * and no commits renders no empty signal row at all.
+                      */}
+                    {(item.branchName || item.commitCount > 0 || canOfferBranch(item)) ? (
                       <div className="card-signals">
                         {item.branchName ? (
                           <span className="branch-chip" title={item.branchName}>
@@ -384,7 +411,7 @@ export function Board({
                             <CommitIcon /> {item.commitCount}
                           </span>
                         ) : null}
-                        {!item.branchName && autoBranch && item.state === 'Active' ? (
+                        {canOfferBranch(item) ? (
                           <button
                             className="btn btn-sm btn-ghost"
                             style={{ marginLeft: 'auto' }}
