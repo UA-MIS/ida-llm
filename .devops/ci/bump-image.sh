@@ -63,26 +63,37 @@ KUSTOMIZATION="${REPO_DIR}/${OVERLAY_PATH}/kustomization.yaml"
 
 echo "==> bumping ${ENV} overlay (${OVERLAY_PATH}) — every images[].newTag -> ${NEW_TAG}"
 
-# Set newTag on EVERY images[] entry (all components share the tag). yq-preferred;
-# sed fallback rewrites each `newTag:` line (the overlay's only newTag lines are under
+# Set newTag on EVERY images[] entry (all components share the tag).
+#
+# ⚠ SED, UNCONDITIONALLY — NOT yq, even when yq is installed. This used to be
+# yq-preferred with a sed fallback, and that made the script's OUTPUT DEPEND ON THE
+# OPERATOR'S MACHINE. `yq -i` reserialises the whole document: it strips blank lines
+# and reflows every inline flow-map (`{ kind: Deployment }` -> `{kind: Deployment}`).
+# CI has no yq (node:24.16-trixie), so every CI bump is a clean 3-line diff — but the
+# same command run from a dev box WITH yq reformats the entire overlay. Same script,
+# same inputs, two different commits. Live-confirmed 2026-08-25: a hand-run staging
+# bump produced a 13-deletion whole-file reformat where CI produces 3 lines.
+#
+# That is not cosmetic-only. The overlays are dense with load-bearing comments, the
+# diff is the human-readable record of what a deploy changed, and two operators
+# bumping from different environments produce spurious conflicts in the same file.
+# One code path, one output, everywhere. yq is still used for READING promotion.yaml
+# above, where it parses but never rewrites.
+#
+# The sed rewrites each `newTag:` line (the overlay's only newTag lines are under
 # images[], and image tags are [A-Za-z0-9._-] with no '|', so the sed is safe).
 #
 # The written value is ALWAYS a QUOTED YAML string. kustomize requires images[].newTag to
 # be a string; an all-numeric short git-sha (e.g. `0640920` — a sha with no a-f digit)
 # written bare is parsed by YAML as an INTEGER, and `kustomize build` then aborts the whole
 # overlay ("cannot unmarshal number into Go struct field Image.images.newTag of type
-# string") -> ArgoCD ComparisonError, the app never deploys (bug: meow-dev, #341). The yq
-# path handles this via strenv (it quotes when the value looks numeric); the sed fallback
-# must quote explicitly. `.*` consumes any prior value INCLUDING its quotes, so re-quoting
-# is idempotent across repeated CI bumps (no `""tag""` doubling).
-if command -v yq >/dev/null 2>&1; then
-  NEW_TAG="${NEW_TAG}" yq -i '(.images[].newTag) = strenv(NEW_TAG)' "${KUSTOMIZATION}"
-else
-  sed -i "s|^\([[:space:]]*newTag:[[:space:]]*\).*\$|\1\"${NEW_TAG}\"|" "${KUSTOMIZATION}"
-fi
+# string") -> ArgoCD ComparisonError, the app never deploys (bug: meow-dev, #341). `.*`
+# consumes any prior value INCLUDING its quotes, so re-quoting is idempotent across
+# repeated CI bumps (no `""tag""` doubling).
+sed -i "s|^\([[:space:]]*newTag:[[:space:]]*\).*\$|\1\"${NEW_TAG}\"|" "${KUSTOMIZATION}"
 
 echo "==> overlay now pins:"
-if command -v yq >/dev/null 2>&1; then yq '.images' "${KUSTOMIZATION}"; else grep -E 'newName:|newTag:' "${KUSTOMIZATION}"; fi
+grep -E 'newName:|newTag:' "${KUSTOMIZATION}"
 
 # The GitOps signal: commit the overlay change so ArgoCD reconciles it.
 # FIX-18/D-030: the commit message deliberately does NOT carry `[skip ci]`. It used to —

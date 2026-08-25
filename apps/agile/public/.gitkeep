@@ -1,0 +1,6 @@
+# Keeps public/ present in every checkout.
+#
+# apps/agile/Dockerfile does `COPY /app/public ./public`, and a COPY of a
+# missing directory fails the image build. The PR gates run `next build`, not
+# a docker build, so that failure would not surface until the image build on
+# main. This file makes the directory unconditional.

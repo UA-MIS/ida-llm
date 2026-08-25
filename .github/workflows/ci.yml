@@ -331,7 +331,7 @@ jobs:
       - name: Unit-test the CI seam scripts
         run: |
           set -eu
-          for suite in resolve-image resolve-components bump-image promote seed-initial-envs; do
+          for suite in resolve-image resolve-components bump-image promote seed-initial-envs promotion-writers; do
             echo "::group::${suite}"
             bash ".devops/ci/${suite}.test.sh"
             echo "::endgroup::"
