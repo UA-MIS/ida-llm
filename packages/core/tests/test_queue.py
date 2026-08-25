@@ -4,12 +4,24 @@ does not lose a job when the runner holding it dies.
 HOW THIS FILE IS ORGANISED
 --------------------------
 The durability behaviour is written ONCE, in :class:`TestQueueParity`, and run
-against **both** :class:`~ida_core.queue.InMemoryQueue` and
-:class:`~ida_core.queue.RedisQueue`.  That is not tidiness: ``InMemoryQueue``
-is what the unit tests, the API tests and the e2e tracer bullet actually
-exercise, so any behaviour it does not share with Redis is behaviour this
-project believes it has and does not.  A parity suite is the only thing that
-keeps the double honest as the real implementation grows.
+against **three** backends: :class:`~ida_core.queue.InMemoryQueue`,
+:class:`~ida_core.queue.RedisQueue` over a faithful fake, and -- when
+``IDA_TEST_REDIS_URL`` is set -- ``RedisQueue`` over a **real Redis**.
+
+That is not tidiness.  ``InMemoryQueue`` is what the unit tests, the API tests
+and the e2e tracer bullet actually exercise, so any behaviour it does not share
+with Redis is behaviour this project believes it has and does not.  And running
+the same assertions over the fake AND the real server is what makes drift in the
+fake **self-detecting**: a fake that quietly stops matching Redis fails here
+rather than silently weakening every test that depends on it.
+
+The real-Redis leg SKIPS by default, because the python CI job runs no Redis
+service (see ``.github/workflows/ci.yml``).  So the everyday guarantee is
+in-memory + fake; the real leg is what a developer or a follow-up CI change
+turns on:
+
+    docker compose up -d redis
+    IDA_TEST_REDIS_URL=redis://127.0.0.1:6379/15 pytest packages/core/tests/
 
 Failure paths first (L-1/L-2): the crash, the exhausted retry and the poison
 message are the reason this module exists.  The happy path is asserted mostly
@@ -19,7 +31,9 @@ to prove the durability machinery did not change it.
 from __future__ import annotations
 
 import json
+import os
 import threading
+import uuid
 
 import pytest
 from _queue_fakes import BrokenPipelineRedis, FakeRedis
@@ -195,16 +209,109 @@ class _RedisWorld(_World):
         return list(self.redis.lists.get(f"{PROCESSING_KEY_PREFIX}:{queue.consumer_id}", []))
 
 
-@pytest.fixture(params=["in-memory", "redis"])
+class _RealRedisWorld(_World):
+    """The same assertions, against a real Redis server.
+
+    Runs on a randomised key namespace, and because the processing and liveness
+    namespaces are DERIVED from the queue key, nothing here can see -- let alone
+    reap -- claims belonging to a runner someone has running locally.  Keys are
+    deleted afterwards; nothing calls ``FLUSHDB``.
+    """
+
+    def __init__(self, client, max_attempts: int) -> None:
+        self.redis = client
+        self.key = f"ida:test:parity:{uuid.uuid4().hex}"
+        self._dead_key = f"{self.key}:dead"
+        self._max_attempts = max_attempts
+        self._consumers: dict[str, RedisQueue] = {}
+
+    def consumer(self, name: str) -> RunQueue:
+        if name not in self._consumers:
+            self._consumers[name] = RedisQueue(
+                self.redis,
+                key=self.key,
+                dead_key=self._dead_key,
+                consumer_id=name,
+                max_attempts=self._max_attempts,
+                heartbeat_ttl_s=60,
+            )
+        return self._consumers[name]
+
+    def kill(self, queue) -> None:
+        # Deleting the liveness key is what its TTL elapsing leaves behind, and
+        # is indistinguishable to every reader. That the TTL genuinely *does*
+        # elapse is proved separately, with a real clock, in
+        # test_queue_redis_integration.py -- doing it that way here would add
+        # seconds of sleeping to every one of these cases for no extra coverage.
+        self.redis.delete(f"{self.key}:alive:{queue.consumer_id}")
+
+    def push_raw(self, payload: bytes) -> None:
+        self.redis.rpush(self.key, payload)
+
+    def pending(self) -> list[bytes]:
+        return list(self.redis.lrange(self.key, 0, -1))
+
+    def dead_letters(self) -> list[bytes]:
+        return list(self.redis.lrange(self._dead_key, 0, -1))
+
+    def claims(self, queue) -> list[bytes]:
+        return list(self.redis.lrange(f"{self.key}:processing:{queue.consumer_id}", 0, -1))
+
+    def cleanup(self) -> None:
+        for found in self.redis.scan_iter(match=f"{self.key}*", count=100):
+            self.redis.delete(found)
+
+
+def _real_redis_or_skip():
+    """A live Redis, or a skip that says exactly how to get one."""
+    url = os.environ.get("IDA_TEST_REDIS_URL", "")
+    if not url:
+        pytest.skip(
+            "set IDA_TEST_REDIS_URL (e.g. redis://127.0.0.1:6379/15) to run the "
+            "parity suite against a real Redis as well as the fake"
+        )
+    redis = pytest.importorskip("redis")
+    client = redis.Redis.from_url(url, socket_connect_timeout=2)
+    try:
+        client.ping()
+    except Exception as exc:  # pragma: no cover - environment-dependent
+        pytest.skip(f"no Redis at {url}: {exc}")
+    return client
+
+
+def _build_world(kind: str, max_attempts: int):
+    if kind == "in-memory":
+        yield _InMemoryWorld(max_attempts)
+        return
+    if kind == "redis":
+        yield _RedisWorld(max_attempts)
+        return
+    world = _RealRedisWorld(_real_redis_or_skip(), max_attempts)
+    try:
+        yield world
+    finally:
+        world.cleanup()
+
+
+BACKENDS = ["in-memory", "redis", "real-redis"]
+"""In-memory, RedisQueue-over-a-fake, and RedisQueue-over-a-real-server.
+
+The third SKIPS unless IDA_TEST_REDIS_URL is set. Keeping it in the same
+parametrisation rather than a separate hand-written suite is the point: the
+assertions cannot drift apart, because there is only one copy of them.
+"""
+
+
+@pytest.fixture(params=BACKENDS)
 def world(request) -> _World:
-    """Both implementations, same assertions.  See the module docstring."""
-    return _InMemoryWorld(3) if request.param == "in-memory" else _RedisWorld(3)
+    """Every backend, same assertions.  See the module docstring."""
+    yield from _build_world(request.param, 3)
 
 
-@pytest.fixture(params=["in-memory", "redis"])
+@pytest.fixture(params=BACKENDS)
 def strict_world(request) -> _World:
     """A world with ``max_attempts=2``, so exhaustion is two lines away."""
-    return _InMemoryWorld(2) if request.param == "in-memory" else _RedisWorld(2)
+    yield from _build_world(request.param, 2)
 
 
 def _attempts(payloads: list[bytes]) -> list[int]:

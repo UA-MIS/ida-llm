@@ -695,7 +695,16 @@ class RunJobMessage(BaseModel):
     ``queue_max_attempts`` to decide whether a further delivery is allowed."""
 
     def to_wire(self) -> str:
-        """Serialise to the exact bytes that go on the queue."""
+        """Serialise to the exact bytes that go on the queue.
+
+        ⚠ **Byte-stability is load-bearing, not cosmetic.**  A queue ack removes
+        a claim with ``LREM``, which matches by exact bytes, and falls back to
+        re-serialising the message when the claiming process is gone.  Changing
+        how this renders -- key order, separators, datetime or float formatting,
+        including via a pydantic upgrade -- would make that fallback match
+        nothing, so acks would silently no-op and claims would leak until
+        reaped.  See the note above ``RedisQueue.ack``.
+        """
         return self.model_dump_json()
 
     @classmethod

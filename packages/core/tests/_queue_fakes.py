@@ -34,8 +34,22 @@ wants a thread to sleep, and the queue only calls it with a positive timeout on
 a path whose blocking behaviour is Redis's problem, not the queue's. It is
 called out here rather than left for a reader to discover.
 
-For the genuine article, see ``test_queue_redis_integration.py``, which runs
-this same suite against the Redis in ``docker-compose.yml`` when one is offered.
+HOW MUCH THIS FAKE IS ACTUALLY TRUSTED
+--------------------------------------
+Precisely as much as the real server corroborates, and no more. When
+``IDA_TEST_REDIS_URL`` is set, ``test_queue.py``'s ``TestQueueParity`` runs the
+**same** assertions over this fake AND over a real ``RedisQueue``, so a
+divergence between the two fails the fake's leg rather than silently weakening
+every test built on it. (Verified by deliberately breaking the str->bytes
+encoding below: the fake's leg went red while the real one stayed green.)
+
+``test_queue_redis_integration.py`` covers, separately, the handful of things no
+fake can honestly stand in for -- a real ``SCAN`` cursor and a key TTL genuinely
+elapsing.
+
+Without that env var both files skip their real-Redis work and this fake is
+carrying the guarantee alone. That is the everyday CI position today, and it is
+why fidelity here is worth the effort rather than being a nicety.
 """
 
 from __future__ import annotations

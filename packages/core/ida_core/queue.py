@@ -434,6 +434,18 @@ class RedisQueue:
         self._inflight[message.run_id] = raw
         return message
 
+    # ⚠ `RunJobMessage.to_wire()` BYTE-STABILITY IS LOAD-BEARING BELOW.
+    # Both methods prefer the exact bytes recorded at claim time, but fall back
+    # to re-serialising when this process did not claim the message (a restart,
+    # or a claim taken over by recovery). `LREM` matches by EXACT BYTES, so if
+    # `to_wire()` ever emitted a different encoding of the same message -- a key
+    # order change, different separators, a pydantic upgrade altering float or
+    # datetime rendering -- the fallback would match nothing, the ack would
+    # silently no-op, and the claim would leak until a reaper picked it up.
+    # That degrades to at-least-once rather than data loss, which is why this is
+    # a comment and not a checksum; but nobody should "tidy" the serialisation
+    # without knowing an ack depends on it.
+
     def ack(self, message: RunJobMessage) -> None:
         raw = self._inflight.pop(message.run_id, None) or _as_bytes(message.to_wire())
         self._drop_claim(raw)
