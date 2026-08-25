@@ -338,7 +338,20 @@ jobs:
           # 3) ONE push. Authored by GIT_AUTHOR_EMAIL, which the `resolve` guard
           #    above recognises and skips — no bump loop, and unlike [skip ci] a
           #    later tag on this commit still triggers normally.
-          git push origin HEAD:main
+          # ⚠ RETRY, NOT A BARE PUSH. `concurrency` is keyed on github.ref, so a push
+          # to main and a push of a tag land in DIFFERENT groups and run CONCURRENTLY —
+          # and "merge the PR, then tag it" is exactly that overlap. Both jobs check out
+          # main, commit an overlay bump, and push; the loser gets `! [rejected] (fetch
+          # first)` and dies under set -eu. Newly reachable as of the bump-staging job:
+          # before it, only ONE CI job wrote main, so it could only race a human.
+          # It fails safe (no wrong image is written, and promote stays gated), but the
+          # symptom is "staging silently didn't advance" if nobody reads the red job —
+          # uncomfortably close to the bug this rung exists to fix. Rebase and retry.
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && break
+            [ "$i" = 3 ] && exit 1
+            sleep 5
+          done
 
   # ── THE TAG RUNG ────────────────────────────────────────────────────────────
   # bump-staging — what makes `git tag vX.Y.Z` actually REACH staging.
@@ -397,4 +410,17 @@ jobs:
           # Authored by GIT_AUTHOR_EMAIL, which `resolve`'s if: guard skips for BRANCH
           # pushes — so this commit lands on main without starting a build loop, while
           # a later `git tag` on that same commit still triggers normally.
-          git push origin HEAD:main
+          # ⚠ RETRY, NOT A BARE PUSH. `concurrency` is keyed on github.ref, so a push
+          # to main and a push of a tag land in DIFFERENT groups and run CONCURRENTLY —
+          # and "merge the PR, then tag it" is exactly that overlap. Both jobs check out
+          # main, commit an overlay bump, and push; the loser gets `! [rejected] (fetch
+          # first)` and dies under set -eu. Newly reachable as of the bump-staging job:
+          # before it, only ONE CI job wrote main, so it could only race a human.
+          # It fails safe (no wrong image is written, and promote stays gated), but the
+          # symptom is "staging silently didn't advance" if nobody reads the red job —
+          # uncomfortably close to the bug this rung exists to fix. Rebase and retry.
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && break
+            [ "$i" = 3 ] && exit 1
+            sleep 5
+          done

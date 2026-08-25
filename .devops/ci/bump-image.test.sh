@@ -128,6 +128,28 @@ fi
 # a dev box with yq reformatted the whole overlay. Same script, same inputs, two
 # different commits, and spurious conflicts when two operators bumped the same file.
 # Live-confirmed 2026-08-25. The write is now sed unconditionally; this locks that in.
+# 6a) STRUCTURAL, RUNS EVERYWHERE: bump-image.sh must contain no IN-PLACE yq write.
+# ⚠ The byte-comparison test below needs BOTH code paths, so it can only run where yq
+# is installed — and CI (node:24.16-trixie) has none, which is the very premise of the
+# fix. Caught in review of PR #16: re-introducing the original `yq -i` write verbatim
+# FAILED on a dev box but passed 11/0 GREEN in CI's real environment, so the guard was
+# inert exactly where regressions get caught. This assertion needs no yq and therefore
+# runs in CI, which is where it has to hold.
+#
+# Comment lines are stripped first: this file and bump-image.sh both DISCUSS `yq -i` at
+# length to explain why it was removed, and a naive grep would match that prose and fail
+# on a correct tree.
+BUMP_CODE="$(grep -vE '^[[:space:]]*#' "${BUMP}")"
+if printf '%s' "${BUMP_CODE}" | grep -qE 'yq[[:space:]]+([^|]*[[:space:]])?(-i|--inplace)([[:space:]]|$)|yq[[:space:]]+eval[[:space:]]+-i'; then
+  FAIL=$((FAIL+1))
+  echo "FAIL [no-inplace-yq]: bump-image.sh performs an in-place yq write; the overlay"
+  echo "                      write must be sed so CI and dev boxes emit identical diffs."
+  printf '%s' "${BUMP_CODE}" | grep -nE 'yq.*(-i|--inplace)'
+else
+  PASS=$((PASS+1))
+fi
+
+# 6b) BYTE-COMPARISON (dev boxes only — needs both paths present).
 if command -v yq >/dev/null 2>&1; then
   R6a="$(make_repo)"; R6b="$(make_repo)"
   K6a="${R6a}/.devops/chart/overlays/dev/kustomization.yaml"

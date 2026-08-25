@@ -65,6 +65,17 @@ def find_writer(env):
     prom = re.compile(r'promote\.sh\b.*?["\']?' + re.escape(env) + r'["\']?\s*$')
     for path, text in sorted(blobs.items()):
         for line in text.splitlines():
+            # ⚠ SKIP COMMENTED-OUT LINES. Without this the detector counts a
+            # `#`-disabled invocation as a live writer — and "comment it out
+            # temporarily" is the single most likely way a writer actually gets
+            # disabled, far likelier than deleting the whole job. Caught in review
+            # of PR #16: commenting out staging's real bump-image.sh line, leaving
+            # the job and its `if:` intact, left this suite fully GREEN (5 passed,
+            # 0 failed) while staging silently stopped advancing and promote.sh
+            # would copy a stale tag into prod. A gate that reports all-clear on
+            # the regression it exists to catch is worse than no gate.
+            if line.lstrip().startswith('#'):
+                continue
             if bump.search(line) or prom.search(line):
                 return os.path.basename(path)
     return None
@@ -163,6 +174,59 @@ SYNTH="$(writers_for "${TMP}/promotion.yaml" "${TMP}/wf")"
 assert_eq "negative control: dev detected"    "$(echo "${SYNTH}" | awk '$1=="dev"{print $2}')"   "build.yaml"
 assert_eq "negative control: ghost MISSING"   "$(echo "${SYNTH}" | awk '$1=="ghost"{print $2}')" "MISSING"
 assert_eq "negative control: dev is head-gated" "$(echo "${SYNTH}" | awk '$1=="dev"{print $3}')" "refs/heads"
+
+# ---- 4) COMMENTED-OUT WRITER must NOT count (regression test for M-1) ------
+# The reviewer's exact repro from PR #16. Commenting a writer out — leaving the job,
+# its `if:` and everything else intact — is how a writer gets disabled in practice,
+# far likelier than deleting the whole job. Before the comment-skip in find_writer
+# this tree reported "staging build-and-push.yaml refs/tags" and passed 5/0 GREEN
+# while staging silently stopped advancing. Assert both halves: the disabled env is
+# MISSING, and the suite's own top-level assertion actually fails on it.
+TMP2="$(mktemp -d)"
+mkdir -p "${TMP2}/wf"
+cat > "${TMP2}/promotion.yaml" <<'YAML'
+apiVersion: platform.capstone/v1
+registry: harbor.example.com/team-sample
+app: myapp
+environments:
+  staging:
+    trigger: "tag:v*"
+    overlay: ".devops/chart/overlays/staging"
+    gate: auto
+YAML
+cat > "${TMP2}/wf/build.yaml" <<'YAML'
+name: build
+on:
+  push:
+    tags: ["v*"]
+jobs:
+  bump-staging:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          # TEMPORARILY DISABLED: COMMIT=1 bash .devops/ci/bump-image.sh staging "${TAG}"
+          echo "noop"
+YAML
+COMMENTED="$(writers_for "${TMP2}/promotion.yaml" "${TMP2}/wf")"
+assert_eq "commented-out writer is MISSING" "$(echo "${COMMENTED}" | awk '$1=="staging"{print $2}')" "MISSING"
+
+# And the same shape with a YAML-level comment (whole line commented at lower indent).
+cat > "${TMP2}/wf/build.yaml" <<'YAML'
+name: build
+on:
+  push:
+    tags: ["v*"]
+jobs:
+  bump-staging:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    steps:
+#      - run: COMMIT=1 bash .devops/ci/bump-image.sh staging "${TAG}"
+      - run: echo noop
+YAML
+COMMENTED2="$(writers_for "${TMP2}/promotion.yaml" "${TMP2}/wf")"
+assert_eq "yaml-commented writer is MISSING" "$(echo "${COMMENTED2}" | awk '$1=="staging"{print $2}')" "MISSING"
 
 echo "== FINAL: $PASS passed, $FAIL failed =="
 [ "${FAIL}" -eq 0 ]
