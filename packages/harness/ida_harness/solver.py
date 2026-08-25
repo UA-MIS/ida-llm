@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from ida_core.contracts import ChatMessage, SamplingParams, TaskSample, TaskSpec
-from ida_harness.client import ChatCompletion, OpenAICompatibleClient
+from ida_harness.client import ChatCompletion, ModelClient
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ class Solver(Protocol):
         self,
         task: TaskSpec,
         sample: TaskSample,
-        client: OpenAICompatibleClient,
+        client: ModelClient,
         sampling: SamplingParams,
     ) -> SolveOutcome:
         """Produce an answer.  May call the client more than once."""
@@ -47,14 +47,14 @@ class SingleTurnSolver:
     Deliberately does *not* append "answer with only the number" style coaching:
     any instruction that shapes the answer belongs in the task's
     ``system_prompt``, where it is visible, versioned and part of the git SHA
-    recorded on the result (D-1).
+    recorded on the result (D-13).
     """
 
     def solve(
         self,
         task: TaskSpec,
         sample: TaskSample,
-        client: OpenAICompatibleClient,
+        client: ModelClient,
         sampling: SamplingParams,
     ) -> SolveOutcome:
         messages: list[ChatMessage] = []

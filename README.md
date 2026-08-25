@@ -109,12 +109,15 @@ cd frontend && npm ci && npm run dev
       └─────────┬─────────┘
                 │ ida_harness
       ┌─────────▼─────────┐     ┌────────────────────┐
-      │  OpenAI-compatible│────▶│  mock-model :8000  │  deterministic, no key, no GPU
-      │  client (D-1)     │     ├────────────────────┤
-      │  ONE client, no   │────▶│  a hosted API      │  (Anthropic / OpenAI)
-      │  provider         │     ├────────────────────┤
-      │  branching        │────▶│  campus vLLM       │  ("Sparks" — deferred, see infra/)
+      │  client, selected │────▶│  mock-model :8000  │  deterministic, no key, no GPU
+      │  by serving_stack │     ├────────────────────┤
+      │  in models.yaml   │────▶│  OpenAI            │  chat/completions
+      │  (D-1)            │     ├────────────────────┤
+      │                   │────▶│  Anthropic         │  Messages API
+      │  Adding a model   │     ├────────────────────┤
+      │  is a YAML edit.  │────▶│  campus vLLM       │  ("Sparks" — deferred, see infra/)
       └─────────┬─────────┘     └────────────────────┘
+                │                docs/model-clients.md
                 │ transcripts + eval logs
       ┌─────────▼─────────┐
       │  object store     │  runs/<run_id>/transcripts/<sample_id>.json
