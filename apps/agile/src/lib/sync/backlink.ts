@@ -2,6 +2,11 @@ import { config } from '@/lib/env';
 import { upsertPrBacklinkComment, setCommitStatus } from '@/lib/github/client';
 import { setBacklinkCommentId } from '@/lib/domain/queries';
 import type { WorkItem } from '@/lib/domain/workitem';
+import {
+  githubActionCredential,
+  missingCredentialMessage,
+  type GitHubCredential,
+} from '@/lib/github/credential';
 
 /**
  * Keeps ONE authoritative comment on a pull request pointing back at the work
@@ -11,7 +16,8 @@ import type { WorkItem } from '@/lib/domain/workitem';
  * accumulate a stream of bot comments.
  *
  * Every failure here is swallowed by design: a backlink is a courtesy, and it
- * must never fail the link operation that triggered it.
+ * must never fail the link operation that triggered it — but it reports WHY it
+ * did not happen, so a missing comment is never a silent no-op.
  */
 export function renderBacklinkBody(item: WorkItem, boardUrl: string): string {
   const url = `${boardUrl}/items/${item.id}`;
@@ -35,13 +41,17 @@ export async function syncBacklinkComment(
   item: WorkItem,
   repoFullName: string,
   prNumber: number,
-  githubToken: string | null,
+  credential: GitHubCredential | null,
 ): Promise<{ ok: boolean; reason?: string }> {
-  if (!config.prBacklinkComments) return { ok: false, reason: 'disabled' };
-  if (!githubToken) {
-    // A webhook-driven event has no user in context. Documented in the README:
-    // commenting then requires a GitHub App or bot PAT. Degrade quietly.
-    return { ok: false, reason: 'no-credential' };
+  if (!config.prBacklinkComments) {
+    return { ok: false, reason: 'Backlink comments are disabled (PR_BACKLINK_COMMENTS=false).' };
+  }
+
+  // A webhook-driven event has no user in context, so fall back to the app
+  // credential rather than silently skipping the comment.
+  const cred = credential ?? githubActionCredential(null);
+  if (!cred.token) {
+    return { ok: false, reason: missingCredentialMessage('Commenting on the pull request') };
   }
 
   try {
@@ -49,7 +59,7 @@ export async function syncBacklinkComment(
       repoFullName,
       prNumber,
       renderBacklinkBody(item, config.appUrl),
-      githubToken,
+      cred.token,
     );
     if (result.id) {
       await setBacklinkCommentId(item.id, repoFullName, prNumber, result.id);
@@ -66,9 +76,10 @@ export async function syncCommitStatus(
   item: WorkItem | null,
   repoFullName: string,
   headSha: string,
-  githubToken: string | null,
+  credential: GitHubCredential | null,
 ): Promise<boolean> {
-  if (!config.prCommitStatus || !githubToken || !headSha) return false;
+  const cred = credential ?? githubActionCredential(null);
+  if (!config.prCommitStatus || !cred.token || !headSha) return false;
   try {
     return await setCommitStatus(
       repoFullName,
@@ -84,7 +95,7 @@ export async function syncCommitStatus(
             description: 'No work item linked to this pull request',
             targetUrl: config.appUrl,
           },
-      githubToken,
+      cred.token,
     );
   } catch {
     return false;

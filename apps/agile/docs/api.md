@@ -66,9 +66,14 @@ Both are attributed to you in item history, and the two are distinguishable —
 a board token records *"via API"*, a GitHub token records *"via API (github
 token)"*.
 
-A few operations need a **browser session** rather than a token, because they act
-on GitHub as you: creating a branch (`/start-work`) and linking a PR. They return
-a clear error explaining this.
+A few operations need an **interactive session** rather than a token — creating
+an API token, for instance, since a token may not mint further tokens. Any
+signed-in session works, whichever identity provider the board uses.
+
+Operations that touch GitHub (creating a branch, linking a PR, posting the
+backlink comment) use your own GitHub credential when the board has one, and
+otherwise the board's configured credential. If neither exists they fail with a
+message naming what an owner needs to set — never silently.
 
 ---
 

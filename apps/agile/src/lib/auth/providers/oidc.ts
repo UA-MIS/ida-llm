@@ -273,12 +273,15 @@ export class OidcProvider implements AuthProvider {
   }
 
   /**
-   * Group membership is asserted at sign-in and carried in the session. There
-   * is no cheap way to re-read it without a new authorization round trip, so
-   * this returns 'unknown' (never revokes) and freshness comes from the
-   * session TTL instead. Documented in the README.
+   * Re-checks the groups claim carried in the session.
+   *
+   * This is a real decision, not 'unknown': if REQUIRED_GROUP changes, or the
+   * session somehow carries no qualifying group, access is denied immediately.
+   * What it cannot see is an upstream removal from the GitHub team after
+   * sign-in — that claim is only refreshed by a new authorization round trip,
+   * so session TTL is the freshness bound there. Documented in the README.
    */
-  async revalidate(): Promise<'ok' | 'denied' | 'unknown'> {
-    return 'unknown';
+  async revalidate(identity: { groups: string[] }): Promise<'ok' | 'denied' | 'unknown'> {
+    return hasRequiredGroup(identity.groups, config.requiredGroup) ? 'ok' : 'denied';
   }
 }

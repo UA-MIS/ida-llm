@@ -103,7 +103,7 @@ export async function reconcileItem(
             checksState: pr.checksState,
             action: 'synchronize',
           },
-          githubToken,
+          { token: githubToken, source: 'app' },
         ),
       );
 

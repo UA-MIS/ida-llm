@@ -242,18 +242,34 @@ out the whole team.
 ### ⚠️ What Dex sign-in means for GitHub features
 
 Under OIDC the board never receives a GitHub token — that is the point, since a
-team no longer registers a GitHub OAuth app. The GitHub-touching features
-therefore split:
+team no longer registers a GitHub OAuth app. Every GitHub-touching path
+therefore states where its credential comes from:
 
-| Feature | Under Dex OIDC |
-|---|---|
-| Assignee picker, PR picker, reading a PR to link it, on-view reconciliation | Work **if `GITHUB_POLL_TOKEN` is set** (a read-only PAT or GitHub App token). Without it they degrade to empty lists with an explanatory note. |
-| **Creating a branch** ("Start work"), **posting the PR backlink comment** | Do **not** work, and deliberately do not fall back to the shared token — a branch attributed to a bot instead of the student defeats the purpose. The UI explains why. |
+| Kind of call | Credential | Behaviour under Dex |
+|---|---|---|
+| **Read** — assignee picker, PR picker, reading a PR to link, reconciliation | user's token if present, else `GITHUB_POLL_TOKEN` | Works when the app token is set; otherwise degrades to an empty list **with a note naming the variable to set**. |
+| **Action** — create a branch, comment on a PR, set a commit status | user's token if present, else `GITHUB_POLL_TOKEN` | Works via the app credential. When it acts, the item history records *"performed with the board's GitHub credential"*, so attribution is never implied falsely. |
+| Neither available | — | Fails **loudly** with a message naming `GITHUB_POLL_TOKEN`. Never a silent no-op, and never a blocked state transition — the state change is applied first and is not rolled back by a GitHub failure. |
 
-So: **set `GITHUB_POLL_TOKEN`** for a Dex-based deployment, and accept that
-branch creation needs either `AUTH_PROVIDER=github` or a future GitHub App
-integration. Everything else — items, board, sprints, dependencies, the Ready
-queue, the API — is unaffected.
+**So: set `GITHUB_POLL_TOKEN` on any Dex-based deployment.** It needs `read:org`
+plus write access to the configured repos if you want branch creation and PR
+comments to work. The board is fully usable without it — items, board, sprints,
+dependencies, Ready queue and the whole API are unaffected — but the
+GitHub-integration features will report themselves unavailable.
+
+### Session revalidation
+
+Each session is revalidated by **the provider that issued it**, so flipping
+`AUTH_PROVIDER` does not invalidate sessions minted by the previous one:
+
+| Provider | Rule | Blind spot |
+|---|---|---|
+| `oidc` | The `groups` claim in the session is re-checked against `REQUIRED_GROUP` on every request. Changing the required group takes effect immediately, and a session lacking the group is denied at once. | An upstream removal from the GitHub team is not visible until the session expires — the claim is only refreshed by a new authorization round trip. **Session TTL (7 days) is the freshness bound.** |
+| `github` | Membership re-read from GitHub at most every ~10 minutes. | None; removal revokes within ~10 minutes. |
+
+A verdict of "cannot tell" (for example a GitHub outage) keeps the session — an
+inconclusive check must never sign out the team — while a provable denial
+revokes immediately.
 
 ### API authentication
 

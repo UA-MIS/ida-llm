@@ -1,5 +1,9 @@
 import { config } from '@/lib/env';
-import { writeCredentialHint } from './credential';
+import {
+  attributionNote,
+  missingCredentialMessage,
+  type GitHubCredential,
+} from './credential';
 import { createBranch, GitHubError } from './client';
 import { renderBranchName, type WorkItem } from '@/lib/domain/workitem';
 import { setItemBranch } from '@/lib/domain/queries';
@@ -24,16 +28,14 @@ export type StartWorkOutcome =
 export async function startWork(
   item: WorkItem,
   actor: Actor,
-  githubToken: string | null,
+  credential: GitHubCredential,
   repoOverride?: string,
 ): Promise<StartWorkOutcome> {
   if (!config.autoBranch) {
     return { status: 'disabled', message: 'Automatic branch creation is disabled (AUTO_BRANCH=false).' };
   }
-  if (!githubToken) {
-    // Deliberately does NOT fall back to a shared token: a branch created by a
-    // bot instead of the student defeats the point of creating it from the item.
-    return { status: 'failed', message: writeCredentialHint() };
+  if (!credential.token) {
+    return { status: 'failed', message: missingCredentialMessage('Creating a branch') };
   }
 
   const repo = repoOverride ?? item.branchRepo ?? config.primaryRepo;
@@ -45,11 +47,13 @@ export async function startWork(
   const branchName = item.branchName ?? renderBranchName(config.branchPattern, item);
 
   try {
-    const result = await createBranch(repo, branchName, githubToken);
+    const result = await createBranch(repo, branchName, credential.token);
+    // When the app credential acted, history says so rather than implying the
+    // user pushed the ref themselves.
     const saved = await setItemBranch(
       item.id,
       { repoFullName: repo, name: result.branch, url: result.url },
-      actor,
+      { ...actor, note: [actor.note, attributionNote(credential.source)].filter(Boolean).join(' — ') || undefined },
     );
     return {
       status: result.existed ? 'existing' : 'created',

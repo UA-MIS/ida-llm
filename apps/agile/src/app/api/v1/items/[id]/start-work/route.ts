@@ -5,6 +5,7 @@ import { getWorkItem, updateWorkItem } from '@/lib/domain/queries';
 import { readinessFor } from '@/lib/domain/deps-queries';
 import { blockedMessage } from '@/lib/domain/dependencies';
 import { startWork, checkoutCommand } from '@/lib/github/branches';
+import { githubActionCredential } from '@/lib/github/credential';
 import { canTransition, InvalidTransitionError } from '@/lib/domain/workitem';
 
 export const dynamic = 'force-dynamic';
@@ -66,7 +67,7 @@ export const POST = withApi(async ({ request, params, principal }) => {
   }
 
   // 2. Branch second, and never fatally.
-  const branch = await startWork(item, actor, principal.githubToken, body.repo);
+  const branch = await startWork(item, actor, githubActionCredential(principal), body.repo);
   if (branch.status === 'created' || branch.status === 'existing') item = branch.item;
   else warnings.push(branch.message);
 

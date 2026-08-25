@@ -23,10 +23,14 @@ export const GET = withApi(async ({ principal }) => {
  * The plaintext value is returned here ONCE and is never recoverable.
  */
 export const POST = withApi(async ({ request, principal }) => {
-  if (principal.source !== 'user' || !principal.githubToken) {
+  // Intent: a token may not mint further tokens, which would let a leaked one
+  // silently extend its own lifetime. This is about the CREDENTIAL KIND, not
+  // the identity provider — a Dex session is a perfectly good interactive
+  // session even though it carries no GitHub token.
+  if (principal.source !== 'user') {
     return apiError(
       'session_required',
-      'Creating an API token requires a signed-in GitHub session, not another API token.',
+      'Creating an API token requires an interactive signed-in session, not another API token.',
       403,
     );
   }
@@ -39,7 +43,10 @@ export const POST = withApi(async ({ request, principal }) => {
   const { token, record } = await createApiToken({
     name: parsed.data.name,
     ownerLogin: principal.login,
-    githubToken: principal.githubToken,
+    // Only present on a GitHub-backed session. When absent (Dex), the token
+    // simply has no stored GitHub credential to re-check membership with —
+    // see verifyApiToken, which treats that as "cannot tell", not "denied".
+    githubToken: principal.githubToken ?? undefined,
     expiresInDays: parsed.data.expiresInDays,
   });
 
