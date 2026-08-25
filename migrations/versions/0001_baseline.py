@@ -17,7 +17,7 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0001_baseline"
+revision: str = "ida_0001_baseline"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
