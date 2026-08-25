@@ -295,12 +295,18 @@ class TestTheRealConfigMapIsUsable:
         setting somebody thinks is live and is not. Both are worth knowing about,
         so new keys must be classified here deliberately."""
         consumed = {
-            "LOG_LEVEL", "HOST", "PORT", "REDIS_URL",
-            "MINIO_ENDPOINT", "MINIO_PORT", "MINIO_USE_SSL", "MINIO_BUCKET",
+            "LOG_LEVEL",
+            "HOST",
+            "PORT",
+            "REDIS_URL",
+            "MINIO_ENDPOINT",
+            "MINIO_PORT",
+            "MINIO_USE_SSL",
+            "MINIO_BUCKET",
             "MOCK_MODEL_BASE_URL",
         }
         not_ours = {
-            "API_URL",          # the frontend reads this, server-side (Node, not Python)
+            "API_URL",  # the frontend reads this, server-side (Node, not Python)
             "SPARKS_BASE_URL",  # read via models.yaml's base_url_env, not Settings
         }
         unclassified = set(self._configmap_data()) - consumed - not_ours
