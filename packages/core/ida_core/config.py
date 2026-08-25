@@ -198,7 +198,56 @@ class Settings(BaseSettings):
     working on is never eligible however old it is -- see
     :meth:`ida_core.queue.RunQueue.live_claims`.  Erring long costs a delayed
     status update; erring short would report a healthy run as failed, which is
-    the kind of false statement this platform exists to avoid."""
+    the kind of false statement this platform exists to avoid.
+
+    TWO CONSUMERS, ONE HORIZON.  The scheduled sweeps also read this to decide
+    how long a ``queued`` row may be treated as "in flight" before it is assumed
+    abandoned and its pair re-planned.  Deliberately the same value rather than a
+    second knob: both answer the identical question -- how long before we stop
+    believing a row that says work is in progress -- and two knobs that must
+    agree are two knobs that will eventually disagree."""
+
+    # ── scheduled sweeps (see services/runner/ida_runner/sweeps.py) ───────
+    # IDA_-only with in-image defaults, same as the queue block above: the
+    # ConfigMap carries no entry for any of them, so these defaults ARE the
+    # deployed values. The three CronJobs run a FIXED argv, so an operator's only
+    # lever in-cluster is the environment -- which is why the force switch is a
+    # setting and not merely a CLI flag.
+
+    sweep_max_runs: int = 200
+    """Most runs one sweep may enqueue.  Beyond this the sweep REFUSES.
+
+    Bounds queue pressure and blast radius: a dedupe regression that made every
+    pair look un-measured would otherwise re-enqueue the whole cross product
+    every night.  Sized well above a realistic registry x catalog (today: 1
+    enabled model x 8 scorable tasks = 8), so tripping it means something is
+    wrong, not that the suite grew."""
+
+    sweep_max_samples: int = 2000
+    """Most *samples* one sweep may enqueue.  Beyond this the sweep REFUSES.
+
+    The honest spend estimate, and the reason there are two caps rather than
+    one.  A run is not a unit of cost; a sample is -- one sample is one provider
+    call.  Ten runs of two hundred samples and two hundred runs of ten samples
+    cost the same and look nothing alike to :attr:`sweep_max_runs`.  Known
+    exactly (not estimated) at planning time, because ``len(spec.samples)`` is
+    read from the task file the sweep is planning against."""
+
+    sweep_force: bool = False
+    """Re-enqueue pairs that are already measured, ignoring dedupe.
+
+    The deliberate credit-spending switch: a sweep normally skips a
+    ``(task, model, task_content_sha)`` triple that already succeeded, which is
+    what makes a nightly CronJob cheap and idempotent.  Off by default, and the
+    budget caps still apply when it is on -- forcing a re-measurement is a
+    decision about staleness, not permission to spend without limit."""
+
+    sweep_judge_candidate_limit: int = 500
+    """Most ungraded subjective samples one judge-calibration pass examines.
+
+    Bounds the pass the same way :attr:`stale_run_ttl_s`'s query is bounded; the
+    next night's firing picks up the remainder.  The sweep logs when it hits
+    this bound so a truncated pass never reads as "that was all"."""
 
     auth_mode: str = "disabled"
     """``disabled`` today.

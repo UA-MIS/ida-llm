@@ -101,6 +101,34 @@ class TestSettings:
         assert settings.resolved_models_file() == tmp_path / "m.yaml"
         assert settings.resolved_tasks_dir() == tmp_path / "t"
 
+    def test_sweep_knobs_are_settable_from_the_environment(self, monkeypatch) -> None:
+        """The CronJobs run a FIXED argv, so the environment is the ONLY lever.
+
+        A sweep setting that could be reached solely through a CLI flag would be
+        unreachable in the cluster -- and the flag it duplicates would look like
+        a working control while the schedule ignored it. Asserted here rather
+        than trusted to the prefix convention.
+        """
+        monkeypatch.setenv("IDA_SWEEP_MAX_RUNS", "7")
+        monkeypatch.setenv("IDA_SWEEP_MAX_SAMPLES", "70")
+        monkeypatch.setenv("IDA_SWEEP_FORCE", "1")
+        monkeypatch.setenv("IDA_SWEEP_JUDGE_CANDIDATE_LIMIT", "9")
+
+        settings = Settings()
+
+        assert settings.sweep_max_runs == 7
+        assert settings.sweep_max_samples == 70
+        assert settings.sweep_force is True
+        assert settings.sweep_judge_candidate_limit == 9
+
+    def test_sweep_defaults_are_the_deployed_values(self) -> None:
+        """No ConfigMap entry exists for these, so the defaults ARE production."""
+        settings = Settings()
+
+        assert settings.sweep_force is False, "forcing spend must never be the default"
+        assert settings.sweep_max_runs > 0
+        assert settings.sweep_max_samples > 0
+
     def test_repo_root_honours_explicit_env(self, monkeypatch, tmp_path) -> None:
         monkeypatch.setenv("IDA_REPO_ROOT", str(tmp_path))
         assert repo_root() == tmp_path

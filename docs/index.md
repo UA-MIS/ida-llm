@@ -29,9 +29,15 @@ not scaffolding.
    sampling rejections) are the likeliest first failures.
 2. **Make `subjective` tasks scorable.** The schema loads and validates them
    today (`tasks/SCHEMA.md`), but the LLM-as-judge scorer is still an interface.
-3. **Fill in the three sweeps.** `services/runner/ida_runner/sweeps.py` is
-   scaffold: the CronJobs run nightly and exit 0 without doing work. Every sweep
-   must stay idempotent and MUST exit non-zero on failure.
+3. **Wire the judge into the runner and into `judge-calibration`.**
+   `rebenchmark` and `model-sweep` are implemented in
+   `services/runner/ida_runner/sweeps.py`; `judge-calibration` ships as an
+   orchestration shell that finds ungraded subjective samples, says how many it
+   skipped and exits 0. Both the retroactive wiring (`_load_retroactive_grader`)
+   and the live one (`IDA_JUDGE_MODEL_KEY` → Worker → `run_task(judge=…)`) land
+   **with** item 2, not before it: what a failed grading writes has to be settled
+   first, or the sweep re-nominates the same failed samples nightly at judge
+   cost. Every sweep must stay idempotent and MUST exit non-zero on failure.
 4. **Write real tasks.** [`tasks/SCHEMA.md`](../tasks/SCHEMA.md) is the whole
    authoring guide and `tasks/quantitative-quiz/` and `tasks/conceptual-grading/`
    are the two families to copy from. (`tasks/demo/` is not an exemplar -- it is
