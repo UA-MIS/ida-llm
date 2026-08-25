@@ -7,7 +7,8 @@ is yours, and [`.devops/README.md`](../.devops/README.md) for the deploy contrac
 
 | topic | where |
 |---|---|
-| task + rubric schema, and the 8 rules CI enforces | [`tasks/SCHEMA.md`](../tasks/SCHEMA.md) |
+| **authoring tasks** -- the full guide: families, difficulty ladders, gold answers, anchored rubrics, dataset hygiene, the pre-PR checklist | [`tasks/SCHEMA.md`](../tasks/SCHEMA.md) |
+| two worked exemplar families to copy | [`tasks/quantitative-quiz/`](../tasks/quantitative-quiz/) (verifiable), [`tasks/conceptual-grading/`](../tasks/conceptual-grading/) (subjective) |
 | the deploy path, secrets, previews, adding a component | [`.devops/README.md`](../.devops/README.md) |
 | every environment variable | [`.env.example`](../.env.example) |
 | the model registry | [`models.yaml`](../models.yaml) |
@@ -27,6 +28,9 @@ not scaffolding.
 3. **Fill in the three sweeps.** `services/runner/ida_runner/sweeps.py` is
    scaffold: the CronJobs run nightly and exit 0 without doing work. Every sweep
    must stay idempotent and MUST exit non-zero on failure.
-4. **Write real tasks.** `tasks/demo/` is two worked examples. The schema gate
-   runs on every PR, so a malformed rubric fails the pull request instead of a
-   benchmark run three hours in.
+4. **Write real tasks.** [`tasks/SCHEMA.md`](../tasks/SCHEMA.md) is the whole
+   authoring guide and `tasks/quantitative-quiz/` and `tasks/conceptual-grading/`
+   are the two families to copy from. (`tasks/demo/` is not an exemplar -- it is
+   the pair of tiny tasks the tracer bullet runs.) The schema gate runs on every
+   PR, so a malformed rubric fails the pull request instead of a benchmark run
+   three hours in.

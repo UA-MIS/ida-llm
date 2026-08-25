@@ -270,7 +270,12 @@ how much of the task the mean actually covers.
 
 ### A task
 
-Write a YAML file under `tasks/`, read [`tasks/SCHEMA.md`](tasks/SCHEMA.md), then:
+Read [`tasks/SCHEMA.md`](tasks/SCHEMA.md) -- it is the whole authoring guide, and
+it is written for someone who has never seen this repository. Copy whichever of
+the two worked families matches what you are writing:
+[`tasks/quantitative-quiz/`](tasks/quantitative-quiz/) (verifiable, seven
+difficulty rungs) or [`tasks/conceptual-grading/`](tasks/conceptual-grading/)
+(subjective, anchored rubrics). Then:
 
 ```bash
 make lint-tasks
@@ -467,7 +472,7 @@ it matters.
 ## Where to start reading
 
 1. `packages/core/ida_core/contracts.py` — the contracts, written to be read
-2. `tasks/SCHEMA.md` — how to author a task
+2. `tasks/SCHEMA.md` — how to author a task, end to end
 3. `e2e/test_tracer_inprocess.py` — the whole system in one file
 4. `packages/harness/ida_harness/runner.py` — the orchestration guarantees
 5. `models.yaml` — the registry, with worked examples for real endpoints
