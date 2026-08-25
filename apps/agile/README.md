@@ -23,7 +23,7 @@ see [Deploying another instance](#deploying-another-instance).
 
 - [Stack](#stack) · [Configuration](#configuration) · [Registering the Dex client](#registering-the-dex-client)
 - [Authentication](#authentication) · [API](#api)
-- [Sprints](#sprints) · [Dependencies and the Ready queue](#dependencies-and-the-ready-queue)
+- [Homepage](#homepage-living-readme) · [Sprints](#sprints) · [Dependencies and the Ready queue](#dependencies-and-the-ready-queue)
 - [Git integration](#git-integration) · [Webhooks](#webhooks) · [Multiple repos](#multiple-repos)
 - [State, durability and backup](#state-durability-and-backup)
 - [Deploying another instance](#deploying-another-instance)
@@ -142,6 +142,7 @@ repo's existing convention; `S3_*` are accepted as aliases.
 | Variable | Default |
 |---|---|
 | `AGILE_DB_SCHEMA` | `agile` |
+| `HOME_TEMPLATE` / `HOME_TEMPLATE_PATH` | built-in starter text |
 | `PGPOOL_MAX` | `10` |
 | `RATE_LIMIT_BURST` / `RATE_LIMIT_PER_SECOND` | `240` / `8` |
 
@@ -326,6 +327,30 @@ re-run progression rules.
    reconcile unattended.
 
 So an unconfigured deployment converges when someone looks, rather than instantly.
+
+---
+
+## Homepage (living README)
+
+`/` is the landing route: a project 101 in two halves.
+
+1. **A narrative the team writes** — markdown, edited in the browser by any
+   authorized member, stored in Postgres and rendered through the same
+   sanitising pipeline as work-item descriptions. **Every save archives the text
+   it replaced**, with who changed it and when, so "when did our goal change?"
+   stays answerable a semester later. It is writable via the API
+   (`PUT /api/v1/pages/home`), so a Claude session can seed it.
+2. **A state strip nobody maintains** — current sprint with days remaining,
+   counts by state, points done vs remaining, how many items are Ready, how many
+   are blocked, recently merged PRs and recently finished items. All derived from
+   board data, so it cannot drift the way a status paragraph does.
+
+A fresh instance shows **starter content with an "edit this" prompt**, never a
+blank page — every wizard-provisioned team starts here. Override the starter text
+per instance with `HOME_TEMPLATE` (inline) or `HOME_TEMPLATE_PATH` (a file).
+
+The board stays one click away and directly linkable at `/board`, so daily use
+never bounces through here.
 
 ---
 
@@ -547,6 +572,7 @@ application data.
 | `oidc-auth` | Groups-claim authorization (exact `org:team`, no bare-org or prefix match), PKCE, GitHub-token passthrough incl. caching and non-member rejection |
 | `dependencies` | Cycle detection, the readiness gate, override semantics, branch staleness |
 | `deps-integration` | Gate blocks/opens against real Postgres, override logged, shared current sprint, one-call semester seeding |
+| `home-page` | Starter template, edit persistence and attribution, revision history, overridable template, and that the state strip reflects real data (merged PRs count, commits do not) |
 | `session` | Cookie encryption, tampering, expiry, open-redirect protection |
 | `api-tokens` | Issue/verify/revoke, hash-only storage, expiry, membership-linked revocation |
 | `idempotency` | Replay, conflict, per-user scoping, purge |

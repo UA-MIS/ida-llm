@@ -20,8 +20,11 @@ d('dependencies, gating and shared sprint (real Postgres)', () => {
     db = await import('@/lib/db/pool');
     await db.query(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
     const applied = await (await import('@/lib/db/migrate')).runMigrations();
-    // Both migrations must apply, in order.
-    expect(applied).toEqual(['001_init.sql', '002_deps_sprints_repos.sql']);
+    // Every migration applies, in lexical order. Asserted as a property rather
+    // than an exact list, so adding a migration does not break this test.
+    expect(applied).toContain('001_init.sql');
+    expect(applied).toContain('002_deps_sprints_repos.sql');
+    expect(applied).toEqual([...applied].sort());
     q = await import('@/lib/domain/queries');
     deps = await import('@/lib/domain/deps-queries');
     seed = await import('@/lib/api/seed');

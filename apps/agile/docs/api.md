@@ -334,6 +334,49 @@ curl -X POST "$AGILE/api/v1/items/42/comments" -H "Authorization: Bearer $TOKEN"
 
 ---
 
+## The homepage (living README)
+
+The landing page has two halves: a **narrative** the team writes, and a **state
+strip** generated from board data. Both are reachable from the API, so a Claude
+session can seed the narrative when a board is first provisioned.
+
+```sh
+# Read it (returns the starter template, with isTemplate:true, until first edit)
+curl -H "Authorization: Bearer $TOKEN" "$AGILE/api/v1/pages/home"
+
+# Write it — markdown, same renderer and sanitiser as work-item descriptions
+curl -X PUT "$AGILE/api/v1/pages/home" \
+  -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"body":"# IDA-LLM\n\n## What this project is\n\nAn LLM benchmark harness.\n\n## Goals\n\n- Reproducible evaluation across models\n- A results UI the class can read"}'
+
+# Prior versions: who changed it and when
+curl -H "Authorization: Bearer $TOKEN" "$AGILE/api/v1/pages/home/revisions"
+```
+
+Each save archives the text it replaced, so "when did our goal change?" stays
+answerable. Saving identical text records no revision.
+
+The generated half is available on its own:
+
+```sh
+curl -H "Authorization: Bearer $TOKEN" "$AGILE/api/v1/summary"
+```
+
+```json
+{
+  "currentSprint": { "sprint": { "name": "Sprint 1", ... }, "daysRemaining": 13, "setBy": "clayton" },
+  "states": { "New": 12, "Active": 4, "Resolved": 2, "Closed": 7, "Removed": 0 },
+  "points": { "total": 68, "done": 21, "remaining": 47 },
+  "readyCount": 5, "blockedCount": 3, "mergedPrCount": 9,
+  "recentMergedPrs": [ ... ], "recentlyResolved": [ ... ]
+}
+```
+
+Progress here is **merged PRs and finished items**. Commit counts and branch age
+appear elsewhere as activity and are deliberately excluded.
+
+---
+
 ## Other endpoints
 
 | Endpoint | Purpose |
@@ -343,6 +386,8 @@ curl -X POST "$AGILE/api/v1/items/42/comments" -H "Authorization: Bearer $TOKEN"
 | `GET /api/v1/prs` | Open PRs annotated with the item ids they mention. Session only. |
 | `POST /api/v1/items/{id}/links` | Attach a PR (URL, `owner/repo#123`, or `123`) |
 | `POST /api/v1/items/{id}/start-work` | Activate + create the branch. Session only. |
+| `GET`/`PUT /api/v1/pages/home` | The living README |
+| `GET /api/v1/summary` | Generated board state |
 | `GET`/`DELETE /api/v1/tokens` | Manage your board tokens |
 | `GET /api/healthz` · `GET /api/readyz` | Liveness · readiness. No auth. |
 

@@ -10,10 +10,11 @@ export function Shell({
   children,
 }: {
   session: SessionPayload;
-  active: 'board' | 'ready' | 'backlog' | 'sprints' | 'tokens' | 'item';
+  active: 'home' | 'board' | 'ready' | 'backlog' | 'sprints' | 'tokens' | 'item';
   children: React.ReactNode;
 }) {
   const nav = [
+    { key: 'home', href: '/', label: 'Home' },
     { key: 'board', href: '/board', label: 'Board' },
     { key: 'ready', href: '/ready', label: 'Ready' },
     { key: 'backlog', href: '/backlog', label: 'Backlog' },
