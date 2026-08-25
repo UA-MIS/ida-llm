@@ -108,10 +108,11 @@ class TestStackHealth:
 
     def test_registry_and_catalog_loaded_in_the_container(self, api: httpx.Client) -> None:
         assert [m["key"] for m in api.get("/models").json()] == ["mock"]
-        assert {t["id"] for t in api.get("/tasks").json()} == {
-            VERIFIABLE_TASK,
-            SUBJECTIVE_TASK,
-        }
+        # A superset, not an equality: the container ships whatever is in
+        # `tasks/`, which grows as families are authored. What this asserts is
+        # that the catalog loaded at all and that the two tasks the tracer runs
+        # below are in it.
+        assert {VERIFIABLE_TASK, SUBJECTIVE_TASK} <= {t["id"] for t in api.get("/tasks").json()}
 
 
 class TestTracerBullet:

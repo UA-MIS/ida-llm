@@ -64,9 +64,20 @@ class TestLoadTaskFile:
 
 class TestTaskCatalog:
     def test_indexes_the_shipped_tasks(self) -> None:
+        """Every file under ``tasks/`` loads, and the tracer's two are among them.
+
+        Deliberately NOT an equality against the whole id list. Authoring a task
+        family is the routine contribution this repository invites
+        (``tasks/SCHEMA.md``), so an exact-list assertion fails on every new task
+        file and teaches contributors to edit the assertion instead of reading
+        it. What the rest of the suite genuinely depends on is that the two
+        tracer tasks are present and that the tree as a whole loads -- which is
+        what is asserted here.
+        """
         catalog = TaskCatalog.from_directory(repo_root() / "tasks")
-        assert catalog.ids() == ["demo/arithmetic-quiz-check", "demo/essay-feedback"]
-        assert len(catalog) == 2
+        ids = catalog.ids()
+        assert len(catalog) == len(ids), "an id was indexed twice"
+        assert {"demo/arithmetic-quiz-check", "demo/essay-feedback"} <= set(ids)
 
     def test_membership_and_lookup(self) -> None:
         catalog = TaskCatalog.from_directory(repo_root() / "tasks")
@@ -96,7 +107,14 @@ class TestTaskCatalog:
     def test_empty_directory_yields_empty_catalog(self, tmp_path) -> None:
         assert len(TaskCatalog.from_directory(tmp_path)) == 0
 
-    def test_demo_tasks_cover_both_kinds(self) -> None:
+    def test_shipped_tasks_cover_both_kinds(self) -> None:
+        """Both branches of the taxonomy stay represented in the shipped tree.
+
+        The second assertion is the invariant the old positional one was really
+        after: scorability is decided by ``kind`` and nothing else, so a
+        subjective task can never be reported with a score and a verifiable one
+        can never be reported without.
+        """
         catalog = TaskCatalog.from_directory(repo_root() / "tasks")
         assert {t.kind.value for t in catalog.all()} == {"verifiable", "subjective"}
-        assert [t.is_scorable for t in catalog.all()] == [True, False]
+        assert all(t.is_scorable is (t.kind.value == "verifiable") for t in catalog.all())
