@@ -86,11 +86,17 @@ jobs:
         # which is why running the whole directory is safe here.
         #
         # ⚠ YES, `pytest` ABOVE ALREADY RAN THIS (e2e is in testpaths), AND THAT
-        # IS THE POINT. This step invokes it the way a developer debugging the
-        # tracer does -- `cd e2e`, its own rootdir -- which resolves conftest and
-        # sys.path differently from the root invocation. A suite that passes only
-        # one of those two ways has a latent import bug; this repo has already
-        # had exactly that bug, and two seconds is a cheap standing check.
+        # IS THE POINT -- but not for the reason you might assume. `cd e2e` does
+        # NOT give the suite its own rootdir: pytest walks up, finds the root
+        # pyproject.toml, and rootdir stays the repo root (test ids still print
+        # as `e2e/test_...`, and the root `addopts` still apply).
+        #
+        # What it DOES change is WHICH SIBLING CONFTESTS GET LOADED. A root run
+        # collects five conftest.py files (core, harness, api, runner, e2e); this
+        # run collects one. That is exactly the axis the bug this guards against
+        # lives on -- `from conftest import ...` binds to whichever conftest
+        # loaded first -- and this repo has already had that bug. Two seconds for
+        # a standing check on a failure mode we have actually hit.
         run: cd e2e && python -m pytest .
 
   frontend:
