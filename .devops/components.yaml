@@ -52,9 +52,26 @@ components:
     needsDb: true
     buildType: container
 
-  # ── RESERVED: `agile` — the ADO-style sprint board. ────────────────────────
-  # A third component is being built concurrently by another agent and will land
-  # here as its own entry (own image, own Deployment, prod only, explicit host
-  # ida-agile.capstone.uamishub.com). Do NOT invent its fields — see
-  # .devops/README.md § "Adding the agile component" for the exact five-file
-  # change, written so it drops in without touching anything above.
+  # agile — the ADO-style sprint board (apps/agile). PROD ONLY, single replica,
+  # and the ONE component with an EXPLICIT host (ida-agile.capstone.uamishub.com)
+  # instead of the <app>-<env> pattern.
+  #
+  # `path: ""` because it does not serve a path on the main app's host — it gets
+  # its own host rule on the same Ingress OBJECT. Same object on purpose: the
+  # platform's env ApplicationSet attaches the non-prod SSO forwardAuth by
+  # targeting `kind: Ingress, name: ida-llm`, so a second Ingress would silently
+  # receive no gate. Harmless here (prod is never gated) and correct if it ever
+  # gains a non-prod presence.
+  #
+  # needsDb: true — its own `agile` SCHEMA inside the SAME tenant database, not a
+  # second database. The XRD provisions one engine per tenant, and a second claim
+  # for the same team would fight the first over the same namespaces.
+  - name: agile
+    kind: backend
+    context: .
+    dockerfile: apps/agile/Dockerfile
+    image: ida-llm-agile
+    port: 8080
+    path: ""
+    needsDb: true
+    buildType: container

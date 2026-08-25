@@ -11,12 +11,15 @@ kind: Kustomization
 resources:
   - serviceaccount.yaml
   - configmap.yaml
+  - agile-config.yaml
   - pvc.yaml
   - statefulset.yaml
   - deployments.yaml
   - cronjobs.yaml
   - services.yaml
   - ingress.yaml
+  - servicemonitor.yaml
+  - autoscaling.yaml
 
 labels:
   - pairs:

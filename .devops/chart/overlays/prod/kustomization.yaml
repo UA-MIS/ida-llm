@@ -17,6 +17,8 @@ resources:
   - ../../base
   - app-secret.externalsecret.yaml
   - database.externalsecret.yaml
+  # PROD ONLY -- the sprint board runs nowhere else. See the file header.
+  - agile-secret.externalsecret.yaml
 
 labels:
   - pairs:
@@ -30,6 +32,9 @@ images:
     newTag: "be4e3d9"
   - name: ida-llm-python-app
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-python-app
+    newTag: "be4e3d9"
+  - name: ida-llm-agile
+    newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-agile
     newTag: "be4e3d9"
 
 # No `patches:`. Every prod value lives in base, where it is read by anyone

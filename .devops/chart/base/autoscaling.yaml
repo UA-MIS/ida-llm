@@ -1,0 +1,116 @@
+# HorizontalPodAutoscaler + PodDisruptionBudgets.
+#
+# ── HPA: `runner` ONLY, and only that one, deliberately ──────────────────────
+# The runner is the one component whose replica count is genuinely variable: the
+# project spec calls for 2-4 workers depending on how much benchmarking is in
+# flight. Everything else here is either fixed-capacity or would be actively
+# harmed by autoscaling:
+#   frontend/api  their load is human traffic on a research dashboard; two
+#                 replicas is an availability floor, not a capacity number.
+#   mock-model    stateless and trivially cheap; scaling it would signal load it
+#                 does not have.
+#   object-store  an RWO PVC — a second replica CANNOT attach and would hang.
+#   redis         a StatefulSet queue broker; a second replica is a different
+#                 topology (replication), not more of the same thing.
+#   agile         runs a background GitHub poller; N replicas means N times the
+#                 rate-limit burn against one token and duplicate webhook work.
+#
+# ⚠ CPU IS THE WRONG SIGNAL FOR THIS WORKLOAD, and the target reflects that.
+# The runner is NETWORK-bound: it blocks on remote LLM APIs rather than
+# computing, so a worker saturated with in-flight requests may sit at low CPU.
+# Scaling on CPU alone therefore UNDER-scales exactly when the queue is deepest.
+# The honest signal is queue depth (`ida_llm_runner_queue_depth`, now exported),
+# but that needs prometheus-adapter or KEDA, which the platform does not run —
+# so CPU at a deliberately LOW target (60%) is the approximation, chosen to trip
+# early rather than late. Revisit if an external-metrics source ever lands; the
+# metric it would need is already being emitted.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ida-llm-runner
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: runner
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ida-llm-runner
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+  behavior:
+    # Scale UP fast (a deep queue is the whole reason to add workers) and DOWN
+    # slowly: a worker killed mid-benchmark loses in-flight work, and benchmark
+    # load is bursty enough that a fast scale-down would thrash.
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 300
+---
+# ── PodDisruptionBudgets ─────────────────────────────────────────────────────
+# These bound VOLUNTARY disruption only — node drains, cluster upgrades, the
+# descheduler. They do nothing about crashes, and a PDB on a single-replica
+# workload with minAvailable: 1 would BLOCK node drains entirely, so only the
+# multi-replica components get one.
+#
+# ⚠ `maxUnavailable: 1` rather than `minAvailable: N`. With minAvailable pinned
+# to a number, a scaled-down deployment (dev runs 1 replica of each) becomes
+# undrainable — the node drain hangs forever and the symptom is a stuck cluster
+# upgrade with no obvious cause. maxUnavailable stays correct at every replica
+# count these deployments actually take.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ida-llm-frontend
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: frontend
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ida-llm
+      app.kubernetes.io/component: frontend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ida-llm-api
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: api
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ida-llm
+      app.kubernetes.io/component: api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ida-llm-runner
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: runner
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ida-llm
+      app.kubernetes.io/component: runner

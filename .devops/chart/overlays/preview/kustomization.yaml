@@ -47,8 +47,23 @@ images:
   - name: ida-llm-python-app
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-python-app
     newTag: preview
+  - name: ida-llm-agile
+    newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-agile
+    newTag: preview
 
 patches:
+  # ── agile: PROD ONLY ──────────────────────────────────────────────────────
+  # The sprint board is ONE always-on instance for the team, not a
+  # three-environment app: it runs a background GitHub poller, so a second live
+  # copy means double the rate-limit burn against one token and duplicate webhook
+  # work. Scaled to zero rather than omitted so the object still exists here (it
+  # can be scaled up for a same-shape debugging session without editing the
+  # chart) and so the promotion seam keeps moving all three components together.
+  - target: { kind: Deployment, name: ida-llm-agile }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
   # Smallest possible footprint — one of everything.
   - target: { kind: Deployment, name: ida-llm-frontend }
     patch: |-
@@ -106,6 +121,11 @@ patches:
         path: /spec/tls/0/hosts
         value:
           - ida-llm-pr-1.capstone.uamishub.com
+          # ⚠ RE-LISTED VERBATIM. This patch replaces the WHOLE tls.hosts list,
+          # so omitting the agile host here would leave rules[1] serving a
+          # hostname the certificate does not cover. The host is env-less on
+          # purpose -- see base/ingress.yaml rules[1].
+          - ida-agile.capstone.uamishub.com
   # Tiny volumes — a preview stores nothing worth keeping.
   - target: { kind: PersistentVolumeClaim, name: ida-llm-object-store }
     patch: |-

@@ -13,6 +13,11 @@ dependencies = [
   "uvicorn[standard]>=0.32,<0.40",
   "sqlalchemy>=2.0,<3",
   "psycopg[binary]>=3.2,<4",
+  "prometheus-client>=0.21,<1",
+  # /readyz checks redis and the object store, so the api needs both clients even
+  # though it does not otherwise talk to them yet.
+  "redis>=5.2,<7",
+  "httpx>=0.28,<0.29",
 ]
 
 [project.scripts]

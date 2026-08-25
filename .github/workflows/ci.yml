@@ -204,13 +204,26 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install kubectl (for `kubectl kustomize`) + PyYAML
+        # ⚠ NO apt-get. These runners have external egress on :443 ONLY, and
+        # Debian's apt mirrors are dialled over http://deb.debian.org:80 — so
+        # `apt-get install curl` does not fail fast, it warns four times about an
+        # unreachable network, continues with an empty package list, and exits
+        # 100. (Same trap that bit Dockerfile.python; this job had it too.)
+        #
+        # Python is already in this image and its urllib speaks HTTPS, so it is
+        # the fetch tool: no package manager, no extra image, no :80.
         run: |
           set -eu
-          apt-get update && apt-get install --no-install-recommends -y curl ca-certificates
-          KUBECTL_VERSION=v1.31.1
-          curl -fsSLo /usr/local/bin/kubectl \
-            "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
-          chmod +x /usr/local/bin/kubectl
+          python - <<'PY'
+          import urllib.request, os, stat
+          version = "v1.31.1"
+          url = f"https://dl.k8s.io/release/{version}/bin/linux/amd64/kubectl"
+          dest = "/usr/local/bin/kubectl"
+          urllib.request.urlretrieve(url, dest)
+          os.chmod(dest, os.stat(dest).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+          print("installed kubectl", version)
+          PY
+          kubectl version --client
           pip install --upgrade pip && pip install pyyaml==6.0.2
 
       - name: Render every overlay and assert the invariants

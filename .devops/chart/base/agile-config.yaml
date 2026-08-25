@@ -1,0 +1,58 @@
+# NON-SECRET config for the sprint board, kept SEPARATE from ida-llm-config.
+#
+# Why a second ConfigMap rather than more keys on the shared one: this component
+# is prod-only and has a completely different config vocabulary (OIDC, GitHub
+# identity, branding). Folding it into the shared map would push ~12 keys into
+# every runner and CronJob pod that will never read one of them, and would make
+# the shared map's per-env patches harder to reason about.
+#
+# Secrets are NOT here — SESSION_SECRET, OIDC_CLIENT_SECRET and the optional
+# GitHub credentials arrive from Vault via the overlay's ExternalSecret.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ida-llm-agile-config
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: agile
+data:
+  NODE_ENV: "production"
+
+  # ⚠ APP_URL must be the EXACT public origin — the app builds its OAuth callback
+  # from it, and Dex matches redirect URIs exactly. A trailing slash, http://, or
+  # the wrong host here produces an OIDC error at sign-in, not a startup failure.
+  APP_URL: "https://ida-agile.capstone.uamishub.com"
+
+  # ── Sign-in: Dex OIDC through the shared platform broker ──────────────────
+  # One GitHub OAuth app, N tools: this registers as a Dex staticClient rather
+  # than getting its own GitHub OAuth app (platform-services/dex/configmap.yaml).
+  OIDC_ISSUER: "https://id.capstone.uamishub.com"
+  OIDC_CLIENT_ID: "ida-agile"
+
+  # ── Identity: authorization IS membership of this GitHub team ─────────────
+  # The Dex GitHub connector sets `teamNameField: slug` and, with `orgs:` set,
+  # emits ONLY `<org>:<team-slug>` groups — so the group this app must require is
+  # `UA-MIS:ida-llm`. The app defaults REQUIRED_GROUP to <GITHUB_ORG>:<GITHUB_TEAM>,
+  # which these two values make correct without setting it explicitly.
+  GITHUB_ORG: "UA-MIS"
+  GITHUB_TEAM: "ida-llm"
+  GITHUB_REPOS: "UA-MIS/ida-llm"
+
+  # ── Branding ──────────────────────────────────────────────────────────────
+  BOARD_TITLE: "IDA Agile"
+  BOARD_ACCENT: "#9e1b32"
+  BOARD_INSTANCE: "UA-MIS/ida-llm"
+
+  # ── Database ──────────────────────────────────────────────────────────────
+  # Its own schema INSIDE the shared tenant database. The app's migrations
+  # create and target this schema; the tenant role owns the database, so it has
+  # CREATE on it.
+  AGILE_DB_SCHEMA: "agile"
+
+  # ── Attachments: the tenant's own MinIO, its own bucket ───────────────────
+  # All four of these plus the two credentials (from the app Secret) must be
+  # present or the app leaves attachments disabled.
+  MINIO_ENDPOINT: "ida-llm-object-store"
+  MINIO_PORT: "9000"
+  MINIO_USE_SSL: "false"
+  MINIO_BUCKET: "agile-attachments"

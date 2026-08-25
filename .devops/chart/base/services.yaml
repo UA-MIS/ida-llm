@@ -115,3 +115,54 @@ spec:
       port: 9000
       targetPort: s3
       protocol: TCP
+---
+# The sprint board. Its Service exists in every environment even though the
+# Deployment is scaled to 0 outside prod — a Service with no endpoints is
+# harmless, and it keeps the Ingress rule resolvable everywhere.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ida-llm-agile
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: agile
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: agile
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+# The runner's METRICS-ONLY Service. The runner is a queue consumer with no API,
+# so this exposes nothing but /metrics on :9100 — it exists so a ServiceMonitor
+# has something to select. Without it the workers are invisible to Prometheus and
+# the only symptom of "every worker died" is a queue that quietly stops draining.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ida-llm-runner-metrics
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: runner
+spec:
+  type: ClusterIP
+  # Headless: nothing dials the runners, and a ClusterIP would imply a
+  # load-balanced API that does not exist. Headless also gives the ServiceMonitor
+  # one target PER POD, which is what makes "how many workers are up" answerable
+  # -- a load-balanced VIP would scrape a random single worker each interval.
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: runner
+  ports:
+    - name: metrics
+      port: 9100
+      # targetPort is the CONTAINER port name, which is `http` — see the comment
+      # on the runner container in deployments.yaml for why it cannot be called
+      # `metrics` there. The SERVICE port keeps the honest name.
+      targetPort: http
+      protocol: TCP

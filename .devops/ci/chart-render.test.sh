@@ -82,10 +82,10 @@ config = next((d for d in by_kind.get("ConfigMap", []) if d["metadata"]["name"] 
 named = {d["metadata"]["name"]: d for d in deploys}
 
 # ---- shape -----------------------------------------------------------------
-check(len(deploys) == 5, f"5 Deployments (got {len(deploys)})")
+check(len(deploys) == 6, f"6 Deployments (got {len(deploys)})")
 check(len(statefulsets) == 1, f"1 StatefulSet (got {len(statefulsets)})")
 check(len(cronjobs) == 3, f"3 CronJobs (got {len(cronjobs)})")
-check(len(services) == 5, f"5 Services (got {len(services)})")
+check(len(services) == 7, f"7 Services (got {len(services)})")
 check(len(services) <= 15, "Services within the tenant quota of 15")
 
 # Every Service must select a workload that exists -- a renamed component leaves
@@ -215,6 +215,60 @@ for container in containers:
                 check("value" not in entry,
                       f"{container['name']}: {entry['name']} comes from a secretKeyRef, not a literal")
 
+# ---- the agile board -----------------------------------------------------------
+agile = named.get("ida-llm-agile")
+check(agile is not None, "the agile Deployment is rendered")
+if agile:
+    if env == "prod":
+        check(agile["spec"]["replicas"] == 1, "prod: agile runs 1 replica")
+    else:
+        # It runs a background GitHub poller: a second live copy doubles the
+        # rate-limit burn on one token and duplicates webhook work.
+        check(agile["spec"]["replicas"] == 0, f"{env}: agile is scaled to zero (prod-only)")
+
+if ingress:
+    hosts = [r["host"] for r in ingress["spec"]["rules"]]
+    # The board's host is env-LESS in every overlay -- the per-env patches touch
+    # rules[0] only. If an overlay ever patched rules[1], this catches it.
+    check("ida-agile.capstone.uamishub.com" in hosts,
+          f"{env}: the agile host is unpatched by the overlay (got {hosts})")
+
+# ---- servicemonitors + autoscaling ---------------------------------------------
+monitors = {d["metadata"]["name"] for d in by_kind.get("ServiceMonitor", [])}
+check(monitors == {"ida-llm-api", "ida-llm-runner", "ida-llm-frontend"},
+      f"3 ServiceMonitors (got {sorted(monitors)})")
+
+# ⚠ Every scraped port must be a CONTAINER port named `http`: the
+# Composition-owned netpol allows ingress from `monitoring` on `port: http` only,
+# and a NetworkPolicy port name matches the CONTAINER port name. A scrape blocked
+# that way reads as a broken exporter, not a firewall.
+container_port_names = {
+    p["name"]
+    for w in deploys + statefulsets
+    for c in w["spec"]["template"]["spec"]["containers"]
+    for p in c.get("ports", [])
+}
+runner = named.get("ida-llm-runner")
+if runner:
+    names = {p["name"] for c in runner["spec"]["template"]["spec"]["containers"]
+             for p in c.get("ports", [])}
+    check("http" in names,
+          f"runner's metrics container port is named 'http' so the netpol admits the scrape (got {sorted(names)})")
+
+hpas = by_kind.get("HorizontalPodAutoscaler", [])
+check(len(hpas) == 1 and hpas[0]["spec"]["scaleTargetRef"]["name"] == "ida-llm-runner",
+      "exactly one HPA, targeting the runner")
+if hpas:
+    check(hpas[0]["spec"]["minReplicas"] == 2 and hpas[0]["spec"]["maxReplicas"] == 4,
+          "HPA bounds are 2-4 (the spec's stated runner range)")
+
+pdbs = by_kind.get("PodDisruptionBudget", [])
+for pdb in pdbs:
+    # minAvailable on a scaled-down deployment makes the node UNDRAINABLE and
+    # hangs a cluster upgrade with no obvious cause.
+    check("maxUnavailable" in pdb["spec"],
+          f"{pdb['metadata']['name']}: PDB uses maxUnavailable, not minAvailable")
+
 for ok, label in checks:
     print(("PASS " if ok else "FAIL ") + label)
 PY
@@ -229,6 +283,31 @@ PY
   done <<< "${result}"
 
   rm -f "${rendered_file}"
+done
+
+# ── THE PROMOTION INVARIANT ──────────────────────────────────────────────────
+# Within ONE overlay every images[].newTag must agree. bump-image.sh rewrites
+# them all in a single pass and promote.sh REFUSES to promote when they disagree
+# -- so a component whose entry was forgotten or hand-edited does not fail here,
+# it fails much later at the next promotion, with a tag-mismatch error that
+# points nowhere near the missing line. (Nearly shipped exactly that when the
+# agile component was added while CI had already bumped the other two.)
+echo "== promotion invariant (one tag per overlay)"
+for env in dev staging prod preview; do
+  overlay="${REPO_ROOT}/.devops/chart/overlays/${env}/kustomization.yaml"
+  tags="$(grep -E '^[[:space:]]*newTag:' "${overlay}" | sed -E 's/^[[:space:]]*newTag:[[:space:]]*//; s/^"(.*)"$/\1/' | sort -u)"
+  count="$(printf '%s\n' "${tags}" | grep -c .)"
+  names="$(grep -cE '^[[:space:]]*- name: ida-llm-' "${overlay}")"
+  if [ "${count}" = "1" ]; then
+    pass "${env}: all ${names} components share one tag ($(printf '%s' "${tags}"))"
+  else
+    fail "${env}: components disagree on a tag -- promote.sh would refuse: $(printf '%s' "${tags}" | tr '\n' ' ')"
+  fi
+  if [ "${names}" = "3" ]; then
+    pass "${env}: all 3 built components have an images[] entry"
+  else
+    fail "${env}: expected 3 images[] entries, found ${names}"
+  fi
 done
 
 echo "== FINAL: ${PASS} passed, ${FAIL} failed =="
