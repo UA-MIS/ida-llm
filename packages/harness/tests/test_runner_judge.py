@@ -212,15 +212,34 @@ class TestJudgeSpendAttribution:
         assert record.judge_usage.prompt_tokens == 200
         assert record.judge_usage.completion_tokens == 40
 
-    def test_judge_cost_is_priced_at_the_judge_s_rates(
+    def test_each_side_is_billed_at_its_own_rates(
         self, anchored_task, model_entry, judge_entry
     ) -> None:
-        """The fixtures price the candidate at zero and the judge above zero, so
-        a folded-together total could not pass this."""
+        """Both fixtures are priced, and neither rate is a multiple of the
+        other's, so each number below identifies exactly ONE arithmetic.
+
+        This assertion used to read ``record.cost_usd == 0.0``, which was
+        trivially true because the candidate fixture was unpriced -- a
+        regression billing the candidate at the judge's rates, or summing the
+        two, would have sailed through it. The three ``!=`` lines are the ones
+        that would have caught that.
+        """
         log = self._run(anchored_task, model_entry, judge_entry)
         record = log.results[0]
-        assert record.cost_usd == 0.0
-        assert record.judge_cost_usd == pytest.approx((200 * 1.0 + 40 * 2.0) / 1_000_000)
+
+        candidate = (10 * 0.5 + 2 * 4.0) / 1_000_000  # 10 prompt + 2 completion
+        judge = (200 * 1.0 + 40 * 2.0) / 1_000_000  # 2 criteria x (100 + 20)
+        assert record.cost_usd == pytest.approx(candidate)
+        assert record.judge_cost_usd == pytest.approx(judge)
+
+        # The three ways this could go wrong, each a visibly different number.
+        assert record.cost_usd != pytest.approx((10 * 1.0 + 2 * 2.0) / 1_000_000), (
+            "candidate billed at the judge's rates"
+        )
+        assert record.judge_cost_usd != pytest.approx((200 * 0.5 + 40 * 4.0) / 1_000_000), (
+            "judge billed at the candidate's rates"
+        )
+        assert record.cost_usd != pytest.approx(candidate + judge), "the two bills were summed"
 
     def test_the_log_reports_both_totals_separately(
         self, anchored_task, model_entry, judge_entry

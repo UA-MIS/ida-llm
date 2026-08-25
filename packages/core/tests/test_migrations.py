@@ -450,3 +450,71 @@ class TestPartialDowngradeToTwo:
         downgrade(config, "ida_0002_failure_and_provenance")
         upgrade(config, "head")
         assert _describe(migrated_engine) == _describe(metadata_engine)
+
+    def test_the_downgrade_discards_judge_spend_and_the_docstring_says_so(
+        self, migrated_engine, monkeypatch
+    ) -> None:
+        """E8 — expected for a column drop, but it must not be a surprise.
+
+        0002 has a data-survival test; this is its counterpart, asserting the
+        opposite and pinning the warning that tells an operator so. The judge
+        TRANSCRIPTS are untouched in object storage — it is the pointers to them
+        that a rollback discards.
+        """
+        import migrations.versions as _versions  # noqa: F401 - locate the package
+        from alembic.command import downgrade, upgrade
+        from sqlalchemy import text
+
+        with migrated_engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO runs (id, status, task_id, model_key, harness_version, "
+                    "sample_count, scored_count, error_count, prompt_tokens, "
+                    "completion_tokens, total_cost_usd, created_at) VALUES "
+                    "('r1', 'succeeded', 't', 'm', '0.1.0', 1, 1, 0, 0, 0, 0.0, "
+                    "CURRENT_TIMESTAMP)"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO results (id, run_id, task_id, sample_id, repeat_index, "
+                    "model_key, serving_config, scorable, cached, prompt_tokens, "
+                    "completion_tokens, cost_usd, latency_ms, judge_prompt_tokens, "
+                    "judge_completion_tokens, judge_cost_usd, judge_transcript_uri, "
+                    "created_at) VALUES ('x1', 'r1', 't', 's1', 0, 'm', '{}', 1, 0, 10, 2, "
+                    "0.0, 1.0, 200, 40, 0.00028, 's3://b/runs/r1/judge/s1.json', "
+                    "CURRENT_TIMESTAMP)"
+                )
+            )
+
+        config = self._config(migrated_engine, monkeypatch)
+        downgrade(config, "ida_0002_failure_and_provenance")
+        upgrade(config, "head")
+
+        with migrated_engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT judge_prompt_tokens, judge_completion_tokens, judge_cost_usd, "
+                    "judge_transcript_uri FROM results WHERE id = 'x1'"
+                )
+            ).one()
+        assert tuple(row) == (0, 0, 0.0, None), "the loss is real"
+
+        # The row itself survives -- this is a column drop, not a table drop.
+        with migrated_engine.begin() as conn:
+            kept = conn.execute(
+                text("SELECT cost_usd, latency_ms FROM results WHERE id = 'x1'")
+            ).one()
+        assert tuple(kept) == (0.0, 1.0)
+
+        from pathlib import Path
+
+        source = (
+            Path(__file__).resolve().parents[3]
+            / "migrations"
+            / "versions"
+            / "0003_judge_spend_and_evidence.py"
+        ).read_text()
+        assert "THE DOWNGRADE DESTROYS DATA" in source, (
+            "an operator must be warned where they look, not only where we tested"
+        )

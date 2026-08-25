@@ -76,10 +76,20 @@ def effective_serving_config(
     Applies a per-run sampling override *into a copy*, so the registry entry is
     never mutated and the record shows the params actually used -- never the
     registry default the override replaced.
+
+    ⚠ The override is deep-copied explicitly.  ``model_copy(update=...)``
+    assigns update values BY REFERENCE even under ``deep=True``, so without this
+    the caller's ``SamplingParams`` would be aliased into every result config
+    built from it -- and every run sharing that override would share one mutable
+    object. Same defect, same fix, as
+    :attr:`ida_harness.judge.LLMJudge.serving_config`; found while fixing that
+    one and repaired here rather than left as a known twin.
     """
     if sampling_override is None:
         return entry.serving.model_copy(deep=True)
-    return entry.serving.model_copy(deep=True, update={"sampling": sampling_override})
+    return entry.serving.model_copy(
+        deep=True, update={"sampling": sampling_override.model_copy(deep=True)}
+    )
 
 
 def run_task(
@@ -210,6 +220,13 @@ def run_task(
                 record.judge_serving_config = verdict.serving_config
                 record.judge_usage = verdict.usage
                 record.judge_cost_usd = verdict.cost_usd
+                # `error` IS set on a judge failure, deliberately: a run whose
+                # grading failed must not report itself `succeeded`, and
+                # error_count is what makes terminal_status call it `partial`.
+                # That shape is distinguishable from a dead candidate call --
+                # judge config stamped, transcript archived -- so
+                # `ida_harness.regrade.is_judge_failure` can still pick it up
+                # and retry it later. See E3 in the PR #12 review.
                 if verdict.score is None:
                     log.warning(
                         "run %s sample %s: judge failed: %s", run_id, sample.id, verdict.error

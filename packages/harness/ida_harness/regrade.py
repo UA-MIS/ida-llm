@@ -32,6 +32,10 @@ records come back from :func:`regrade_run` ready to persist, and the service
 that owns those rows (the API, and behind it the runner) owns that write.  Doing
 it from here would mean the harness reaching into a database it otherwise never
 touches.  See the module's ``NOTE`` in ``docs/llm-judge.md``.
+
+That contract is why ``dry_run`` leaves the records **untouched** rather than
+merely skipping the writes: "ready to persist" and "these grades were never
+archived" cannot both be true of the same object.
 """
 
 from __future__ import annotations
@@ -67,15 +71,24 @@ class RegradeReport:
     judge_cost_usd: float = 0.0
     """Money this regrade spent, at the judge's rates.  Includes failed samples."""
 
+    dry_run: bool = False
+    """True when nothing was written and the records were left untouched.
+
+    On the report rather than only in the caller's memory, because
+    :attr:`eval_log` is otherwise indistinguishable from a real one -- and the
+    difference is whether persisting it would be a lie.
+    """
+
     @property
     def mean_score(self) -> float | None:
         return self.eval_log.mean_score
 
     def summary(self) -> str:
+        suffix = " [DRY RUN -- nothing written, records unchanged]" if self.dry_run else ""
         return (
             f"run {self.run_id}: graded {len(self.graded)}, failed {len(self.failed)}, "
             f"skipped {len(self.skipped)}, judge cost ${self.judge_cost_usd:.6f}, "
-            f"mean={self.mean_score}"
+            f"mean={self.mean_score}{suffix}"
         )
 
 
@@ -120,9 +133,12 @@ def regrade_run(
     is left exactly as it was, so running this twice cannot quietly regrade a
     run under a different judge and overwrite the first verdict.
 
-    ``dry_run`` does everything except write to the store -- including calling
-    the judge, which costs money.  It answers "what would this change", not
-    "what would this cost".
+    ``dry_run`` calls the judge -- and is charged for it -- but changes nothing:
+    it writes no object, and it leaves the returned records exactly as it found
+    them, so a caller acting on this function's "ready to persist" contract
+    cannot write grades that were never archived.  ``graded``/``failed`` still
+    report what *would* have changed, and :attr:`RegradeReport.dry_run` says so.
+    It answers "what would this change", **not** "what would this cost".
     """
     eval_log = load_eval_log(store, run_id)
 
@@ -131,7 +147,7 @@ def regrade_run(
             raise ValueError("regrade_run needs either task= or catalog=")
         task = catalog.get(eval_log.task_id)
 
-    report = RegradeReport(run_id=run_id, eval_log=eval_log)
+    report = RegradeReport(run_id=run_id, eval_log=eval_log, dry_run=dry_run)
 
     if task.rubric is None:
         report.skipped.append(("*", f"task {task.id!r} has no rubric; nothing to judge against"))
@@ -173,63 +189,127 @@ def regrade_run(
             completion=transcript.completion,
             run_id=run_id,
         )
-        record.judge_serving_config = verdict.serving_config
-        record.judge_usage = verdict.usage
-        record.judge_cost_usd = verdict.cost_usd
         report.judge_cost_usd += verdict.cost_usd
 
         if verdict.score is None:
-            # Left NOT scorable rather than marked errored: the sample itself is
-            # fine and still gradable, and flipping it to `error` would make a
-            # judge outage look like a broken run forever after.
             report.failed.append((record.sample_id, verdict.error or "judge produced no score"))
+        else:
+            report.graded.append(record.sample_id)
+
+        if dry_run:
+            # A DRY RUN CHANGES NOTHING, INCLUDING THE RECORDS IT HANDS BACK.
+            # `regrade_run` documents its results as "ready to persist"; a caller
+            # who believes that and persists after a dry run would write grades
+            # this function deliberately did not archive, and the store and the
+            # database would disagree about a run with nothing to say which is
+            # right. The judge was still called and still charged -- see
+            # `report.judge_cost_usd` and `report.dry_run`.
+            continue
+
+        record.judge_serving_config = verdict.serving_config
+        record.judge_usage = verdict.usage
+        record.judge_cost_usd = verdict.cost_usd
+
+        if verdict.score is None:
+            # Left NOT scorable rather than newly marked errored: the sample
+            # itself is fine and still gradable, and inventing an `error` here
+            # would make a judge outage look like a broken run forever after.
+            # A record that ALREADY carried a judge error keeps one -- refreshed
+            # to this attempt's -- so the run still reports the outage, and
+            # `is_judge_failure` still recognises it as retryable.
+            if record.error is not None:
+                record.error = verdict.error
         else:
             record.score = verdict.score
             record.scorable = True
-            report.graded.append(record.sample_id)
+            # The grade succeeded. A leftover judge error from the failed
+            # attempt would keep this run reporting `partial` forever and would
+            # contradict the score sitting next to it.
+            record.error = None
 
-        if not dry_run:
-            try:
-                record.judge_transcript_uri = store.put_json(
-                    judge_key(run_id, record.sample_id, record.repeat_index),
-                    verdict.transcript.model_dump(mode="json"),
-                )
-            except Exception as exc:  # pragma: no cover - storage outage
-                log.exception(
-                    "run %s sample %s: judge transcript archival failed", run_id, record.sample_id
-                )
-                record.archive_error = (
-                    f"judge: {type(exc).__name__}: {exc}"
-                    if not record.archive_error
-                    else f"{record.archive_error}; judge: {type(exc).__name__}: {exc}"
-                )
+        try:
+            record.judge_transcript_uri = store.put_json(
+                judge_key(run_id, record.sample_id, record.repeat_index),
+                verdict.transcript.model_dump(mode="json"),
+            )
+        except Exception as exc:  # pragma: no cover - storage outage
+            log.exception(
+                "run %s sample %s: judge transcript archival failed", run_id, record.sample_id
+            )
+            record.archive_error = (
+                f"judge: {type(exc).__name__}: {exc}"
+                if not record.archive_error
+                else f"{record.archive_error}; judge: {type(exc).__name__}: {exc}"
+            )
+
+    if dry_run:
+        return report
 
     # The status is re-derived, not preserved: a run that was `succeeded` with
-    # nothing scored is still `succeeded`, but if regrading turned samples into
-    # errors the count has to move with them.
+    # nothing scored is still `succeeded`, but a run that was `partial` because
+    # its judge failed becomes `succeeded` once the retry grades it, and the
+    # count has to move with the errors it cleared.
     eval_log.status = terminal_status(
         sample_count=len(eval_log.results), error_count=eval_log.error_count
     )
 
-    if not dry_run and (report.graded or report.failed):
+    if report.graded or report.failed:
         store.put_json(eval_log_key(run_id), eval_log.model_dump(mode="json"))
 
     return report
 
 
+def is_judge_failure(record: ResultRecord) -> bool:
+    """True when the COMPLETION is sound and only the GRADE failed.
+
+    The two paths that can produce an ungraded subjective sample record it
+    differently, and the difference is not cosmetic:
+
+    ``run_task`` with a judge   ``scorable=True``, ``score=None``,
+                                ``error="criterion 'x': ..."`` -- because a run
+                                whose grading failed must not report itself
+                                ``succeeded``; ``error_count`` is what makes
+                                :func:`~ida_core.contracts.terminal_status` call
+                                it ``partial``.
+    ``run_task`` with no judge  ``scorable=False``, ``score=None``,
+                                ``error=None`` -- nothing failed; nothing was
+                                attempted.
+
+    Read through ``error`` alone the first shape is indistinguishable from a
+    sample whose model call died, so it was skipped as ungradable -- making a
+    judge outage **permanently** unrecoverable, which is the exact outcome this
+    module was written to prevent.
+
+    The distinction is structural, not a string match: a judge failure has a
+    stamped ``judge_serving_config`` (the runner records who was asked even when
+    the answer was unusable) and an archived ``transcript_uri`` (the completion
+    was bought, scored or not).  A dead *candidate* call has neither -- it never
+    reaches the judge and never produces a transcript.
+    """
+    return (
+        record.score is None
+        and record.judge_serving_config is not None
+        and bool(record.transcript_uri)
+    )
+
+
 def _skip_reason(record: ResultRecord) -> str | None:
     """Why this record is not a candidate for regrading, or ``None``."""
-    if record.error is not None:
-        return "the sample errored when it ran; there is no completion to grade"
     if record.score is not None:
         return (
             "already scored -- regrading would overwrite a verdict with one from a "
             "possibly different judge"
         )
+    if not record.transcript_uri:
+        # Checked before `error`, because it is the reason a failed model call is
+        # ungradable: there is no completion, not merely a flag saying so.
+        return "no archived transcript, so the completion is gone"
+    if is_judge_failure(record):
+        return None  # the grade failed, not the sample -- this is what we retry
+    if record.error is not None:
+        return "the sample errored when it ran, and the failure was not the judge's"
     if record.scorable:
         return "not a subjective sample"
-    if not record.transcript_uri:
-        return "no archived transcript, so the completion is gone"
     return None
 
 

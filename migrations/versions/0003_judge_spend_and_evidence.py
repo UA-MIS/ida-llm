@@ -23,6 +23,16 @@ of ``score_details``.
 Additive, all defaulted: an existing row is a row nothing judged, and zero is the
 true answer for it rather than a placeholder.
 
+⚠ THE DOWNGRADE DESTROYS DATA, AND THERE IS NO WAY FOR IT NOT TO. Dropping these
+columns discards every judge spend figure and every judge-transcript pointer
+recorded since the upgrade; a downgrade-then-upgrade round trip leaves them
+reading (0, 0, 0.0, NULL). The evidence itself survives -- the JudgeTranscript
+objects are in object storage under `runs/<id>/judge/` and are not touched -- but
+the POINTERS to them do not, so a rollback means walking the bucket to find them
+again. Rolling back past this revision on a database that has graded anything is
+therefore a decision, not a formality. Export `results.judge_*` first if the
+numbers matter.
+
 Revision ID: ida_0003_judge_spend
 Revises: ida_0002_failure_and_provenance
 Create Date: 2026-08-25 00:00:00.000000

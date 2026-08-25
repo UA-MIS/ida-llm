@@ -21,10 +21,10 @@ import httpx
 import pytest
 
 from ida_core.artifacts import LocalArtifactStore, eval_log_key, judge_key
-from ida_core.contracts import TaskSpec
+from ida_core.contracts import RunStatus, TaskSpec
 from ida_harness.client import OpenAICompatibleClient
 from ida_harness.judge import LLMJudge
-from ida_harness.regrade import load_eval_log, regrade_run
+from ida_harness.regrade import is_judge_failure, load_eval_log, regrade_run
 from ida_harness.runner import run_task
 
 RUN_ID = "run_regrade0000000000000000"
@@ -201,7 +201,10 @@ class TestWhatARegradeRefusesToDo:
             report = regrade_run(run_id=RUN_ID, store=store, judge=judge, task=anchored_task)
         assert report.graded == []
         assert calls.get("n", 0) == 0
-        assert all("no completion to grade" in reason for _s, reason in report.skipped)
+        # The reason is the MISSING TRANSCRIPT, not the `error` flag: a dead
+        # candidate call leaves nothing to grade, which is a fact about the
+        # artifacts rather than about a field. See `is_judge_failure`.
+        assert all("no archived transcript" in reason for _s, reason in report.skipped)
 
     def test_a_verifiable_run_is_not_a_regrade_candidate(
         self, verifiable_task, model_entry, judge_entry, tmp_path
@@ -410,3 +413,262 @@ def _task_document() -> dict:
         },
         "samples": [{"id": "s1", "input": "Give feedback."}],
     }
+
+
+class TestAJudgeFailureStaysRegradable:
+    """E3 — the runner and this module must agree on what a judge failure is.
+
+    They record it differently, and both are right to:
+
+      * the ONLINE runner sets ``error`` so the run reports ``partial`` rather
+        than claiming ``succeeded`` while its grading failed;
+      * a REGRADE leaves ``error`` alone so a judge outage does not make the run
+        look broken forever.
+
+    Read through ``error`` alone, the runner's shape is indistinguishable from a
+    sample whose model call died -- so it was skipped as ungradable, making a
+    judge outage **permanently** unrecoverable. That is the exact outcome this
+    module exists to prevent, and it would have bitten the moment the runner
+    service was wired up.
+    """
+
+    def _run_with_a_failing_judge(self, task, entry, judge_entry, tmp_path):
+        """A run through the ONLINE path whose judge could not answer."""
+        store = LocalArtifactStore(tmp_path)
+        store.ensure_bucket()
+        candidate = lambda _r: httpx.Response(  # noqa: E731
+            200, json=_body("Your thesis needs sharpening.")
+        )
+        garbage = lambda _r: httpx.Response(200, json=_body("not json at all"))  # noqa: E731
+        with _client(entry, candidate) as client, _judge(judge_entry, garbage) as judge:
+            log = run_task(
+                task=task,
+                entry=entry,
+                run_id=RUN_ID,
+                client=client,
+                judge=judge,
+                artifact_store=store,
+            )
+        return store, log
+
+    def test_the_online_runner_really_does_produce_that_shape(
+        self, anchored_task, model_entry, judge_entry, tmp_path
+    ) -> None:
+        """Guards the premise of every test below -- if the runner stops setting
+        `error` on a judge failure, these would pass vacuously."""
+        _store, log = self._run_with_a_failing_judge(
+            anchored_task, model_entry, judge_entry, tmp_path
+        )
+        record = log.results[0]
+        assert record.score is None
+        assert record.error is not None, "the run must still report the outage"
+        assert record.judge_serving_config is not None, "we know who was asked"
+        assert record.transcript_uri is not None, "the completion was bought and archived"
+        assert log.status is RunStatus.FAILED
+
+    def test_it_is_recognised_as_a_judge_failure_not_a_dead_sample(
+        self, anchored_task, model_entry, judge_entry, tmp_path
+    ) -> None:
+        _store, log = self._run_with_a_failing_judge(
+            anchored_task, model_entry, judge_entry, tmp_path
+        )
+        assert all(is_judge_failure(r) for r in log.results)
+
+    def test_a_dead_candidate_call_is_not_mistaken_for_one(
+        self, anchored_task, model_entry, judge_entry, tmp_path
+    ) -> None:
+        """The distinction must be structural, not a string match: a sample that
+        never reached the judge has no judge config and no transcript."""
+        store = LocalArtifactStore(tmp_path)
+        store.ensure_bucket()
+        with (
+            _client(model_entry, lambda _r: httpx.Response(500)) as client,
+            _judge(judge_entry, _judging()) as judge,
+        ):
+            log = run_task(
+                task=anchored_task,
+                entry=model_entry,
+                run_id=RUN_ID,
+                client=client,
+                judge=judge,
+                artifact_store=store,
+            )
+        assert not any(is_judge_failure(r) for r in log.results)
+
+    def test_a_later_regrade_recovers_the_run(
+        self, anchored_task, model_entry, judge_entry, tmp_path
+    ) -> None:
+        """The whole point: the judge came back, so the run must too."""
+        store, _log = self._run_with_a_failing_judge(
+            anchored_task, model_entry, judge_entry, tmp_path
+        )
+        with _judge(judge_entry, _judging()) as judge:
+            report = regrade_run(run_id=RUN_ID, store=store, judge=judge, task=anchored_task)
+        assert report.graded == ["s1", "s2"]
+        assert report.mean_score == pytest.approx(1.0)
+
+    def test_the_stale_judge_error_is_cleared_when_the_retry_succeeds(
+        self, anchored_task, model_entry, judge_entry, tmp_path
+    ) -> None:
+        """A leftover error would keep the run reporting `partial` forever, and
+        would sit next to a score contradicting it."""
+        store, _log = self._run_with_a_failing_judge(
+            anchored_task, model_entry, judge_entry, tmp_path
+        )
+        with _judge(judge_entry, _judging()) as judge:
+            regrade_run(run_id=RUN_ID, store=store, judge=judge, task=anchored_task)
+        reloaded = load_eval_log(store, RUN_ID)
+        assert all(r.error is None for r in reloaded.results)
+        assert reloaded.error_count == 0
+        assert reloaded.status is RunStatus.SUCCEEDED, "the run recovered, and says so"
+
+    def test_a_second_failure_leaves_it_retryable_again(
+        self, anchored_task, model_entry, judge_entry, tmp_path
+    ) -> None:
+        """A judge that is still down must not burn the sample's last chance."""
+        store, _log = self._run_with_a_failing_judge(
+            anchored_task, model_entry, judge_entry, tmp_path
+        )
+        still_broken = lambda _r: httpx.Response(503)  # noqa: E731
+        with _judge(judge_entry, still_broken) as judge:
+            second = regrade_run(run_id=RUN_ID, store=store, judge=judge, task=anchored_task)
+        assert second.graded == []
+        assert len(second.failed) == 2
+        assert all(is_judge_failure(r) for r in second.eval_log.results)
+
+        with _judge(judge_entry, _judging()) as judge:
+            third = regrade_run(run_id=RUN_ID, store=store, judge=judge, task=anchored_task)
+        assert third.graded == ["s1", "s2"]
+
+    def test_the_run_keeps_reporting_the_outage_while_it_persists(
+        self, anchored_task, model_entry, judge_entry, tmp_path
+    ) -> None:
+        """Retryable must not mean silent: a record that arrived with an error
+        keeps one, refreshed to the latest attempt's."""
+        store, _log = self._run_with_a_failing_judge(
+            anchored_task, model_entry, judge_entry, tmp_path
+        )
+        with _judge(judge_entry, lambda _r: httpx.Response(503)) as judge:
+            report = regrade_run(run_id=RUN_ID, store=store, judge=judge, task=anchored_task)
+        record = report.eval_log.results[0]
+        assert record.error is not None
+        assert "TransientModelError" in record.error, "refreshed to THIS attempt's failure"
+
+    def test_a_verifiable_scoring_error_is_still_not_regradable(
+        self, model_entry, judge_entry, tmp_path
+    ) -> None:
+        """A sample with a transcript and an error that is NOT the judge's must
+        stay skipped -- the widened gate must not swallow other failures."""
+        store = LocalArtifactStore(tmp_path)
+        store.ensure_bucket()
+        task = TaskSpec.model_validate(
+            {
+                "version": 1,
+                "id": "test/bad-target",
+                "title": "Bad target",
+                "kind": "verifiable",
+                "scorer": {"kind": "numeric_match"},
+                "samples": [{"id": "s1", "input": "What is 2 + 2?", "target": "no number here"}],
+            }
+        )
+        with _client(model_entry, lambda _r: httpx.Response(200, json=_body("4"))) as client:
+            log = run_task(
+                task=task,
+                entry=model_entry,
+                run_id=RUN_ID,
+                client=client,
+                artifact_store=store,
+            )
+        assert log.results[0].error is not None and log.results[0].transcript_uri is not None
+        assert not is_judge_failure(log.results[0])
+
+        calls: dict = {}
+        with _judge(judge_entry, _judging(calls=calls)) as judge:
+            report = regrade_run(run_id=RUN_ID, store=store, judge=judge, task=task)
+        assert report.graded == []
+        assert calls.get("n", 0) == 0
+
+
+class TestDryRunChangesNothing:
+    """E4 — `regrade_run` documents its results as "ready to persist".
+
+    A dry run that hands back scored records makes that sentence a trap: a
+    caller following the documented contract would write grades this function
+    deliberately did not archive, leaving the store and the database disagreeing
+    about a run with nothing to say which is right.
+    """
+
+    def test_the_returned_records_are_untouched(
+        self, archived_run, anchored_task, judge_entry
+    ) -> None:
+        store, _log = archived_run
+        with _judge(judge_entry, _judging()) as judge:
+            report = regrade_run(
+                run_id=RUN_ID, store=store, judge=judge, task=anchored_task, dry_run=True
+            )
+        for record in report.eval_log.results:
+            assert record.score is None
+            assert record.scorable is False
+            assert record.judge_serving_config is None
+            assert record.judge_cost_usd == 0.0
+            assert record.judge_transcript_uri is None
+
+    def test_persisting_the_report_after_a_dry_run_would_write_nothing_new(
+        self, archived_run, anchored_task, judge_entry
+    ) -> None:
+        """The failure mode stated directly: a doc-following caller cannot
+        write a grade that was never archived."""
+        store, log = archived_run
+        before = [r.model_dump(mode="json") for r in log.results]
+        with _judge(judge_entry, _judging()) as judge:
+            report = regrade_run(
+                run_id=RUN_ID, store=store, judge=judge, task=anchored_task, dry_run=True
+            )
+        assert [r.model_dump(mode="json") for r in report.eval_log.results] == before
+
+    def test_it_still_reports_what_WOULD_have_changed(
+        self, archived_run, anchored_task, judge_entry
+    ) -> None:
+        """Non-mutating must not mean uninformative."""
+        store, _log = archived_run
+        with _judge(judge_entry, _judging()) as judge:
+            report = regrade_run(
+                run_id=RUN_ID, store=store, judge=judge, task=anchored_task, dry_run=True
+            )
+        assert report.graded == ["s1", "s2"]
+        assert report.judge_cost_usd > 0.0
+
+    def test_the_report_says_it_was_a_dry_run(
+        self, archived_run, anchored_task, judge_entry
+    ) -> None:
+        """On the report, not only in the caller's memory: `eval_log` is
+        otherwise indistinguishable from a real one."""
+        store, _log = archived_run
+        with _judge(judge_entry, _judging()) as judge:
+            report = regrade_run(
+                run_id=RUN_ID, store=store, judge=judge, task=anchored_task, dry_run=True
+            )
+        assert report.dry_run is True
+        assert "DRY RUN" in report.summary()
+
+    def test_a_real_run_is_not_flagged_as_one(
+        self, archived_run, anchored_task, judge_entry
+    ) -> None:
+        store, _log = archived_run
+        with _judge(judge_entry, _judging()) as judge:
+            report = regrade_run(run_id=RUN_ID, store=store, judge=judge, task=anchored_task)
+        assert report.dry_run is False
+        assert "DRY RUN" not in report.summary()
+
+    def test_a_dry_run_does_not_block_the_real_one_that_follows(
+        self, archived_run, anchored_task, judge_entry
+    ) -> None:
+        """If dry-run had mutated the records, the real run would then skip them
+        as `already scored` -- and grade nothing."""
+        store, _log = archived_run
+        with _judge(judge_entry, _judging()) as judge:
+            regrade_run(run_id=RUN_ID, store=store, judge=judge, task=anchored_task, dry_run=True)
+        with _judge(judge_entry, _judging()) as judge:
+            real = regrade_run(run_id=RUN_ID, store=store, judge=judge, task=anchored_task)
+        assert real.graded == ["s1", "s2"]
+        assert load_eval_log(store, RUN_ID).mean_score == pytest.approx(1.0)

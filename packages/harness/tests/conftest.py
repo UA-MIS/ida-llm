@@ -23,6 +23,15 @@ from ida_core.contracts import (
 
 @pytest.fixture
 def model_entry() -> ModelEntry:
+    """The model under test.
+
+    **Priced, and priced differently from the judge.**  It used to inherit
+    ``CostRates(0.0, 0.0)``, which made every ``cost_usd == 0`` assertion in the
+    suite trivially true: a regression that billed the candidate's tokens at the
+    JUDGE's rates, or folded judge spend into ``cost_usd``, would have left every
+    one of them passing.  Rates that are non-zero, and not multiples of the
+    judge's, make each of those numbers identify exactly one arithmetic.
+    """
     return ModelEntry(
         key="mock",
         display_name="Mock",
@@ -35,6 +44,7 @@ def model_entry() -> ModelEntry:
             quantization=Quantization.NONE,
             sampling=SamplingParams(temperature=0.0, max_tokens=64, seed=7),
         ),
+        cost=CostRates(input_usd_per_mtok=0.5, output_usd_per_mtok=4.0),
     )
 
 
@@ -133,9 +143,11 @@ def anchored_task() -> TaskSpec:
 def judge_entry() -> ModelEntry:
     """A judge model entry priced DIFFERENTLY from the candidate.
 
-    Non-zero, and different from ``model_entry``'s zero rates, so a test can tell
-    judge spend from candidate spend by the number alone -- if the two were both
-    zero, folding one into the other would pass every assertion.
+    Both sides are non-zero and neither rate is a multiple of the other's, so
+    every spend figure in the suite names exactly one arithmetic: candidate
+    tokens at candidate rates, judge tokens at judge rates, and the two mistakes
+    worth catching -- billing one at the other's rates, or summing them --
+    produce visibly different numbers rather than the same zero.
     """
     return ModelEntry(
         key="mock-judge",
