@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { renderMarkdown, toPlainText } from '@/lib/markdown';
 
@@ -62,7 +63,7 @@ describe('renderMarkdown — XSS hardening', () => {
   });
 });
 
-describe('renderMarkdown — images are allowed, but only relative or https', () => {
+describe('renderMarkdown — images are allowed, same-origin only', () => {
   it('renders a relative image, which is how the board loads its diagrams', () => {
     const html = renderMarkdown('![Architecture](/architecture.svg)');
     expect(html).toContain('<img');
@@ -70,9 +71,27 @@ describe('renderMarkdown — images are allowed, but only relative or https', ()
     expect(html).toContain('alt="Architecture"');
   });
 
-  it('keeps an https image', () => {
-    const html = renderMarkdown('![x](https://example.org/a.png)');
-    expect(html).toContain('src="https://example.org/a.png"');
+  it('drops an off-origin https image', () => {
+    // Not a script bypass -- https is a fetch a browser would happily make.
+    // It is a tracking pixel: the page author learns the IP, the user agent
+    // and a Referer carrying the item id of everyone who reads the page.
+    const html = renderMarkdown('![x](https://evil.example/a.png)');
+    expect(html).not.toContain('evil.example');
+  });
+
+  it('drops the backslash spelling that a browser reads as off-origin (MED-1)', () => {
+    // sanitize-html reads the scheme as `https`; a browser normalises the
+    // backslash and loads https://evil.example/x.png. Any policy that allows
+    // the `https` scheme on an image passes this through, which is why the
+    // scheme list for img is empty rather than ['https'].
+    for (const src of [
+      'https:/\\evil.example/x.png',
+      'https:\\\\evil.example/x.png',
+      'HTTPS:/\\evil.example/x.png',
+    ]) {
+      const html = renderMarkdown(`<img src="${src}">`);
+      expect(html.toLowerCase(), `${src} must not survive`).not.toContain('evil.example');
+    }
   });
 
   it('drops a data: image source', () => {
@@ -102,6 +121,21 @@ describe('renderMarkdown — images are allowed, but only relative or https', ()
   it('drops a plain http image, so a diagram cannot become mixed content', () => {
     const html = renderMarkdown('![x](http://insecure.example/a.png)');
     expect(html).not.toContain('http://insecure.example');
+  });
+
+  it('keeps every same-origin spelling the diagrams actually use', () => {
+    for (const src of ['/architecture.svg', '/workflow.svg', './workflow.svg', 'workflow.svg']) {
+      const html = renderMarkdown(`![d](${src})`);
+      expect(html, `${src} must survive`).toContain(`src="${src}"`);
+    }
+  });
+
+  it('still scheme-checks cite, so allowing <blockquote cite> later fails safe', () => {
+    // `cite` is not in ALLOWED_TAGS' attribute lists today. This pins the
+    // policy rather than the behaviour: the library default covers
+    // ['href', 'src', 'cite'] and our override must not narrow it.
+    const src = readFileSync(new URL('../src/lib/markdown.ts', import.meta.url), 'utf8');
+    expect(src).toContain("allowedSchemesAppliedToAttributes: ['href', 'src', 'cite']");
   });
 
   it('allows no attribute on an image beyond src, alt and title', () => {

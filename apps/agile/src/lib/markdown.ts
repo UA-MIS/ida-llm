@@ -19,11 +19,23 @@ import sanitizeHtml from 'sanitize-html';
  *   - `allowedSchemesAppliedToAttributes` now covers `src` as well as `href`.
  *     Without that entry the scheme rules simply would not run on `src`, and
  *     `data:`/`javascript:` image sources would be legal;
- *   - `allowedSchemesByTag` narrows images further than links: an image may be
- *     a relative path (how our own SVGs are referenced) or `https`, never
- *     plain `http`, so a diagram cannot become mixed content;
+ *   - `allowedSchemesByTag` gives images an EMPTY scheme list, which is
+ *     stricter than any list of schemes: a `src` carrying any scheme at all is
+ *     rejected, so an image resolves same-origin or not at all. The two
+ *     diagrams this exists for are `/architecture.svg` and `/workflow.svg`,
+ *     both relative, so nothing legitimate needs a scheme;
  *   - `allowProtocolRelative` is off, so `//host/x.svg` is not a back door
  *     around the scheme rules for either `src` or `href`.
+ *
+ * Same-origin-only is what closes off-origin image loading in ALL its
+ * spellings, which an allow-list of schemes does not. `https:/\evil/x.png` is
+ * read by this library as scheme `https` and by a browser as
+ * `https://evil/x.png`, so an `https`-allowing policy passes a request to a
+ * host the page author chose -- no script, but the author learns the IP, the
+ * user agent and a Referer carrying the item id of every reader. Plain
+ * `https://evil/x.png` is the same leak spelled honestly. An empty scheme list
+ * ends the whole class rather than the one spelling `allowProtocolRelative`
+ * covers.
  *
  * `svg` is deliberately NOT allowed: inline SVG carries scripts and event
  * handlers. An SVG referenced through `<img src>` is safe for a different
@@ -58,9 +70,12 @@ export function renderMarkdown(source: string): string {
     // Blocks javascript:, data: and vbscript: URLs.
     allowedSchemes: ['http', 'https', 'mailto'],
     // `src` must be listed or the scheme rules never run on an image source.
-    allowedSchemesAppliedToAttributes: ['href', 'src'],
-    // Images are held to a stricter set than links: relative, or https.
-    allowedSchemesByTag: { img: ['https'] },
+    // `cite` is carried so the policy stays correct if it is ever allowed --
+    // this replaces the library default ['href', 'src', 'cite'] and must not
+    // silently narrow it.
+    allowedSchemesAppliedToAttributes: ['href', 'src', 'cite'],
+    // Empty on purpose: an image may carry NO scheme, i.e. same-origin only.
+    allowedSchemesByTag: { img: [] },
     // `//host/x` must not slip past the scheme rules.
     allowProtocolRelative: false,
     disallowedTagsMode: 'discard',
