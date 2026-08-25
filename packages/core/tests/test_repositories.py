@@ -416,3 +416,40 @@ class TestSweepPlanningHelpers:
             )
         with session_scope(session_factory) as session:
             assert len(list_ungraded_subjective_results(session, limit=2)) == 2
+
+    def test_existing_run_keys_honours_the_created_after_bound(self, session_factory) -> None:
+        """The bound that stops an abandoned `queued` row suppressing its pair forever.
+
+        A sweep asks "is this pair in flight?" and answers it from a row. A row
+        old enough that nothing will ever process it must answer no.
+        """
+        from datetime import timedelta
+
+        from ida_core.db import utcnow as _utcnow
+
+        now = _utcnow()
+        with session_scope(session_factory) as session:
+            create_run(
+                session,
+                _run(
+                    status=RunStatus.QUEUED,
+                    task_content_sha="fresh",
+                    created_at=now - timedelta(seconds=10),
+                ),
+            )
+            create_run(
+                session,
+                _run(
+                    status=RunStatus.QUEUED,
+                    task_content_sha="ancient",
+                    created_at=now - timedelta(days=30),
+                ),
+            )
+
+        cutoff = now - timedelta(hours=6)
+        with session_scope(session_factory) as session:
+            bounded = existing_run_keys(session, statuses=[RunStatus.QUEUED], created_after=cutoff)
+            unbounded = existing_run_keys(session, statuses=[RunStatus.QUEUED])
+
+        assert bounded == {("demo/t", "mock", "fresh")}
+        assert len(unbounded) == 2, "without the bound both rows answer 'in flight'"

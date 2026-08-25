@@ -5,9 +5,25 @@
 # bootstrap stage. `uv pip install -r requirements.txt` also works verbatim if
 # you prefer uv locally -- see README.md.
 #
-# Pins are compatible-release (~=): patch and minor updates are allowed, majors
-# are not. Regenerate a fully-locked set with `pip freeze` if the platform ever
-# requires hash-pinned builds.
+# Pins are compatible-release (~=), and the number of components is the whole
+# decision:
+#
+#   1.x and up   two components -- `pydantic~=2.9` allows >=2.9,<3.0. Patch and
+#                minor updates are allowed, majors are not. Semver says minors
+#                are compatible, and for these projects it holds.
+#
+#   0.x          THREE components -- `fastapi~=0.141.0` allows >=0.141.0,<0.142.0.
+#                Below 1.0 there is no major to protect you: semver gives 0.x no
+#                stability guarantee at all, so the MINOR is the breaking
+#                position. A two-component `fastapi~=0.115` means <1.0, which is
+#                every future 0.x release, forever -- and it was not theoretical:
+#                that pin was written against 0.115 and silently resolved to
+#                0.141.1, twenty-six minor versions of unreviewed change.
+#
+# So a 0.x pin names the minor series we actually test against, and moving it is
+# a deliberate commit rather than a side effect of whenever an image last built.
+# Regenerate a fully-locked set with `pip freeze` if the platform ever requires
+# hash-pinned builds.
 
 # --- contracts / data -------------------------------------------------------
 pydantic~=2.9
@@ -17,8 +33,8 @@ alembic~=1.13
 psycopg[binary]~=3.2
 
 # --- services ---------------------------------------------------------------
-fastapi~=0.115
-uvicorn[standard]~=0.32
+fastapi~=0.141.0
+uvicorn[standard]~=0.52.0
 
 # --- infrastructure clients -------------------------------------------------
 redis~=5.1
@@ -29,4 +45,4 @@ PyYAML~=6.0
 jsonschema~=4.23
 
 # --- harness ----------------------------------------------------------------
-httpx~=0.27
+httpx~=0.28.0

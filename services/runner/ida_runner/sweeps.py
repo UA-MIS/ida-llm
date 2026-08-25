@@ -42,7 +42,9 @@ import logging
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import timedelta
 
+from ida_core.artifacts import ArtifactStore, LocalArtifactStore, S3ArtifactStore
 from ida_core.config import Settings, get_settings
 from ida_core.contracts import (
     ModelRegistry,
@@ -58,6 +60,7 @@ from ida_core.registry import load_registry
 from ida_core.repositories import (
     create_run,
     existing_run_keys,
+    fail_run,
     list_ungraded_subjective_results,
     models_with_any_run,
 )
@@ -80,7 +83,14 @@ MEASURED_STATUSES: tuple[RunStatus, ...] = (RunStatus.SUCCEEDED,)
 where some or all samples errored is not a measurement of the model, it is a
 record of an outage, and leaving it in the dedupe index would mean one bad night
 permanently suppresses the pair. Excluding them is what makes the nightly
-self-healing -- yesterday's failures are exactly what tonight retries.
+self-healing -- a pair whose only runs errored is retried tonight.
+
+Read the rule precisely: it is "this triple has NO succeeded run", not "this
+triple's LAST run failed". A pair that succeeded on Monday and failed on Tuesday
+is still skipped, because a valid measurement of that exact task version exists
+and re-buying it would spend credits to learn nothing. Recency is deliberately
+not part of the key -- ``task_content_sha`` is what expires a measurement here,
+not the clock.
 """
 
 IN_FLIGHT_STATUSES: tuple[RunStatus, ...] = (RunStatus.QUEUED, RunStatus.RUNNING)
@@ -93,6 +103,14 @@ on ITSELF; it says nothing about ``rebenchmark`` (02:00) and ``model-sweep``
 firing would re-enqueue pairs the 02:00 firing has queued but not yet finished,
 and every one of those duplicates is a real provider charge for a number we
 already commissioned.
+
+⚠ TIME-BOUNDED, AND THAT BOUND IS NOT OPTIONAL. A ``queued`` row only means "in
+flight" while a message for it really is on the queue. If the sweep died between
+committing rows and pushing messages -- an evicted pod, a SIGKILL -- the rows
+survive and the messages do not, and an UNBOUNDED read of this set would then
+skip those pairs every night forever while exiting 0. The sweep asks only about
+rows younger than ``stale_run_ttl_s``, the same horizon the reaper uses to decide
+a run is not coming back; anything older is treated as abandoned and re-planned.
 """
 
 
@@ -327,11 +345,30 @@ def enqueue_candidates(
     picks up, which is visible and re-drivable. The other order hands a runner a
     message for a row that does not exist.
 
-    A push that fails partway is REPORTED, not hidden. The remaining candidates
-    keep their ``queued`` rows and are counted as ``failed``, so the summary line
-    says how many actually landed and the exit code is non-zero. Claiming a whole
-    sweep when half of it never reached Redis is precisely the silent-success
-    failure the module docstring exists to forbid.
+    A push that fails partway is REPORTED, not hidden: the summary line says how
+    many actually landed and the exit code is non-zero. Claiming a whole sweep
+    when half of it never reached Redis is precisely the silent-success failure
+    the module docstring exists to forbid.
+
+    ⚠ AND THE UN-PUSHED ROWS ARE CLOSED OUT ``failed``, NOT LEFT ``queued``.
+    This is the one place this module deliberately diverges from ``POST /runs``,
+    and the divergence is forced by dedupe. The API leaves un-pushed rows
+    ``queued`` because a human sees them and re-drives them. A sweep has no
+    human: it reads its own ``queued`` rows back as "in flight" on the next
+    firing and skips those pairs -- so leaving them would convert the API's
+    "visible and re-drivable" into "permanently invisible", and every subsequent
+    night would exit 0 having measured nothing. Verified before this line
+    existed: after one mid-sweep Redis blip, six pairs were skipped every night
+    thereafter, with a green CronJob.
+
+    A row saying ``queued`` when no message exists is also simply FALSE, which is
+    reason enough. ``failed`` carries the real reason, is excluded from
+    :data:`MEASURED_STATUSES`, and is therefore retried tomorrow.
+
+    Safe against the ambiguous case where the push actually landed and only the
+    acknowledgement was lost: delivery is at-least-once, so the runner claims the
+    message, flips the row back to ``running`` and finishes it normally, and
+    :func:`ida_core.repositories.fail_run` refuses to overwrite a terminal row.
     """
     if not candidates:
         return
@@ -382,18 +419,49 @@ def enqueue_candidates(
         except Exception:
             remaining = len(messages) - index
             log.exception(
-                "sweep %s: queue push failed for run %s; %d of %d landed, %d left queued "
-                "in the database for a later re-drive",
+                "sweep %s: queue push failed for run %s; %d of %d landed, closing out "
+                "the remaining %d as failed so tomorrow's sweep re-plans them",
                 sweep_id,
                 message.run_id,
                 report.enqueued,
                 len(messages),
                 remaining,
             )
-            report.enqueued += remaining
+            report.failed += remaining
+            _close_out_unpushed(
+                session_factory,
+                [m.run_id for m in messages[index:]],
+                sweep_id=sweep_id,
+            )
             return
         report.enqueued += 1
         report.samples_enqueued += candidates[index].sample_count
+
+
+def _close_out_unpushed(session_factory, run_ids: list[str], *, sweep_id: str) -> None:
+    """Mark runs whose queue message never landed as ``failed``.
+
+    Best-effort by design. If the database is unreachable too -- the likeliest
+    reason the queue was -- the sweep has already counted these as ``failed`` and
+    will still exit non-zero, so the operator is told the truth either way. What
+    must not happen is this raising and replacing a precise "N of M landed"
+    report with a traceback about the cleanup.
+    """
+    reason = (
+        f"sweep {sweep_id}: enqueue failed -- no queue message was ever pushed for this run, "
+        f"so no runner will claim it"
+    )
+    try:
+        with session_scope(session_factory) as session:
+            for run_id in run_ids:
+                fail_run(session, run_id, reason)
+    except Exception:
+        log.exception(
+            "sweep %s: could not close out %d un-pushed run(s); they stay `queued` and "
+            "will be re-planned once older than stale_run_ttl_s",
+            sweep_id,
+            len(run_ids),
+        )
 
 
 # ---------------------------------------------------------------- context ----
@@ -414,18 +482,47 @@ class SweepContext:
     registry: ModelRegistry
     catalog: TaskCatalog
     git_sha: str | None
+    artifact_store: ArtifactStore | None = None
+    """Present only for the sweep that needs it -- today, none of them.
+
+    Retroactive grading reads archived transcripts out of object storage, so
+    ``judge-calibration`` will need this the moment a grader exists. It stays
+    OPTIONAL, and ``build_context`` builds it only on request, because
+    ``rebenchmark`` and ``model-sweep`` touch no blobs: giving them one would
+    make the nightly benchmark fail on a MinIO outage that cannot affect it."""
 
 
-def build_context(settings: Settings | None = None) -> SweepContext:
+def build_artifact_store(settings: Settings) -> ArtifactStore:
+    """MinIO/S3 or a local directory, per ``IDA_ARTIFACT_BACKEND``.
+
+    Mirrors ``ida_runner.main.build_worker`` rather than importing the API's
+    copy: the runner does not depend on ``ida_api``, and a sweep is a runner.
+    """
+    if settings.artifact_backend == "local":
+        return LocalArtifactStore(settings.artifact_local_root, bucket=settings.s3_bucket)
+    return S3ArtifactStore.from_settings(
+        endpoint_url=settings.s3_endpoint_url,
+        access_key=settings.s3_access_key,
+        secret_key=settings.s3_secret_key,
+        bucket=settings.s3_bucket,
+        region=settings.s3_region,
+    )
+
+
+def build_context(
+    settings: Settings | None = None, *, need_artifacts: bool = False
+) -> SweepContext:
     """Assemble the production context from environment settings.
 
-    No artifact store: a sweep writes rows and queue messages and touches no
-    blobs. Building one anyway would make a sweep fail on a MinIO outage that
-    cannot affect it.
+    ``need_artifacts`` is opt-in per sweep rather than always-on. Only a sweep
+    that reads archived transcripts needs object storage, and building a client
+    a sweep will not use turns an unrelated MinIO outage into a failed nightly
+    benchmark.
     """
     settings = settings or get_settings()
     engine = make_engine(settings.database_url)
     return SweepContext(
+        artifact_store=build_artifact_store(settings) if need_artifacts else None,
         settings=settings,
         session_factory=make_session_factory(engine),
         queue=RedisQueue.from_url(settings.redis_url),
@@ -464,11 +561,22 @@ def _enqueueing_sweep(
         report.notes.append("nothing to consider")
         return report
 
+    # TWO queries, not one, because the two halves of the index expire
+    # differently. A measurement is timeless -- it stays valid until the task's
+    # content sha changes. "In flight" is a claim about RIGHT NOW, and a row old
+    # enough that the reaper would have given up on it is not in flight, it is
+    # abandoned; reading it as in-flight would skip the pair forever.
+    in_flight_cutoff = utcnow() - timedelta(seconds=ctx.settings.stale_run_ttl_s)
     with session_scope(ctx.session_factory) as session:
         seen = existing_run_keys(
             session,
-            statuses=(*MEASURED_STATUSES, *IN_FLIGHT_STATUSES),
+            statuses=MEASURED_STATUSES,
             model_keys=dedupe_model_scope,
+        ) | existing_run_keys(
+            session,
+            statuses=IN_FLIGHT_STATUSES,
+            model_keys=dedupe_model_scope,
+            created_after=in_flight_cutoff,
         )
     candidates = apply_dedupe(candidates, seen=seen, force=ctx.settings.sweep_force, report=report)
 
@@ -515,7 +623,8 @@ def run_rebenchmark(ctx: SweepContext, *, dry_run: bool = False) -> SweepReport:
     a nightly full-suite job cheap in the steady state: on an unchanged repo with
     everything measured it enqueues zero runs and exits quietly. It re-enqueues
     exactly three things -- a newly enabled model, a task whose content changed,
-    and a pair whose last run failed or came back partial.
+    and a pair with no succeeded run at the current content sha (so a pair that
+    has only ever failed, never one that succeeded and later failed).
     """
     report = SweepReport(sweep="rebenchmark")
     return _enqueueing_sweep(
@@ -581,14 +690,21 @@ def run_model_sweep(ctx: SweepContext, *, dry_run: bool = False) -> SweepReport:
 def _load_retroactive_grader():
     """The judge's retroactive-grading entry point, or ``None`` if not built yet.
 
-    ⚠ THE ONE-LINE WIRING POINT. When the LLM judge merges, replace the body with
-    an import of whatever it exposes for grading already-persisted results::
+    ⚠ THE WIRING POINT. The judge is in flight as PR #12, which exposes
+    ``ida_harness.regrade.regrade_run`` -- per RUN, not per result, which is why
+    this sweep already collects ``candidate_runs`` alongside the sample ids::
 
-        from ida_harness.judge import grade_results
-        return grade_results
+        from ida_harness.regrade import regrade_run
+        return regrade_run
 
-    Everything else in this sweep -- candidate query, bound, reporting, exit code
-    -- is already correct and needs no edit.
+    and then, below, a loop over ``candidate_runs`` calling it with
+    ``ctx.artifact_store`` (regrading reads archived transcripts, which is why
+    ``judge-calibration`` is listed in :data:`NEEDS_ARTIFACTS` and its context
+    already carries a store while the other two sweeps deliberately do not).
+
+    Everything else here -- candidate query, bound, truncation note, reporting,
+    exit code -- is already correct and needs no edit. Named against the PR as it
+    stands, not guessed: check the merged signature before trusting this verbatim.
 
     Deliberately a lookup returning ``None`` rather than a ``try: import`` with a
     swallowed ``ImportError``: a bare import guard cannot tell "the judge is not
@@ -617,14 +733,20 @@ def run_judge_calibration(ctx: SweepContext, *, dry_run: bool = False) -> SweepR
     report = SweepReport(sweep="judge-calibration")
     limit = ctx.settings.sweep_judge_candidate_limit
     with session_scope(ctx.session_factory) as session:
-        candidates = list_ungraded_subjective_results(session, limit=limit)
+        # limit + 1: fetching exactly `limit` cannot distinguish "the backlog is
+        # exactly this long" from "there is more", and claiming more candidates
+        # remain when none do is a false statement on the operator's only
+        # surface. One extra row answers it for certain; it is then dropped.
+        candidates = list_ungraded_subjective_results(session, limit=limit + 1)
+        truncated = len(candidates) > limit
+        candidates = candidates[:limit]
         # Read the ids inside the session: the rows are detached on exit and
         # touching a lazy attribute afterwards raises.
         candidate_ids = [row.id for row in candidates]
         candidate_runs = {row.run_id for row in candidates}
     report.considered = len(candidate_ids)
 
-    if len(candidate_ids) == limit:
+    if truncated:
         # A bounded pass that looks complete is the failure this note prevents.
         report.notes.append(f"hit IDA_SWEEP_JUDGE_CANDIDATE_LIMIT={limit}; more candidates remain")
 
@@ -652,6 +774,12 @@ def run_judge_calibration(ctx: SweepContext, *, dry_run: bool = False) -> SweepR
         "see _load_retroactive_grader"
     )
 
+
+NEEDS_ARTIFACTS = frozenset({"judge-calibration"})
+"""Sweeps that read archived transcripts and therefore need object storage.
+
+Kept as data next to :data:`HANDLERS` so adding a sweep is one table edit, and so
+the two enqueueing sweeps stay provably independent of MinIO."""
 
 HANDLERS = {
     "rebenchmark": run_rebenchmark,
@@ -684,7 +812,7 @@ def main(argv: list[str] | None = None) -> int:
     log.info("sweep=%s dry_run=%s -- %s", args.sweep, args.dry_run, SWEEPS[args.sweep])
 
     try:
-        ctx = build_context(settings)
+        ctx = build_context(settings, need_artifacts=args.sweep in NEEDS_ARTIFACTS)
         report = HANDLERS[args.sweep](ctx, dry_run=args.dry_run)
     except Exception:
         # A sweep that dies must LOOK dead. Logging and returning non-zero rather

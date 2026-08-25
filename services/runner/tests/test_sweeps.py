@@ -93,8 +93,9 @@ def _seed_terminal_run(
     model_key: str,
     content_sha: str | None,
     status: RunStatus = RunStatus.SUCCEEDED,
+    created_at=None,
 ) -> str:
-    """A finished run, exactly as the worker would have left it."""
+    """A run in whatever state the worker (or a crash) would have left it."""
     run_id = new_run_id()
     with session_scope(session_factory) as session:
         create_run(
@@ -107,7 +108,7 @@ def _seed_terminal_run(
                 task_content_sha=content_sha,
                 task_git_sha="b" * 40,
                 harness_version="0.1.0",
-                created_at=utcnow(),
+                created_at=created_at or utcnow(),
             ),
         )
     return run_id
@@ -445,11 +446,11 @@ class TestPartialEnqueueFailure:
 
         assert run_rebenchmark(scoped).exit_code != 0
 
-    def test_rows_survive_a_queue_failure_so_the_work_is_re_drivable(self, ctx) -> None:
-        """Rows are committed BEFORE any push, exactly as `POST /runs` does it.
+    def test_rows_are_written_before_any_message_is_pushed(self, ctx) -> None:
+        """Rows first, exactly as `POST /runs` does it.
 
-        The un-pushed runs stay `queued` and visible rather than vanishing, which
-        is what makes the failure recoverable instead of merely reported.
+        The other order hands a runner a message for a row that does not exist.
+        Asserted by the runs that DID land having rows.
         """
         from ida_core.repositories import count_runs
 
@@ -458,7 +459,74 @@ class TestPartialEnqueueFailure:
         report = run_rebenchmark(scoped)
 
         with session_scope(ctx.session_factory) as session:
-            assert count_runs(session, status=RunStatus.QUEUED) == report.considered
+            assert count_runs(session) == report.considered
+
+    def test_un_pushed_rows_are_closed_out_failed_not_left_queued(self, ctx) -> None:
+        """A row saying `queued` when no message exists is simply FALSE.
+
+        It is also the bug that made this the highest-severity finding on the
+        first draft: a sweep reads its own `queued` rows back as "in flight", so
+        leaving them there suppressed those pairs on every later night.
+        """
+        from ida_core.repositories import count_runs
+
+        scoped = _with(ctx, queue=_ExplodingQueue(ok_count=2))
+
+        run_rebenchmark(scoped)
+
+        with session_scope(ctx.session_factory) as session:
+            assert count_runs(session, status=RunStatus.QUEUED) == 2
+            assert count_runs(session, status=RunStatus.FAILED) == 6
+
+    def test_the_closed_out_rows_carry_a_reason_naming_the_cause(self, ctx) -> None:
+        from ida_core.repositories import list_runs
+
+        scoped = _with(ctx, queue=_ExplodingQueue(ok_count=0))
+
+        run_rebenchmark(scoped)
+
+        with session_scope(ctx.session_factory) as session:
+            errors = {row.error for row in list_runs(session, status=RunStatus.FAILED)}
+        assert len(errors) == 1
+        assert "no queue message was ever pushed" in errors.pop()
+
+    def test_the_next_sweep_re_enqueues_the_pairs_that_never_landed(self, ctx) -> None:
+        """THE regression test for the highest-severity finding.
+
+        Reproduced before the fix: after one mid-sweep Redis blip, six pairs were
+        skipped as "already in flight" on every subsequent night, forever, with a
+        green CronJob each time. Two nights are asserted because the first is
+        where the fix acts and the second is where a wrong fix would loop.
+        """
+        blip = _with(ctx, queue=_ExplodingQueue(ok_count=2))
+        first = run_rebenchmark(blip)
+        assert first.failed == 6
+
+        second = run_rebenchmark(ctx)
+
+        assert second.enqueued == 6, "the orphaned pairs must come back"
+        assert second.skipped_dedupe == 2, "the two that really landed stay skipped"
+        assert second.exit_code == 0
+
+        third = run_rebenchmark(ctx)
+        assert third.enqueued == 0, "and then it settles"
+
+    def test_a_database_failure_during_cleanup_does_not_mask_the_report(
+        self, ctx, monkeypatch, caplog
+    ) -> None:
+        """The cleanup must never replace "N of M landed" with its own traceback."""
+        monkeypatch.setattr(
+            sweeps, "fail_run", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("db gone"))
+        )
+        scoped = _with(ctx, queue=_ExplodingQueue(ok_count=1))
+
+        with caplog.at_level(logging.ERROR, logger="ida.sweep"):
+            report = run_rebenchmark(scoped)
+
+        assert report.enqueued == 1
+        assert report.failed == report.considered - 1
+        assert report.exit_code != 0
+        assert "could not close out" in caplog.text
 
     def test_the_failure_is_logged_with_the_landed_count(self, ctx, caplog) -> None:
         scoped = _with(ctx, queue=_ExplodingQueue(ok_count=2))
@@ -681,7 +749,7 @@ class TestSummaryLine:
         assert SweepReport(sweep="x", considered=3, enqueued=3).exit_code == 0
 
     def test_the_summary_is_logged_once_on_success(self, ctx, caplog, monkeypatch) -> None:
-        monkeypatch.setattr(sweeps, "build_context", lambda _settings=None: ctx)
+        monkeypatch.setattr(sweeps, "build_context", lambda _settings=None, **_kw: ctx)
 
         with caplog.at_level(logging.INFO, logger="ida.sweep"):
             assert main(["rebenchmark"]) == 0
@@ -711,14 +779,14 @@ class TestEntrypoint:
         Renaming one here without the chart -- which this story does not own --
         would leave a CronJob failing every night on a usage message.
         """
-        monkeypatch.setattr(sweeps, "build_context", lambda _settings=None: ctx)
+        monkeypatch.setattr(sweeps, "build_context", lambda _settings=None, **_kw: ctx)
 
         assert main([name, "--dry-run"]) == 0
 
     def test_dry_run_changes_nothing(self, ctx, monkeypatch) -> None:
         from ida_core.repositories import count_runs
 
-        monkeypatch.setattr(sweeps, "build_context", lambda _settings=None: ctx)
+        monkeypatch.setattr(sweeps, "build_context", lambda _settings=None, **_kw: ctx)
 
         assert main(["rebenchmark", "--dry-run"]) == 0
 
@@ -728,7 +796,7 @@ class TestEntrypoint:
 
     def test_a_budget_refusal_propagates_to_the_process_exit_code(self, ctx, monkeypatch) -> None:
         tight = _with(ctx, settings={"sweep_max_runs": 1})
-        monkeypatch.setattr(sweeps, "build_context", lambda _settings=None: tight)
+        monkeypatch.setattr(sweeps, "build_context", lambda _settings=None, **_kw: tight)
 
         assert main(["rebenchmark"]) != 0
 
@@ -737,7 +805,7 @@ class TestEntrypoint:
         run_rebenchmark(ctx)
         seen: list[bool] = []
 
-        def _capture(settings=None):
+        def _capture(settings=None, **_kw):
             seen.append(settings.sweep_force)
             return _with(ctx, settings={"sweep_force": settings.sweep_force})
 
@@ -751,7 +819,7 @@ class TestEntrypoint:
     def test_a_crashing_sweep_exits_non_zero_rather_than_raising(self, monkeypatch, caplog) -> None:
         """A sweep that dies must LOOK dead, in the operator's log format."""
 
-        def _boom(_settings=None):
+        def _boom(_settings=None, **_kw):
             raise RuntimeError("postgres is unreachable")
 
         monkeypatch.setattr(sweeps, "build_context", _boom)
@@ -961,3 +1029,206 @@ class TestDryRunAccounting:
         report = run_rebenchmark(ctx, dry_run=True)
 
         assert f"planned={report.considered}" in report.summary()
+
+
+class TestTheDedupeRuleIsWhatTheDocstringSays:
+    """Pins the PRECISE rule, because an earlier docstring stated a different one.
+
+    The draft claimed dedupe re-ran "a pair whose LAST run failed". The code
+    implements "a pair with NO succeeded run at this content sha" -- which is the
+    right rule, but the two differ exactly when a success is followed by a
+    failure, and nothing covered that case.
+    """
+
+    def test_a_success_followed_by_a_failure_is_still_skipped(self, ctx) -> None:
+        """A valid measurement of this task version exists; re-buying it teaches nothing."""
+        spec = _scorable(ctx)[0]
+        _seed_terminal_run(
+            ctx.session_factory,
+            task_id=spec.id,
+            model_key="mock",
+            content_sha=spec.content_sha,
+            status=RunStatus.SUCCEEDED,
+        )
+        _seed_terminal_run(
+            ctx.session_factory,
+            task_id=spec.id,
+            model_key="mock",
+            content_sha=spec.content_sha,
+            status=RunStatus.FAILED,
+        )
+
+        report = run_rebenchmark(ctx)
+
+        assert report.skipped_dedupe == 1
+        assert (spec.id, "mock") not in _drain_pairs(ctx.queue)
+
+    def test_a_success_at_an_older_sha_does_not_cover_the_current_one(self, ctx) -> None:
+        """Content sha, not the clock, is what expires a measurement."""
+        spec = _scorable(ctx)[0]
+        _seed_terminal_run(
+            ctx.session_factory,
+            task_id=spec.id,
+            model_key="mock",
+            content_sha="an-older-edition",
+            status=RunStatus.SUCCEEDED,
+        )
+
+        assert (spec.id, "mock") in _drain_pairs_after(run_rebenchmark, ctx)
+
+
+class TestAbandonedQueuedRowsExpire:
+    """ "In flight" is a claim about right now, and it has to expire.
+
+    The exception path is closed out explicitly (see TestPartialEnqueueFailure),
+    but a sweep SIGKILLed between committing rows and pushing messages runs no
+    handler at all. Without an age bound those rows would suppress their pairs
+    forever -- the same permanent-invisibility failure, reached a different way.
+    """
+
+    def _orphan(self, ctx, *, age_s: int) -> str:
+        from datetime import timedelta
+
+        spec = _scorable(ctx)[0]
+        _seed_terminal_run(
+            ctx.session_factory,
+            task_id=spec.id,
+            model_key="mock",
+            content_sha=spec.content_sha,
+            status=RunStatus.QUEUED,
+            created_at=utcnow() - timedelta(seconds=age_s),
+        )
+        return spec.id
+
+    def test_a_recent_queued_row_still_counts_as_in_flight(self, ctx) -> None:
+        task_id = self._orphan(ctx, age_s=60)
+
+        report = run_rebenchmark(ctx)
+
+        assert report.skipped_dedupe == 1
+        assert (task_id, "mock") not in _drain_pairs(ctx.queue)
+
+    def test_a_queued_row_older_than_the_stale_ttl_is_re_planned(self, ctx) -> None:
+        task_id = self._orphan(ctx, age_s=ctx.settings.stale_run_ttl_s + 60)
+
+        report = run_rebenchmark(ctx)
+
+        assert report.skipped_dedupe == 0
+        assert (task_id, "mock") in _drain_pairs(ctx.queue)
+
+    def test_an_old_SUCCEEDED_row_never_expires(self, ctx) -> None:
+        """Only the in-flight half is time-bounded.
+
+        A measurement is timeless -- ageing one out would re-buy every number in
+        the database on a schedule, which is the most expensive possible bug here.
+        """
+        from datetime import timedelta
+
+        spec = _scorable(ctx)[0]
+        _seed_terminal_run(
+            ctx.session_factory,
+            task_id=spec.id,
+            model_key="mock",
+            content_sha=spec.content_sha,
+            status=RunStatus.SUCCEEDED,
+            created_at=utcnow() - timedelta(days=3650),
+        )
+
+        assert run_rebenchmark(ctx).skipped_dedupe == 1
+
+
+class TestTheTruncationNoteIsNeverAFalseStatement:
+    """`len(rows) == limit` cannot tell a full backlog from an exact fit."""
+
+    def _seed(self, ctx, count: int) -> None:
+        run_id = new_run_id()
+        with session_scope(ctx.session_factory) as session:
+            create_run(
+                session,
+                RunRecord(
+                    id=run_id,
+                    status=RunStatus.SUCCEEDED,
+                    task_id=SUBJECTIVE_TASK,
+                    model_key="mock",
+                    task_git_sha="c" * 40,
+                    harness_version="0.1.0",
+                    created_at=utcnow(),
+                ),
+            )
+            insert_results(session, [_ungraded_result(run_id, i) for i in range(count)])
+
+    def test_exactly_limit_candidates_does_not_claim_more_remain(self, ctx) -> None:
+        """The off-by-one that would put a lie on the operator's only surface."""
+        self._seed(ctx, 3)
+        bounded = _with(ctx, settings={"sweep_judge_candidate_limit": 3})
+
+        report = run_judge_calibration(bounded)
+
+        assert report.considered == 3
+        assert not any("more candidates remain" in note for note in report.notes)
+
+    def test_one_more_than_the_limit_does_claim_more_remain(self, ctx) -> None:
+        self._seed(ctx, 4)
+        bounded = _with(ctx, settings={"sweep_judge_candidate_limit": 3})
+
+        report = run_judge_calibration(bounded)
+
+        assert report.considered == 3
+        assert any("more candidates remain" in note for note in report.notes)
+
+    def test_the_extra_probe_row_is_never_counted_as_a_candidate(self, ctx) -> None:
+        """limit + 1 is fetched; limit is reported. Reporting limit+1 would
+        overstate the backlog and, once the judge lands, over-grade it."""
+        self._seed(ctx, 10)
+        bounded = _with(ctx, settings={"sweep_judge_candidate_limit": 4})
+
+        report = run_judge_calibration(bounded)
+
+        assert report.considered == 4
+        assert report.skipped_unavailable == 4
+        assert report.balances()
+
+
+def _drain_pairs_after(sweep, ctx) -> set[tuple[str, str]]:
+    sweep(ctx)
+    return _drain_pairs(ctx.queue)
+
+
+class TestObjectStoreIsOptional:
+    """The enqueueing sweeps must not depend on MinIO.
+
+    They write rows and push messages and touch no blobs. Building an object
+    store client for them anyway would turn an unrelated MinIO outage into a
+    failed nightly benchmark -- an availability coupling with nothing behind it.
+    """
+
+    def test_only_judge_calibration_asks_for_object_storage(self) -> None:
+        assert set(sweeps.NEEDS_ARTIFACTS) == {"judge-calibration"}
+        assert not set(sweeps.NEEDS_ARTIFACTS) - set(sweeps.SWEEPS), (
+            "an entry for a sweep that no longer exists"
+        )
+
+    def test_the_enqueueing_sweeps_run_with_no_store_at_all(self, ctx) -> None:
+        assert ctx.artifact_store is None
+
+        assert run_rebenchmark(ctx).exit_code == 0
+        assert run_model_sweep(ctx).exit_code == 0
+
+    def test_build_context_does_not_construct_a_store_unless_asked(self, monkeypatch) -> None:
+        """Asserted at the constructor, because "we never call it" is not the same
+        as "we never build it" -- an S3 client is built eagerly."""
+        built: list[bool] = []
+        monkeypatch.setattr(
+            sweeps, "build_artifact_store", lambda _s: built.append(True) or object()
+        )
+        monkeypatch.setattr(sweeps, "make_engine", lambda _url: None)
+        monkeypatch.setattr(sweeps, "make_session_factory", lambda _e: None)
+        monkeypatch.setattr(
+            sweeps, "RedisQueue", type("Q", (), {"from_url": staticmethod(lambda *a, **k: None)})
+        )
+
+        sweeps.build_context(Settings(), need_artifacts=False)
+        assert built == []
+
+        sweeps.build_context(Settings(), need_artifacts=True)
+        assert built == [True]

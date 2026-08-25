@@ -6,6 +6,8 @@ schema version, update the docs) or a bug.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from pydantic import ValidationError
 
@@ -193,3 +195,143 @@ class TestTaskSampleRoundTrip:
     def test_sample_metadata_is_preserved(self) -> None:
         sample = TaskSample(id="s", input="i", target="t", metadata={"difficulty": "easy"})
         assert TaskSample.model_validate(sample.model_dump()).metadata == {"difficulty": "easy"}
+
+
+class TestTargetsDoNotLeakIntoMetadata:
+    """The rule that closes the metadata/redaction hole.
+
+    `GET /tasks/{id}` redacts every `target` behind the `author` role but
+    serves `sample.metadata` verbatim to anyone. A derivation written into
+    metadata therefore publishes the answer key the redaction exists to
+    protect. `tasks/SCHEMA.md` told authors not to do it; nothing stopped them.
+    """
+
+    @staticmethod
+    def _with(metadata: dict, target: str = "42") -> dict:
+        return _verifiable_task(
+            samples=[{"id": "s1", "input": "q", "target": target, "metadata": metadata}]
+        )
+
+    # --- must be rejected ---------------------------------------------------
+
+    @pytest.mark.parametrize(
+        ("target", "metadata", "why"),
+        [
+            ("42", {"note": "the answer is 42"}, "stated in prose"),
+            ("42", {"answer": 42}, "an int value"),
+            ("7.5", {"working": "63/840*100 = 7.50"}, "same value, different format"),
+            ("3", {"note": "result: +3"}, "signed form"),
+            ("-11", {"note": "comes to -11"}, "negative"),
+            ("1.92", {"check": "1.92"}, "exact string"),
+            ("42", {"outer": {"inner": "= 42"}}, "nested dict"),
+            ("42", {"steps": ["first", "then 42"]}, "inside a list"),
+            ("paris", {"note": "the answer is Paris"}, "non-numeric, case-insensitive"),
+        ],
+    )
+    def test_a_recoverable_target_is_rejected(self, target, metadata, why) -> None:
+        with pytest.raises(ValidationError, match="leaks gold answers"):
+            TaskSpec.model_validate(self._with(metadata, target))
+
+    # --- must NOT be rejected ----------------------------------------------
+
+    @pytest.mark.parametrize(
+        ("target", "metadata", "why"),
+        [
+            ("4", {"mirrors": "l4-distribution-key"}, "digit inside an identifier"),
+            ("2", {"template": "interest-v2"}, "version suffix"),
+            ("3", {"tags": "ladder-l3"}, "rung name"),
+            ("5", {"skill": "mode", "provenance": "synthetic"}, "no digits at all"),
+            ("42", {"note": "421 items"}, "a longer number is not the target"),
+            ("1", {"skill": "one-sample-t"}, "the word one is not the digit 1"),
+        ],
+    )
+    def test_an_identifier_containing_a_digit_is_not_a_leak(self, target, metadata, why) -> None:
+        """The false-positive guard. Without it the rule is unusable.
+
+        Sample metadata is full of digit-bearing identifiers (`ladder-l3`,
+        `mirrors: l4-distribution-key`). A rule that reads the `4` out of
+        `l4-distribution-key` and fails a task whose target is `4` gets
+        switched off, and then it protects nothing.
+        """
+        TaskSpec.model_validate(self._with(metadata, target))  # must not raise
+
+    def test_subjective_samples_are_unaffected(self) -> None:
+        """No target, nothing to leak -- and metadata is how subjective samples
+        carry their probe labels."""
+        doc = _subjective_task(
+            samples=[{"id": "s1", "input": "q", "metadata": {"probe": "42", "n": 42}}]
+        )
+        TaskSpec.model_validate(doc)
+
+    def test_the_rule_reports_the_offending_sample(self) -> None:
+        doc = _verifiable_task(
+            samples=[
+                {"id": "clean", "input": "q", "target": "1", "metadata": {"skill": "x"}},
+                {"id": "dirty", "input": "q", "target": "42", "metadata": {"note": "it is 42"}},
+            ]
+        )
+        with pytest.raises(ValidationError, match="dirty"):
+            TaskSpec.model_validate(doc)
+
+    def test_a_derivation_without_the_answer_is_not_caught(self) -> None:
+        """The documented blind spot, asserted so it stays documented.
+
+        `sum=70, n=5` hands a reader the answer 14 without containing it. This
+        rule is a tripwire for the mechanical mistake, NOT proof that a task
+        keeps its key secret -- and a test that pretends otherwise would be
+        worse than no test.
+        """
+        TaskSpec.model_validate(self._with({"working": "sum=70, n=5"}, "14"))
+
+    @pytest.mark.parametrize(
+        ("metadata", "expected_field"),
+        [
+            ({"n_samples": 5}, "metadata.n_samples"),
+            ({"note": "= 5 exactly"}, "metadata.note"),
+            ({"outer": {"inner": "= 5"}}, "metadata.outer.inner"),
+            ({"steps": ["a", "then 5"]}, "metadata.steps[1]"),
+        ],
+    )
+    def test_the_error_names_the_offending_field(self, metadata, expected_field) -> None:
+        """A gate the author cannot act on is a gate that gets switched off.
+
+        "Something in metadata matches" leaves them hunting; the path does not.
+        """
+        with pytest.raises(ValidationError, match=re.escape(expected_field)):
+            TaskSpec.model_validate(self._with(metadata, "5"))
+
+    def test_a_numeric_collision_is_not_misdiagnosed_as_a_derivation(self) -> None:
+        """`{n_samples: 5}` beside a target of "5" trips the rule with nothing to move.
+
+        The tripwire is deliberately blunt, so this false positive is accepted --
+        but the message must not tell the author to "move the derivation into a
+        comment" when there is no derivation. Misdiagnosis is what turns a gate
+        into something people disable rather than satisfy.
+        """
+        with pytest.raises(ValidationError) as exc:
+            TaskSpec.model_validate(self._with({"n_samples": 5}, "5"))
+        message = str(exc.value)
+        assert "metadata.n_samples is numerically the target" in message
+        assert "if this field is not a derivation, rename it or move it" in message
+
+    def test_a_zero_target_collides_too(self) -> None:
+        """`{error_count: 0}` beside a target of "0" -- the other reported shape."""
+        with pytest.raises(ValidationError, match=re.escape("metadata.error_count")):
+            TaskSpec.model_validate(self._with({"error_count": 0}, "0"))
+
+    def test_booleans_are_not_read_as_numbers(self) -> None:
+        """`True == 1` in Python. Without the bool guard `{verified: true}` would
+        trip every task whose target is `1`, which is the commonest metadata
+        field there is."""
+        TaskSpec.model_validate(self._with({"verified": True}, "1"))
+        TaskSpec.model_validate(self._with({"verified": False}, "0"))
+
+    def test_the_shipped_tasks_all_pass(self) -> None:
+        """The corpus students copy must itself be clean."""
+        from ida_core.config import repo_root
+        from ida_core.validation import discover_task_files, load_yaml
+
+        files = discover_task_files(repo_root() / "tasks")
+        assert files, "no task files found -- this test would pass vacuously"
+        for path in files:
+            TaskSpec.model_validate(load_yaml(path))
