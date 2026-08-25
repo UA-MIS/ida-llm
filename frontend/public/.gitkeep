@@ -1,0 +1,8 @@
+# Git does not track empty directories, so without this file `frontend/public/`
+# does not exist in a fresh checkout -- and the Dockerfile's
+# `COPY --from=build /app/public ./public` fails with
+#   lstat /kaniko/1/app/public: no such file or directory
+# A local build works fine (the directory exists on disk), so this only ever
+# shows up in CI. Cost one build to learn.
+#
+# Delete this file once there is a real asset in here.

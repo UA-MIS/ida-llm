@@ -1,25 +1,16 @@
 """Console-script entry point for the task/model schema gate.
 
-The implementation lives in tools/validate_tasks.py so it can also be run
-directly from a checkout with no install step (`python tools/validate_tasks.py`).
-This wrapper is what `ida-validate-tasks` resolves to inside the container image,
-where tools/ is not on the path.
+The implementation is in `validate_impl` -- inside this package, so the harness
+stays standalone-installable and its schema gate does not depend on a `tools/`
+directory being importable. `tools/validate_tasks.py` is a thin shim over the
+same code, for running straight from a checkout with no install step.
 """
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+from ida_harness.validate_impl import main
 
-
-def main() -> int:
-    # Repo layout: packages/harness/src/ida_harness/validate.py -> repo root is 4 up.
-    repo_root = Path(__file__).resolve().parents[4]
-    sys.path.insert(0, str(repo_root / "tools"))
-    from validate_tasks import main as validate_main  # noqa: PLC0415
-
-    return validate_main(["--root", str(repo_root)])
-
+__all__ = ["main"]
 
 if __name__ == "__main__":
     raise SystemExit(main())

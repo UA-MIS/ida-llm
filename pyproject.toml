@@ -36,4 +36,3 @@ ignore = [
 # error instead of a silently-skipped test.
 addopts = "-q --strict-markers"
 testpaths = ["packages", "services", "tools"]
-pythonpath = ["tools"]

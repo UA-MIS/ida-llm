@@ -22,11 +22,25 @@ FROM ${PYTHON_IMAGE} AS build
 WORKDIR /src
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
 
-# build-essential is needed for any sdist that has no manylinux wheel. It stays
-# in THIS stage only; the runtime image below never sees a compiler.
-RUN apt-get update \
- && apt-get install --no-install-recommends -y build-essential \
- && rm -rf /var/lib/apt/lists/*
+# ⚠ NO apt-get HERE, DELIBERATELY -- and the reason is not "it was not needed".
+#
+# The ARC runners this builds on have external egress on :443 ONLY (platform
+# netpol, hardening/netpol-runners). Debian's apt mirrors are dialled over
+# http://deb.debian.org:80, so `apt-get update` inside a Kaniko build does not
+# fail fast -- it emits four "Network is unreachable" WARNINGS, carries on with an
+# empty package list, and then dies at `E: Unable to locate package
+# build-essential`, which reads like a typo rather than a firewall. (Cost one
+# build to learn; written down so it costs nobody a second.)
+#
+# Rewriting sources.list to HTTPS would work, but the better answer is to not
+# need a compiler at all: every runtime dependency here ships a manylinux wheel,
+# including psycopg (pinned to the `[binary]` extra precisely so it never
+# compiles libpq) and uvicorn's [standard] extras.
+#
+# `--only-binary=:all:` makes that a GUARANTEE rather than a hope. If a future
+# dependency ever lacks a wheel, pip fails immediately with "Could not find a
+# version that satisfies" naming the package -- instead of silently reaching for
+# a toolchain that is not installed and cannot be fetched.
 
 # Manifests first so the dependency layer survives a source-only edit.
 COPY packages/core/pyproject.toml     packages/core/
@@ -45,7 +59,7 @@ COPY migrations/ migrations/
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 RUN pip install --upgrade pip setuptools wheel \
- && pip install \
+ && pip install --only-binary=:all: \
       ./packages/core \
       ./packages/harness \
       ./services/api \

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from validate_tasks import main
+from ida_harness.validate_impl import main
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
