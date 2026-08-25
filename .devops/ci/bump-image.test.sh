@@ -42,7 +42,13 @@ images:
     newName: harbor.example.com/team-sample/myapp-backend
     newTag: v0.0.0
 YAML
-  ( cd "${root}" && git init -q && git config user.email t@t && git config user.name t && git add -A && git commit -qm init )
+  # git is optional here (no test that consumes make_repo's non-commit assertions
+  # needs a real repo) -- guard it so a git-less container doesn't spray
+  # "git: command not found" across every make_repo() call (only the [commit]
+  # test below actually depends on git being present).
+  if command -v git >/dev/null 2>&1; then
+    ( cd "${root}" && git init -q && git config user.email t@t && git config user.name t && git add -A && git commit -qm init )
+  fi
   printf '%s' "${root}"
 }
 
@@ -103,14 +109,18 @@ fi
 # permanently suppress any FUTURE tag push referencing this same commit too, which is
 # exactly what broke vX.Y.Z re-promotion; loop-prevention now lives in build-and-push
 # .yaml's `resolve` job `if:` guard instead, keyed on the commit author identity).
-R3="$(make_repo)"
-COMMIT=1 bash "${R3}/.devops/ci/bump-image.sh" dev "9.9.9" >/tmp/bump.log 2>&1
-LAST="$(git -C "${R3}" log -1 --pretty=%s 2>/dev/null)"
-case "${LAST}" in
-  *"[skip ci]"*) FAIL=$((FAIL+1)); echo "FAIL [commit]: commit subject must NOT carry [skip ci] (FIX-18): '${LAST}'" ;;
-  "ci: bump dev images to 9.9.9") PASS=$((PASS+1)) ;;
-  *) FAIL=$((FAIL+1)); echo "FAIL [commit]: unexpected commit subject: '${LAST}'" ;;
-esac
+if command -v git >/dev/null 2>&1; then
+  R3="$(make_repo)"
+  COMMIT=1 bash "${R3}/.devops/ci/bump-image.sh" dev "9.9.9" >/tmp/bump.log 2>&1
+  LAST="$(git -C "${R3}" log -1 --pretty=%s 2>/dev/null)"
+  case "${LAST}" in
+    *"[skip ci]"*) FAIL=$((FAIL+1)); echo "FAIL [commit]: commit subject must NOT carry [skip ci] (FIX-18): '${LAST}'" ;;
+    "ci: bump dev images to 9.9.9") PASS=$((PASS+1)) ;;
+    *) FAIL=$((FAIL+1)); echo "FAIL [commit]: unexpected commit subject: '${LAST}'" ;;
+  esac
+else
+  echo "NOTE: git not available — skipping COMMIT=1 commit-message assertion"
+fi
 
 echo "== FINAL: $PASS passed, $FAIL failed =="
 [ "${FAIL}" -eq 0 ]

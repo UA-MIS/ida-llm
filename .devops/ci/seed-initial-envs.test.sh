@@ -64,7 +64,12 @@ images:
     newTag: v0.0.0
 YAML
   done
-  ( cd "${root}" && git init -q && git config user.email t@t && git config user.name t && git add -A && git commit -qm init )
+  # git is optional here — guard it so a git-less container doesn't spray
+  # "git: command not found" across every make_repo() call (only the [commit]
+  # and commit-count assertions below actually depend on git being present).
+  if command -v git >/dev/null 2>&1; then
+    ( cd "${root}" && git init -q && git config user.email t@t && git config user.name t && git add -A && git commit -qm init )
+  fi
   printf '%s' "${root}"
 }
 
@@ -79,7 +84,9 @@ resources:
   - ../../base
 YAML
   done
-  ( cd "${root}" && git add -A && git commit -qm noimages )
+  if command -v git >/dev/null 2>&1; then
+    ( cd "${root}" && git add -A && git commit -qm noimages )
+  fi
   printf '%s' "${root}"
 }
 
@@ -127,17 +134,21 @@ assert_eq "gate prod not-bumped"    "$(count_tag 'second88' "${PRD2}")" "0"
 # 3) COMMIT=1 makes a commit for a seeded env -- FIX-18/D-030: must NOT carry `[skip ci]`
 # (permanently suppresses any future tag push on this commit too; see bump-image.sh's
 # header comment).
-R3="$(make_repo)"
-COMMIT=1 sh "${R3}/.devops/ci/seed-initial-envs.sh" "9.9.9" >/tmp/seed.log 2>&1
-LAST="$(git -C "${R3}" log -1 --pretty=%s 2>/dev/null)"
-case "${LAST}" in
-  *"[skip ci]"*) FAIL=$((FAIL+1)); echo "FAIL [commit]: commit subject must NOT carry [skip ci] (FIX-18): '${LAST}'" ;;
-  "ci: bump prod images to 9.9.9") PASS=$((PASS+1)) ;;
-  *) FAIL=$((FAIL+1)); echo "FAIL [commit]: unexpected commit subject: '${LAST}'" ;;
-esac
-# both staging + prod seeds committed -> 2 commits on top of the 1 init.
-NCOMMITS="$(git -C "${R3}" rev-list --count HEAD 2>/dev/null)"
-assert_eq "commit count" "${NCOMMITS}" "3"
+if command -v git >/dev/null 2>&1; then
+  R3="$(make_repo)"
+  COMMIT=1 sh "${R3}/.devops/ci/seed-initial-envs.sh" "9.9.9" >/tmp/seed.log 2>&1
+  LAST="$(git -C "${R3}" log -1 --pretty=%s 2>/dev/null)"
+  case "${LAST}" in
+    *"[skip ci]"*) FAIL=$((FAIL+1)); echo "FAIL [commit]: commit subject must NOT carry [skip ci] (FIX-18): '${LAST}'" ;;
+    "ci: bump prod images to 9.9.9") PASS=$((PASS+1)) ;;
+    *) FAIL=$((FAIL+1)); echo "FAIL [commit]: unexpected commit subject: '${LAST}'" ;;
+  esac
+  # both staging + prod seeds committed -> 2 commits on top of the 1 init.
+  NCOMMITS="$(git -C "${R3}" rev-list --count HEAD 2>/dev/null)"
+  assert_eq "commit count" "${NCOMMITS}" "3"
+else
+  echo "NOTE: git not available — skipping COMMIT=1 commit-message and commit-count assertions"
+fi
 
 # 4) no-yq awk/sed fallback — same FIRST-build seed with yq hidden from PATH.
 if PATH="${NOYQ_DIR}" command -v yq >/dev/null 2>&1; then
