@@ -12,6 +12,7 @@ from logging.config import fileConfig
 
 from alembic import context
 from ida_core.models import Base
+from ida_core.settings import get_settings
 from sqlalchemy import engine_from_config, pool
 
 config = context.config
@@ -23,19 +24,20 @@ target_metadata = Base.metadata
 
 
 def _database_url() -> str:
-    url = os.environ.get("DATABASE_URL")
-    if not url:
+    """Delegate to ida_core so migrations and the app can never disagree.
+
+    This used to normalise the DSN scheme itself. That is exactly how the app and
+    the migration ended up on different drivers -- the initContainer migrated the
+    schema happily while the API could not connect at all. One helper, both
+    callers (see Settings.sqlalchemy_url).
+    """
+    if not os.environ.get("DATABASE_URL"):
         raise RuntimeError(
             "DATABASE_URL is not set. In the cluster it is materialized by ESO from Vault "
             "(tenants/ida-llm/<env>/database); in CI it points at the throwaway Postgres "
             "service container; locally, copy .env.example to .env."
         )
-    # SQLAlchemy 2 + psycopg 3 wants the explicit driver. The Vault-assembled DSN
-    # is a plain `postgresql://`, so normalise here rather than asking every
-    # consumer to remember.
-    if url.startswith("postgresql://"):
-        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
-    return url
+    return get_settings().sqlalchemy_url()
 
 
 def run_migrations_offline() -> None:

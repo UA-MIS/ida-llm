@@ -32,7 +32,8 @@ _engine = None
 def _get_engine():
     global _engine  # noqa: PLW0603
     if _engine is None:
-        _engine = create_engine(_settings.require_database_url(), pool_pre_ping=True)
+        # sqlalchemy_url(), NOT require_database_url() -- see that helper's docstring.
+        _engine = create_engine(_settings.sqlalchemy_url(), pool_pre_ping=True)
     return _engine
 
 

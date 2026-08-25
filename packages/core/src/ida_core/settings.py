@@ -56,12 +56,35 @@ class Settings(BaseSettings):
     sparks_api_key: str | None = None
 
     def require_database_url(self) -> str:
+        """The raw DSN, as ESO/Vault supply it. Use `sqlalchemy_url()` to connect."""
         if not self.database_url:
             raise RuntimeError(
                 "DATABASE_URL is not set. In the cluster it is materialized by ESO from "
                 "Vault (tenants/ida-llm/<env>/database); locally, copy .env.example to .env."
             )
         return self.database_url
+
+    def sqlalchemy_url(self) -> str:
+        """The DSN with an EXPLICIT driver, which is what SQLAlchemy needs.
+
+        ⚠ THIS FUNCTION EXISTS BECAUSE ITS ABSENCE WAS A LIVE BUG. The Composition
+        writes a plain `postgresql://...` DSN into Vault (engine-agnostic by
+        design -- the MySQL path writes the same four parts). SQLAlchemy 2.x maps
+        a bare `postgresql://` to its DEFAULT driver, psycopg2, which this image
+        deliberately does not install -- it ships psycopg 3.
+
+        The failure mode was nasty precisely because it was PARTIAL: the Alembic
+        migration normalised the scheme itself in migrations/env.py, so the
+        initContainer ran the schema successfully and the app then could not
+        connect at all. Migrations green, service down, two code paths quietly
+        disagreeing about the same URL.
+
+        One helper, both callers. Do not re-derive this at a call site.
+        """
+        url = self.require_database_url()
+        if url.startswith("postgresql://"):
+            return url.replace("postgresql://", "postgresql+psycopg://", 1)
+        return url
 
 
 @lru_cache
