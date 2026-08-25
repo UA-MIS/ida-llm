@@ -153,12 +153,25 @@ class TestNumericMatch:
 
 
 class TestLLMJudgeScorer:
-    def test_is_registered_but_not_implemented(self) -> None:
-        """The interface exists so subjective tasks validate; calling it must be loud."""
+    """The scorer exists unbound so subjective tasks still LOAD without a judge.
+
+    That is the state a deployment with no ``IDA_JUDGE_MODEL_KEY`` is in, and it
+    has to stay a validating, non-scoring state rather than an import error --
+    which is why calling an unbound judge scorer is loud instead of silent.
+    """
+
+    def test_is_registered_and_inert_without_a_judge(self) -> None:
         scorer = build_scorer(ScorerSpec(kind=ScorerKind.LLM_JUDGE, rubric_id="r"))
         assert isinstance(scorer, LLMJudgeScorer)
-        with pytest.raises(NotImplementedError, match="walking skeleton"):
+        assert scorer.is_bound is False
+        with pytest.raises(ScoringError, match="needs a judge model"):
             scorer.score("some feedback", None)
+
+    def test_the_refusal_names_the_way_forward(self) -> None:
+        """A message that only says 'no' costs the reader a source dive."""
+        scorer = build_scorer(ScorerSpec(kind=ScorerKind.LLM_JUDGE, rubric_id="r"))
+        with pytest.raises(ScoringError, match="build_judge"):
+            scorer.grade("some feedback")
 
 
 class TestBuildScorer:

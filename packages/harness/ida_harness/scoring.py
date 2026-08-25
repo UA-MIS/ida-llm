@@ -11,7 +11,11 @@ Design rules, in priority order:
    is done to the target too.  An asymmetric comparison silently marks correct
    answers wrong, which in a benchmarking platform is data corruption that
    propagates all the way into a recommendation.
-3. **``explanation`` shows the compared values.**  A reviewer reading the UI
+3. **A bad JUDGE response is never turned into a score.**  The converse of
+   rule 1, and it lives in :mod:`ida_harness.judge`: a judge that returns
+   garbage, or a score outside the rubric's scale, degrades that sample with an
+   honest error.  Nothing is clamped or defaulted into a grade.
+4. **``explanation`` shows the compared values.**  A reviewer reading the UI
    must be able to see *why* a sample failed without opening the transcript.
 """
 
@@ -21,8 +25,16 @@ import re
 import string
 from typing import Protocol, runtime_checkable
 
-from ida_core.contracts import Normalisation, Score, ScorerKind, ScorerSpec
+from ida_core.contracts import (
+    Normalisation,
+    Score,
+    ScorerKind,
+    ScorerSpec,
+    TaskSample,
+    TaskSpec,
+)
 from ida_harness.errors import ScoringError
+from ida_harness.judge import JudgeVerdict, LLMJudge
 
 _WHITESPACE = re.compile(r"\s+")
 _NUMBER = re.compile(r"[-+]?\d{1,3}(?:,\d{3})+(?:\.\d+)?|[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
@@ -181,38 +193,93 @@ class NumericMatchScorer:
 
 
 class LLMJudgeScorer:
-    """Rubric-graded scoring by a judge model.  **Interface only in the skeleton.**
+    """Rubric-graded scoring by a judge model, bound to **one sample**.
 
-    Per **D-5** the judge is *not* a separate service: it is a code path inside
-    the harness that calls another model through the same
-    :class:`~ida_harness.client.OpenAICompatibleClient`.  When implemented it
-    will:
+    Why binding, and why it is not a wart
+    -------------------------------------
+    A programmatic scorer is a function of ``(completion, target)`` and nothing
+    else.  A rubric judgment is not: it is a function of the completion, the
+    prompt the completion was answering, and the rubric.  Rather than widen the
+    :class:`Scorer` protocol -- which would force every scorer to accept context
+    two of the three do not use -- the judge scorer takes its context at
+    construction, so ``score(completion, target)`` still means exactly what it
+    means everywhere else.  ``target`` is always ``None`` here (subjective tasks
+    forbid targets, enforced on :class:`~ida_core.contracts.TaskSpec`) and is
+    accepted only to satisfy the protocol.
 
-    1. render the rubric + the sample input + the completion into a judge prompt,
-    2. call the configured judge model with a structured-output constraint,
-    3. map the per-criterion scores onto ``[0, 1]`` using the criterion weights,
-    4. put the judge's own transcript in ``Score.details`` so the grade is
-       traceable to evidence (D-3).
+    Two ways in, one implementation
+    -------------------------------
+    :meth:`grade` returns the full :class:`~ida_harness.judge.JudgeVerdict` --
+    score *plus* the judge's token usage, cost and transcript.  That is what
+    :func:`ida_harness.runner.run_task` uses, because a grade that costs money
+    has to be accounted for.  :meth:`score` is the protocol-shaped view for
+    callers that only want the number, and raises
+    :class:`~ida_harness.errors.ScoringError` when the judge could not produce
+    one -- there is no fallback score, by design.
 
-    Until then, tasks whose scorer is ``llm_judge`` are loaded, validated, and
-    reported as **not yet scorable** (:attr:`ida_core.contracts.TaskSpec.is_scorable`
-    is False); the runner records a :class:`~ida_core.contracts.ResultRecord`
-    with ``scorable=False`` and ``score=None`` rather than calling this class.
-    Calling :meth:`score` is therefore a programming error, and it says so.
+    Constructed with no judge (``build_scorer(spec)``, the API's validation
+    path), it is inert and says so when called.  That keeps a task whose scorer
+    is ``llm_judge`` loadable and validatable on a deployment that has no judge
+    configured, which is the state the platform ships in.
     """
 
     kind = ScorerKind.LLM_JUDGE
 
-    def __init__(self, spec: ScorerSpec) -> None:
+    def __init__(
+        self,
+        spec: ScorerSpec,
+        *,
+        judge: LLMJudge | None = None,
+        task: TaskSpec | None = None,
+        sample: TaskSample | None = None,
+        run_id: str | None = None,
+    ) -> None:
         self._spec = spec
+        self._judge = judge
+        self._task = task
+        self._sample = sample
+        self._run_id = run_id
 
-    def score(self, completion: str, target: str | None) -> Score:
-        raise NotImplementedError(
-            "LLM-as-judge scoring is not implemented in the walking skeleton. "
-            "Subjective tasks are loaded and validated but recorded with "
-            "scorable=False and score=None. See LLMJudgeScorer's docstring for "
-            "the intended implementation."
+    @property
+    def is_bound(self) -> bool:
+        """True when this scorer has everything it needs to actually grade."""
+        return self._judge is not None and self._task is not None and self._sample is not None
+
+    def grade(self, completion: str) -> JudgeVerdict:
+        """Grade ``completion``, returning score **and** accounting.
+
+        Raises :class:`~ida_harness.errors.ScoringError` only when this scorer
+        was never bound to a judge -- that is a programming error.  A judge that
+        fails or answers unusably comes back as a verdict with ``score=None``
+        and an ``error``, never as an exception.
+        """
+        if not self.is_bound:
+            raise ScoringError(
+                "llm_judge scoring needs a judge model, a task and a sample; this scorer "
+                "was built without them. Pass judge=/task=/sample= to build_scorer, or "
+                "give run_task a judge= (see ida_harness.judge.build_judge)."
+            )
+        assert self._judge is not None and self._task is not None  # noqa: S101 - is_bound
+        assert self._sample is not None  # noqa: S101 - is_bound
+        return self._judge.grade(
+            task=self._task, sample=self._sample, completion=completion, run_id=self._run_id
         )
+
+    def score(self, completion: str, target: str | None = None) -> Score:
+        """:class:`Scorer`-protocol view.  ``target`` is unused and must be ``None``.
+
+        Discards the judge's usage and cost, so it is the wrong entry point for
+        anything that persists a result -- use :meth:`grade` there.
+        """
+        if target is not None:
+            raise ScoringError(
+                f"llm_judge scored a sample carrying target {target!r}; subjective tasks "
+                "must not have targets and TaskSpec validation should have caught this"
+            )
+        verdict = self.grade(completion)
+        if verdict.score is None:
+            raise ScoringError(verdict.error or "the judge produced no score")
+        return verdict.score
 
 
 _SCORERS: dict[ScorerKind, type] = {
@@ -222,8 +289,20 @@ _SCORERS: dict[ScorerKind, type] = {
 }
 
 
-def build_scorer(spec: ScorerSpec) -> Scorer:
+def build_scorer(
+    spec: ScorerSpec,
+    *,
+    judge: LLMJudge | None = None,
+    task: TaskSpec | None = None,
+    sample: TaskSample | None = None,
+    run_id: str | None = None,
+) -> Scorer:
     """Construct the scorer a task asked for.
+
+    The keyword arguments are the judge's binding context and are ignored by the
+    programmatic scorers, which genuinely do not need them -- passing them to a
+    ``numeric_match`` task is harmless rather than an error, so a caller does not
+    have to branch on scorer kind before building one.
 
     Raises :class:`~ida_harness.errors.ScoringError` for an unknown kind --
     unreachable via validated task files, reachable if someone constructs a
@@ -233,4 +312,6 @@ def build_scorer(spec: ScorerSpec) -> Scorer:
         cls = _SCORERS[spec.kind]
     except KeyError:
         raise ScoringError(f"no scorer registered for kind {spec.kind!r}") from None
+    if cls is LLMJudgeScorer:
+        return LLMJudgeScorer(spec, judge=judge, task=task, sample=sample, run_id=run_id)
     return cls(spec)
