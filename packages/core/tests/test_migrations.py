@@ -13,6 +13,8 @@ import pytest
 import sqlalchemy as sa
 from alembic.command import upgrade
 from alembic.config import Config
+from alembic.script import ScriptDirectory
+from alembic.util.exc import CommandError
 from sqlalchemy import inspect
 
 from ida_core.db import Base, create_all, make_engine
@@ -216,7 +218,7 @@ class TestPartialDowngrade:
         assert added_to_runs <= set(before["runs"]["columns"])
         assert added_to_results <= set(before["results"]["columns"])
 
-        downgrade(self._config(migrated_engine, monkeypatch), "0001_baseline")
+        downgrade(self._config(migrated_engine, monkeypatch), "ida_0001_baseline")
         after = _describe(migrated_engine)
 
         assert added_to_runs.isdisjoint(after["runs"]["columns"])
@@ -226,7 +228,7 @@ class TestPartialDowngrade:
         """Going back one revision must not take the baseline with it."""
         from alembic.command import downgrade
 
-        downgrade(self._config(migrated_engine, monkeypatch), "0001_baseline")
+        downgrade(self._config(migrated_engine, monkeypatch), "ida_0001_baseline")
         after = _describe(migrated_engine)
 
         assert set(after) == {"runs", "results"}
@@ -242,7 +244,7 @@ class TestPartialDowngrade:
         widened = _describe(migrated_engine)["results"]["indexes"]["ix_results_run_sample"]
         assert widened == (("run_id", "sample_id", "repeat_index"), True)
 
-        downgrade(self._config(migrated_engine, monkeypatch), "0001_baseline")
+        downgrade(self._config(migrated_engine, monkeypatch), "ida_0001_baseline")
         reverted = _describe(migrated_engine)["results"]["indexes"]["ix_results_run_sample"]
         assert reverted == (("run_id", "sample_id"), True)
 
@@ -253,7 +255,7 @@ class TestPartialDowngrade:
         from alembic.command import downgrade, upgrade
 
         config = self._config(migrated_engine, monkeypatch)
-        downgrade(config, "0001_baseline")
+        downgrade(config, "ida_0001_baseline")
         upgrade(config, "head")
         assert _describe(migrated_engine) == _describe(metadata_engine)
 
@@ -275,9 +277,106 @@ class TestPartialDowngrade:
             )
 
         config = self._config(migrated_engine, monkeypatch)
-        downgrade(config, "0001_baseline")
+        downgrade(config, "ida_0001_baseline")
         upgrade(config, "head")
 
         with migrated_engine.connect() as conn:
             rows = conn.execute(text("SELECT id, status FROM runs")).all()
         assert rows == [("run_keep", "succeeded")]
+
+
+class TestForeignStampIsRefused:
+    """The bug that broke the first real deploy of the port.
+
+    ⚠ ALEMBIC RESOLVES PARTIAL REVISION IDENTIFIERS. The pre-port scaffold
+    stamped its databases with the bare revision id ``"0001"``. Our baseline was
+    ``"0001_baseline"`` -- of which ``"0001"`` is a unique PREFIX. So on every
+    already-deployed environment, `alembic upgrade head` did NOT fail and did NOT
+    run our baseline: it concluded the baseline was applied and went straight to
+    0002, against the scaffold's schema, which shares table NAMES with ours and
+    nothing else.
+
+    It happened to die on `DROP INDEX ix_results_run_sample` (the scaffold never
+    created that index). One statement earlier and it would have started adding
+    our columns to the scaffold's tables and reported success. That is the
+    failure this class exists to prevent: not a crash, a SILENT WRONG SCHEMA.
+
+    All three environments held zero rows when this was found, which is the only
+    reason it cost nothing.
+    """
+
+    def test_our_ids_cannot_be_prefix_matched_by_the_scaffolds(self) -> None:
+        """The specific collision, closed by renaming."""
+        config = _alembic_config("sqlite+pysqlite:///:memory:")
+        script = ScriptDirectory.from_config(config)
+
+        with pytest.raises(CommandError):
+            script.get_revision("0001")
+
+        # ...and ours still resolve by their real names.
+        assert script.get_revision("ida_0001_baseline").revision == "ida_0001_baseline"
+
+    def test_no_revision_id_is_a_prefix_of_another(self) -> None:
+        """The general rule, so the next migration cannot reintroduce this.
+
+        Alembic's partial matching makes any id that prefixes another id an
+        ambiguity waiting to happen.
+        """
+        config = _alembic_config("sqlite+pysqlite:///:memory:")
+        revisions = [s.revision for s in ScriptDirectory.from_config(config).walk_revisions()]
+        for a in revisions:
+            for b in revisions:
+                if a != b:
+                    assert not b.startswith(a), f"{b!r} is prefixed by {a!r}"
+
+    def test_a_foreign_stamp_stops_the_migration_before_any_ddl(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        """THE guard. Reproduces dev's exact state: stamped '0001', scaffold schema.
+
+        What must NOT happen is what happened: DDL running against a schema this
+        chain did not build.
+        """
+        url = f"sqlite+pysqlite:///{tmp_path / 'foreign.db'}"
+        monkeypatch.setenv("IDA_DATABASE_URL", url)
+        engine = make_engine(url)
+        with engine.begin() as conn:
+            conn.execute(sa.text("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)"))
+            conn.execute(sa.text("INSERT INTO alembic_version (version_num) VALUES ('0001')"))
+            # the scaffold's `results`: same NAME, entirely different columns
+            conn.execute(sa.text("CREATE TABLE results (id VARCHAR, run_id VARCHAR, score FLOAT)"))
+
+        with pytest.raises(Exception) as exc:
+            upgrade(_alembic_config(url), "head")
+        assert "0001" in str(exc.value)
+
+        # The scaffold's table is untouched: the guard ran before any DDL.
+        with engine.begin() as conn:
+            columns = {r[1] for r in conn.execute(sa.text("PRAGMA table_info(results)")).fetchall()}
+        assert columns == {"id", "run_id", "score"}, (
+            "the guard must refuse BEFORE altering a schema it does not own"
+        )
+
+    def test_the_message_tells_the_operator_what_to_do(self, tmp_path, monkeypatch) -> None:
+        """A migration that fails inside an initContainer is read once, in a hurry,
+        by someone who did not write it. 'Can't locate revision' is not enough."""
+        url = f"sqlite+pysqlite:///{tmp_path / 'foreign2.db'}"
+        monkeypatch.setenv("IDA_DATABASE_URL", url)
+        engine = make_engine(url)
+        with engine.begin() as conn:
+            conn.execute(sa.text("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)"))
+            conn.execute(sa.text("INSERT INTO alembic_version (version_num) VALUES ('0001')"))
+
+        with pytest.raises(Exception) as exc:
+            upgrade(_alembic_config(url), "head")
+        message = str(exc.value)
+        assert "PRE-PORT SCAFFOLD" in message
+        assert "DROP TABLE" in message
+        assert "IF THEY ARE NOT EMPTY, STOP" in message
+
+    def test_a_clean_database_is_unaffected(self, tmp_path, monkeypatch) -> None:
+        """The guard must be invisible on the path everyone actually takes."""
+        url = f"sqlite+pysqlite:///{tmp_path / 'clean.db'}"
+        monkeypatch.setenv("IDA_DATABASE_URL", url)
+        upgrade(_alembic_config(url), "head")
+        assert {"runs", "results"} <= set(inspect(make_engine(url)).get_table_names())
