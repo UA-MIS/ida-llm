@@ -49,7 +49,7 @@ export async function syncBacklinkComment(
 
   // A webhook-driven event has no user in context, so fall back to the app
   // credential rather than silently skipping the comment.
-  const cred = credential ?? githubActionCredential(null);
+  const cred = credential ?? (await githubActionCredential(null));
   if (!cred.token) {
     return { ok: false, reason: missingCredentialMessage('Commenting on the pull request') };
   }
@@ -78,7 +78,7 @@ export async function syncCommitStatus(
   headSha: string,
   credential: GitHubCredential | null,
 ): Promise<boolean> {
-  const cred = credential ?? githubActionCredential(null);
+  const cred = credential ?? (await githubActionCredential(null));
   if (!config.prCommitStatus || !cred.token || !headSha) return false;
   try {
     return await setCommitStatus(

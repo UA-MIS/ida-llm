@@ -123,6 +123,43 @@ spec:
                   name: ida-llm-agile-secret
                   key: GITHUB_POLL_TOKEN
                   optional: true
+            # ── The board's OWN GitHub identity ────────────────────────────
+            # Under Dex a session carries identity and groups but NO GitHub
+            # token, so the assignee picker, "Start work" branch creation and PR
+            # backlink comments have nothing to call the API with. These three
+            # give the board an identity of its own: the SAME platform GitHub
+            # App every tool here already uses, so provisioning a new board is a
+            # copy of three values, not a new App registration.
+            #
+            # ⚠ The private key is a multi-line PEM — the single most fragile
+            # thing to carry through Vault -> ESO -> env. Seed it BASE64-ENCODED
+            # into Vault; the app also accepts real newlines and `\n`-escaped
+            # newlines, so a key mangled in transit still works instead of
+            # producing an opaque 401 on every GitHub call.
+            #
+            # `optional: true`, like the two above: a board without them degrades
+            # to the acting user's own token rather than failing to start. What
+            # is NOT optional any more is knowing — the pod logs
+            # `[startup] GitHub credential: ...` on boot, so "configured but
+            # inert" (which is exactly how this broke) cannot be silent again.
+            - name: GITHUB_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ida-llm-agile-secret
+                  key: GITHUB_APP_ID
+                  optional: true
+            - name: GITHUB_APP_INSTALLATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ida-llm-agile-secret
+                  key: GITHUB_APP_INSTALLATION_ID
+                  optional: true
+            - name: GITHUB_APP_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ida-llm-agile-secret
+                  key: GITHUB_APP_PRIVATE_KEY
+                  optional: true
             # Attachment storage reuses the tenant's own MinIO — same credentials,
             # its own bucket. All four MINIO_* keys must be present or the app
             # leaves attachments disabled; endpoint/port/ssl/bucket come from the

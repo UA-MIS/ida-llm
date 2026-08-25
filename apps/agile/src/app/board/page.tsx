@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 export default async function BoardPage() {
   const session = await requireSession('/board');
   await ensureSchema();
-  const ghToken = githubReadToken({ githubToken: session.token || null });
+  const ghToken = await githubReadToken({ githubToken: session.token || null });
 
   const [items, sprints, members, current, readiness] = await Promise.all([
     listWorkItems(),

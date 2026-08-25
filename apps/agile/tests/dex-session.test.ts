@@ -37,6 +37,9 @@ beforeEach(() => {
   process.env.OIDC_CLIENT_ID = 'ida-agile';
   delete process.env.GITHUB_POLL_TOKEN;
   delete process.env.REQUIRED_GROUP;
+  delete process.env.GITHUB_APP_ID;
+  delete process.env.GITHUB_APP_PRIVATE_KEY;
+  delete process.env.GITHUB_APP_INSTALLATION_ID;
 });
 
 afterEach(() => {
@@ -85,19 +88,22 @@ describe('session revalidation for a Dex user', () => {
 describe('credential selection for a Dex principal', () => {
   const dexPrincipal = { githubToken: null };
 
-  it('has no read credential until the app token is configured', () => {
-    expect(githubReadToken(dexPrincipal)).toBeNull();
+  it('has no read credential until a board credential is configured', async () => {
+    expect(await githubReadToken(dexPrincipal)).toBeNull();
     process.env.GITHUB_POLL_TOKEN = 'gho_app';
-    expect(githubReadToken(dexPrincipal)).toBe('gho_app');
+    expect(await githubReadToken(dexPrincipal)).toBe('gho_app');
   });
 
-  it('uses the app credential for actions, and says so', () => {
+  it('uses the board credential for actions, and says which one', async () => {
     process.env.GITHUB_POLL_TOKEN = 'gho_app';
-    expect(githubActionCredential(dexPrincipal)).toEqual({ token: 'gho_app', source: 'app' });
+    expect(await githubActionCredential(dexPrincipal)).toEqual({
+      token: 'gho_app',
+      source: 'poll-token',
+    });
   });
 
-  it('reports "none" — never a silent no-op — when nothing is configured', () => {
-    expect(githubActionCredential(dexPrincipal)).toEqual({ token: null, source: 'none' });
+  it('reports "none" — never a silent no-op — when nothing is configured', async () => {
+    expect(await githubActionCredential(dexPrincipal)).toEqual({ token: null, source: 'none' });
   });
 });
 
@@ -120,7 +126,7 @@ describe('"Start work" for a Dex user', () => {
     if (outcome.status !== 'failed') throw new Error('expected failure');
     // Never a silent no-op: it names what failed and what an owner must set.
     expect(outcome.message).toContain('Creating a branch');
-    expect(outcome.message).toContain('GITHUB_POLL_TOKEN');
+    expect(outcome.message).toContain('GITHUB_APP_ID');
   });
 
   it('is disabled cleanly when AUTO_BRANCH is off', async () => {
@@ -152,7 +158,7 @@ describe('PR backlink for a Dex user', () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.reason).toContain('GITHUB_POLL_TOKEN');
+    expect(result.reason).toContain('GITHUB_APP_ID');
   });
 
   it('reports the disabled flag distinctly from a missing credential', async () => {

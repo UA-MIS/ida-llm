@@ -43,6 +43,48 @@ export function assertSafeIdentifier(name: string): string {
   return name;
 }
 
+/**
+ * Repairs a PEM private key that has been through a secret pipeline.
+ *
+ * A GitHub App key is multi-line, and multi-line values are exactly what
+ * Vault -> External Secrets -> container env is worst at carrying: depending on
+ * how it was written, the newlines arrive as real newlines, as the two
+ * characters `\` `n`, as `\r\n`, or the whole PEM arrives base64-wrapped
+ * (the shape that survives every pipeline, and therefore the one this repo
+ * recommends). All four are accepted here so a mangled key is a non-event
+ * instead of an opaque "invalid key" at the first GitHub call.
+ *
+ * Anything that is not recognisably a PEM returns '' — the caller then treats
+ * the App as UNCONFIGURED, which degrades a feature, rather than as configured
+ * with a key that will fail on every request.
+ */
+export function normalizePrivateKey(raw: string | undefined | null): string {
+  const input = (raw ?? '').trim();
+  if (!input) return '';
+
+  const unescape = (v: string) =>
+    v.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\r\n/g, '\n').trim();
+
+  let pem = unescape(input);
+
+  // Base64-wrapped: no PEM header, but decodes to one.
+  if (!pem.includes('-----BEGIN')) {
+    if (!/^[A-Za-z0-9+/=\s]+$/.test(pem)) return '';
+    try {
+      const decoded = unescape(Buffer.from(pem.replace(/\s+/g, ''), 'base64').toString('utf8'));
+      if (!decoded.includes('-----BEGIN')) return '';
+      pem = decoded;
+    } catch {
+      return '';
+    }
+  }
+
+  if (!/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(pem)) return '';
+  if (!/-----END [A-Z ]*PRIVATE KEY-----/.test(pem)) return '';
+  // OpenSSL wants a trailing newline after the END line.
+  return `${pem.replace(/\n+$/, '')}\n`;
+}
+
 const REPO_RE = /^[\w.-]+\/[\w.-]+$/;
 
 export const config = {
@@ -155,7 +197,37 @@ export const config = {
     return optional('GITHUB_POLL_TOKEN', '');
   },
   get backgroundPollEnabled(): boolean {
-    return this.pollIntervalSeconds > 0 && this.githubPollToken !== '';
+    // Either credential source will do — the App is the modern one, the static
+    // token the legacy one. Requiring the PAT specifically is what left this
+    // board with a placeholder in prod and no background reconciliation.
+    return this.pollIntervalSeconds > 0 && (this.githubAppConfigured || this.githubPollToken !== '');
+  },
+
+  // ------------------------------------------------------------- GitHub App
+  /**
+   * The board's OWN GitHub identity, used when the signed-in session carries no
+   * GitHub token — which, under Dex, is always.
+   *
+   * These three values are deliberately generic: every board this platform
+   * provisions points at the SAME platform GitHub App (the one already
+   * installed org-wide), so onboarding a new team is a copy of three values,
+   * not a new App registration. Nothing here is specific to one team.
+   *
+   * Installation tokens minted from this key expire in about an hour, so the
+   * key is the durable secret and the token is never stored anywhere.
+   */
+  get githubAppId(): string {
+    return optional('GITHUB_APP_ID', '').trim();
+  },
+  get githubAppPrivateKey(): string {
+    return normalizePrivateKey(process.env.GITHUB_APP_PRIVATE_KEY);
+  },
+  get githubAppInstallationId(): string {
+    return optional('GITHUB_APP_INSTALLATION_ID', '').trim();
+  },
+  /** All three present AND the key actually parses as a PEM. */
+  get githubAppConfigured(): boolean {
+    return Boolean(this.githubAppId && this.githubAppInstallationId && this.githubAppPrivateKey);
   },
   /** Minimum seconds between on-view reconciliations of the same resource. */
   get onViewRefreshSeconds(): number {

@@ -119,9 +119,70 @@ links in PR backlink comments): set it to the exact public origin, e.g.
 | Variable | Default | Description |
 |---|---|---|
 | `GITHUB_WEBHOOK_SECRET` | — | HMAC secret. **Unset means webhooks are disabled**; the app falls back to polling. |
-| `GITHUB_POLL_TOKEN` | — | Credential for the *background* poller. Without it, only on-view refresh runs. |
+| `GITHUB_POLL_TOKEN` | — | **Legacy fallback.** A static PAT. Still honoured, but prefer the GitHub App below — an unrotated static token is how this board once ran for weeks against a placeholder value. |
 | `POLL_INTERVAL_SECONDS` | `300` | Background sweep interval. `0` disables. |
 | `ONVIEW_REFRESH_SECONDS` | `120` | Throttle for refreshing an item when someone opens it. |
+
+### The board's own GitHub identity (GitHub App)
+
+Under Dex the signed-in session carries **no GitHub token**, so the board needs
+an identity of its own to call the API at all. These three variables give it
+one. They point at a GitHub App **installed once, org-wide** — the same three
+values serve every board this platform provisions, so onboarding a new team is a
+copy, not a new App registration.
+
+| Variable | Default | Description |
+|---|---|---|
+| `GITHUB_APP_ID` | — | The App's numeric id. Not a secret. |
+| `GITHUB_APP_INSTALLATION_ID` | — | The App's installation on your org. Not a secret. |
+| `GITHUB_APP_PRIVATE_KEY` | — | The App's PEM private key. **The only secret of the three.** |
+
+**Required App permissions** — the minimum for the three features that need one:
+
+| Permission | Level | Needed for |
+|---|---|---|
+| `members` | read | the assignee picker (team roster) |
+| `contents` | write | "Start work" branch creation |
+| `pull_requests` | write | PR backlink comments |
+| `metadata` | read | implied by the above |
+
+**The token is minted, never stored.** An installation access token lives about
+one hour. Storing one in a Secret would give you a board that works for an hour
+after each deploy and then quietly stops — the exact failure mode this replaces.
+The durable secret is the private key; the app mints a token on demand, holds it
+in memory, renews it a few minutes before expiry, and shares a single mint
+across concurrent requests. Losing the cache on restart costs one API call.
+
+**⚠ The private key is multi-line, which is the fragile part.** A PEM carried
+through Vault → External Secrets → container env is the classic place for a key
+to arrive mangled, producing an opaque 401 on every GitHub call. The app
+therefore accepts **all four** shapes it might arrive in — real newlines,
+`\n`-escaped newlines, CRLF escapes, and base64 of the whole PEM — and treats an
+unparsable key as *not configured* rather than configured-and-broken.
+**Seed it base64-encoded**; that is the shape that survives every pipeline:
+
+```bash
+vault kv patch -method=patch -mount=secret tenants/<team>/<env>/agile \
+  GITHUB_APP_ID=<app-id> \
+  GITHUB_APP_INSTALLATION_ID=<installation-id> \
+  GITHUB_APP_PRIVATE_KEY="$(base64 -w0 < app.private-key.pem)"
+```
+
+Use `kv patch`, **not** `kv put` — `put` replaces the whole path and would take
+`SESSION_SECRET` and `OIDC_CLIENT_SECRET` with it. Verify by reading the value
+back **inside the pod**, not by trusting the write.
+
+**How to tell which credential a board is actually using.** On boot the pod logs
+exactly one of:
+
+```
+[startup] GitHub credential: GitHub App (app id 4097147, installation 141394298)
+[startup] GitHub credential: static GITHUB_POLL_TOKEN (legacy fallback; the GitHub App is preferred)
+[startup] GitHub credential: NONE — the assignee picker, branch creation and PR backlink comments are inert. ...
+```
+
+That line exists because the failure it diagnoses was **silent**: a placeholder
+token produced empty pickers, no error, and nothing in the log. Check it first.
 
 ### Object storage (attachments — optional)
 
@@ -245,17 +306,32 @@ Under OIDC the board never receives a GitHub token — that is the point, since 
 team no longer registers a GitHub OAuth app. Every GitHub-touching path
 therefore states where its credential comes from:
 
-| Kind of call | Credential | Behaviour under Dex |
-|---|---|---|
-| **Read** — assignee picker, PR picker, reading a PR to link, reconciliation | user's token if present, else `GITHUB_POLL_TOKEN` | Works when the app token is set; otherwise degrades to an empty list **with a note naming the variable to set**. |
-| **Action** — create a branch, comment on a PR, set a commit status | user's token if present, else `GITHUB_POLL_TOKEN` | Works via the app credential. When it acts, the item history records *"performed with the board's GitHub credential"*, so attribution is never implied falsely. |
-| Neither available | — | Fails **loudly** with a message naming `GITHUB_POLL_TOKEN`. Never a silent no-op, and never a blocked state transition — the state change is applied first and is not rolled back by a GitHub failure. |
+**Credential precedence, in order.** Both reads and actions resolve the same
+way; the difference is that an action records *which* credential acted.
 
-**So: set `GITHUB_POLL_TOKEN` on any Dex-based deployment.** It needs `read:org`
-plus write access to the configured repos if you want branch creation and PR
-comments to work. The board is fully usable without it — items, board, sprints,
-dependencies, Ready queue and the whole API are unaffected — but the
-GitHub-integration features will report themselves unavailable.
+| # | Source | When | Attribution |
+|---|---|---|---|
+| 1 | **The acting user's own token** | GitHub-backed session, or a GitHub token sent to the API | The action is genuinely theirs. |
+| 2 | **The board's GitHub App installation token** | `GITHUB_APP_*` configured. **The default for a platform-provisioned board, and what makes it work under Dex at all.** | History records *"performed with the board's GitHub credential"*. |
+| 3 | **`GITHUB_POLL_TOKEN`** | Only if set, and only when the App is absent or momentarily unmintable | Same note as above. |
+| 4 | **Nothing** | none configured | Fails **loudly**, naming `GITHUB_APP_ID` and the rest. |
+
+| Kind of call | Behaviour under Dex |
+|---|---|
+| **Read** — assignee picker, PR picker, reading a PR to link, reconciliation | Works via the App. Without any credential, degrades to an empty list **with a note naming the variables to set**. |
+| **Action** — create a branch, comment on a PR, set a commit status | Works via the App, and says so in item history — attribution is never implied falsely. |
+| Neither available | Never a silent no-op, and never a blocked state transition: the state change is applied first and is **not** rolled back by a GitHub failure. |
+
+**So: configure the GitHub App on any Dex-based deployment** (see *The board's
+own GitHub identity* above). The board is fully usable without it — items,
+board, sprints, dependencies, Ready queue and the whole API are unaffected — but
+the three GitHub-integration features will report themselves unavailable.
+
+> **The failure this replaces.** `GITHUB_POLL_TOKEN` was seeded as a literal
+> placeholder. Nothing validated it, so the assignee picker was simply empty,
+> "Start work" would have failed the first time anyone pressed it, and no log
+> line said why. Step 2 above takes the static token off the critical path; the
+> startup log line takes away the silence.
 
 ### Session revalidation
 
@@ -331,9 +407,10 @@ new one per event. Optionally (`PR_COMMIT_STATUS=true`) it also publishes an
 `ida-agile/work-item` commit status, making "is this attached to a story?"
 visible in the PR checks list.
 
-Commenting acts as the linking user. A webhook-driven event has **no user in
-context**; to have those comment too, supply a GitHub App installation token or
-bot PAT via `GITHUB_POLL_TOKEN`. Without it, auto-linking still works — only the
+Commenting acts as the linking user when they have a token of their own, and as
+the board's GitHub App otherwise — a webhook-driven event has **no user in
+context**, so the App is what lets those comment at all. Either way the comment
+is a courtesy: if it cannot be posted, auto-linking still works and only the
 comment is skipped, never the link.
 
 ---
