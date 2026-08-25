@@ -27,6 +27,7 @@ from dataclasses import dataclass
 import httpx
 
 from ida_core.contracts import ChatMessage, ModelEntry, SamplingParams, TokenUsage
+from ida_core.registry import resolve_base_url
 from ida_harness.errors import PermanentModelError, TransientModelError
 
 TRANSIENT_STATUS_CODES = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
@@ -97,7 +98,11 @@ class OpenAICompatibleClient:
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
         self._client = httpx.Client(
-            base_url=entry.base_url.rstrip("/"),
+            # resolve_base_url, NOT entry.base_url: the endpoint is env-indirect
+            # so that ONE promoted image can point at the mock in dev and at a
+            # real provider in prod. Reading the literal here would silently
+            # defeat the safety switch.
+            base_url=resolve_base_url(entry).rstrip("/"),
             headers=headers,
             timeout=entry.timeout_s,
             transport=transport,

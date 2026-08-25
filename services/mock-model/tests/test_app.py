@@ -171,3 +171,22 @@ class TestInProcessTransport:
         for _ in range(3):
             with httpx.Client(base_url="http://mock-model:8000/v1", transport=transport) as client:
                 assert client.post("/chat/completions", json=payload).status_code == 200
+
+
+class TestProbeContract:
+    """The chart probes /healthz for BOTH liveness and readiness; compose and the
+    tracer use /health. Losing either path breaks a deployment, not a test."""
+
+    def test_healthz_is_served(self, client) -> None:
+        response = client.get("/healthz")
+        assert response.status_code == 200
+        assert response.json()["status"] == "ok"
+
+    def test_health_and_healthz_agree(self, client) -> None:
+        assert client.get("/health").json() == client.get("/healthz").json()
+
+    def test_the_console_entrypoint_exists(self) -> None:
+        """`command: ["ida-mock-model"]` in the chart resolves to this."""
+        from ida_mock_model.main import main
+
+        assert callable(main)

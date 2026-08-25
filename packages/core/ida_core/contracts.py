@@ -269,7 +269,29 @@ class ModelEntry(BaseModel):
 
     display_name: str
     base_url: str
-    """OpenAI-compatible base, *including* ``/v1``.  e.g. ``http://mock-model:8000/v1``."""
+    """OpenAI-compatible base, *including* ``/v1``.  e.g. ``http://mock-model:8000/v1``.
+
+    A literal, and therefore the FALLBACK.  Prefer :attr:`base_url_env` whenever
+    the endpoint differs per environment -- see below.
+    """
+
+    base_url_env: str | None = None
+    """Name of an env var that OVERRIDES :attr:`base_url` when set and non-empty.
+
+    This is the credit/hardware safety switch, and it has to be env indirection
+    rather than a literal because ONE image is promoted byte-identically across
+    dev, staging and prod.  ``MOCK_MODEL_BASE_URL`` is patched per overlay --
+    pointed at the in-cluster stub in dev and preview, and EMPTY in staging and
+    prod -- and the chart's render test asserts both directions.  With only a
+    literal here, that patch would have no effect and dev would resolve a
+    docker-compose hostname.
+
+    Same mechanism gives ``sparks-local`` its ``SPARKS_BASE_URL``, which is empty
+    everywhere today (no egress route to campus), so selecting it fails fast with
+    a clear message instead of hanging.
+
+    Like :attr:`api_key_env` this holds the NAME of a variable, never a value.
+    """
 
     api_key_env: str | None = None
     """Name of the env var holding the key.  ``None`` for unauthenticated endpoints.
@@ -284,6 +306,17 @@ class ModelEntry(BaseModel):
     max_retries: Annotated[int, Field(ge=0, le=10)] = 3
     enabled: bool = True
     tags: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _has_somewhere_to_send_the_request(self) -> ModelEntry:
+        """An entry with neither a literal endpoint nor a variable naming one is
+        unusable, and the only honest time to say so is at load."""
+        if not self.base_url and not self.base_url_env:
+            raise ValueError(
+                f"model {self.key!r} has neither base_url nor base_url_env; "
+                "one of them must say where to send the request"
+            )
+        return self
 
     @model_validator(mode="after")
     def _registry_key_matches(self) -> ModelEntry:

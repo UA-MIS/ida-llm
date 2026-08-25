@@ -52,7 +52,12 @@
     "modelEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["key", "display_name", "base_url", "serving"],
+      "required": ["key", "display_name", "serving"],
+      "anyOf": [
+        { "required": ["base_url"], "properties": { "base_url": { "minLength": 1 } } },
+        { "required": ["base_url_env"] }
+      ],
+      "$comment": "An entry needs SOMEWHERE to send the request: a literal base_url, an env var naming one, or both (env wins, literal is the fallback). base_url may be the empty string only alongside base_url_env -- that is the deliberate 'fail loudly, never guess' shape used by sparks-local.",
       "properties": {
         "key": {
           "type": "string",
@@ -62,12 +67,17 @@
         "display_name": { "type": "string", "minLength": 1 },
         "base_url": {
           "type": "string",
-          "format": "uri",
-          "pattern": "^https?://",
-          "description": "OpenAI-compatible base URL, INCLUDING the /v1 suffix."
+          "pattern": "^(https?://.+)?$",
+          "description": "OpenAI-compatible base URL, INCLUDING the /v1 suffix. May be empty ONLY when base_url_env is set, meaning there is no fallback and an unset variable must fail loudly rather than resolve to a guess."
+        },
+        "base_url_env": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "description": "Name of an env var that OVERRIDES base_url when set and non-empty. The NAME, never a URL. This is the safety switch: one image is promoted byte-identically across environments, so a per-env endpoint cannot be a literal."
         },
         "api_key_env": {
           "type": ["string", "null"],
+          "pattern": "^[A-Z][A-Z0-9_]*$",
           "description": "Name of the env var holding the key. The key itself is NEVER in YAML."
         },
         "serving": { "$ref": "#/$defs/servingConfig" },

@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError as PydanticValidationError
 
 from ida_core.config import Settings, repo_root
 from ida_core.contracts import ModelEntry, ServingConfig, ServingStack
-from ida_core.registry import MissingApiKeyError, load_registry, resolve_api_key
+from ida_core.registry import (
+    MissingApiKeyError,
+    MissingBaseUrlError,
+    load_registry,
+    resolve_api_key,
+    resolve_base_url,
+)
 from ida_core.validation import ValidationError
 
 MINIMAL = """
@@ -158,3 +165,85 @@ class TestGitShaShapeChecking:
 
         monkeypatch.setenv("IDA_GIT_SHA", "b" * 40)
         assert current_git_sha() == "b" * 40
+
+
+class TestResolveBaseUrl:
+    """The credit/hardware safety switch.
+
+    ONE image is promoted byte-identically from dev to staging to prod, so the
+    endpoint a model resolves to CANNOT be baked into the image -- it has to come
+    from the environment. `MOCK_MODEL_BASE_URL` is patched per overlay (the
+    in-cluster stub in dev and preview, EMPTY in staging and prod) and
+    .devops/ci/chart-render.test.sh asserts both directions. These tests are the
+    app-side half of that assertion.
+    """
+
+    @staticmethod
+    def _entry(**overrides) -> ModelEntry:
+        base = {
+            "key": "probe",
+            "display_name": "Probe",
+            "base_url": "http://literal:8000/v1",
+            "serving": {"model_id": "m", "serving_stack": "mock"},
+        }
+        base.update(overrides)
+        return ModelEntry.model_validate(base)
+
+    def test_the_literal_is_used_when_no_variable_is_declared(self) -> None:
+        assert resolve_base_url(self._entry(), env={}) == "http://literal:8000/v1"
+
+    def test_the_variable_wins_when_set(self) -> None:
+        entry = self._entry(base_url_env="MOCK_MODEL_BASE_URL")
+        resolved = resolve_base_url(entry, env={"MOCK_MODEL_BASE_URL": "http://in-cluster"})
+        assert resolved == "http://in-cluster"
+
+    def test_an_empty_variable_falls_back_to_the_literal(self) -> None:
+        """THE safety switch, in the shape the overlays actually use.
+
+        staging and prod set MOCK_MODEL_BASE_URL to "" rather than deleting the
+        key, so an overlay diff shows the switch being thrown rather than a line
+        quietly vanishing. Empty must therefore mean "not set", not "the endpoint
+        is the empty string".
+        """
+        entry = self._entry(base_url_env="MOCK_MODEL_BASE_URL")
+        assert resolve_base_url(entry, env={"MOCK_MODEL_BASE_URL": ""}) == (
+            "http://literal:8000/v1"
+        )
+
+    def test_whitespace_is_treated_as_empty(self) -> None:
+        entry = self._entry(base_url_env="MOCK_MODEL_BASE_URL")
+        assert resolve_base_url(entry, env={"MOCK_MODEL_BASE_URL": "   "}) == (
+            "http://literal:8000/v1"
+        )
+
+    def test_no_literal_and_no_value_fails_loudly_naming_the_variable(self) -> None:
+        """`sparks-local` is the live case: unreachable from this cluster today.
+
+        The message must name SPARKS_BASE_URL, because "which variable do I set"
+        is the only question the operator actually has. Silently resolving to
+        anything -- or hanging on a connect timeout -- answers it far too late.
+        """
+        entry = self._entry(base_url="", base_url_env="SPARKS_BASE_URL")
+        with pytest.raises(MissingBaseUrlError, match="SPARKS_BASE_URL"):
+            resolve_base_url(entry, env={})
+
+    def test_an_entry_with_neither_is_refused_at_load(self) -> None:
+        """Unlike the two resolve-at-use-time rules above, this one CAN be
+        decided at load: an entry with no endpoint at all is not "unconfigured
+        for this environment", it is unusable in every environment."""
+        with pytest.raises(PydanticValidationError, match="neither base_url"):
+            self._entry(base_url="")
+
+    def test_the_shipped_mock_entry_uses_the_switch(self) -> None:
+        """A regression guard on models.yaml itself: dropping base_url_env from
+        the mock entry would make the dev overlay's patch a silent no-op and dev
+        would try to resolve a docker-compose hostname."""
+        registry = load_registry(repo_root() / "models.yaml")
+        assert registry.get("mock").base_url_env == "MOCK_MODEL_BASE_URL"
+
+    def test_the_shipped_sparks_entry_is_present_disabled_and_fallback_free(self) -> None:
+        registry = load_registry(repo_root() / "models.yaml")
+        sparks = registry.get("sparks-local")
+        assert sparks.enabled is False
+        assert sparks.base_url_env == "SPARKS_BASE_URL"
+        assert sparks.base_url == "", "no fallback: fail loudly rather than guess"

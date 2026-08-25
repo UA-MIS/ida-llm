@@ -69,9 +69,21 @@ def create_app() -> FastAPI:
     )
     app.state.mock = MockState()
 
+    @app.get("/healthz")
     @app.get("/health")
     def health() -> dict:
-        """Liveness + readiness.  Trivially both, since there are no dependencies."""
+        """Liveness AND readiness -- trivially both, since there are no dependencies.
+
+        TWO PATHS, ONE BODY, and both are load-bearing:
+
+        * ``/healthz`` is what the chart's `ida-llm-mock-model` Deployment probes
+          for BOTH liveness and readiness.
+        * ``/health`` is what the docker-compose healthcheck and the tracer use.
+
+        The api splits these two paths because it HAS dependencies and liveness
+        must not touch them. This service has none, so there is nothing to split
+        -- and inventing a difference would only invite someone to "fix" it.
+        """
         return {"status": "ok", "service": "mock-model", "version": __version__}
 
     @app.get("/v1/models")

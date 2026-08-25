@@ -1,9 +1,18 @@
 """Load and validate ``models.yaml`` into a :class:`~ida_core.contracts.ModelRegistry`.
 
-Also resolves the API key: the YAML holds only the *name* of an env var
-(``api_key_env``); the value is read from the process environment at call time.
-That is what makes the same registry file safe to commit and safe to project
-from Vault in-cluster.
+Also resolves the two pieces of an entry that are DELIBERATELY not in the YAML:
+
+* the API key -- the file holds only the *name* of an env var (``api_key_env``)
+  and the value is read from the process environment at call time.  That is what
+  makes the same registry file safe to commit and safe to project from Vault.
+* the base URL -- ``base_url_env`` names a variable that overrides the literal
+  ``base_url``.  One image is promoted byte-identically across dev, staging and
+  prod, so an endpoint that differs per environment cannot be baked in.
+
+Both resolve at **use** time, never at load time.  A developer running only the
+mock model must not be forced to hold an Anthropic key, and a `models.yaml` that
+refuses to parse because one disabled entry's variable is unset is a file nobody
+can edit.
 """
 
 from __future__ import annotations
@@ -13,6 +22,17 @@ from pathlib import Path
 
 from ida_core.contracts import ModelEntry, ModelRegistry
 from ida_core.validation import load_yaml, validate_models_document
+
+
+class MissingBaseUrlError(RuntimeError):
+    """An entry declares ``base_url_env`` with no ``base_url`` fallback, and the
+    named variable is empty.
+
+    Raised at *use* time, with the variable's NAME in the message -- which is the
+    whole point of the indirection. ``sparks-local`` is the live example: it is
+    unreachable from this cluster today, so selecting it should say
+    "SPARKS_BASE_URL is unset", not hang on a connect timeout.
+    """
 
 
 class MissingApiKeyError(RuntimeError):
@@ -53,3 +73,29 @@ def resolve_api_key(entry: ModelEntry, env: dict[str, str] | None = None) -> str
             f"model {entry.key!r} requires env var {entry.api_key_env!r}, which is unset"
         )
     return value
+
+
+def resolve_base_url(entry: ModelEntry, env: dict[str, str] | None = None) -> str:
+    """Return the endpoint for ``entry``.
+
+    Resolution order, and each step is deliberate:
+
+    1. ``base_url_env``, when the named variable is set **and non-empty**.
+       Emptiness is what makes the safety switch work: staging and prod set
+       ``MOCK_MODEL_BASE_URL`` to ``""`` rather than removing the key, so an
+       overlay diff shows the switch being thrown rather than a line vanishing.
+    2. ``base_url``, the committed literal -- correct for docker-compose.
+    3. :class:`MissingBaseUrlError`, naming the variable.
+
+    Mirrors :func:`resolve_api_key` exactly, including raising at use time.
+    """
+    environ = os.environ if env is None else env
+    if entry.base_url_env:
+        value = (environ.get(entry.base_url_env) or "").strip()
+        if value:
+            return value
+    if entry.base_url:
+        return entry.base_url
+    raise MissingBaseUrlError(
+        f"model {entry.key!r} has no base_url and env var {entry.base_url_env!r} is unset or empty"
+    )

@@ -4,9 +4,12 @@
 # Everything here has an in-cluster counterpart:
 #   postgres    -> CloudNativePG
 #   minio       -> the platform MinIO tenant
-#   redis       -> the redis Deployment in infra/k8s/base
-#   mock-model  -> the mock-model Deployment (dev/PR-preview only)
-# The api and runner containers are the SAME image, differing only by command.
+#   redis       -> the redis StatefulSet in .devops/chart/base
+#   mock-model  -> the ida-llm-mock-model Deployment (dev/preview only; 0 replicas
+#                  in staging and prod -- that is the credit safety switch)
+# api, runner and mock-model are the SAME image, differing only by command --
+# exactly as in the cluster, which is what makes "build once, promote the same
+# image" mean something.
 #
 # HOST PORTS ARE OVERRIDABLE. Every published port reads an env var with a
 # sensible default, because a developer machine may already be running something
@@ -27,22 +30,36 @@ x-python-image: &python-image
     args:
       GIT_SHA: ${GIT_SHA:-}
 
+# ⚠ THE PLATFORM'S NAMES, NOT OURS, wherever the cluster supplies one. The
+# ConfigMap `ida-llm-config` and the ESO-materialised Secrets write UNPREFIXED
+# variables, so local dev exercises the same code path the cluster does. Using
+# IDA_-prefixed names here would leave the dual-alias in ida_core.config
+# untested by anything anyone actually runs.
+#
+# `postgresql://` -- bare, no +psycopg -- ON PURPOSE: that is the scheme ESO
+# writes, and normalising it is the app's job (ida_core.config
+# .normalize_database_url). Writing the normalised form here would hide the very
+# bug that helper exists to prevent.
 x-python-env: &python-env
-  IDA_DATABASE_URL: postgresql+psycopg://ida:ida@postgres:5432/ida
-  IDA_REDIS_URL: redis://redis:6379/0
-  IDA_S3_ENDPOINT_URL: http://minio:9000
-  IDA_S3_ACCESS_KEY: minioadmin
-  IDA_S3_SECRET_KEY: minioadmin
-  IDA_S3_BUCKET: ida-artifacts
+  DATABASE_URL: postgresql://ida:ida@postgres:5432/ida
+  REDIS_URL: redis://redis:6379/0
+  MINIO_ENDPOINT: minio
+  MINIO_PORT: "9000"
+  MINIO_USE_SSL: "false"
+  MINIO_ACCESS_KEY: minioadmin
+  MINIO_SECRET_KEY: minioadmin
+  MINIO_BUCKET: run-artifacts
+  MOCK_MODEL_BASE_URL: http://mock-model:8000/v1
+  LOG_LEVEL: INFO
+  # App-internal knobs have no ConfigMap entry, so they keep the IDA_ prefix.
   IDA_ARTIFACT_BACKEND: s3
   IDA_MODELS_FILE: /app/models.yaml
   IDA_TASKS_DIR: /app/tasks
-  IDA_LOG_LEVEL: INFO
   IDA_AUTH_MODE: disabled
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine  # matches the platform's tenant DB tier
     environment:
       POSTGRES_USER: ida
       POSTGRES_PASSWORD: ida
@@ -87,8 +104,9 @@ services:
 
   mock-model:
     <<: *python-image
-    command:
-      ["uvicorn", "ida_mock_model.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    # The SAME console script the chart's Deployment runs, not a bare uvicorn
+    # line -- so local dev exercises the entry point the cluster uses.
+    command: ["ida-mock-model"]
     environment:
       MOCK_MODEL_ID: mock-echo-1
       MOCK_LATENCY_MS: "25"   # a little latency so timings in the UI are non-zero
@@ -118,8 +136,7 @@ services:
 
   api:
     <<: *python-image
-    command:
-      ["uvicorn", "ida_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["ida-api"]
     environment: *python-env
     ports:
       - "${API_PORT:-8000}:8000"
@@ -137,7 +154,7 @@ services:
 
   runner:
     <<: *python-image
-    command: ["python", "-m", "ida_runner.main"]
+    command: ["ida-runner"]
     environment: *python-env
     depends_on:
       bootstrap: {condition: service_completed_successfully}
@@ -148,14 +165,17 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        # Baked at build time: Next.js inlines NEXT_PUBLIC_* into the client bundle.
-        NEXT_PUBLIC_API_BASE_URL: http://localhost:${API_PORT:-8000}
+      # ⚠ CONTEXT IS THE REPO ROOT, matching .devops/components.yaml. The
+      # frontend Dockerfile's paths are repo-relative for that reason.
+      context: .
+      dockerfile: frontend/Dockerfile
     environment:
-      # Server-side (RSC) calls go over the compose network, not via localhost.
-      API_BASE_URL: http://api:8000
+      # THE ONLY api base, and it is server-side. There is no NEXT_PUBLIC_*
+      # equivalent and there must not be one: the browser can never reach the
+      # api (it has no Ingress in any environment), and NEXT_PUBLIC_* is inlined
+      # at BUILD time while one frontend image is promoted byte-identically
+      # across dev, staging and prod. `API_URL` is the ConfigMap's name for it.
+      API_URL: http://api:8000
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
