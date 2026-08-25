@@ -233,6 +233,27 @@ def finish_run(session: Session, record: RunRecord) -> RunRow:
     row.error_count = record.error_count
     row.mean_score = record.mean_score
     row.task_content_sha = record.task_content_sha or row.task_content_sha
+    # ⚠ THE BUILD THAT EXECUTED IT, NOT THE ONE THAT ENQUEUED IT.
+    #
+    # This line was MISSING, and its absence was invisible: the worker computes
+    # `record.harness_version` from the eval log and this function silently
+    # dropped it, so the value that survived was whatever the api or the sweep
+    # stamped at ENQUEUE time. For a field documented as "the version that
+    # executed the run" that is the wrong build by construction whenever the two
+    # differ -- which is exactly what a rolling deploy does: pods on the old
+    # image enqueue, pods on the new image execute, and every row credits the
+    # code that merely queued the work.
+    #
+    # It read as correct because the two builds usually ARE the same, so the
+    # dropped write and a working write produce identical rows on a quiet
+    # cluster. `services/runner/tests/test_worker.py::
+    # TestExecutedRunsRecordTheBuildThatRanThem` is what makes the difference
+    # observable.
+    #
+    # `or row.harness_version` guards a blank rather than letting it erase a good
+    # value -- the same idiom as `task_content_sha` above, and the column is NOT
+    # NULL.
+    row.harness_version = record.harness_version or row.harness_version
     row.prompt_tokens = record.total_usage.prompt_tokens
     row.completion_tokens = record.total_usage.completion_tokens
     row.total_cost_usd = record.total_cost_usd

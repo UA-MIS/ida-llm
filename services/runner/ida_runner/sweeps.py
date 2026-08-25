@@ -377,6 +377,15 @@ def enqueue_candidates(
     # Without it, "show me what last night's rebenchmark did" is a timestamp
     # range guess rather than a filter the API already supports.
     sweep_id = new_id("swp")
+    # ⚠ RESOLVED ONCE PER FIRING, NOT PER CANDIDATE. With IDA_GIT_SHA unset
+    # `build_identity()` shells out to `git`, and a rebenchmark plans hundreds of
+    # candidates -- so calling it inside the loop below would fork a subprocess
+    # per row for a value that cannot change mid-sweep. Same rule `ctx.git_sha`
+    # already follows (resolved once in `build_context`) and the same rule
+    # `ida_api.app.HARNESS_VERSION` follows. Deliberately a LOCAL and not a module
+    # constant: the sweep must read the environment as it is when it FIRES, which
+    # is also what keeps it honest under a test that changes directory.
+    harness_version = build_identity()
     report.sweep_id = sweep_id
 
     records: list[RunRecord] = []
@@ -393,7 +402,7 @@ def enqueue_candidates(
                 sweep_id=sweep_id,
                 task_git_sha=git_sha,
                 task_content_sha=candidate.content_sha,
-                harness_version=build_identity(),
+                harness_version=harness_version,
                 sample_count=candidate.sample_count,
                 created_at=now,
             )
