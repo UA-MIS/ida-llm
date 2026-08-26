@@ -22,7 +22,7 @@ export default function RootLayout({
               <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>
                 Capstone-IDA
               </Link>
-              <span className="badge badge-version">v0.1.3</span>
+              <span className="badge badge-version">v0.1.4</span>
             </h1>
           </header>
           {children}
