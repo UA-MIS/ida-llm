@@ -121,13 +121,6 @@ jobs:
         env:
           HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
           HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
-          # TEMPORARY (demo 2026-08-26). The runner cannot REACH Harbor at all --
-          # promote.sh's tag check returns HTTP 000 (unreachable), not 401, so a
-          # credential does not fix it and every promotion is refused. Driven by
-          # the repo variable so turning it off is a VARIABLE DELETE, not a code
-          # revert: unset/absent -> empty -> the guard is fully armed again.
-          # REVERT AFTER THE DEMO: gh variable delete ALLOW_UNVERIFIED_PROMOTE
-          ALLOW_UNVERIFIED_PROMOTE: ${{ vars.ALLOW_UNVERIFIED_PROMOTE }}
         run: |
           set -eu
           if [ -n "${HARBOR_USERNAME:-}" ] && [ -n "${HARBOR_PASSWORD:-}" ]; then
@@ -157,6 +150,13 @@ jobs:
           # is the documented "fall through to DOCKER_CONFIG" case, not an error.
           HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
           HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+          # TEMPORARY (demo 2026-08-26). The runner cannot REACH Harbor at all --
+          # promote.sh's tag check returns HTTP 000 (unreachable), not 401, so a
+          # credential does not fix it and every promotion is refused. Driven by
+          # the repo variable so turning it off is a VARIABLE DELETE, not a code
+          # revert: unset/absent -> empty -> the guard is fully armed again.
+          # REVERT AFTER THE DEMO: gh variable delete ALLOW_UNVERIFIED_PROMOTE
+          ALLOW_UNVERIFIED_PROMOTE: ${{ vars.ALLOW_UNVERIFIED_PROMOTE }}
         run: |
           set -eu
           echo "registry credential source: ${HARBOR_CREDENTIAL_SOURCE}"
