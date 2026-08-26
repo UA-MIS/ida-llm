@@ -137,6 +137,45 @@ echo "==> ${FROM} is live at ${LIVE_TAG}"
 # the documented, deliberately loud escape hatch for an operator who has
 # confirmed the images another way and needs to ship anyway.
 PROBE_TIMEOUT="${REGISTRY_PROBE_TIMEOUT:-10}"
+
+# ── THE REGISTRY MAY BE FRONTED BY A PRIVATE CA, AND THAT READS AS HTTP 000 ──
+#
+# THE BUG THIS CLOSES (live-reproduced in arc-runners, 2026-08-26). This job's
+# pod carries a `hostAliases` entry pinning the registry hostname to the
+# in-cluster Traefik ClusterIP -- the platform does that deliberately so image
+# traffic stays inside the cluster instead of hairpinning out through Cloudflare
+# (which caps bodies at 100MB and 413s a real push). Going direct to Traefik
+# means the certificate presented is the PLATFORM's, issued by
+# `CN=capstone-platform-ca` -- NOT the public certificate Cloudflare terminates
+# with. curl does not trust that issuer out of the box, so every probe died with
+# exit 60 ("unable to get local issuer certificate"), which this script's
+# transport turns into an empty body -> HTTP 000 -> inconclusive -> REFUSE.
+#
+# ⚠ THE GUARD WAS RIGHT. 000 meant "I could not get a verdict", and it refused,
+# exactly as designed. The defect was never the guard's logic -- it was that the
+# probe could not complete a TLS handshake the rest of the platform completes
+# fine. So the fix belongs HERE, in how the probe reaches the registry, and the
+# fail-closed classification above is left untouched.
+#
+# ⚠ VERIFICATION STAYS ON. This does NOT pass -k / --insecure and does NOT set
+# verify=False; a promote that trusts any certificate is a promote that can be
+# answered by anything on the path. It ADDS one more trusted issuer -- the CA
+# the ARC container hook already mounts into this very pod -- and nothing else.
+#
+# WHY IT IS A SECOND PASS AND NOT A REPLACEMENT: --cacert REPLACES the system
+# trust store rather than adding to it, so pinning it unconditionally would
+# BREAK any tenant whose registry presents an ordinary public certificate. The
+# first attempt is therefore byte-for-byte today's behaviour (system trust); the
+# platform CA is tried only when that attempt produced no answer at all. A
+# working probe can never be made worse by this, and a probe that already failed
+# gets one more chance to return a real verdict.
+if [ -z "${REGISTRY_CA_BUNDLE:-}" ]; then
+  for _ca in "/kaniko/ssl/certs/platform-ca.crt" "/etc/ssl/certs/platform-ca.crt"; do
+    if [ -s "${_ca}" ]; then REGISTRY_CA_BUNDLE="${_ca}"; break; fi
+  done
+fi
+REGISTRY_CA_BUNDLE="${REGISTRY_CA_BUNDLE:-}"
+[ -s "${REGISTRY_CA_BUNDLE}" ] || REGISTRY_CA_BUNDLE=""
 # Every manifest media type a Harbor-hosted image can present. Omitting these
 # makes a registry answer 404 for an image that exists but is an OCI index —
 # which would be a FALSE ALARM, and a guard that cries wolf gets switched off.
@@ -218,7 +257,7 @@ PY
 # TLS verification stays ON: a promote that trusts any certificate is a promote
 # that can be answered by anything on the path.
 PY_PROBE='
-import os, urllib.error, urllib.request
+import os, ssl, urllib.error, urllib.request
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -244,8 +283,16 @@ request = urllib.request.Request(os.environ["PROBE_URL"], method="GET")
 request.add_header("Accept", os.environ["PROBE_ACCEPT"])
 if os.environ.get("PROBE_AUTH"):
     request.add_header("Authorization", os.environ["PROBE_AUTH"])
+handlers = [NoRedirect]
+# PROBE_CA mirrors curl --cacert on the other transport: an ADDITIONAL trusted
+# issuer for a registry fronted by a private CA. create_default_context keeps
+# check_hostname and CERT_REQUIRED on -- this never becomes an unverified probe.
+probe_ca = os.environ.get("PROBE_CA") or ""
+if probe_ca:
+    handlers.append(urllib.request.HTTPSHandler(
+        context=ssl.create_default_context(cafile=probe_ca)))
 try:
-    opener = urllib.request.build_opener(NoRedirect)
+    opener = urllib.request.build_opener(*handlers)
     response = opener.open(request, timeout=float(os.environ["PROBE_TIMEOUT_S"]))
     status, headers, body = response.status, response.headers, response.read()
 except urllib.error.HTTPError as exc:
@@ -264,8 +311,12 @@ else:
 # ("Basic ..." or "Bearer ..."), empty for anonymous. Never fails the script: an
 # unreachable registry is a RESULT (classified as inconclusive by the caller),
 # not a stack of set -e surprises here.
-http_get() {
-  local url="$1" auth="${2:-}" mode="${3:-status}" out=""
+# One attempt with ONE trust configuration. `ca` empty means the system trust
+# store (today's behaviour, unchanged); non-empty means additionally trust that
+# bundle. Split out of http_get so the two-pass retry below is the only new
+# control flow, and each pass is provably the same request it always was.
+http_get_once() {
+  local url="$1" auth="${2:-}" mode="${3:-status}" ca="${4:-}" out=""
   case "${HTTP_CLIENT}" in
     curl)
       # ⚠ NO -L, DELIBERATELY. Following a redirect would forward the
@@ -274,6 +325,8 @@ http_get() {
       # the other transport). A 3xx must stay a 3xx so it reads as inconclusive.
       local args=(-s --connect-timeout 5 -m "${PROBE_TIMEOUT}" -H "Accept: ${ACCEPT_MANIFESTS}")
       [ -n "${auth}" ] && args+=(-H "Authorization: ${auth}")
+      # ⚠ --cacert, NOT -k. Adds an issuer; never disables verification.
+      [ -n "${ca}" ] && args+=(--cacert "${ca}")
       case "${mode}" in
         status)    out="$(curl "${args[@]}" -o /dev/null -w '%{http_code}' "${url}" 2>/dev/null)" || out="" ;;
         challenge) out="$(curl "${args[@]}" -D - -o /dev/null "${url}" 2>/dev/null \
@@ -283,9 +336,31 @@ http_get() {
       ;;
     python3)
       out="$(PROBE_URL="${url}" PROBE_AUTH="${auth}" PROBE_TIMEOUT_S="${PROBE_TIMEOUT}" \
-             PROBE_ACCEPT="${ACCEPT_MANIFESTS}" PROBE_MODE="${mode}" python3 -c "${PY_PROBE}" 2>/dev/null)" || out=""
+             PROBE_ACCEPT="${ACCEPT_MANIFESTS}" PROBE_MODE="${mode}" PROBE_CA="${ca}" \
+             python3 -c "${PY_PROBE}" 2>/dev/null)" || out=""
       ;;
   esac
+  printf '%s' "${out}"
+}
+
+# One GET, three things we might want from it. `auth` is the FULL header value
+# ("Basic ..." or "Bearer ..."), empty for anonymous. Never fails the script: an
+# unreachable registry is a RESULT (classified as inconclusive by the caller),
+# not a stack of set -e surprises here.
+#
+# TWO PASSES, AND ONLY WHEN THE FIRST ONE SAID NOTHING. Pass 1 is exactly the
+# request this function has always made. An EMPTY result means the transport
+# never got an HTTP answer -- a dead connection, or the private-CA TLS failure
+# documented at REGISTRY_CA_BUNDLE above. Only then is pass 2 run with the
+# platform CA added. A 401, a 404, a 500 -- any real answer -- returns
+# immediately and pass 2 never happens, so the credential is not re-sent and no
+# extra load is put on a registry that is answering fine.
+http_get() {
+  local url="$1" auth="${2:-}" mode="${3:-status}" out=""
+  out="$(http_get_once "${url}" "${auth}" "${mode}" "")"
+  if [ -z "${out}" ] && [ -n "${REGISTRY_CA_BUNDLE}" ]; then
+    out="$(http_get_once "${url}" "${auth}" "${mode}" "${REGISTRY_CA_BUNDLE}")"
+  fi
   printf '%s' "${out}"
 }
 
