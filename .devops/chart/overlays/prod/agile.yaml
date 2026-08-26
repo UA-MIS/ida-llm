@@ -123,43 +123,30 @@ spec:
                   name: ida-llm-agile-secret
                   key: GITHUB_POLL_TOKEN
                   optional: true
-            # ── The board's OWN GitHub identity ────────────────────────────
-            # Under Dex a session carries identity and groups but NO GitHub
-            # token, so the assignee picker, "Start work" branch creation and PR
-            # backlink comments have nothing to call the API with. These three
-            # give the board an identity of its own: the SAME platform GitHub
-            # App every tool here already uses, so provisioning a new board is a
-            # copy of three values, not a new App registration.
+            # ── The board's GitHub identity: DELIBERATELY ABSENT (SEC-037) ──
+            # GITHUB_APP_ID / _INSTALLATION_ID / _PRIVATE_KEY were wired here from
+            # `ida-llm-agile-secret`. They have been removed, along with the three
+            # properties that fed them (see agile-secret.externalsecret.yaml).
             #
-            # ⚠ The private key is a multi-line PEM — the single most fragile
-            # thing to carry through Vault -> ESO -> env. Seed it BASE64-ENCODED
-            # into Vault; the app also accepts real newlines and `\n`-escaped
-            # newlines, so a key mangled in transit still works instead of
-            # producing an opaque 401 on every GitHub call.
+            # Those values are the private key of `ua-mis-backstage` (app_id
+            # 4097147) — installed org-wide with `administration: write`,
+            # `contents: write` and `workflows: write`, and a branch-protection
+            # bypass on `platform-infra` main. A pod in THIS namespace can mount
+            # any Secret in it, and this namespace is reconciled from this repo at
+            # HEAD, so holding that key here means one ordinary commit — or one
+            # change to the board image this team builds itself — yields org-admin
+            # GitHub for all of UA-MIS. Placement, not permissions, is the bug.
             #
-            # `optional: true`, like the two above: a board without them degrades
-            # to the acting user's own token rather than failing to start. What
-            # is NOT optional any more is knowing — the pod logs
-            # `[startup] GitHub credential: ...` on boot, so "configured but
-            # inert" (which is exactly how this broke) cannot be silent again.
-            - name: GITHUB_APP_ID
-              valueFrom:
-                secretKeyRef:
-                  name: ida-llm-agile-secret
-                  key: GITHUB_APP_ID
-                  optional: true
-            - name: GITHUB_APP_INSTALLATION_ID
-              valueFrom:
-                secretKeyRef:
-                  name: ida-llm-agile-secret
-                  key: GITHUB_APP_INSTALLATION_ID
-                  optional: true
-            - name: GITHUB_APP_PRIVATE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: ida-llm-agile-secret
-                  key: GITHUB_APP_PRIVATE_KEY
-                  optional: true
+            # The consequence, stated plainly: the assignee picker, "Start work"
+            # branch creation and PR backlink comments are UNAVAILABLE until this
+            # board migrates onto platform-infra/platform-services/agile-boards/,
+            # where the same App key is read from `platform/agile-board` into the
+            # platform-owned `agile` namespace that students cannot schedule pods
+            # in. The pod still starts and still logs `[startup] GitHub
+            # credential: ...`, so the gap is announced rather than silent.
+            #
+            # Everything else is untouched: sign-in (Dex), sessions, webhook
+            # ingest, polling and all board data use none of these three.
             # Attachment storage reuses the tenant's own MinIO — same credentials,
             # its own bucket. All four MINIO_* keys must be present or the app
             # leaves attachments disabled; endpoint/port/ssl/bucket come from the
