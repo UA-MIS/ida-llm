@@ -63,6 +63,11 @@ tbody tr:hover { background: var(--surface); }
   display: inline-block; padding: 0.1rem 0.45rem; border-radius: 999px;
   font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border);
 }
+.badge-version {
+  color: var(--accent); border-color: currentColor;
+  margin-left: 0.6rem; vertical-align: middle;
+  font-family: var(--mono); letter-spacing: 0.02em;
+}
 .badge-succeeded { color: var(--pass); border-color: currentColor; }
 .badge-failed    { color: var(--fail); border-color: currentColor; }
 .badge-partial   { color: var(--pending); border-color: currentColor; }
