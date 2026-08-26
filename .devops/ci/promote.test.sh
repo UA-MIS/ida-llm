@@ -765,5 +765,85 @@ done
 
 fi
 
+# ── 20) THE PRIVATE-CA SECOND PASS (2026-08-26 regression) ──────────────────
+#
+# The promote job's pod pins the registry hostname to the in-cluster Traefik
+# ClusterIP via hostAliases, so the certificate presented is the platform's
+# (CN=capstone-platform-ca), not the public one Cloudflare terminates with.
+# curl rejected it with exit 60, the transport returned empty, and that became
+# HTTP 000 -> inconclusive -> every promotion refused. Live-reproduced in
+# arc-runners: `code=000 exit=60` without the CA, `code=401` with it.
+#
+# These cases pin the CONTROL FLOW of the fix, which is where the risk is --
+# not curl's TLS stack, which is not ours to test. A `curl` shim on PATH
+# records every invocation, so we can assert exactly how many times the
+# transport ran and whether --cacert was present each time.
+CA_DIR="$(mktemp -d)"
+printf 'not-a-real-cert\n' > "${CA_DIR}/platform-ca.crt"
+
+# $1 = what the shim should print on its FIRST call ("" simulates the TLS
+#      failure: curl writes nothing and exits non-zero).
+# $2 = what it should print on every later call.
+make_curl_shim() {
+  local first="$1" rest="$2" dir; dir="$(mktemp -d)"
+  cat > "${dir}/curl" <<SHIM
+#!/usr/bin/env bash
+echo "\$@" >> "${dir}/calls.log"
+if [ "\$(grep -c . "${dir}/calls.log")" -eq 1 ]; then
+  [ -n '${first}' ] || exit 60
+  printf '%s' '${first}'
+else
+  [ -n '${rest}' ] || exit 60
+  printf '%s' '${rest}'
+fi
+SHIM
+  chmod +x "${dir}/curl"
+  printf '%s' "${dir}"
+}
+
+# 20a) First pass answers -> the CA pass must NEVER run, and the one call made
+#      must NOT carry --cacert. This is the "do not break the working case"
+#      guarantee: a tenant on an ordinary public certificate is untouched.
+SHIM_DIR="$(make_curl_shim '200' '200')"
+R20="$(make_repo_at "harbor.example.com/team-sample")"
+REGISTRY_HTTP_CLIENT=curl REGISTRY_CA_BUNDLE="${CA_DIR}/platform-ca.crt" \
+  PATH="${SHIM_DIR}:${PATH}" bash "${R20}/.devops/ci/promote.sh" staging prod >/tmp/promote.log 2>&1; RC=$?
+assert_eq "private-ca: healthy probe rc" "${RC}" "0"
+assert_eq "private-ca: healthy probe makes ONE call per url (no CA retry)" \
+  "$(grep -c -- '--cacert' "${SHIM_DIR}/calls.log" || true)" "0"
+
+# 20b) First pass returns nothing (the exit-60 shape) -> a second pass MUST run
+#      for the same url, and it MUST carry --cacert. Without this the guard
+#      stays stuck at 000 and refuses every promotion, which is the outage.
+SHIM_DIR="$(make_curl_shim '' '200')"
+R21="$(make_repo_at "harbor.example.com/team-sample")"
+REGISTRY_HTTP_CLIENT=curl REGISTRY_CA_BUNDLE="${CA_DIR}/platform-ca.crt" \
+  PATH="${SHIM_DIR}:${PATH}" bash "${R21}/.devops/ci/promote.sh" staging prod >/tmp/promote.log 2>&1; RC=$?
+assert_eq "private-ca: TLS-failed probe recovers via CA retry rc" "${RC}" "0"
+if [ "$(grep -c -- '--cacert' "${SHIM_DIR}/calls.log" || true)" -ge 1 ]; then
+  PASS=$((PASS+1))
+else
+  FAIL=$((FAIL+1)); echo "FAIL [private-ca retry]: no second pass carried --cacert"
+fi
+
+# 20c) ⚠ VERIFICATION IS NEVER DISABLED. The whole point is to ADD an issuer,
+#      not to stop checking. If -k/--insecure ever appears on a probe, a
+#      promote can be answered by anything on the path -- fail loudly.
+if grep -qE -- '(^| )(-k|--insecure)( |$)' "${SHIM_DIR}/calls.log"; then
+  FAIL=$((FAIL+1)); echo "FAIL [private-ca no -k]: the probe disabled TLS verification"
+else
+  PASS=$((PASS+1))
+fi
+
+# 20d) NO CA AVAILABLE -> behaviour is exactly as before: one pass, still fails
+#      closed. The fix must not invent a pass out of a missing file.
+SHIM_DIR="$(make_curl_shim '' '')"
+R22="$(make_repo_at "harbor.example.com/team-sample")"
+REGISTRY_HTTP_CLIENT=curl REGISTRY_CA_BUNDLE="/nonexistent/ca.crt" \
+  PATH="${SHIM_DIR}:${PATH}" bash "${R22}/.devops/ci/promote.sh" staging prod >/tmp/promote.log 2>&1; RC=$?
+assert_eq "private-ca: absent CA still fails closed" "${RC}" "1"
+assert_eq "private-ca: absent CA adds no --cacert" \
+  "$(grep -c -- '--cacert' "${SHIM_DIR}/calls.log" || true)" "0"
+
 echo "== FINAL: $PASS passed, $FAIL failed =="
 [ "${FAIL}" -eq 0 ]
