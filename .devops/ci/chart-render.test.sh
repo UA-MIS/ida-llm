@@ -13,8 +13,9 @@
 #     claim never binds and the symptom points at the wrong workload.
 # Plus two that are specific to this app and would be expensive to get wrong:
 #   * a mock model endpoint reachable in staging/prod (results silently faked);
-#   * unsuspended nightly sweeps in a preview namespace (every open PR burning
-#     provider credits three times a night).
+#   * an unsuspended nightly sweep in ANY namespace -- the sweeps are currently
+#     frozen in every environment, and a silent un-suspend puts an unattended
+#     credit-spending job back on a timer with nobody watching.
 #
 # Requires: kubectl (for `kubectl kustomize`) and python3.
 # Run: .devops/ci/chart-render.test.sh
@@ -176,14 +177,31 @@ check((config or {}).get("data", {}).get("SPARKS_BASE_URL", "") == "",
       "SPARKS_BASE_URL is empty (no egress route yet)")
 
 # ---- nightly sweeps in previews ---------------------------------------------
+# ⚠ THIS ASSERTION WAS INVERTED FOR dev/staging/prod. It used to require that
+# the sweeps were ACTIVE outside preview. They are now suspended EVERYWHERE, by
+# `suspend: true` in base/cronjobs.yaml -- a deliberate freeze on the only
+# unattended credit-spend surface in this chart, held until the team decides to
+# turn continuous benchmarking back on.
+#
+# The check is kept (rather than deleted) because it still guards the thing worth
+# guarding -- it now catches an ACCIDENTAL un-suspend, and it catches a PARTIAL
+# one, where a patch or a merge leaves one of the three firing while the other two
+# look correctly off. A silently-resumed sweep bills on a timer with nobody
+# watching; that is exactly the failure this suite exists to make loud.
+#
+# TO RE-ENABLE: flip `suspend` in .devops/chart/base/cronjobs.yaml AND change the
+# dev/staging/prod branch below back to asserting the sweeps are active. Two
+# deliberate edits, by design -- see the header comment in base/cronjobs.yaml.
 if env == "preview":
     # Left running, every open PR fires three benchmark sweeps a night against a
     # namespace with no quota. Single most expensive accident available here.
+    # Preview is suspended by its OWN overlay patch as well as by base, so it
+    # stays off even after base's suspend is flipped back for the real envs.
     check(all(c["spec"].get("suspend") is True for c in cronjobs),
           "preview: all CronJobs are suspended")
 else:
-    check(all(c["spec"].get("suspend", False) is False for c in cronjobs),
-          f"{env}: CronJobs are active")
+    check(all(c["spec"].get("suspend") is True for c in cronjobs),
+          f"{env}: all CronJobs are suspended (nightly sweeps frozen)")
 
 # ---- CronJob safety settings -------------------------------------------------
 for cron in cronjobs:

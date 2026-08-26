@@ -40,6 +40,23 @@ metadata:
 spec:
   schedule: "0 2 * * *"
   timeZone: "Etc/UTC"
+  # ⚠ SUSPENDED DELIBERATELY — the nightly sweeps are OFF in every environment.
+  # These three CronJobs are the ONLY unattended surface in this chart that can
+  # spend real provider credits: each fires `ida-sweep` against whatever model
+  # the env is pointed at, three times a night, with no human in the loop. With a
+  # real model enabled they bill on a timer. Suspended here in BASE (not per
+  # overlay) so "off" means off in dev, staging, prod and preview alike -- the
+  # only place a reader has to look, and the only place a re-enable can happen.
+  #
+  # TO RE-ENABLE continuous benchmarking: flip this to `suspend: false` (or delete
+  # the field) on all three CronJobs below, AND invert the matching assertion in
+  # .devops/ci/chart-render.test.sh ("all envs: sweeps suspended"). The test is
+  # paired with this field ON PURPOSE so re-enabling costs a deliberate edit in
+  # two places rather than happening by accident in one.
+  #
+  # NOTE: preview is suspended a SECOND time by its own overlay patch. That is
+  # not redundant -- it must stay suspended even after this field is flipped back.
+  suspend: true
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 3600
   successfulJobsHistoryLimit: 2
@@ -121,6 +138,23 @@ metadata:
 spec:
   schedule: "30 3 * * *"
   timeZone: "Etc/UTC"
+  # ⚠ SUSPENDED DELIBERATELY — the nightly sweeps are OFF in every environment.
+  # These three CronJobs are the ONLY unattended surface in this chart that can
+  # spend real provider credits: each fires `ida-sweep` against whatever model
+  # the env is pointed at, three times a night, with no human in the loop. With a
+  # real model enabled they bill on a timer. Suspended here in BASE (not per
+  # overlay) so "off" means off in dev, staging, prod and preview alike -- the
+  # only place a reader has to look, and the only place a re-enable can happen.
+  #
+  # TO RE-ENABLE continuous benchmarking: flip this to `suspend: false` (or delete
+  # the field) on all three CronJobs below, AND invert the matching assertion in
+  # .devops/ci/chart-render.test.sh ("all envs: sweeps suspended"). The test is
+  # paired with this field ON PURPOSE so re-enabling costs a deliberate edit in
+  # two places rather than happening by accident in one.
+  #
+  # NOTE: preview is suspended a SECOND time by its own overlay patch. That is
+  # not redundant -- it must stay suspended even after this field is flipped back.
+  suspend: true
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 3600
   successfulJobsHistoryLimit: 2
@@ -201,6 +235,23 @@ metadata:
 spec:
   schedule: "0 5 * * *"
   timeZone: "Etc/UTC"
+  # ⚠ SUSPENDED DELIBERATELY — the nightly sweeps are OFF in every environment.
+  # These three CronJobs are the ONLY unattended surface in this chart that can
+  # spend real provider credits: each fires `ida-sweep` against whatever model
+  # the env is pointed at, three times a night, with no human in the loop. With a
+  # real model enabled they bill on a timer. Suspended here in BASE (not per
+  # overlay) so "off" means off in dev, staging, prod and preview alike -- the
+  # only place a reader has to look, and the only place a re-enable can happen.
+  #
+  # TO RE-ENABLE continuous benchmarking: flip this to `suspend: false` (or delete
+  # the field) on all three CronJobs below, AND invert the matching assertion in
+  # .devops/ci/chart-render.test.sh ("all envs: sweeps suspended"). The test is
+  # paired with this field ON PURPOSE so re-enabling costs a deliberate edit in
+  # two places rather than happening by accident in one.
+  #
+  # NOTE: preview is suspended a SECOND time by its own overlay patch. That is
+  # not redundant -- it must stay suspended even after this field is flipped back.
+  suspend: true
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 3600
   successfulJobsHistoryLimit: 2
