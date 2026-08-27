@@ -70,16 +70,46 @@ spec:
           ports:
             - name: redis
               containerPort: 6379
+          # ── PROBE TIMEOUTS ARE SET EXPLICITLY. THE DEFAULT KILLED THIS POD. ──
+          #
+          # Neither probe used to set `timeoutSeconds`, so both inherited
+          # Kubernetes' default of ONE SECOND. An `exec` probe has to fork
+          # `redis-cli`, connect and round-trip inside that budget -- and when
+          # the Ceph RBD volume has a latency burst, Redis logs
+          # "Asynchronous AOF fsync is taking too long (disk is busy?)" and
+          # briefly stalls. Three 1s timeouts later, kubelet killed a perfectly
+          # healthy Redis: 12 restarts in prod, 8 in dev, 6 in staging.
+          #
+          # The restarts were invisible because a probe kill is a GRACEFUL stop.
+          # The container exits 0/Completed, so there is no OOMKilled, no
+          # CrashLoopBackOff, and nothing that reads as a crash -- while each
+          # restart costs a 5.8s AOF reload during which clients get
+          # BusyLoadingError.
+          #
+          # Readiness KEEPS the exec ping: taking Redis out of Service endpoints
+          # while it is genuinely stalled is correct, and it verifies the actual
+          # command path rather than just the socket.
           readinessProbe:
             exec:
               command: ["redis-cli", "ping"]
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 5
+          # Liveness is a TCP socket, NOT an exec. Restarting is the violent
+          # remedy and should fire only when the process is truly gone, not when
+          # it is slow -- and `exec` adds a fork whose cost depends on node
+          # scheduling pressure (capstone-w1 sits at 98% of allocatable CPU
+          # requests), which makes the probe measure the node as much as Redis.
+          # A socket check has no fork and cannot be starved the same way.
+          # failureThreshold: 5 x 20s gives ~100s of stall tolerance before a
+          # restart, which is longer than any fsync burst observed here.
           livenessProbe:
-            exec:
-              command: ["redis-cli", "ping"]
+            tcpSocket:
+              port: 6379
             initialDelaySeconds: 15
             periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
           resources:
             requests: { cpu: "50m", memory: "128Mi" }
             limits: { cpu: "500m", memory: "512Mi" }
