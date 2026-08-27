@@ -43,6 +43,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from collections.abc import Collection
 from dataclasses import dataclass, field
 
 from ida_core.artifacts import ArtifactStore, eval_log_key, judge_key, parse_uri, sample_key
@@ -121,6 +122,7 @@ def regrade_run(
     catalog: TaskCatalog | None = None,
     allow_task_drift: bool = False,
     dry_run: bool = False,
+    only_result_ids: Collection[str] | None = None,
 ) -> RegradeReport:
     """Grade every ungraded subjective sample of a completed run.
 
@@ -132,6 +134,15 @@ def regrade_run(
     touched.  An errored sample has no completion to grade; an already-scored one
     is left exactly as it was, so running this twice cannot quietly regrade a
     run under a different judge and overwrite the first verdict.
+
+    ``only_result_ids`` restricts grading to the results whose ``id`` appears in
+    it; everything else in the run is skipped untouched.  **This is what makes a
+    per-result bound survive a per-run call.**  A caller that nominated three of
+    a run's twenty samples -- because the other seventeen are graded, ungradable,
+    or have exhausted ``judge_attempts`` -- would otherwise have its bound
+    silently widened back to the whole run by the very call meant to honour it,
+    and the exhausted samples would be re-billed on every firing.  ``None`` means
+    the whole run, which is what the CLI wants.
 
     ``dry_run`` calls the judge -- and is charged for it -- but changes nothing:
     it writes no object, and it leaves the returned records exactly as it found
@@ -154,6 +165,14 @@ def regrade_run(
         return report
 
     for record in eval_log.results:
+        if only_result_ids is not None and record.id not in only_result_ids:
+            # Not nominated. Recorded as a skip rather than passed over in
+            # silence so the report still accounts for every sample in the run
+            # -- a caller reconciling "twenty results, three graded" against a
+            # report listing three needs the other seventeen to be somewhere.
+            report.skipped.append((record.sample_id, "not nominated by the caller"))
+            continue
+
         reason = _skip_reason(record)
         if reason is not None:
             report.skipped.append((record.sample_id, reason))
@@ -209,6 +228,21 @@ def regrade_run(
         record.judge_serving_config = verdict.serving_config
         record.judge_usage = verdict.usage
         record.judge_cost_usd = verdict.cost_usd
+        # One more attempt on this sample, whatever the verdict. This is the
+        # only thing that terminates a retry loop against a judge that stays
+        # down: `judge_cost_usd` on the line above was just OVERWRITTEN with
+        # this attempt's spend, so earlier attempts' costs are gone and no sum
+        # over them is recoverable after the fact.
+        #
+        # Below the `dry_run` guard, so a dry run does NOT count an attempt.
+        # That is deliberate and it is the consistent reading of the guard's own
+        # rule -- a dry run changes nothing, including the records it hands back
+        # -- but note the asymmetry it creates: a dry run DOES call the judge and
+        # IS billed (`report.judge_cost_usd` says so), so repeated dry runs spend
+        # money without ever moving toward the bound. `--dry-run` answers "what
+        # would this change", not "what would this cost"; a scheduled caller must
+        # not use it as a free probe.
+        record.judge_attempts += 1
 
         if verdict.score is None:
             # Left NOT scorable rather than newly marked errored: the sample

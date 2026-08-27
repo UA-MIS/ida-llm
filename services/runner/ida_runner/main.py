@@ -19,6 +19,7 @@ from ida_core.queue import RedisQueue
 from ida_core.registry import load_registry
 from ida_harness.tasks import TaskCatalog
 from ida_runner import metrics
+from ida_runner.judging import build_judge_from_settings
 from ida_runner.reaper import Reaper
 from ida_runner.worker import Worker
 
@@ -53,15 +54,27 @@ def build_worker() -> Worker:
         heartbeat_ttl_s=settings.runner_heartbeat_ttl_s,
     )
     session_factory = make_session_factory(engine)
+    registry = load_registry(settings.resolved_models_file())
+
+    # BUILT BEFORE THE WORKER, AND ALLOWED TO RAISE. A judge that cannot be
+    # constructed is an operator who asked for grading and would not get it; the
+    # runner must not come up healthy, grade nothing, and write blanks that read
+    # exactly like "no judge configured". See ida_runner.judging.
+    #
+    # One judge for the process: it owns an HTTP client, and every job reuses it.
+    # Nothing closes it, deliberately -- the worker loop's lifetime is the
+    # process's, and the OS reclaims the socket at exit.
+    judge = build_judge_from_settings(settings, registry)
 
     return Worker(
         queue=queue,
         session_factory=session_factory,
-        registry=load_registry(settings.resolved_models_file()),
+        registry=registry,
         catalog=TaskCatalog.from_directory(settings.resolved_tasks_dir()),
         artifact_store=store,
         git_sha=current_git_sha(settings.resolved_tasks_dir()),
         poll_timeout_s=settings.runner_poll_timeout_s,
+        judge=judge,
         reaper=Reaper(
             queue=queue,
             session_factory=session_factory,

@@ -29,6 +29,7 @@ from ida_core.repositories import (
     list_ungraded_subjective_results,
     mark_run_running,
     models_with_any_run,
+    persist_regraded_results,
     result_row_to_record,
     run_row_to_record,
 )
@@ -65,6 +66,163 @@ def _result(run_id: str, serving: ServingConfig, **overrides) -> ResultRecord:
     }
     base.update(overrides)
     return ResultRecord(**base)
+
+
+class TestJudgeAttemptsRoundTrip:
+    """The attempt counter has to survive the trip through the table.
+
+    It is the only thing bounding a nightly retry, so a column that silently
+    reset to 0 on write-back would restore the money pump while every test about
+    the *predicate* stayed green.
+    """
+
+    def test_it_round_trips_through_insert_and_read(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(
+                session, [_result(run.id, serving_config, sample_id="s1", judge_attempts=2)]
+            )
+        with session_scope(session_factory) as session:
+            [row] = list_results_for_run(session, run.id)
+            assert result_row_to_record(row).judge_attempts == 2
+
+    def test_it_defaults_to_zero_for_a_sample_no_judge_touched(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(session, [_result(run.id, serving_config, sample_id="s1")])
+        with session_scope(session_factory) as session:
+            [row] = list_results_for_run(session, run.id)
+            assert row.judge_attempts == 0
+
+
+class TestPersistRegradedResults:
+    """The write-back that closes the loop between object storage and Postgres.
+
+    ``regrade_run`` archives grades and hands back records; without this, a
+    retroactive grade lived only in the eval log -- the UI kept showing the
+    original blank, and ``judge_attempts`` never moved, so the bound could never
+    engage.
+    """
+
+    def _seeded(self, session_factory, serving_config, **overrides):
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            [row] = insert_results(
+                session,
+                [
+                    _result(
+                        run.id,
+                        serving_config,
+                        sample_id="s1",
+                        score=None,
+                        scorable=False,
+                        **overrides,
+                    )
+                ],
+            )
+            result_id = row.id
+        return run, result_id
+
+    def test_it_writes_the_grade_and_the_attempt_count(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        run, result_id = self._seeded(session_factory, serving_config)
+
+        with session_scope(session_factory) as session:
+            record = result_row_to_record(list_results_for_run(session, run.id)[0])
+        record.score = Score(
+            scorer=ScorerKind.LLM_JUDGE, value=0.75, passed=None, explanation="rubric r: 0.75"
+        )
+        record.scorable = True
+        record.judge_attempts = 1
+        record.judge_cost_usd = 0.02
+        record.judge_transcript_uri = "s3://ida-artifacts/judge.json"
+
+        with session_scope(session_factory) as session:
+            assert persist_regraded_results(session, [record]) == 1
+
+        with session_scope(session_factory) as session:
+            restored = result_row_to_record(list_results_for_run(session, run.id)[0])
+        assert restored.score.value == 0.75
+        assert restored.score.scorer is ScorerKind.LLM_JUDGE
+        assert restored.scorable is True
+        assert restored.judge_attempts == 1
+        assert restored.judge_cost_usd == 0.02
+        assert restored.judge_transcript_uri == "s3://ida-artifacts/judge.json"
+        assert restored.id == result_id
+
+    def test_it_leaves_the_candidate_model_accounting_alone(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """A regrade grades an OLD completion; it does not re-run the model.
+
+        Rewriting usage, cost or latency from a record that merely carried them
+        along would silently restate the original run's history -- and those
+        numbers are the citable evidence a recommendation is built on.
+        """
+        run, _ = self._seeded(session_factory, serving_config)
+        with session_scope(session_factory) as session:
+            before = result_row_to_record(list_results_for_run(session, run.id)[0])
+
+        record = before.model_copy(deep=True)
+        record.usage = TokenUsage(prompt_tokens=999, completion_tokens=999)
+        record.cost_usd = 42.0
+        record.latency_ms = 1.0
+        record.judge_attempts = 1
+
+        with session_scope(session_factory) as session:
+            persist_regraded_results(session, [record])
+
+        with session_scope(session_factory) as session:
+            after = result_row_to_record(list_results_for_run(session, run.id)[0])
+        assert after.usage == before.usage
+        assert after.cost_usd == before.cost_usd
+        assert after.latency_ms == before.latency_ms
+        assert after.judge_attempts == 1, "the judge-owned column still moved"
+
+    def test_a_vanished_row_is_skipped_not_resurrected(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """A regrade is not a path by which deleted evidence comes back."""
+        run, _ = self._seeded(session_factory, serving_config)
+        with session_scope(session_factory) as session:
+            record = result_row_to_record(list_results_for_run(session, run.id)[0])
+        ghost = record.model_copy(deep=True, update={"id": new_result_id()})
+
+        with session_scope(session_factory) as session:
+            assert persist_regraded_results(session, [ghost]) == 0
+        with session_scope(session_factory) as session:
+            assert len(list_results_for_run(session, run.id)) == 1
+
+    def test_a_successful_retry_clears_the_stale_judge_error(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """Otherwise the run reports ``partial`` forever, next to a real score."""
+        run, _ = self._seeded(
+            session_factory, serving_config, error="criterion 'x': unparseable", judge_attempts=1
+        )
+        with session_scope(session_factory) as session:
+            record = result_row_to_record(list_results_for_run(session, run.id)[0])
+        record.score = Score(scorer=ScorerKind.LLM_JUDGE, value=0.5, passed=None, explanation="ok")
+        record.scorable = True
+        record.error = None
+        record.judge_attempts = 2
+
+        with session_scope(session_factory) as session:
+            persist_regraded_results(session, [record])
+
+        with session_scope(session_factory) as session:
+            restored = result_row_to_record(list_results_for_run(session, run.id)[0])
+        assert restored.error is None
+        assert restored.score is not None
+        assert restored.judge_attempts == 2
 
 
 class TestRunRoundTrip:
@@ -553,19 +711,130 @@ class TestSweepPlanningHelpers:
         with session_scope(session_factory) as session:
             assert list_ungraded_subjective_results(session) == []
 
-    def test_a_scorable_sample_is_never_a_candidate(
+    def test_a_sample_whose_online_grading_failed_IS_a_candidate(
         self, session_factory, serving_config: ServingConfig
     ) -> None:
-        """Verifiable samples are scored programmatically; a judge must not touch them."""
+        """``scorable`` is not the predicate, and this is the direction that bit.
+
+        A sample whose ONLINE grading failed is written ``scorable=True`` -- the
+        run must not report itself ``succeeded`` -- so the old
+        ``scorable IS FALSE`` predicate never re-nominated it. Silent, permanent
+        non-retry, arriving the moment the runner was wired to a judge. The
+        completion is sound and only the grade is missing, which is precisely
+        the class retroactive grading exists to recover.
+        """
         run = _run()
         with session_scope(session_factory) as session:
             create_run(session, run)
             insert_results(
                 session,
-                [_result(run.id, serving_config, sample_id="s1", score=None, scorable=True)],
+                [
+                    _result(
+                        run.id,
+                        serving_config,
+                        sample_id="s1",
+                        score=None,
+                        scorable=True,
+                        judge_attempts=1,
+                        error="criterion 'specificity': unparseable judgment",
+                    )
+                ],
+            )
+        with session_scope(session_factory) as session:
+            assert [r.sample_id for r in list_ungraded_subjective_results(session)] == ["s1"]
+
+    def test_a_sample_with_no_completion_is_never_a_candidate(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """The *ungradable* class: the model call died, so nothing exists to grade.
+
+        Nominating it costs no judge money -- the grader skips it before calling
+        -- but it can never succeed, so it would be selected every night forever.
+        """
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(
+                session,
+                [
+                    _result(
+                        run.id,
+                        serving_config,
+                        sample_id="died",
+                        score=None,
+                        scorable=False,
+                        transcript_uri=None,
+                        error="ProviderError: 500",
+                    )
+                ],
             )
         with session_scope(session_factory) as session:
             assert list_ungraded_subjective_results(session) == []
+
+    def test_a_sample_past_the_attempt_bound_is_no_longer_a_candidate(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """The money pump's off switch.
+
+        A judge that stays down fails the same sample every night. Without a
+        bound the sweep re-nominates it forever and the only symptom is the
+        invoice, so the attempt count -- not the cost, which is only the LAST
+        attempt's spend -- is what terminates the loop.
+        """
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(
+                session,
+                [
+                    _result(
+                        run.id,
+                        serving_config,
+                        sample_id="tried-twice",
+                        score=None,
+                        scorable=True,
+                        judge_attempts=2,
+                    )
+                ],
+            )
+        with session_scope(session_factory) as session:
+            assert [
+                r.sample_id for r in list_ungraded_subjective_results(session, max_judge_attempts=3)
+            ] == ["tried-twice"]
+            assert list_ungraded_subjective_results(session, max_judge_attempts=2) == []
+
+    def test_the_attempt_bound_can_be_reopened_by_raising_it(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """Raising the setting is the documented way to retry a backlog.
+
+        There is no separate reset, because the count is the evidence of what
+        was already spent on this sample.
+        """
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(
+                session,
+                [_result(run.id, serving_config, sample_id="s1", score=None, judge_attempts=3)],
+            )
+        with session_scope(session_factory) as session:
+            assert list_ungraded_subjective_results(session, max_judge_attempts=3) == []
+            assert len(list_ungraded_subjective_results(session, max_judge_attempts=5)) == 1
+
+    def test_a_zero_bound_nominates_nothing(
+        self, session_factory, serving_config: ServingConfig
+    ) -> None:
+        """A coherent way to park the sweep without editing the CronJob."""
+        run = _run()
+        with session_scope(session_factory) as session:
+            create_run(session, run)
+            insert_results(
+                session,
+                [_result(run.id, serving_config, sample_id="s1", score=None)],
+            )
+        with session_scope(session_factory) as session:
+            assert list_ungraded_subjective_results(session, max_judge_attempts=0) == []
 
     def test_the_candidate_list_is_bounded(
         self, session_factory, serving_config: ServingConfig

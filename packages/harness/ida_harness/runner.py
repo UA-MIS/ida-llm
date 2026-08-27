@@ -220,6 +220,15 @@ def run_task(
                 record.judge_serving_config = verdict.serving_config
                 record.judge_usage = verdict.usage
                 record.judge_cost_usd = verdict.cost_usd
+                # The FIRST attempt on this sample, counted here rather than
+                # inferred later. A retroactive retry adds to it (see
+                # `ida_harness.regrade.regrade_run`), and the nightly sweep
+                # stops nominating the sample once the total reaches
+                # IDA_SWEEP_JUDGE_MAX_ATTEMPTS. Incremented rather than assigned
+                # 1 so that this stays correct if a sample is ever graded more
+                # than once inside one run (repeat_index > 1 with a shared
+                # record would be the way that happens).
+                record.judge_attempts += 1
                 # `error` IS set on a judge failure, deliberately: a run whose
                 # grading failed must not report itself `succeeded`, and
                 # error_count is what makes terminal_status call it `partial`.

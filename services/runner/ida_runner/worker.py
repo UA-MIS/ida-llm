@@ -71,6 +71,7 @@ from ida_core.repositories import (
     run_row_to_record,
 )
 from ida_harness.cache import CompletionCache
+from ida_harness.judge import LLMJudge
 from ida_harness.runner import effective_serving_config, run_task
 from ida_harness.tasks import TaskCatalog
 from ida_runner import metrics
@@ -89,6 +90,7 @@ def execute_job(
     git_sha: str | None = None,
     completion_cache: CompletionCache | None = None,
     client_factory=None,
+    judge: LLMJudge | None = None,
 ) -> RunRecord:
     """Execute one queue message end to end and return the finished run record.
 
@@ -97,6 +99,12 @@ def execute_job(
     ``error``.  It does propagate genuinely unexpected exceptions so that
     :class:`Worker` can log them with a stack trace -- but the worker still
     marks the run failed before continuing.
+
+    ``judge`` grades ``subjective`` samples.  ``None`` -- the default -- leaves
+    them archived and honestly unscored, exactly as before, which is what keeps
+    this safe for a deployment that has not chosen to pay a judge.  It is NOT
+    closed here: one judge is built per process and reused across every job, for
+    the same reason the registry and the catalog are.
     """
     with session_scope(session_factory) as session:
         row = get_run(session, message.run_id)
@@ -150,6 +158,7 @@ def execute_job(
             artifact_store=artifact_store,
             completion_cache=completion_cache,
             client_factory=client_factory,
+            judge=judge,
         )
     except Exception as exc:  # setup-level failure: the whole run is bad
         log.exception("run %s failed during execution", record.id)
@@ -227,6 +236,7 @@ class Worker:
         poll_timeout_s: int = 5,
         completion_cache: CompletionCache | None = None,
         client_factory=None,
+        judge: LLMJudge | None = None,
         reaper: Reaper | None = None,
         reaper_interval_s: float = 60.0,
         heartbeat_interval_s: float = 30.0,
@@ -240,6 +250,12 @@ class Worker:
         self._poll_timeout_s = poll_timeout_s
         self._completion_cache = completion_cache
         self._client_factory = client_factory
+        # ONE judge for the process, built once in `build_worker` and reused by
+        # every job -- it owns an HTTP client, and building one per job would
+        # open and discard a connection pool per run. Never closed by the
+        # worker: the loop's lifetime IS the judge's lifetime, and closing it
+        # between jobs would break the next one.
+        self._judge = judge
         self._reaper = reaper
         self._reaper_interval_s = reaper_interval_s
         self._heartbeat_interval_s = heartbeat_interval_s
@@ -345,6 +361,7 @@ class Worker:
                 git_sha=self._git_sha,
                 completion_cache=self._completion_cache,
                 client_factory=self._client_factory,
+                judge=self._judge,
             )
         except Exception as exc:
             metrics.JOBS.labels(outcome="crashed").inc()

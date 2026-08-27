@@ -40,6 +40,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -51,6 +52,7 @@ from ida_core.contracts import (
     RunJobMessage,
     RunRecord,
     RunStatus,
+    TaskKind,
 )
 from ida_core.db import make_engine, make_session_factory, session_scope, utcnow
 from ida_core.gitmeta import build_identity, current_git_sha
@@ -63,9 +65,12 @@ from ida_core.repositories import (
     fail_run,
     list_ungraded_subjective_results,
     models_with_any_run,
+    persist_regraded_results,
 )
+from ida_harness.regrade import regrade_run
 from ida_harness.runner import unscorable_reason
 from ida_harness.tasks import TaskCatalog
+from ida_runner.judging import build_judge_from_settings
 
 log = logging.getLogger("ida.sweep")
 
@@ -162,8 +167,24 @@ class SweepReport:
     already have this number" and "nothing here can produce this number" are
     opposite states, and an operator reading the summary line has to be able to
     tell them apart."""
+    graded: int = 0
+    """Candidates that now carry a judge score they did not have before.
+
+    ``judge-calibration``'s equivalent of ``enqueued``, and its own bucket
+    rather than a reuse of that one: this sweep pushes nothing onto the queue,
+    and an operator reading ``enqueued=7`` from a sweep that enqueues nothing
+    would reasonably conclude seven runs were about to happen."""
+
     failed: int = 0
     samples_enqueued: int = 0
+    judge_cost_usd: float = 0.0
+    """What tonight's grading actually cost, at the judge's rates.
+
+    On the summary line because a sweep that spends money on every firing is the
+    one an operator most needs a running number for -- and because the retry
+    bound this sweep enforces is a cost control, so its effect has to be visible
+    in the same place."""
+
     notes: list[str] = field(default_factory=list)
     sweep_id: str | None = None
 
@@ -178,6 +199,10 @@ class SweepReport:
             f"failed={self.failed}",
             f"samples={self.samples_enqueued}",
         ]
+        if self.graded:
+            parts.append(f"graded={self.graded}")
+        if self.judge_cost_usd:
+            parts.append(f"judge_cost_usd={self.judge_cost_usd:.6f}")
         if self.planned:
             parts.append(f"planned={self.planned}")
         if self.sweep_id:
@@ -190,6 +215,7 @@ class SweepReport:
         """Does every considered candidate land in exactly one bucket?"""
         return self.considered == (
             self.enqueued
+            + self.graded
             + self.planned
             + self.skipped_dedupe
             + self.skipped_budget
@@ -212,12 +238,25 @@ class SweepReport:
 def scorable_tasks(catalog: TaskCatalog) -> list:
     """Tasks a sweep can enqueue, in stable id order.
 
-    Subjective tasks are excluded because nothing can score them yet
-    (:func:`ida_harness.runner.unscorable_reason`). Enqueueing them anyway would
-    spend provider credits producing completions that land as ``scorable=False``
-    rows -- and the platform would then show a benchmark suite whose subjective
-    half is permanently blank. When the judge lands, those tasks become scorable
-    and this function starts returning them with no change here.
+    Subjective tasks are excluded: enqueueing them would spend provider credits
+    producing completions that land as ``scorable=False`` rows, and the platform
+    would then show a benchmark suite whose subjective half is permanently blank.
+
+    ⚠ THIS ASKS THE JUDGE-FREE QUESTION ON PURPOSE, AND IT IS NOW A CHOICE
+    RATHER THAN A CONSEQUENCE. :func:`~ida_harness.runner.unscorable_reason`
+    takes ``judge_configured``, and this call leaves it at its conservative
+    default, so subjective tasks stay out of ``rebenchmark`` and ``model-sweep``
+    **even on a deployment that has configured a judge** -- despite those tasks
+    now being fully gradable by the live path.
+
+    That is deliberate, because flipping it is a spending decision, not a wiring
+    one: it would add every subjective task to the nightly cross product at one
+    candidate call *plus one judge call per criterion per sample*, unattended.
+    The backlog is not stranded in the meantime -- ``judge-calibration`` grades
+    subjective samples retroactively, so the numbers arrive either way. Whoever
+    decides the nightly should also *produce* subjective runs passes
+    ``judge_configured=bool(settings.judge_model_key)`` here and re-checks the
+    budget caps against the new sample count.
     """
     return [spec for spec in catalog.all() if unscorable_reason(spec) is None]
 
@@ -683,133 +722,271 @@ def run_model_sweep(ctx: SweepContext, *, dry_run: bool = False) -> SweepReport:
 
 # ── judge calibration ────────────────────────────────────────────────────────
 #
-# The LLM judge is NOT in main as of this change: `ScorerKind.LLM_JUDGE` is
-# registered and unimplemented, `unscorable_reason()` still reports subjective
-# tasks as unscorable, and `LLMJudgeScorer` raises. Checked against the branch
-# point rather than assumed.
+# THE RETROACTIVE HALF OF GRADING. Its live counterpart is
+# `IDA_JUDGE_MODEL_KEY` -> `ida_runner.main.build_worker` -> `Worker` ->
+# `run_task(judge=...)`, which grades a subjective sample while its run is
+# happening. The two exist together and must agree, because they write the same
+# columns: this sweep picks up what the live path could not grade -- samples
+# that ran before a judge was configured, and samples whose online grading
+# failed -- and its candidate query is the SQL image of the four-way partition
+# in `docs/llm-judge.md`.
 #
-# So this sweep ships as the full orchestration shell: it finds the candidates,
-# reports how many there are, and exits 0 having graded nothing. That is worth
-# shipping now rather than stubbing, because the candidate query, the bound, the
-# summary line and the CronJob wiring are all independently testable, and none of
-# them change when the judge lands.
+# ⚠ THIS SWEEP SPENDS MONEY ON EVERY FIRING, WHICH IS WHY IT IS BOUNDED TWICE.
+# `IDA_SWEEP_JUDGE_CANDIDATE_LIMIT` bounds one pass; `IDA_SWEEP_JUDGE_MAX_ATTEMPTS`
+# bounds a sample's lifetime. Only the second one terminates: without it a judge
+# that stays down is re-asked about the same failed samples every night forever,
+# and the only symptom is the invoice.
 
 
-def _load_retroactive_grader():
-    """The judge's retroactive-grading entry point, or ``None`` if not built yet.
+def _judgeable(catalog: TaskCatalog, task_id: str) -> bool:
+    """Can a judge produce a grade for this task at all?
 
-    ⚠ THE WIRING POINT -- AND IT IS DELIBERATELY NOT WIRED YET. The judge is in
-    flight as PR #12, which was REJECTED at review and is on a retry: a blocking
-    parse hole in judge-output extraction, plus a disagreement between the runner
-    and the retroactive path about what a judge FAILURE means, which currently
-    leaves judge-failed samples permanently un-regradable.
+    The nomination query cannot answer this. ``results`` stores ``task_id``, not
+    task *kind*, so no SQL predicate can distinguish a subjective sample from a
+    verifiable one whose score is missing for some other reason -- and a task
+    that has been deleted or had its rubric removed since the run is not visible
+    to SQL at all. Filtering here, against the live catalog, is what keeps the
+    sweep from handing the grader work it will only decline.
 
-    That second one is not upstream trivia -- it decides whether this sweep's
-    candidate query converges or re-nominates the same failed samples every
-    night, at judge cost, indefinitely. See the OPEN CONTRACT note on
-    :func:`ida_core.repositories.list_ungraded_subjective_results`.
-
-    So this sweep ships skipping honestly rather than wiring against a contract
-    being renegotiated. Wiring it now would yield a nightly job that looks
-    finished while resting on both a signature and a failure semantics that are
-    still moving.
-
-    The shape exposed at rejection time was
-    ``ida_harness.regrade.regrade_run(run_id, judge_model, ...)`` -- per RUN, not
-    per result, which is why this sweep already collects ``candidate_runs``
-    alongside the sample ids::
-
-        from ida_harness.regrade import regrade_run
-        return regrade_run
-
-    and then, below, a loop over ``candidate_runs`` calling it with
-    ``ctx.artifact_store`` (regrading reads archived transcripts, which is why
-    ``judge-calibration`` is listed in :data:`NEEDS_ARTIFACTS` and its context
-    already carries a store while the other two sweeps deliberately do not).
-
-    Everything else here -- candidate query, bound, truncation note, reporting,
-    exit code -- is already correct and needs no edit. That signature is recorded
-    from a REJECTED revision, so treat it as a pointer, not a contract: re-read
-    the merged version, and reconcile the failure semantics, before wiring.
-
-    Deliberately a lookup returning ``None`` rather than a ``try: import`` with a
-    swallowed ``ImportError``: a bare import guard cannot tell "the judge is not
-    built yet" from "the judge is built and its own import is broken", and would
-    report the second as the first every night. This function is only ever the
-    first case, on purpose.
+    An unknown task is not judgeable: the rubric is gone, so there is nothing to
+    grade against. That is a real state -- a task deleted after its runs -- and
+    it must not raise.
     """
-    return None
+    try:
+        spec = catalog.get(task_id)
+    except KeyError:
+        return False
+    return spec.kind is TaskKind.SUBJECTIVE and spec.rubric is not None
 
 
 def run_judge_calibration(ctx: SweepContext, *, dry_run: bool = False) -> SweepReport:
-    """Re-score subjective samples that carry no score.
+    """Grade subjective samples that carry no score, retroactively.
 
-    Candidates are results the harness wrote as ``scorable=False`` with no score
-    -- i.e. samples from subjective tasks that were completed but never graded,
-    which is every subjective sample produced so far.
+    Candidates come from :func:`~ida_core.repositories.list_ungraded_subjective_results`,
+    which selects the two gradable classes of the ``docs/llm-judge.md``
+    partition -- *never judged* and the still-affordable part of *judge failed* --
+    and excludes the two that are not: *graded* (done) and *ungradable* (the
+    model call died, so no completion exists and no judge can ever succeed).
 
-    With no judge available this exits **0**, not non-zero. "The judge is not
-    built yet" is a known and accepted state of the system, not a failure of
-    tonight's firing; failing the CronJob for it would put a permanent red mark
-    in the operator's dashboard that no operator action can clear, and a
-    permanently-red alarm is one nobody reads on the night it means something.
-    The count of skipped candidates is logged explicitly so the backlog is
-    visible while it waits.
+    Each nominated result is graded from its **archived completion**. The model
+    under test is never called again: re-answering the prompt would produce a
+    grade of a different run that happens to share a run id.
+
+    WHY THIS CALLS A PER-RUN FUNCTION WITH A PER-RESULT FILTER
+    ---------------------------------------------------------
+    :func:`ida_harness.regrade.regrade_run` reads one run's archived eval log,
+    so grading is batched by run. But the bound this sweep enforces is
+    per-*result*: within one run, some samples are freshly nominated and others
+    have already exhausted ``judge_attempts``. Calling ``regrade_run`` bare would
+    silently re-grade the exhausted ones -- the per-run call widening the
+    per-result bound back open, and re-billing exactly the samples the bound
+    exists to stop. ``only_result_ids`` is what keeps the two honest.
+
+    WHAT IT WRITES, AND WHY THE WRITE-BACK IS HERE
+    ----------------------------------------------
+    ``regrade_run`` archives to object storage and hands back records "ready to
+    persist"; it has no database, because the harness deliberately has no
+    database. The service that owns ``results`` does the write, and this is that
+    service. Until it did, a regrade updated the eval log while the UI kept
+    showing the original blank -- and, more sharply, ``judge_attempts`` never
+    moved, so the bound could never engage.
+
+    EXIT CODE
+    ---------
+    A judge that fails on a sample makes this sweep exit non-zero. That is a
+    change in kind from the state it replaces, and it is deliberate: "no judge is
+    built yet" was a gap no operator action could clear, so failing on it would
+    have painted a permanent red mark and taught everyone to ignore the alarm.
+    A judge that is configured and failing is the opposite -- someone can fix it,
+    and the retry bound means it will stop being retried if nobody does.
+
+    ``dry_run`` reports what would change **and still calls the judge, and is
+    still billed for it**. It answers "what would this change", not "what would
+    this cost". It does not count an attempt, so a dry run does not move a sample
+    toward its bound.
     """
     report = SweepReport(sweep="judge-calibration")
-    limit = ctx.settings.sweep_judge_candidate_limit
+    settings = ctx.settings
+    limit = settings.sweep_judge_candidate_limit
+    max_attempts = settings.sweep_judge_max_attempts
+
     with session_scope(ctx.session_factory) as session:
         # limit + 1: fetching exactly `limit` cannot distinguish "the backlog is
         # exactly this long" from "there is more", and claiming more candidates
         # remain when none do is a false statement on the operator's only
         # surface. One extra row answers it for certain; it is then dropped.
-        candidates = list_ungraded_subjective_results(session, limit=limit + 1)
-        truncated = len(candidates) > limit
-        candidates = candidates[:limit]
-        # Read the ids inside the session: the rows are detached on exit and
-        # touching a lazy attribute afterwards raises.
-        candidate_ids = [row.id for row in candidates]
-        candidate_runs = {row.run_id for row in candidates}
-    report.considered = len(candidate_ids)
+        rows = list_ungraded_subjective_results(
+            session, limit=limit + 1, max_judge_attempts=max_attempts
+        )
+        truncated = len(rows) > limit
+        rows = rows[:limit]
+        # Read every attribute inside the session: the rows are detached on exit
+        # and touching a lazy attribute afterwards raises.
+        nominated = [(row.id, row.run_id, row.task_id) for row in rows]
+
+    candidates = [
+        (rid, run_id) for rid, run_id, task_id in nominated if _judgeable(ctx.catalog, task_id)
+    ]
+    not_judgeable = len(nominated) - len(candidates)
+    report.considered = len(candidates)
 
     if truncated:
         # A bounded pass that looks complete is the failure this note prevents.
         report.notes.append(f"hit IDA_SWEEP_JUDGE_CANDIDATE_LIMIT={limit}; more candidates remain")
-
-    grader = _load_retroactive_grader()
-    if grader is None:
-        log.warning(
-            "judge not yet available -- skipped %d candidate(s) across %d run(s)",
-            len(candidate_ids),
-            len(candidate_runs),
+    if not_judgeable:
+        # Kept OUT of `considered` rather than parked in a skip bucket: these
+        # rows are not candidates this sweep declined, they are rows the SQL
+        # predicate cannot exclude on its own (no task kind in `results`). They
+        # would otherwise inflate the backlog figure every night forever.
+        report.notes.append(
+            f"{not_judgeable} nominated row(s) belong to tasks that are not subjective "
+            "or have no rubric; not judgeable"
         )
-        report.skipped_unavailable = len(candidate_ids)
-        report.notes.append("judge not yet available")
+
+    if not candidates:
         return report
 
-    if dry_run:  # pragma: no cover - unreachable until the judge lands
-        report.planned = len(candidate_ids)
-        report.notes.append(f"dry-run: would grade {len(candidate_ids)} candidate(s)")
+    if ctx.artifact_store is None:
+        # Regrading reads archived transcripts. A context built without object
+        # storage cannot grade anything, and saying so beats an AttributeError
+        # at 02:00. `judge-calibration` is in NEEDS_ARTIFACTS precisely so this
+        # is unreachable in production.
+        log.warning("no artifact store on this context -- skipped %d candidate(s)", len(candidates))
+        report.skipped_unavailable = len(candidates)
+        report.notes.append("no artifact store configured")
         return report
 
-    # pragma: no cover - unreachable until the judge lands. Left as an explicit
-    # call rather than a `raise NotImplementedError` so the wiring above is the
-    # only edit the judge's author has to make.
-    raise NotImplementedError(  # pragma: no cover
-        "a retroactive grader was found but this sweep has no call wired to it; "
-        "see _load_retroactive_grader"
-    )
+    judge = build_judge_from_settings(settings, ctx.registry)
+    if judge is None:
+        # Still exit 0. "The operator has not chosen to pay for a judge" is a
+        # configuration state, not tonight's failure, and the backlog is logged
+        # so it stays visible while it waits.
+        log.warning(
+            "no judge configured (IDA_JUDGE_MODEL_KEY is unset) -- skipped %d candidate(s) "
+            "across %d run(s)",
+            len(candidates),
+            len({run_id for _rid, run_id in candidates}),
+        )
+        report.skipped_unavailable = len(candidates)
+        report.notes.append("no judge configured")
+        return report
+
+    by_run: dict[str, list[str]] = defaultdict(list)
+    for result_id, run_id in candidates:
+        by_run[run_id].append(result_id)
+
+    with judge:
+        # sorted() so a firing is reproducible and its log is diffable against
+        # the previous one; dict order here would follow row order, which is
+        # stable in practice and not guaranteed.
+        for run_id, result_ids in sorted(by_run.items()):
+            _grade_one_run(
+                ctx,
+                report,
+                judge=judge,
+                run_id=run_id,
+                result_ids=result_ids,
+                dry_run=dry_run,
+            )
+
+    if dry_run:
+        report.notes.append(
+            f"dry-run: nothing written, but the judge WAS called and billed "
+            f"(${report.judge_cost_usd:.6f})"
+        )
+    return report
 
 
-# ── ALSO DEFERRED WITH THE JUDGE: THE RUNNER-SIDE WIRING ─────────────────────
-# `IDA_JUDGE_MODEL_KEY` -> Worker -> `run_task(judge=...)` is the live-scoring
-# counterpart to this sweep's retroactive path, and it belongs to this module's
-# surface. It is NOT absent by oversight: the judge PR it depends on was rejected
-# at review over judge-failure semantics, and wiring live scoring against a
-# contract under renegotiation would put subjective scoring into the nightly path
-# on a definition that is about to change. It lands with the judge, together with
-# the regrade wiring above, so the two agree by construction rather than by two
-# people remembering.
+def _grade_one_run(
+    ctx: SweepContext,
+    report: SweepReport,
+    *,
+    judge,
+    run_id: str,
+    result_ids: list[str],
+    dry_run: bool,
+) -> None:
+    """Grade one run's nominated results and fold the outcome into ``report``.
+
+    Every nominated result lands in exactly one bucket, computed as
+    ``skipped = nominated - graded - failed`` rather than by counting
+    ``regrade_run``'s own skip list. That list also contains the run's
+    *non-nominated* results (``regrade_run`` reports them as skipped so its
+    report accounts for the whole run), and counting it directly would
+    double-count them into this sweep's totals.
+
+    ⚠ ONE RUN'S FAILURE MUST NOT END THE PASS. A sweep that dies on the first
+    unreadable eval log leaves every later run ungraded, and tomorrow it dies on
+    the same one -- so a whole backlog is held hostage by a single bad row.
+    """
+    nominated = len(result_ids)
+    try:
+        regrade_report = regrade_run(
+            run_id=run_id,
+            store=ctx.artifact_store,
+            judge=judge,
+            catalog=ctx.catalog,
+            only_result_ids=set(result_ids),
+            dry_run=dry_run,
+        )
+    except KeyError:
+        # No archived eval log for this run. Nothing failed tonight that fixing
+        # the judge would fix, so this is `unavailable`, not `failed`.
+        #
+        # ⚠ AND IT WILL BE RE-NOMINATED TOMORROW, FOREVER. `judge_attempts` only
+        # moves when a judge is actually asked, and none was, so the bound never
+        # engages on these rows. That is bounded in MONEY (no judge call is made)
+        # and unbounded in NOISE. Stated rather than hidden: the fix is to make
+        # eval-log archival failures visible on the run, which is not this
+        # change's to make.
+        log.warning(
+            "run %s has no archived eval log; %d candidate(s) cannot be graded "
+            "and will be re-nominated",
+            run_id,
+            nominated,
+        )
+        report.skipped_unavailable += nominated
+        return
+    except Exception:
+        log.exception("run %s: regrade failed", run_id)
+        report.failed += nominated
+        return
+
+    report.judge_cost_usd += regrade_report.judge_cost_usd
+
+    if dry_run:
+        report.planned += nominated
+        return
+
+    graded = len(regrade_report.graded)
+    failed = len(regrade_report.failed)
+    report.graded += graded
+    report.failed += failed
+    report.skipped_unavailable += nominated - graded - failed
+
+    # PERSIST ONLY WHAT WAS NOMINATED. The eval log holds every result in the
+    # run; the ones this sweep did not nominate were not touched, and writing
+    # them back would restate untouched rows from a record that merely carried
+    # them along.
+    wanted = set(result_ids)
+    touched = [r for r in regrade_report.eval_log.results if r.id in wanted]
+    try:
+        with session_scope(ctx.session_factory) as session:
+            persist_regraded_results(session, touched)
+    except Exception:
+        # The grades ARE archived (regrade_run wrote the eval log); only the
+        # database copy is missing. Counted as failed so the CronJob goes red:
+        # a silent divergence between object storage and Postgres is exactly the
+        # state nobody discovers until the numbers are needed.
+        log.exception("run %s: could not persist %d regraded result(s)", run_id, len(touched))
+        # MOVE the graded ones from `graded` to `failed` -- do not ADD them to
+        # `failed` while leaving them in `graded`, which would count them twice
+        # and break `balances()`. The already-failed ones are NOT moved: they are
+        # in `failed` already, and adding them again is the same double count.
+        report.graded -= graded
+        report.failed += graded
+        report.notes.append(f"run {run_id}: grades archived but not persisted")
+
 
 NEEDS_ARTIFACTS = frozenset({"judge-calibration"})
 """Sweeps that read archived transcripts and therefore need object storage.

@@ -526,24 +526,29 @@ commit to a design system before there is a design.
 These are **not** oversights. Each is documented at the point in the code where
 it matters.
 
-1. **No LLM judge.** Subjective tasks run and archive transcripts but are not
-   scored. → `packages/harness/ida_harness/scoring.py::LLMJudgeScorer`
+1. **The LLM judge is off by default, and the API read side is not wired.**
+   Subjective tasks are graded when `IDA_JUDGE_MODEL_KEY` names a `models.yaml`
+   key — online during a run and nightly for the backlog. With it unset they run
+   and archive transcripts unscored, exactly as before. Either way the API still
+   reports them `scorable: false`, because both call sites ask the judge-free
+   question; that field is a public contract and changing what it means is its
+   own decision. → [`docs/llm-judge.md`](docs/llm-judge.md)
 
-2. **`judge-calibration` is a shell; the other two sweeps are implemented.**
-   `ida-sweep rebenchmark` and `ida-sweep model-sweep` plan a `(task, model)`
-   cross product, dedupe it against what is already measured or in flight, and
-   enqueue the rest — a sweep enqueues, runners execute. `ida-sweep
-   judge-calibration` finds the subjective samples that carry no score, logs
-   `judge not yet available -- skipped N candidates` and exits 0.
+2. **All three sweeps are implemented.** `ida-sweep rebenchmark` and `ida-sweep
+   model-sweep` plan a `(task, model)` cross product, dedupe it against what is
+   already measured or in flight, and enqueue the rest — a sweep enqueues,
+   runners execute. `ida-sweep judge-calibration` is the one that *spends*: it
+   selects subjective samples that carry no score, grades them from their
+   archived completions, and writes the grades back to Postgres.
 
-   Two pieces are deferred **with** the judge rather than ahead of it, so they
-   land agreeing by construction: the retroactive wiring at
-   `_load_retroactive_grader`, and the live-scoring wiring
-   (`IDA_JUDGE_MODEL_KEY` → Worker → `run_task(judge=…)`). The blocker is not a
-   signature but the semantics — what a *failed* grading writes decides whether
-   this sweep's candidate query converges or re-nominates the same samples every
-   night at judge cost. See the OPEN CONTRACT note on
-   `list_ungraded_subjective_results`.
+   It is bounded twice, and only the second bound terminates:
+   `IDA_SWEEP_JUDGE_CANDIDATE_LIMIT` bounds one pass, and
+   `IDA_SWEEP_JUDGE_MAX_ATTEMPTS` (counted against `results.judge_attempts`)
+   bounds a sample's lifetime. Without the second, a judge that stays down is
+   re-asked about the same failed samples every night forever and the only
+   symptom is the invoice. `rebenchmark` and `model-sweep` still do not enqueue
+   subjective tasks even where a judge is configured — see
+   [`docs/llm-judge.md`](docs/llm-judge.md#known-limits).
 
    Two things stay true of every sweep: **idempotent**, and **exit non-zero on
    failure** — a CronJob that exits 0 after failing looks successful forever. A

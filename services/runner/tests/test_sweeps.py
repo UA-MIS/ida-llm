@@ -3,12 +3,17 @@
 These sweeps are the only thing in the system that can commission provider spend
 on a schedule with nobody watching, so the tests lead with the ways that goes
 wrong: an empty registry, a budget blown, a queue that dies halfway, a judge that
-does not exist yet. The happy path is one small class at the end.
+is unconfigured or answering garbage. The happy path is one small class at the end.
 
 Nothing here touches a real service. The queue is the in-memory implementation
 (a real one, not a mock -- see ``ida_core.queue``), the database is SQLite, and
-no sweep in this module ever reaches a model endpoint, because a sweep does not:
-it enqueues, and runners execute.
+the two *enqueueing* sweeps never reach a model endpoint, because they do not:
+they enqueue, and runners execute.
+
+``judge-calibration`` is the exception and is different in kind -- it is the one
+sweep that SPENDS, calling a judge itself rather than enqueueing work. Its tests
+drive the real mock-model service in process, so the judge is answered by genuine
+service code at zero cost, and no hosted judge is reachable from this file.
 """
 
 from __future__ import annotations
@@ -37,6 +42,7 @@ from ida_runner.sweeps import (
 )
 
 SUBJECTIVE_TASK = "demo/essay-feedback"
+VERIFIABLE_TASK = "demo/arithmetic-quiz-check"
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -79,7 +85,17 @@ def _with(ctx: SweepContext, **overrides) -> SweepContext:
         registry=overrides.pop("registry", ctx.registry),
         catalog=overrides.pop("catalog", ctx.catalog),
         git_sha=overrides.pop("git_sha", ctx.git_sha),
+        artifact_store=overrides.pop("artifact_store", ctx.artifact_store),
     )
+
+
+def _store(tmp_path: Path):
+    """A real local artifact store. Retroactive grading reads archived blobs."""
+    from ida_core.artifacts import LocalArtifactStore
+
+    store = LocalArtifactStore(tmp_path / "artifacts")
+    store.ensure_bucket()
+    return store
 
 
 def _scorable(ctx: SweepContext):
@@ -607,11 +623,13 @@ class TestModelSweep:
 
 
 class TestJudgeCalibration:
-    """Ships as an orchestration shell: the judge is not in main yet.
+    """The retroactive grading path: candidate selection, bounds, and spend.
 
-    Verified against the branch point rather than assumed -- `ScorerKind.
-    LLM_JUDGE` is registered and unimplemented and `unscorable_reason()` still
-    reports subjective tasks as unscorable.
+    Selection is the load-bearing half. The sweep picks candidates in SQL and
+    the grader decides what it will actually grade in Python, and when those
+    disagree the failure is not a crash but a **standoff** -- nominated nightly,
+    declined nightly, visible only as a bill. So these tests assert on which rows
+    are chosen at least as hard as on what happens to them.
     """
 
     def _seed_ungraded(self, session_factory, count: int) -> str:
@@ -655,14 +673,16 @@ class TestJudgeCalibration:
         assert report.enqueued == 0
         assert report.balances()
 
-    def test_the_skip_is_logged_with_an_explicit_reason_and_count(self, ctx, caplog) -> None:
+    def test_the_skip_is_logged_with_an_explicit_reason_and_count(
+        self, ctx, caplog, tmp_path
+    ) -> None:
         """CronJob logs are the operator surface; the backlog must be visible."""
         self._seed_ungraded(ctx.session_factory, 2)
 
         with caplog.at_level(logging.WARNING, logger="ida.sweep"):
-            run_judge_calibration(ctx)
+            run_judge_calibration(_with(ctx, artifact_store=_store(tmp_path)))
 
-        assert "judge not yet available" in caplog.text
+        assert "no judge configured" in caplog.text
         assert "skipped 2 candidate(s)" in caplog.text
 
     def test_skipped_candidates_are_not_counted_as_deduped(self, ctx) -> None:
@@ -686,13 +706,62 @@ class TestJudgeCalibration:
 
         assert run_judge_calibration(ctx).considered == 1
 
-    def test_a_scorable_result_is_never_a_candidate(self, ctx) -> None:
-        """Verifiable samples are scored programmatically; a judge must not touch them."""
+    def test_a_sample_whose_online_grading_failed_IS_a_candidate(self, ctx) -> None:
+        """``scorable`` is not the predicate, and this is the direction that bit.
+
+        Online grading failure writes ``scorable=True`` (the run must not report
+        itself ``succeeded``), so the old ``scorable IS FALSE`` predicate never
+        re-nominated it: a silent, permanent non-retry that arrived the moment
+        the runner was wired to a judge. The completion is sound and only the
+        grade is missing -- exactly what retroactive grading is for.
+        """
         run_id = self._seed_ungraded(ctx.session_factory, 0)
         with session_scope(ctx.session_factory) as session:
-            insert_results(session, [_ungraded_result(run_id, 99, scorable=True)])
+            insert_results(session, [_ungraded_result(run_id, 99, scorable=True, judge_attempts=1)])
+
+        assert run_judge_calibration(ctx).considered == 1
+
+    def test_a_sample_with_no_completion_is_never_a_candidate(self, ctx) -> None:
+        """The *ungradable* class: the model call died, so nothing exists to grade.
+
+        It costs no judge money -- the grader skips it before calling -- but it
+        can never succeed, so selecting it is doing nothing, forever.
+        """
+        run_id = self._seed_ungraded(ctx.session_factory, 0)
+        with session_scope(ctx.session_factory) as session:
+            insert_results(session, [_ungraded_result(run_id, 99, transcript_uri=None)])
 
         assert run_judge_calibration(ctx).considered == 0
+
+    def test_a_sample_past_the_attempt_bound_is_no_longer_a_candidate(self, ctx) -> None:
+        """The money pump's off switch, at the sweep level."""
+        run_id = self._seed_ungraded(ctx.session_factory, 0)
+        with session_scope(ctx.session_factory) as session:
+            insert_results(session, [_ungraded_result(run_id, 99, judge_attempts=3)])
+
+        bounded = _with(ctx, settings={"sweep_judge_max_attempts": 3})
+        assert run_judge_calibration(bounded).considered == 0
+
+        reopened = _with(ctx, settings={"sweep_judge_max_attempts": 4})
+        assert run_judge_calibration(reopened).considered == 1
+
+    def test_a_row_from_a_task_with_no_rubric_is_not_counted_as_backlog(self, ctx) -> None:
+        """SQL cannot see task kind, so the catalog filter has to.
+
+        ``results`` stores ``task_id``, not kind. A verifiable task's row that
+        somehow carries no score would otherwise be nominated every night and
+        inflate the reported backlog forever, while the grader declined it every
+        night for having no rubric.
+        """
+        run_id = self._seed_ungraded(ctx.session_factory, 0)
+        with session_scope(ctx.session_factory) as session:
+            insert_results(session, [_ungraded_result(run_id, 99, task_id=VERIFIABLE_TASK)])
+
+        report = run_judge_calibration(ctx)
+
+        assert report.considered == 0
+        assert any("not judgeable" in note for note in report.notes)
+        assert report.balances()
 
     def test_nothing_to_grade_is_a_quiet_success(self, ctx) -> None:
         report = run_judge_calibration(ctx)
@@ -710,9 +779,354 @@ class TestJudgeCalibration:
         assert report.considered == 3
         assert any("more candidates remain" in note for note in report.notes)
 
-    def test_the_wiring_point_reports_no_grader_today(self) -> None:
-        """Pins the shell state so the judge's author sees this test go red."""
-        assert sweeps._load_retroactive_grader() is None
+    def test_no_judge_configured_is_still_a_quiet_success(self, ctx, tmp_path) -> None:
+        """Judging is opt-in, so "off" is a configuration state, not tonight's failure.
+
+        Distinct from a judge that IS configured and failing, which does go red:
+        that one an operator can fix, and a permanently-red alarm for a gap
+        nobody can clear is one nobody reads on the night it means something.
+        """
+        self._seed_ungraded(ctx.session_factory, 2)
+
+        report = run_judge_calibration(_with(ctx, artifact_store=_store(tmp_path)))
+
+        assert report.exit_code == 0
+        assert report.graded == 0
+        assert report.skipped_unavailable == 2
+        assert any("no judge configured" in note for note in report.notes)
+        assert report.balances()
+
+
+class TestRetroactiveGradingEndToEnd:
+    """A real ungraded run, graded by a real sweep, asserted on the real table.
+
+    Everything here is genuine except the provider: a subjective run is executed
+    through the runner's own ``execute_job`` with no judge (the state every
+    subjective run has been in), its completions and eval log are archived to a
+    real local artifact store, and then the nightly sweep grades it. The judge is
+    the mock-model service answering in process, so the judge protocol is
+    exercised for real at zero cost.
+
+    ⚠ THE ASSERTIONS ARE ON POSTGRES-SHAPED ROWS, NOT ON THE EVAL LOG. Archiving
+    a grade and persisting it are two different writes, and for as long as only
+    the first existed a regrade updated object storage while the UI kept showing
+    the original blank -- and ``judge_attempts`` never moved, so the bound that
+    stops a nightly re-bill could never engage.
+    """
+
+    def _ungraded_run(self, ctx, store, *, judge_mode: str = "json"):
+        """Execute a subjective run with NO judge, archiving everything."""
+        from _runner_helpers import job_message, seed_run
+
+        from ida_mock_model.app import create_app
+        from ida_mock_model.testing import make_transport
+        from ida_runner.worker import execute_job
+
+        app = create_app()
+        app.state.mock.responder.judge_mode = judge_mode
+        transport = make_transport(app)
+
+        def client_factory():
+            from ida_harness.client import OpenAICompatibleClient
+
+            return OpenAICompatibleClient(
+                ctx.registry.get("mock"),
+                transport=transport,
+                sleep=lambda _s: None,
+                jitter=lambda _lo, hi: hi,
+            )
+
+        run_id = seed_run(ctx.session_factory, task_id=SUBJECTIVE_TASK)
+        execute_job(
+            job_message(run_id, task_id=SUBJECTIVE_TASK),
+            session_factory=ctx.session_factory,
+            registry=ctx.registry,
+            catalog=ctx.catalog,
+            artifact_store=store,
+            client_factory=client_factory,
+        )
+        return run_id
+
+    def _rows(self, ctx, run_id):
+        from ida_core.repositories import list_results_for_run, result_row_to_record
+
+        with session_scope(ctx.session_factory) as session:
+            return [result_row_to_record(r) for r in list_results_for_run(session, run_id)]
+
+    def _judging_ctx(self, ctx, store, monkeypatch, *, judge_mode: str = "json", **settings):
+        """A context with object storage and the mock judge configured.
+
+        ⚠ THE TRANSPORT HAS TO BE INJECTED, AND ``monkeypatch`` IS WHY THIS TAKES
+        A FIXTURE. ``build_judge_from_settings`` builds the judge's client
+        through the ordinary factory, which resolves the ``mock`` entry's
+        ``base_url`` -- ``http://mock-model:8000/v1``, a real socket that does
+        not exist in a unit test. Substituting the constructor is the only seam;
+        the judge, the client and the service answering it are all the real ones.
+
+        Via ``monkeypatch`` rather than a bare assignment so the patch is undone
+        at teardown. An earlier draft assigned the module attribute directly and
+        the ``malformed`` judge leaked into every test that ran after it -- which
+        is exactly the kind of order-dependent green a suite must not have.
+        """
+        import ida_runner.sweeps as sweeps_mod
+        from ida_harness.client import OpenAICompatibleClient
+        from ida_harness.judge import LLMJudge
+        from ida_mock_model.app import create_app
+        from ida_mock_model.testing import make_transport
+
+        base = {"judge_model_key": "mock"}
+        base.update(settings)
+        judging = _with(ctx, artifact_store=store, settings=base)
+
+        app = create_app()
+        app.state.mock.responder.judge_mode = judge_mode
+        transport = make_transport(app)
+        entry = ctx.registry.get("mock")
+
+        def _build(settings_arg, registry_arg):
+            # Honour the real "off by default" policy even here: an empty key
+            # must still mean no judge, or the test would prove nothing about
+            # the unconfigured path.
+            if not settings_arg.judge_model_key:
+                return None
+            return LLMJudge(
+                entry=entry,
+                client=OpenAICompatibleClient(
+                    entry,
+                    transport=transport,
+                    sleep=lambda _s: None,
+                    jitter=lambda _lo, hi: hi,
+                ),
+                owns_client=True,
+            )
+
+        monkeypatch.setattr(sweeps_mod, "build_judge_from_settings", _build)
+        return judging
+
+    def test_it_grades_an_ungraded_run_and_persists_the_grades(
+        self, ctx, tmp_path, monkeypatch
+    ) -> None:
+        store = _store(tmp_path)
+        run_id = self._ungraded_run(ctx, store)
+        assert all(r.score is None for r in self._rows(ctx, run_id)), "precondition: ungraded"
+
+        report = run_judge_calibration(self._judging_ctx(ctx, store, monkeypatch))
+
+        assert report.considered == 2
+        assert report.graded == 2
+        assert report.failed == 0
+        assert report.exit_code == 0
+        assert report.balances()
+
+        rows = self._rows(ctx, run_id)
+        assert all(r.score is not None for r in rows), "grades must reach the TABLE, not just S3"
+        assert all(r.scorable for r in rows)
+        assert all(r.judge_serving_config is not None for r in rows)
+        assert all(r.score.criteria for r in rows), "the per-criterion breakdown is the evidence"
+
+    def test_grading_counts_an_attempt_on_every_row_it_touched(
+        self, ctx, tmp_path, monkeypatch
+    ) -> None:
+        store = _store(tmp_path)
+        run_id = self._ungraded_run(ctx, store)
+
+        run_judge_calibration(self._judging_ctx(ctx, store, monkeypatch))
+
+        assert [r.judge_attempts for r in self._rows(ctx, run_id)] == [1, 1]
+
+    def test_a_graded_run_is_not_re_graded_on_the_next_firing(
+        self, ctx, tmp_path, monkeypatch
+    ) -> None:
+        """Without this, every night re-grades all of history at full cost."""
+        store = _store(tmp_path)
+        self._ungraded_run(ctx, store)
+
+        first = run_judge_calibration(self._judging_ctx(ctx, store, monkeypatch))
+        second = run_judge_calibration(self._judging_ctx(ctx, store, monkeypatch))
+
+        assert first.graded == 2
+        assert second.considered == 0
+        assert second.graded == 0
+        assert second.judge_cost_usd == 0.0
+
+    def test_a_failing_judge_converges_instead_of_billing_forever(
+        self, ctx, tmp_path, monkeypatch
+    ) -> None:
+        """THE MONEY PUMP, AND ITS OFF SWITCH.
+
+        A judge that answers unparseable prose fails the same samples every
+        night. The *judge failed* class is retryable by design -- that is what
+        stops an outage making a sample permanently ungradable -- so without a
+        bound the sweep re-nominates, re-fails and re-bills forever, and the
+        only symptom is the invoice.
+
+        Three firings against a permanently-broken judge: attempts climb to the
+        bound and nomination then stops. The fourth night costs nothing.
+        """
+        store = _store(tmp_path)
+        run_id = self._ungraded_run(ctx, store)
+
+        considered = []
+        for _ in range(4):
+            report = run_judge_calibration(
+                self._judging_ctx(
+                    ctx, store, monkeypatch, judge_mode="malformed", sweep_judge_max_attempts=3
+                )
+            )
+            considered.append(report.considered)
+
+        assert considered == [2, 2, 2, 0], (
+            "three attempts per sample, then the bound stops nomination"
+        )
+        assert [r.judge_attempts for r in self._rows(ctx, run_id)] == [3, 3]
+        assert all(r.score is None for r in self._rows(ctx, run_id)), "no grade was fabricated"
+
+    def test_a_failing_judge_makes_the_cronjob_go_red(self, ctx, tmp_path, monkeypatch) -> None:
+        """A configured judge that cannot grade is a fixable fault; say so.
+
+        Distinct from "no judge configured", which exits 0 -- an operator can
+        clear this one, so it earns the alarm.
+        """
+        store = _store(tmp_path)
+        self._ungraded_run(ctx, store)
+
+        report = run_judge_calibration(
+            self._judging_ctx(ctx, store, monkeypatch, judge_mode="malformed")
+        )
+
+        assert report.failed == 2
+        assert report.graded == 0
+        assert report.exit_code != 0
+        assert report.balances()
+
+    def test_a_sample_past_its_bound_is_not_regraded_by_a_run_level_call(
+        self, ctx, tmp_path, monkeypatch
+    ) -> None:
+        """The per-RESULT bound must survive being handed to a per-RUN grader.
+
+        ``regrade_run`` grades a whole run from one eval log. Within a single run
+        some samples can be freshly nominated while others have exhausted their
+        attempts -- so a bare per-run call would silently re-grade the exhausted
+        ones, widening the bound back open and re-billing exactly the samples it
+        exists to protect. ``only_result_ids`` is what keeps them apart.
+
+        Here one of the run's two samples is pushed past the bound directly; the
+        firing must touch the other one only.
+        """
+        from ida_core.db import ResultRow
+
+        store = _store(tmp_path)
+        run_id = self._ungraded_run(ctx, store)
+        rows = self._rows(ctx, run_id)
+        exhausted_id, spared_id = rows[0].id, rows[1].id
+
+        with session_scope(ctx.session_factory) as session:
+            session.get(ResultRow, exhausted_id).judge_attempts = 3
+
+        report = run_judge_calibration(
+            self._judging_ctx(ctx, store, monkeypatch, sweep_judge_max_attempts=3)
+        )
+
+        assert report.considered == 1, "only the un-exhausted sample is a candidate"
+        assert report.graded == 1
+
+        by_id = {r.id: r for r in self._rows(ctx, run_id)}
+        assert by_id[spared_id].score is not None
+        assert by_id[exhausted_id].score is None, "the exhausted sample must be left alone"
+        assert by_id[exhausted_id].judge_attempts == 3, "and must not be charged another attempt"
+
+    def test_a_failed_write_back_is_reported_and_does_not_double_count(
+        self, ctx, tmp_path, monkeypatch
+    ) -> None:
+        """Grades archived but not persisted is a DIVERGENCE, and must go red.
+
+        Object storage and Postgres disagreeing about a run is the state nobody
+        discovers until the numbers are needed, so it cannot be a quiet success.
+
+        The arithmetic is the other half of this test. An earlier draft added the
+        graded rows to ``failed`` while leaving them in ``graded``, counting them
+        twice: the sweep exited red, which looked right, on a summary line whose
+        buckets no longer added up to ``considered``. ``balances()`` is what makes
+        that visible rather than plausible.
+        """
+        import ida_runner.sweeps as sweeps_mod
+
+        store = _store(tmp_path)
+        self._ungraded_run(ctx, store)
+
+        def _boom(_session, _records):
+            raise RuntimeError("postgres is down")
+
+        monkeypatch.setattr(sweeps_mod, "persist_regraded_results", _boom)
+
+        report = run_judge_calibration(self._judging_ctx(ctx, store, monkeypatch))
+
+        assert report.considered == 2
+        assert report.graded == 0, "nothing reached the table, so nothing is graded"
+        assert report.failed == 2
+        assert report.exit_code != 0
+        assert report.balances(), "every considered candidate lands in exactly one bucket"
+        assert any("not persisted" in note for note in report.notes)
+
+    def test_a_failed_write_back_after_a_failed_GRADE_still_balances(
+        self, ctx, tmp_path, monkeypatch
+    ) -> None:
+        """The case that actually discriminates the two arithmetics.
+
+        When the write-back fails after every grade ALSO failed, the buggy
+        ``failed += graded + failed`` counts the judge failures a second time --
+        ``failed`` reaches 4 for 2 candidates -- while the correct
+        ``failed += graded`` (with ``graded`` at 0) leaves it at 2. The
+        all-succeeded case cannot tell them apart, because ``failed`` is 0 there
+        and both formulas agree; this one is why ``balances()`` is asserted
+        rather than the buckets being eyeballed.
+
+        ⚠ It also names a real consequence: the ``judge_attempts`` increments
+        were in that failed write-back too, so these samples are retried on the
+        next firing rather than converging. The bound counts *persisted*
+        attempts, and an unpersisted one never happened as far as it is concerned.
+        """
+        import ida_runner.sweeps as sweeps_mod
+
+        store = _store(tmp_path)
+        run_id = self._ungraded_run(ctx, store)
+
+        def _boom(_session, _records):
+            raise RuntimeError("postgres is down")
+
+        monkeypatch.setattr(sweeps_mod, "persist_regraded_results", _boom)
+
+        report = run_judge_calibration(
+            self._judging_ctx(ctx, store, monkeypatch, judge_mode="malformed")
+        )
+
+        assert report.considered == 2
+        assert report.graded == 0
+        assert report.failed == 2, "two judge failures, counted once"
+        assert report.balances()
+        assert [r.judge_attempts for r in self._rows(ctx, run_id)] == [0, 0], (
+            "the increments were in the write-back that failed"
+        )
+
+    def test_a_dry_run_writes_nothing_and_counts_no_attempt(
+        self, ctx, tmp_path, monkeypatch
+    ) -> None:
+        """It answers "what would change", not "what would this cost" -- it still spends."""
+        store = _store(tmp_path)
+        run_id = self._ungraded_run(ctx, store)
+
+        report = run_judge_calibration(self._judging_ctx(ctx, store, monkeypatch), dry_run=True)
+
+        assert report.planned == 2
+        assert report.graded == 0
+        assert report.balances()
+        assert any("billed" in note for note in report.notes), (
+            "a dry run that silently spends is the expensive surprise"
+        )
+
+        rows = self._rows(ctx, run_id)
+        assert all(r.score is None for r in rows)
+        assert all(r.judge_attempts == 0 for r in rows)
 
 
 # --------------------------------------------------------------- report ----
@@ -911,18 +1325,36 @@ def _serving_config():
     return ServingConfig(model_id="mock-1", serving_stack=ServingStack.OPENAI_API)
 
 
-def _ungraded_result(run_id: str, index: int, *, scorable: bool = False):
+def _ungraded_result(
+    run_id: str,
+    index: int,
+    *,
+    scorable: bool = False,
+    judge_attempts: int = 0,
+    transcript_uri: str | None = "s3://ida-artifacts/x.json",
+    task_id: str = SUBJECTIVE_TASK,
+):
+    """A subjective sample carrying no score.
+
+    ``transcript_uri`` defaults to a real-looking URI because that is what a
+    completed sample HAS: the candidate answered, the answer was archived, and
+    only the grade is missing. A row without one is the *ungradable* class -- the
+    model call died -- and is never a candidate; pass ``transcript_uri=None`` to
+    build that state deliberately.
+    """
     from ida_core.contracts import ResultRecord
 
     return ResultRecord(
         id=f"res_ungraded_{run_id}_{index}",
         run_id=run_id,
-        task_id=SUBJECTIVE_TASK,
+        task_id=task_id,
         sample_id=f"s{index}",
         model_key="mock",
         serving_config=_serving_config(),
         score=None,
         scorable=scorable,
+        judge_attempts=judge_attempts,
+        transcript_uri=transcript_uri,
         created_at=utcnow(),
     )
 
@@ -939,6 +1371,7 @@ def _graded_result(run_id: str):
         serving_config=_serving_config(),
         score=Score(scorer=ScorerKind.LLM_JUDGE, value=0.8, passed=True, explanation="ok"),
         scorable=False,
+        transcript_uri="s3://ida-artifacts/x.json",
         created_at=utcnow(),
     )
 

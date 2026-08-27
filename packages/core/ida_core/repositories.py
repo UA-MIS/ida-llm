@@ -8,6 +8,7 @@ remember to honour.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from datetime import datetime
 
@@ -26,6 +27,8 @@ from ida_core.contracts import (
     TokenUsage,
 )
 from ida_core.db import ResultRow, RunRow, utcnow
+
+log = logging.getLogger(__name__)
 
 # ----------------------------------------------------------------- runs ----
 
@@ -300,6 +303,7 @@ def result_row_to_record(row: ResultRow) -> ResultRecord:
             completion_tokens=row.judge_completion_tokens,
         ),
         judge_cost_usd=row.judge_cost_usd,
+        judge_attempts=row.judge_attempts,
         judge_transcript_uri=row.judge_transcript_uri,
         task_content_sha=row.task_content_sha,
         score=score,
@@ -340,6 +344,7 @@ def insert_results(session: Session, records: list[ResultRecord]) -> list[Result
             judge_prompt_tokens=record.judge_usage.prompt_tokens,
             judge_completion_tokens=record.judge_usage.completion_tokens,
             judge_cost_usd=record.judge_cost_usd,
+            judge_attempts=record.judge_attempts,
             judge_transcript_uri=record.judge_transcript_uri,
             task_content_sha=record.task_content_sha,
             scorer=record.score.scorer.value if record.score else None,
@@ -473,16 +478,59 @@ def models_with_any_run(
     return set(session.scalars(stmt))
 
 
-def list_ungraded_subjective_results(session: Session, *, limit: int = 500) -> list[ResultRow]:
-    """Subjective samples that carry no score yet, oldest first.
+def list_ungraded_subjective_results(
+    session: Session, *, limit: int = 500, max_judge_attempts: int = 3
+) -> list[ResultRow]:
+    """Samples a judge could still usefully grade, oldest first.
 
-    ``scorable=False`` is the harness's marker for a sample from a
-    ``subjective`` task, written because no programmatic scorer can touch it
-    (see ``ida_harness.runner``).  ``score_value IS NULL`` is the second half of
-    the predicate rather than a redundancy: once the LLM judge grades a sample
-    retroactively it writes a score onto exactly these rows, and a candidate
-    query that ignored the score would keep re-grading everything it had already
-    graded -- every night, at full provider cost.
+    This is the SQL half of the four-way partition documented in
+    ``docs/llm-judge.md`` and implemented in Python by
+    :func:`ida_harness.regrade.is_never_judged` / ``is_judge_failure`` /
+    ``is_ungradable``.  The two definitions select the same rows on purpose: the
+    sweep picks candidates in SQL and the grader decides what it will actually
+    grade in Python, and when those disagree the failure is not a crash but a
+    **standoff** -- nominated nightly, declined nightly, visible only as a bill.
+
+    The predicate is three clauses, and each one excludes a different class::
+
+        score_value IS NULL           excludes *graded*      -- already done
+        transcript_uri IS NOT NULL    excludes *ungradable*  -- no completion exists,
+                                                                so no judge can ever
+                                                                succeed on it
+        judge_attempts < N            excludes *exhausted*   -- tried enough times
+
+    What is left is exactly *never judged* (``judge_attempts = 0``) plus the
+    still-affordable part of *judge failed*.
+
+    ⚠ ``scorable`` IS NOT IN THE PREDICATE, AND ITS ABSENCE IS THE FIX.  It
+    records whether a judge was *configured when the sample ran*, which is a
+    different question from whether the sample still needs grading, and using it
+    was wrong in **both** directions at once:
+
+    * it **over-selected** -- ``scorable = FALSE`` also matches a sample whose
+      model call died and which therefore has no completion to grade, nominated
+      forever and able to succeed never;
+    * it **under-selected** -- a sample whose *online* grading failed is written
+      ``scorable = TRUE`` (the run must not report itself ``succeeded``), so it
+      was never re-nominated.  Silent, permanent non-retry, and it arrived the
+      moment the runner service was wired to a judge.  That is this change.
+
+    ⚠ ``judge_serving_config IS NULL`` IS A TRAP AND IS DELIBERATELY UNUSED.
+    SQLAlchemy's ``JSON`` column stores Python ``None`` as the JSON literal
+    ``'null'``, not SQL ``NULL``, so that clause matches nothing, ever -- while
+    the ORM reads the same row back as ``None``.  Python and SQL disagree about
+    the identical row and neither complains.  The columns above are genuinely
+    nullable or numeric, which is why they are the ones used.  Pinned by
+    ``TestTheRowLevelPredicateContract``.
+
+    ``max_judge_attempts`` is the money-pump bound.  The *judge failed* class is
+    retryable by design -- that is what stops a judge outage making a sample
+    permanently ungradable -- so an unbounded retrier is a standing charge
+    against a judge that stays down.  The caller passes
+    ``IDA_SWEEP_JUDGE_MAX_ATTEMPTS``; the default here matches
+    :attr:`ida_core.config.Settings.sweep_judge_max_attempts` so a direct caller
+    is bounded even if it forgets to ask.  ``0`` disables nomination entirely,
+    which is a coherent way to park the sweep without editing the CronJob.
 
     Oldest first so a bounded pass makes progress through the backlog instead of
     re-examining the same head of it.  Bounded by ``limit`` for the same reason
@@ -490,30 +538,83 @@ def list_ungraded_subjective_results(session: Session, *, limit: int = 500) -> l
     transaction.  A caller that hits the bound should say so in its log line
     rather than let a truncated pass read as "that was all".
 
-    ⚠ OPEN CONTRACT: WHAT A **FAILED** JUDGE LEAVES BEHIND.  This predicate says
-    "no score yet", which today is the same set as "never graded" because nothing
-    grades.  It stops being the same set the moment a judge can FAIL on a sample.
-    If a failed grading leaves ``score_value`` NULL, this query nominates that
-    sample again on every subsequent pass -- forever, at judge cost -- while a
-    grader that refuses to retry it never clears it.  That standoff is the
-    disagreement flagged as E3 against the judge PR, and it is unresolved
-    upstream at the time of writing.
-
-    Deliberately NOT pre-emptively guessed at here.  Whoever lands the judge must
-    decide what a failed grading writes (an ``error`` on the result?  a sentinel
-    score?  an attempt counter?) and then make this predicate agree with it in
-    the SAME change.  Encoding a guess now would produce two components that look
-    consistent and are not, which is strictly worse than a query with a known
-    open question written on it.
+    ⚠ SUBJECTIVE-NESS IS NOT DECIDABLE HERE.  ``results`` stores ``task_id``, not
+    task *kind*, so no SQL predicate can tell a subjective sample from a
+    verifiable one whose score is missing for some other reason.  The caller
+    filters on kind against the task catalog -- see
+    ``ida_runner.sweeps.run_judge_calibration`` -- which is cheap because a
+    grader skips a task with no rubric before spending anything.  The name is
+    kept for continuity with the sweep and the docs that cite it.
     """
     stmt = (
         select(ResultRow)
-        .where(ResultRow.scorable.is_(False))
         .where(ResultRow.score_value.is_(None))
+        .where(ResultRow.transcript_uri.is_not(None))
+        .where(ResultRow.judge_attempts < max_judge_attempts)
         .order_by(ResultRow.created_at.asc(), ResultRow.id.asc())
         .limit(limit)
     )
     return list(session.scalars(stmt))
+
+
+def persist_regraded_results(session: Session, records: list[ResultRecord]) -> int:
+    """Write grades produced by a retroactive regrade back onto their rows.
+
+    Returns how many rows were updated.
+
+    ``ida_harness.regrade.regrade_run`` returns records "ready to persist" and
+    writes only to object storage, because the harness has no database.  The
+    service that owns ``results`` has to do the write, and that is this package.
+    Until it did, a regrade updated the archived eval log while the UI kept
+    showing the original blank -- and, more sharply, ``judge_attempts`` never
+    moved, so the bound in :func:`list_ungraded_subjective_results` could never
+    engage and the money pump it exists to stop stayed open.
+
+    Only the judge-owned columns are written.  The candidate model's usage,
+    cost, latency and transcript describe a call that happened during the
+    original run and did not happen again; rewriting them from a record that
+    merely carried them along would silently restate the run's own history.  For
+    the same reason a row that has vanished is skipped rather than re-inserted:
+    a regrade grades what a run produced, and it is not a path by which a
+    deleted result may come back.
+    """
+    updated = 0
+    for record in records:
+        row = session.get(ResultRow, record.id)
+        if row is None:
+            # The run was deleted between nomination and write-back. Nothing to
+            # update, and inventing the row would resurrect deleted evidence.
+            log.warning("result %s vanished before regrade write-back; skipped", record.id)
+            continue
+        row.judge_serving_config = (
+            record.judge_serving_config.model_dump(mode="json")
+            if record.judge_serving_config
+            else None
+        )
+        row.judge_prompt_tokens = record.judge_usage.prompt_tokens
+        row.judge_completion_tokens = record.judge_usage.completion_tokens
+        row.judge_cost_usd = record.judge_cost_usd
+        row.judge_attempts = record.judge_attempts
+        row.judge_transcript_uri = record.judge_transcript_uri
+        row.scorer = record.score.scorer.value if record.score else None
+        row.score_value = record.score.value if record.score else None
+        row.passed = record.score.passed if record.score else None
+        row.score_explanation = record.score.explanation if record.score else None
+        row.score_criteria = (
+            [c.model_dump(mode="json") for c in record.score.criteria]
+            if record.score and record.score.criteria
+            else None
+        )
+        row.score_details = record.score.details if record.score else None
+        row.scorable = record.scorable
+        # `error` moves with the grade: regrade_run clears it when a retry
+        # succeeds (so the run stops reporting `partial` forever) and refreshes
+        # it when a retry fails. Leaving the old string behind would contradict
+        # the score now sitting next to it.
+        row.error = record.error
+        row.archive_error = record.archive_error
+        updated += 1
+    return updated
 
 
 def count_results_for_run(session: Session, run_id: str) -> int:

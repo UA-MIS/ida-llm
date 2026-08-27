@@ -54,6 +54,48 @@ def queue() -> InMemoryQueue:
 
 
 @pytest.fixture
+def mock_judge_factory(registry):
+    """Build an :class:`LLMJudge` backed by the REAL mock-model service.
+
+    ⚠ ZERO SPEND, AND THAT IS A PROPERTY OF THE FIXTURE, NOT A CONVENTION.
+    The judge is the ``mock`` registry entry -- the only enabled key in
+    ``models.yaml`` -- answered in process by the mock-model app. No hosted
+    judge is reachable from here, so a test cannot start billing by accident.
+
+    The mock answers the judge protocol for real (see
+    ``ida_mock_model.responder``): it reads the criterion name and declared
+    scale out of the prompt and returns a well-formed judgment chosen
+    deterministically from the criterion name. So the grade is stable across
+    runs, and if the judge prompt ever changes shape the mock stops matching and
+    these tests fail loudly rather than a hand-written fixture continuing to
+    answer a question nobody asks.
+
+    ``judge_mode`` selects the failure drill: ``"json"`` grades, ``"malformed"``
+    returns prose with a number in it -- the exact shape a real judge produces
+    when it ignores the reply format -- which the harness correctly refuses.
+    That is how the attempt-bound tests get a *service* that misbehaves rather
+    than a stub that pretends to.
+    """
+    from ida_harness.judge import LLMJudge
+    from ida_mock_model.app import create_app
+    from ida_mock_model.testing import make_transport
+
+    def factory(judge_mode: str = "json") -> LLMJudge:
+        app = create_app()
+        app.state.mock.responder.judge_mode = judge_mode
+        entry = registry.get("mock")
+        client = OpenAICompatibleClient(
+            entry,
+            transport=make_transport(app),
+            sleep=lambda _s: None,
+            jitter=lambda _lo, hi: hi,
+        )
+        return LLMJudge(entry=entry, client=client, owns_client=True)
+
+    return factory
+
+
+@pytest.fixture
 def mock_transport_factory(registry):
     """A client factory that reaches the REAL mock-model service, in process.
 
