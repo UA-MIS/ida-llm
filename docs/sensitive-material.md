@@ -1,145 +1,144 @@
-# Sensitive course material: where it lives and how it is handled
+# Sensitive course material: how it is cleaned, stored and used
 
-**Status: decided, pending ratification.** This is the storage and handling rule
-for real MIS 200 course material — exams, quizzes, answer keys, and anything
-else a professor would not publish. It exists so ingestion can start without
-each person inventing their own answer.
+**Status: ratified (D-49).** This is the storage and handling rule for real
+MIS 200 course material. It replaces an earlier, stricter draft that kept all
+real material out of the system entirely; the human ratified a revision, and the
+gate is now **cleaning on intake**, not exclusion.
 
-It is deliberately written from what this system *actually does today*, verified
-against `origin/main` and the running cluster. Where a control does not exist
-yet, it is named as a gap rather than assumed.
+It is written from what this system *actually does today*, verified against
+`origin/main` and the running cluster. Where a control does not exist yet, it is
+named as a gap rather than assumed.
 
 ---
 
-## The three facts that decide this
+## The rule in one paragraph
 
-**1. The results UI is public and unauthenticated.**
+We have permission to take real course material into our own database. Real
+material is **de-identified and sanitised at the point of intake**; once cleaned
+it may live in our database, pass through model calls, and appear in public
+results. Cleaning is the gate. The benchmark is *meant* to be public, so the
+results view stays open — but **triggering a run spends real money**, and that is
+the thing that gets locked.
 
-`ida-llm.capstone.uamishub.com` is served with **no auth middleware** on its
-Ingress. (Compare `ida-llm-dev`, which carries `oauth2-proxy` — the gate exists
-in this platform and prod deliberately does not use it.) An anonymous request
-returns run pages including task name, model, scores, sample counts and task git
-SHA, and the transcript route under `/api/runs/<run_id>/results/<sample_id>/transcript`
-answers without a credential too.
+---
 
-So: **anything that becomes a benchmark run artifact is effectively published.**
-Not "stored somewhere with an access policy" — published, to the internet, with
-no login.
+## What the system actually does
 
-**2. Everything a model sees is archived.**
+**1. The results view is public, and that is intended.**
 
-`packages/core/ida_core/artifacts.py` treats the object-store layout as a
-contract: every sample transcript, judge transcript and eval log is written to
-`s3://<bucket>/runs/<run_id>/…`. The store is a tenant-owned MinIO on a PVC
-(`.devops/chart/base/pvc.yaml`) — not internet-facing itself, but its contents
-are exactly what the public UI reads. There is no "run this without keeping the
-transcript" mode, by design: archiving is what makes results auditable.
+`ida-llm.capstone.uamishub.com` carries no auth middleware and answers
+anonymously with run detail and transcripts. That is **not** a defect — a public
+benchmark that nobody can read is not a benchmark. **Do not gate the results UI.**
 
-**3. There is no local-inference path today.**
+**2. Gold answers are already protected.**
 
-`infra/inference/README.md` states it plainly: off-cluster inference to the
-campus "Sparks" vLLM is **deferred and not reachable**. The tenant egress policy
-grants `:443` to the internet and nothing else; vLLM defaults to `:8000`; the
-NetworkPolicy that would open it lives in a different repo
-(`platform-infra`, `platform-services/ida-llm-egress/netpol.yaml`).
-`SPARKS_BASE_URL` is deliberately empty in `.devops/chart/base/configmap.yaml`
-and CI asserts it stays empty.
+`GET /tasks/{id}` redacts every `target` by default (A10). `?include_targets=true`
+requires the `author` role, and the anonymous principal deliberately does *not*
+hold it — so the answer key is already fail-shut, not fail-open. Publishing every
+answer key would be both an integrity risk and a training-contamination risk.
 
-**Therefore every model call this system can currently make goes to a commercial
-cloud API, and its transcript lands on a public web page.**
+**3. Run execution is *not* protected — and it spends money.**
+
+`POST /runs` (`enqueue_runs`) enqueues benchmark runs against real providers.
+`services/api/ida_api/auth.py` is an explicit placeholder (D-5, `auth_mode="disabled"`),
+and its anonymous principal holds **`reader` and `runner`** — `runner` being, in
+its own words, *"enqueue runs (spends money)"*.
+
+Today that is contained by accident of routing rather than by design: the API has
+**no public Ingress** (only `ida-llm-frontend` and `ida-llm-agile` are routed),
+and the frontend proxies just three read-only routes. So nothing on the internet
+can currently trigger a run. **That containment disappears the moment the API is
+routed publicly or a "run this" button is added** — which is exactly what the
+results work is heading toward.
+
+**4. Everything a model sees is archived and published.**
+
+`ida_core.artifacts` treats the object-store layout as a contract: every sample
+transcript, judge transcript and eval log is written to
+`s3://<bucket>/runs/<run_id>/…`, and that is what the public UI reads. There is
+no "run without keeping the transcript" mode, by design.
+
+**→ Whatever goes into a model call becomes public. That is why cleaning happens
+on intake, not later.**
 
 ---
 
 ## The decision
 
-### 1. Where sensitive material lives
+### 1. Where material lives
 
-**Outside this repository and outside this system**, in a UA-controlled,
-access-restricted location owned by the instructor who provided it — the
-university's managed storage (OneDrive / SharePoint / Box under their account),
-not a personal drive.
+**In our own database**, de-identified on intake. We have permission to hold it.
 
-It does **not** go in:
+The intake pipeline is a real piece of work, not a promise — it is tracked as its
+own story. Material that has not been through it is **not** yet cleaned material
+and must not be used as task content or sent to a model.
 
-- **the git repository** — `tasks/SCHEMA.md` § Dataset hygiene already forbids it,
-  and note that it forbids it *on the assumption the repo is public*. The repo is
-  private today, but that is a setting someone can flip, and it is not the control
-  this rule rests on;
-- **MinIO / the artifact store** — its contents surface through the public UI
-  (fact 1);
-- **Vault** — that is for credentials, not bulk material.
+### 2. Cleaning on intake is the gate
 
-> **Gap for ratification:** the exact UA-sanctioned restricted store is the one
-> question here that genuinely needs an authority outside this repo. That is what
-> the OIT conversation should settle. Until it does, the instructor's own
-> UA-managed storage is the working answer, and nothing in this rule changes if
-> OIT names a different location — only the address changes.
+At intake, strip anything that identifies a person: student names, IDs, emails,
+usernames, submission timestamps tied to an individual, and free-text that
+re-identifies by content. Instructor-identifying material is treated the same
+way unless the instructor has agreed to be named.
 
-### 2. What may and may not enter the repo
+FERPA is the floor here and `tasks/SCHEMA.md` § 1 states it plainly: the
+de-identification standard is **higher than deleting a name**, because
+short-answer text is often re-identifiable from its content. If a passage cannot
+be cleaned without destroying it, use a synthetic stand-in (§4).
 
-**May not:** real exam papers, quizzes and answer keys in current use; any real
-student work, even de-identified (FERPA — `tasks/SCHEMA.md` § 1 is the standing
-rule and it is stricter than "remove the names"); anything from a course LMS;
-copyrighted textbook or question-bank content.
+**Cleaned material may:** live in our database, be used as task content, be sent
+to model providers, and appear in public results.
+**Uncleaned material may not** do any of those things.
 
-**May:** official published curriculum material — the BSCBA curriculum map
-(`bscba-curriculum-map-slo.png`) is public program documentation and is fine to
-commit; the SLO list derived from it; and **synthetic task content** authored to
-imitate the shape of real material without being it.
+### 3. What may enter the git repository
 
-If you are unsure which side something falls on, it does not go in.
+The database and the repo are different questions. The repo is the stricter one:
+`tasks/SCHEMA.md` § Dataset hygiene is written on the assumption that everything
+in `tasks/` is public, and that remains the standing rule.
 
-### 3. How a task references sensitive material without containing it
+**May:** official published curriculum material (the BSCBA curriculum map is
+public program documentation); the SLO list derived from it; synthetic task
+content; cleaned material that is genuinely safe to redistribute.
+**May not:** copyrighted textbook or question-bank content — cleaning does not
+launder copyright; anything not yet through the intake pipeline.
 
-Tasks are authored as **synthetic stand-ins with a provenance pointer**. This is
-not a new mechanism — it is what `tasks/conceptual-grading/` already does, and
-what `tasks/SCHEMA.md` § 1 and § 3 already require. Applied to MIS 200:
+### 4. Provenance pointers and synthetic stand-ins
 
-- the task's content is **written for the file**, imitating the structure and
-  difficulty of the real item;
-- the task's `description` carries the provenance sentence SCHEMA.md § 3 requires;
-- per-sample `metadata` names the source by **reference and content hash**, never
-  by content — e.g. the source document's title, its SHA-256, the SLO it maps to,
-  and the fact that the original is held in the restricted store.
+Still good practice, and still required for anything we do not clean or cannot
+share:
 
-The hash is what makes this honest: it lets someone with authorized access to the
-original confirm which item a task was derived from, without the repo ever
-carrying the item.
+- author the task body as a **synthetic stand-in** imitating the shape of the real
+  item — this is what `tasks/conceptual-grading/` already does;
+- carry the provenance sentence `tasks/SCHEMA.md` § 3 requires;
+- name the source in per-sample `metadata` by **reference and SHA-256**, never by
+  content.
 
-### 4. Cloud API vs local inference for sensitive content
+The hash lets someone with authorised access confirm which item a task derives
+from without the repo carrying the item.
 
-**No sensitive content goes into a model call. Not today, and not by exception.**
+### 5. Cloud API vs local inference
 
-The reason is fact 1 + fact 3 together: the transcript of every call is archived
-and published, and there is no local path to run it instead. A "just this once"
-run against a real exam would put that exam on a public web page.
+**Cleaned material may go to cloud providers.** The earlier blanket prohibition
+is lifted.
 
-This unblocks when **both** of the following are true, and they are separate
-pieces of work:
+Local inference (campus "Sparks" vLLM) remains **deferred and unreachable** —
+`infra/inference/README.md`; the tenant egress policy grants `:443` only, vLLM
+defaults to `:8000`, and the NetworkPolicy lives in `platform-infra`. It is now a
+*capability we want*, not a *precondition we are blocked on*: it would let us
+handle material we choose not to clean, or cannot clean well enough.
 
-1. **A local serving path exists** — the Sparks egress route is open and a model
-   is actually serving (tracked in the local-model research item);
-2. **Runs can be access-gated** — the results UI can keep a run non-public. Today
-   it cannot. The platform already runs `oauth2-proxy` on non-prod ingresses, so
-   the mechanism exists and has simply never been applied to prod.
+### 6. The control that actually matters: gate run execution
 
-Until both land, MIS 200 benchmarking runs on **synthetic stand-ins only**. That
-is not a limitation on the benchmark's usefulness: the stand-ins are what make
-the results redistributable and the whole task suite publishable.
+**Require auth to trigger a run on prod.** Not to view results — to spend money.
 
----
+This is our application's work, not the platform's: `auth.py` already defines the
+`runner` role for exactly this, and every protected route already depends on
+`current_principal`, so it is an edit to that file plus a config flag rather than
+a sweep through the handlers. The specific change is to stop granting `runner` to
+the anonymous principal and to validate a real token.
 
-## What this means if you are ingesting MIS 200 material
-
-You are not blocked. Concretely:
-
-1. Collect the real material into the restricted store (§1) — it never touches
-   this repo.
-2. Commit the **curriculum map** and the **SLO list** derived from it — public
-   material, and the backbone the benchmark hangs on.
-3. Keep an index of what exists in the restricted store: title, SLO, SHA-256,
-   sensitivity. The index may be committed; the material may not.
-4. Author tasks as synthetic stand-ins carrying provenance pointers (§3).
+It pairs with the cost interlocks already in place: nightly sweeps suspended in
+all environments (D-43), and `test_only_the_mock_is_enabled` keeping hosted
+models off by deliberate act.
 
 ---
 
@@ -147,7 +146,24 @@ You are not blocked. Concretely:
 
 | gap | consequence | owner |
 |---|---|---|
-| No UA-sanctioned restricted store confirmed | §1 uses instructor-managed UA storage as the working answer | OIT conversation |
-| Prod results UI has no auth gate | a run cannot be made non-public; blocks sensitive-content inference | this repo (product) |
-| Local inference unreachable (egress netpol) | no compliant path to run sensitive content at all | `platform-infra` |
-| `tasks/SCHEMA.md` says the repo is public; it is currently private | the rules are correct either way, but the stated premise is wrong today | this repo (docs) |
+| **Run execution is unauthenticated** — anonymous principal holds `runner` | anyone who can reach the API can spend real tokens; contained today only because the API has no public route | this repo (tracked as its own story) |
+| Intake cleaning pipeline not built yet | no material is "cleaned material" until it exists | this repo (tracked as its own story) |
+| Local inference unreachable (egress netpol) | no option for material we choose not to clean | `platform-infra` |
+| `tasks/SCHEMA.md` says the repo is public; it is currently **private** | rules are correct either way, but the stated premise is wrong today | this repo (docs) |
+
+### ⚠️ Residual question for the human
+
+Cleaning removes **student** PII. It does not address a separate question:
+**exam questions and answer keys becoming publicly visible.**
+
+Gold answers are already redacted behind the `author` role (A10), so the answer
+key is covered. What is *not* covered is the **question text** of a real exam
+appearing in a public task spec — which matters because professors reuse exams,
+and a publicly readable question retires it.
+
+This is a call for the human and the instructor, not something cleaning solves.
+The safe default until they decide: **use synthetic stand-ins for exam items**
+(§4), which costs about ten minutes per task and keeps the family redistributable.
+
+**Note also:** gating run execution does **not** gate viewing. Results stay public
+by design (§ "What the system actually does", 1).
