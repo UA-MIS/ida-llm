@@ -1,0 +1,1 @@
+When collecting test and other data from Professors to create the benchmark, they need to be informed that we are running their work through an AI model and we need to request their consent.
