@@ -557,8 +557,20 @@ it matters.
    caps still apply.
    → `services/runner/ida_runner/sweeps.py`
 
-3. **No auth.** `auth_mode: disabled` yields an anonymous principal. Any other
-   value returns 501 rather than silently allowing traffic.
+3. **No auth *service*.** There is still no SSO/OIDC integration (D-5) — but
+   the control that matters is real. `auth_mode` selects it:
+
+   - `disabled` (the default) — anonymous holds `reader` and `runner`. Correct
+     for local dev, CI and previews, all of which point at the mock model.
+   - `token` — anonymous holds `reader` only, and `POST /runs` (which spends
+     real provider money) requires a bearer token from `IDA_AUTH_TOKENS`.
+   - anything else — 501 on the gated route, rather than silently allowing it.
+
+   **Reads are anonymous in every mode, deliberately.** A benchmark nobody can
+   read is not a benchmark; what gets locked is *spending*, not *viewing*
+   (D-49, `docs/sensitive-material.md` §1 and §6). A token grants `reader` +
+   `runner` and never `author`, so the answer key stays fail-shut (A10) until a
+   real per-person identity exists to unlock it.
    → `services/api/ida_api/auth.py`
 
 4. **No recommendation engine.** Half of D-3 is not built. The data model

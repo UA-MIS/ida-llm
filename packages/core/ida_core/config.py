@@ -264,12 +264,45 @@ class Settings(BaseSettings):
     """
 
     auth_mode: str = "disabled"
-    """``disabled`` today.
+    """Which credential the API believes.  ``disabled`` (default) or ``token``.
 
-    **D-5: there is no auth service.**  Platform SSO/OIDC arrives later and the
-    API consumes it through one dependency-injected placeholder
-    (``ida_api.auth.current_principal``).  This flag is the seam.
-    """
+    **D-5: there is still no auth *service*.**  Platform SSO/OIDC arrives later
+    and the API consumes it through one dependency-injected seam
+    (``ida_api.auth.current_principal``).  This flag selects what that seam does:
+
+    ``disabled``  anonymous holds ``reader`` AND ``runner`` -- local dev, CI, the
+                  tracer bullet.  The default, because every one of those runs
+                  against the mock model and none of them can reach a provider.
+    ``token``     anonymous holds ``reader`` ONLY.  Spending money needs a bearer
+                  token from :attr:`auth_tokens`.  This is the deployed posture
+                  once the API is routed publicly -- see
+                  ``docs/sensitive-material.md`` section 6.
+    anything else 501 at request time, loudly, rather than a half-implemented
+                  mode that silently allows traffic.
+
+    Reads stay anonymous in BOTH modes.  The public benchmark is the product; the
+    thing being gated is *spend*, not *viewing* (D-49)."""
+
+    auth_tokens: str = ""
+    """Bearer tokens that grant the ``runner`` role, as ``subject:token`` pairs.
+
+    **A SECRET.**  Empty default, like every other secret here -- it arrives from
+    Vault via ESO in-cluster and from ``.env`` locally, never from a default and
+    never from git.
+
+    Format: comma- or whitespace-separated ``subject:token`` entries, e.g.
+    ``ci:s3cr3t...,prof-smith:0th3r...``.  The subject is a LABEL, not a
+    credential: it is what lands in the enqueue log line and in
+    ``Principal.subject``, so a run can be attributed to whoever triggered it.
+
+    Only ``reader`` + ``runner`` are granted.  **``author`` deliberately is
+    not**: a shared static bearer token is a weaker credential than the platform
+    SSO that A10 was written for, so the answer key stays fail-shut until real
+    SSO lands rather than becoming unlockable by a token in an env var.
+
+    Parsing is strict and happens at startup (:func:`ida_api.auth.validate_auth_config`)
+    so a misconfigured deployment fails its readiness probe instead of serving
+    with an auth mode it cannot enforce."""
 
     @field_validator("log_level", mode="after")
     @classmethod
