@@ -16,6 +16,7 @@ is yours, and [`.devops/README.md`](../.devops/README.md) for the deploy contrac
 | **LLM-as-judge** -- how subjective tasks are scored, the bias controls, what judging costs, retroactive grading | [`docs/llm-judge.md`](llm-judge.md) |
 | off-cluster inference (Sparks) | [`infra/inference/README.md`](../infra/inference/README.md) |
 | **sensitive course material** -- where real exams/quizzes live, what may enter the repo, provenance pointers, and the cloud-vs-local rule | [`docs/sensitive-material.md`](sensitive-material.md) |
+| **the intake pipeline** -- how real material is de-identified on intake, the provenance pointer, the cleaned/uncleaned gate, and what pattern-based cleaning does not catch | [`docs/intake-pipeline.md`](intake-pipeline.md) |
 
 ## Suggested first tasks
 
