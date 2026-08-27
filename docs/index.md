@@ -15,6 +15,7 @@ is yours, and [`.devops/README.md`](../.devops/README.md) for the deploy contrac
 | **provider clients** -- which client answers for which entry, the Anthropic/OpenAI gotchas, retry and `Retry-After`, why there is no mock fallback | [`docs/model-clients.md`](model-clients.md) |
 | **LLM-as-judge** -- how subjective tasks are scored, the bias controls, what judging costs, retroactive grading | [`docs/llm-judge.md`](llm-judge.md) |
 | off-cluster inference (Sparks) | [`infra/inference/README.md`](../infra/inference/README.md) |
+| **sensitive course material** -- where real exams/quizzes live, what may enter the repo, provenance pointers, and the cloud-vs-local rule | [`docs/sensitive-material.md`](sensitive-material.md) |
 
 ## Suggested first tasks
 
