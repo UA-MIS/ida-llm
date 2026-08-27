@@ -1,0 +1,74 @@
+# ⚠ TEMPLATE. THIS FILE CONTAINS NO REAL PUBLISHED NUMBER AND NO REAL CITATION.
+#
+# It is shipped so that the shape of a calibration slice is written down, so
+# `--dry-run` has something to resolve, and so the test suite can pin that a
+# slice with a TODO-PLACEHOLDER citation is REFUSED by `run_calibration`.
+# Nothing in it is evidence of anything. Read calibration/README.md before you
+# fill it in -- in particular the part about the two placeholders below being
+# only half the work.
+#
+# Validated by `ida_harness.calibration.load_calibration_slice`. There is no
+# JSON Schema for this format (unlike tasks/ and models.yaml): slices are read
+# by exactly one Python entry point, not by CI or by non-Python contributors.
+version: 1
+
+description: >
+  Illustrative calibration slice. Every published_source below is a
+  TODO-PLACEHOLDER, so `python -m ida_harness.calibration` refuses to run this
+  file without --allow-placeholder, and any outcome it produces reports
+  verdict=placeholder and can never be within tolerance.
+
+references:
+  - benchmark: gsm8k
+    slice_id: template-do-not-cite
+
+    description: >
+      TEMPLATE, NOT A MEASUREMENT. The task_ids below are the first two rungs of
+      the quantitative-quiz ladder -- they exist, they are verifiable, and they
+      are numerically scored, which is enough for the machinery to run end to
+      end. They are NOT GSM8K items and they are not equivalent to GSM8K items:
+      they are undergraduate descriptive-statistics questions authored for this
+      repository. Comparing a mean over them against a GSM8K leaderboard number
+      would be comparing two different tests.
+
+      Making this reference real therefore takes two things, and the second is
+      the hard one: (1) a published_score and a published_source you actually
+      retrieved, and (2) task files whose items are of the same KIND as the
+      benchmark's. Benchmark items may not be copied into this repository
+      (tasks/SCHEMA.md -> "Dataset hygiene"), so (2) means authoring equivalent
+      items or pointing task_ids at a locally generated set held outside the
+      repo. See calibration/README.md.
+
+    # The models.yaml key this published number is claimed for. `luna` is the
+    # real-model entry; against any other key the run is refused unless
+    # --allow-model-mismatch is passed, and is then printed CROSS-MODEL.
+    model_key: luna
+
+    # TODO-PLACEHOLDER(published-score): 0.0 is a NULL, not a claim. Replace it
+    # with the number the source below reports, normalised to 0..1 (a result
+    # quoted as "82.4%" is written here as 0.824).
+    published_score: 0.0
+
+    # TODO-PLACEHOLDER(published-source): the URL of the paper, model card or
+    # leaderboard row you read the number off. Must be an http(s) URL; the
+    # loader rejects anything else that is not a TODO-PLACEHOLDER marker. Do not
+    # write a URL you have not opened.
+    published_source: TODO-PLACEHOLDER(published-source)
+
+    # TODO-PLACEHOLDER(published-retrieved): the date you actually read it.
+    # Required separately from the URL because leaderboards are edited in place,
+    # so the URL alone does not say which version of the page was read. The date
+    # below is when this template was authored, not when anything was retrieved.
+    published_retrieved: 2026-08-27
+
+    # How far measured may sit from published and still agree. Choose this from
+    # the SLICE SIZE, not from what makes the run pass: over 12 samples the
+    # standard error of a proportion near 0.8 is about 0.115, so a tolerance
+    # much tighter than that fails on sampling noise alone, and one much wider
+    # cannot detect a plumbing fault. Twelve samples is a smoke test; a slice
+    # you would defend needs a few hundred.
+    tolerance: 0.25
+
+    task_ids:
+      - quantitative-quiz/l1-descriptive-key   # 6 samples
+      - quantitative-quiz/l2-spread-key        # 6 samples

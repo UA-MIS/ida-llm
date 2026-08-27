@@ -8,15 +8,20 @@
 # (packages/harness/ida_harness/factory.py), so a new vLLM box or a new hosted
 # model needs no code change at all.
 #
-# Two clients exist, because two wire formats exist:
+# Three clients exist, because three wire formats exist:
 #
 #   anthropic_compat  -> the Anthropic Messages API (x-api-key, `system` hoisted
 #                        out of `messages`, `content` as a block list)
+#   openai_reasoning  -> chat-completions as the o-series and the GPT-5/5.4/5.5/
+#                        5.6 families speak it: `max_completion_tokens` instead
+#                        of `max_tokens` (which they reject outright), and only
+#                        the API-default temperature/top_p
 #   everything else   -> OpenAI-compatible POST {base_url}/chat/completions
 #
-# Neither contains an `if provider == ...`; the table in factory.py is the one
+# None contains an `if provider == ...`; the table in factory.py is the one
 # place a provider is named. See docs/model-clients.md for why the Messages API
-# is used directly rather than through Anthropic's compatibility shim.
+# is used directly rather than through Anthropic's compatibility shim, and why
+# the reasoning dialect is a separate stack rather than a flag.
 #
 # SECRETS ARE NEVER IN THIS FILE. `api_key_env` names an environment variable;
 # in-cluster that variable is projected from Vault, locally it comes from .env.
@@ -41,9 +46,13 @@
 version: 1
 
 models:
-  # --- the only entry enabled by default -----------------------------------
+  # --- the only FREE entry, and the only one CI and `make dev` ever reach ---
   # The tracer bullet, every test and `make dev` run against this. No key, no
   # GPU, no network egress, deterministic answers.
+  #
+  # `luna` below is also enabled -- deliberately, on a $25 test budget -- but
+  # nothing local can reach it: OPENAI_API_KEY is unset on dev boxes and in CI,
+  # so selecting it there fails loudly on the missing key rather than spending.
   #
   # It also answers the JUDGE protocol deterministically, so
   # `IDA_JUDGE_MODEL_KEY=mock` exercises the whole subjective path locally
@@ -75,6 +84,105 @@ models:
     cost:
       input_usd_per_mtok: 0.0
       output_usd_per_mtok: 0.0
+
+  # --- "Luna" (OpenAI GPT-5.6 Luna), ENABLED -- TESTING ONLY, $25 HARD CAP --
+  #
+  # THE ONLY HOSTED MODEL THAT MAY BE ENABLED IN THIS FILE. The guard test
+  # `test_only_the_mock_is_enabled` in packages/harness/tests/
+  # test_registry_examples.py allows exactly {mock, luna} and fails the PR that
+  # enables anything else. Read that test before adding a second one.
+  #
+  # ⚠ WHAT THE BUDGET IS. The key behind OPENAI_API_KEY is scoped to this model
+  # and carries a $25 HARD CAP, enforced OpenAI-side. It exists so the real
+  # provider path can be exercised end to end -- it is NOT the finished
+  # product's budget. The cap is a backstop against a mistake, not an allowance
+  # to spend.
+  #
+  # ⚠ ENABLED DOES NOT MEAN SWEPT, AND THAT IS ENFORCED. Both nightly sweeps
+  # plan over the ENABLED set, so on its own `enabled: true` would have signed
+  # this entry up for a full unattended suite every night -- `model-sweep`
+  # especially, whose whole job is giving a NEWLY enabled model its first set of
+  # numbers. The `testing-only` tag below is what holds it back, via
+  # IDA_SWEEP_EXCLUDE_TAGS (default "testing-only"); see
+  # `sweepable_model_keys` in services/runner/ida_runner/sweeps.py. A sweep that
+  # holds a model back SAYS SO in its report. Removing that tag, or clearing the
+  # setting, schedules real spend -- do the arithmetic first
+  # (docs/calibration.md).
+  #
+  # ⚠ WHY serving_stack IS `openai_reasoning` AND NOT `openai_api`. Luna is a
+  # GPT-5.6 model, and that family REJECTS the legacy `max_tokens` with
+  #     "Unsupported parameter: 'max_tokens' is not supported with this model.
+  #      Use 'max_completion_tokens' instead."
+  # The plain OpenAI-compatible client sends `max_tokens`, so this entry served
+  # by `openai_api` would 400 on every single call. `openai_reasoning` selects
+  # OpenAIReasoningClient, which sends `max_completion_tokens` instead. That is
+  # a WIRE FORMAT difference, which is exactly what serving_stack selects --
+  # adding this model was still a YAML edit plus one client subclass, and no
+  # code anywhere names "luna" or "gpt-5.6". See docs/model-clients.md.
+  #
+  # ⚠ SAMPLING IS NOT PINNABLE HERE, AND THAT IS A PROPERTY OF THE MODEL.
+  # Reasoning models accept only OpenAI's default temperature/top_p of 1.0; a
+  # non-default value is a 400. So the benchmark default of 0.0 CANNOT be used,
+  # and Luna's outputs are not greedy-decoded. Runs against this entry are
+  # therefore NOT bit-reproducible the way a mock or a seeded vLLM run is, and
+  # comparing a Luna number to a temperature-0.0 number is comparing two
+  # different things. preflight warns if anyone edits these back to 0.0.
+  #
+  # ⚠ THE OUTPUT CAP IS SHARED WITH THINKING. `max_completion_tokens` bounds
+  # visible output tokens PLUS reasoning tokens. Set it too low and the model
+  # spends the whole budget thinking and returns an EMPTY answer that a scorer
+  # would happily grade 0.0 -- a fabricated measurement. 4096 is chosen to leave
+  # real headroom for short-answer tasks; OpenAIReasoningClient additionally
+  # refuses to return an empty completion that stopped on `length`, so this
+  # fails loudly rather than scoring zero. Raising it raises the worst-case
+  # cost per sample linearly: see docs/calibration.md for the arithmetic.
+  #
+  # ⚠ PRICING retrieved 2026-08-27 from
+  # developers.openai.com/api/docs/models/gpt-5.6-luna. Standard (short-context)
+  # tier. Two caveats, both of which make the RECORDED cost an OVER-estimate
+  # rather than an under-estimate, which is the safe direction:
+  #   * prompts over 272K input tokens bill at 2x input / 1.5x output for the
+  #     whole request. Nothing in tasks/ comes close, so the standard rate is
+  #     the honest one here -- but a long-context task would silently be
+  #     under-recorded, so do not author one against this entry.
+  #   * OpenAI caches prompt prefixes automatically at $0.02/Mtok. TokenUsage
+  #     does not split `cached_tokens` out of `prompt_tokens`, so cached input
+  #     is billed here at the full rate. Real spend is <= recorded spend.
+  - key: luna
+    display_name: Luna (OpenAI GPT-5.6 Luna) -- test budget, $25 cap
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY         # Vault: secret/tenants/ida-llm/<env>/app
+                                        # -> Secret `ida-llm-secret`. See
+                                        # docs/provider-keys.md. NOT set on dev
+                                        # boxes, deliberately.
+    enabled: true
+    timeout_s: 180                      # reasoning models are slow to first token;
+                                        # 120 (the old example) times out under load
+    max_retries: 4
+    tags: [cloud, openai, reasoning, testing-only, budget-capped]
+    serving:
+      model_id: gpt-5.6-luna            # exact id sent in the body
+      serving_stack: openai_reasoning
+      serving_version: null             # provider does not report one; the
+                                        # per-response `system_fingerprint` is
+                                        # in the archived raw response
+      quantization: unknown             # hosted APIs never tell us
+      revision: null                    # no snapshot pinning offered
+      context_window: 1050000           # provider states 1,050,000 total;
+                                        # 922,000 max input, 128,000 max output
+      hardware: null
+      sampling:
+        temperature: 1.0                # the ONLY accepted value -- see above
+        top_p: 1.0                      # ditto
+        max_tokens: 4096                # sent as `max_completion_tokens`;
+                                        # shared with reasoning tokens
+        seed: null                      # accepted by the API but best-effort at
+                                        # most, and thinking is not replayable:
+                                        # recording one would imply a
+                                        # reproducibility this entry lacks
+    cost:
+      input_usd_per_mtok: 0.20
+      output_usd_per_mtok: 1.20
 
   # --- campus vLLM ("Sparks"), DEFERRED AND DISABLED ------------------------
   #
