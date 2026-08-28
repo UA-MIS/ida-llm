@@ -13,7 +13,14 @@
 #      halves of that wiring" — this suite is what makes that sentence enforced
 #      rather than merely written down.
 #
-#   2. IDA_VERSION — the same shape, for the release string /healthz reports.
+#   2. IDA_VERSION — the same shape, for the release string /healthz reports,
+#      and (since the dashboard redesign) for the frontend header's version
+#      badge. That badge was a hardcoded `v0.1.4` no release step ever wrote to;
+#      replacing it with a build-arg chain is only an improvement while BOTH
+#      halves are present, because NEXT_PUBLIC_* is inlined at build time and a
+#      missing build-arg inlines the empty string. A blank badge is harder to
+#      notice than the wrong constant it replaced — which is why the frontend
+#      half is asserted here rather than trusted.
 #      This half did not exist at all: /healthz read a hardcoded `__version__ =
 #      "0.1.0"` that no release step ever wrote to, so the 0.1.1 image answered
 #      "0.1.0". A health endpoint that disagrees with the release it is running
@@ -42,6 +49,8 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 DOCKERFILE="${REPO_DIR}/Dockerfile.python"
+FRONTEND_DOCKERFILE="${REPO_DIR}/frontend/Dockerfile"
+FRONTEND_VERSION_TS="${REPO_DIR}/frontend/src/lib/version.ts"
 BUILD_WF="${REPO_DIR}/.github/workflows/build-and-push.yaml"
 PROMOTE_WF="${REPO_DIR}/.github/workflows/promote-to-prod.yaml"
 
@@ -62,7 +71,7 @@ assert_absent() {
   if grep -Eq -e "$3" -- "$2"; then bad "$1" "$4 (unexpected match for /$3/ in ${2#"${REPO_DIR}"/})"; else ok; fi
 }
 
-for f in "${DOCKERFILE}" "${BUILD_WF}" "${PROMOTE_WF}"; do
+for f in "${DOCKERFILE}" "${FRONTEND_DOCKERFILE}" "${FRONTEND_VERSION_TS}" "${BUILD_WF}" "${PROMOTE_WF}"; do
   [ -f "${f}" ] || { echo "FAIL: missing ${f}"; exit 1; }
 done
 
@@ -99,6 +108,30 @@ assert_absent "version-is-never-hardcoded" "${BUILD_WF}" 'IDA_VERSION: *["'\'']?
   "IDA_VERSION must never be a hardcoded release literal"
 assert_absent "dockerfile-version-is-never-hardcoded" "${DOCKERFILE}" '^ARG IDA_VERSION="?0\.' \
   "ARG IDA_VERSION must default to empty (honest), never to a release-shaped literal"
+
+# ── 2b. IDA_VERSION, the FRONTEND half — the header's version badge ─────────
+# The build-arg is already passed to every matrix leg (asserted above); what is
+# new is that the frontend now consumes it.
+assert_matches "frontend-version-arg" "${FRONTEND_DOCKERFILE}" '^ARG IDA_VERSION=' \
+  "frontend/Dockerfile must declare ARG IDA_VERSION"
+assert_matches "frontend-version-env" "${FRONTEND_DOCKERFILE}" 'NEXT_PUBLIC_APP_VERSION=\$\{IDA_VERSION\}' \
+  "frontend/Dockerfile must inline it as NEXT_PUBLIC_APP_VERSION, or the header badge falls back forever"
+# ⚠ AND IT MUST BE SET BEFORE THE BUILD. NEXT_PUBLIC_* is substituted into the
+# bundle by `npm run build`; an ENV placed after it sets a variable nothing reads,
+# which fails EXACTLY like a missing build-arg and looks correct in review.
+ENV_LINE="$(grep -n '^ *NEXT_PUBLIC_APP_VERSION=' -- "${FRONTEND_DOCKERFILE}" | head -1 | cut -d: -f1)"
+BUILD_LINE="$(grep -n '^RUN npm run build' -- "${FRONTEND_DOCKERFILE}" | head -1 | cut -d: -f1)"
+if [ -n "${ENV_LINE}" ] && [ -n "${BUILD_LINE}" ] && [ "${ENV_LINE}" -lt "${BUILD_LINE}" ]; then ok; else
+  bad "frontend-version-env-precedes-build" \
+    "NEXT_PUBLIC_APP_VERSION must be set BEFORE 'RUN npm run build' -- Next inlines it at build time"
+fi
+# The same by-value regression guard the python half carries: an honest empty
+# default, never a release-shaped literal the image did not earn.
+assert_absent "frontend-version-is-never-hardcoded" "${FRONTEND_DOCKERFILE}" '^ARG IDA_VERSION="?[0-9v]' \
+  "frontend ARG IDA_VERSION must default to empty (honest), never to a release-shaped literal"
+# The badge itself must never go back to a constant.
+assert_absent "frontend-badge-is-not-a-constant" "${REPO_DIR}/frontend/src/app/layout.tsx" 'badge-version">v?[0-9]' \
+  "the header version badge must be resolved from the build, never typed into layout.tsx"
 
 # ── 3. The Harbor read credential the promote-time tag check needs ──────────
 assert_matches "promote-docker-config" "${PROMOTE_WF}" 'DOCKER_CONFIG: */kaniko/\.docker' \

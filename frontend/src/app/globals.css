@@ -281,3 +281,214 @@ button.secondary { background: transparent; color: var(--accent); border-color: 
 .outcome-note { font-size: 0.8rem; margin: 0.5rem 0 0; }
 .sample-facets { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.35rem; }
 .sample-facets .badge { font-weight: 400; font-size: 0.7rem; }
+
+/* ===========================================================================
+   Redesign — model-first IA.
+
+   Still plain CSS on the same tokens declared at the top of this file: no
+   framework, no component library, and every colour below is a `var(--…)` so
+   light and dark are one definition rather than two. What is NEW here is a
+   page grammar the earlier passes did not have:
+
+     .panel        a titled section with a rule under its heading — the unit the
+                   whole site is now assembled from
+     .table-scroll the ONLY thing allowed to scroll sideways. A wide table used
+                   to widen the page; now it scrolls inside its own box and the
+                   body never does.
+     .col-optional a column that is real but not load-bearing, dropped below
+                   760px rather than squeezed into two characters
+
+   ⚠ COLOUR DISCIPLINE IS UNCHANGED AND IT IS DELIBERATE. Score bars are drawn
+   in the accent at a fixed hue — NOT a red-to-green ramp. A ramp turns a 0.55
+   into a verdict, and these are means over small samples whose reliability is
+   already carried by the confidence meter. Colour says "how sure", never "how
+   good".
+   =========================================================================== */
+
+main { max-width: 1180px; }
+
+h2 { font-size: 1.15rem; }
+
+/* --- the version badge --------------------------------------------------- */
+
+/* An unidentified build is muted rather than accented: it is still information,
+   but it must not read as a release string somebody can quote. */
+.badge-version-unknown { color: var(--muted); border-color: var(--border); }
+
+/* --- hero ---------------------------------------------------------------- */
+
+.hero { margin-bottom: 2rem; }
+.hero .subtitle { font-size: 1.05rem; max-width: 62ch; margin-bottom: 1rem; }
+.hero-meta { font-size: 0.82rem; }
+
+.cta:hover { background: var(--accent); color: var(--bg); }
+
+/* --- panels: the section unit -------------------------------------------- */
+
+.panel { margin: 2rem 0; }
+.panel-head {
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 0.6rem; margin-bottom: 1rem;
+}
+.panel-head h2 { margin: 0 0 0.3rem; }
+.panel-note { font-size: 0.82rem; margin: 0; max-width: 78ch; line-height: 1.5; }
+.panel-lead .panel-head { border-bottom-color: var(--accent); }
+
+/* --- tables: scroll inside the box, never widen the page ----------------- */
+
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-scroll > table { min-width: 640px; }
+
+.leaderboard th, .leaderboard td,
+.task-table th, .task-table td,
+.outcome-table th, .outcome-table td { vertical-align: top; }
+
+.leaderboard td, .task-table td, .outcome-table td { padding-top: 0.7rem; padding-bottom: 0.7rem; }
+
+/* De-emphasised, never hidden — the same rule the result cards follow. */
+.row-muted { opacity: 0.68; }
+.leaderboard-muted { margin-top: 0.75rem; }
+
+.col-rank { width: 2.5rem; }
+.col-score { width: 9.5rem; }
+.col-go { text-align: right; white-space: nowrap; font-size: 0.85rem; }
+
+.model-link { font-weight: 600; font-size: 1rem; text-decoration: none; }
+.model-link:hover { text-decoration: underline; }
+.model-sub {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;
+  margin-top: 0.3rem; font-size: 0.8rem;
+}
+
+.task-id { font-size: 0.75rem; margin-top: 0.15rem; }
+.score-of { font-size: 0.8rem; }
+.stacked-badges { display: flex; flex-direction: column; gap: 0.3rem; align-items: flex-start; }
+
+.also-measured { margin-top: 1rem; }
+.also-measured > summary { cursor: pointer; font-size: 0.85rem; }
+
+/* --- the score bar ------------------------------------------------------- */
+
+.scorebar-value { font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.scorebar-track {
+  height: 6px; border-radius: 999px; background: var(--border);
+  margin: 0.3rem 0 0.25rem; overflow: hidden; max-width: 8.5rem;
+}
+.scorebar-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+.scorebar-note { font-size: 0.75rem; line-height: 1.35; }
+.scorebar-large .scorebar-value { font-size: 2.4rem; line-height: 1.05; }
+.scorebar-large .scorebar-track { height: 8px; max-width: 11rem; }
+
+/* --- the compact filter that replaced the chip wall ---------------------- */
+
+.filter-bar {
+  display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: flex-end;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); padding: 0.9rem 1rem; margin-bottom: 1.25rem;
+}
+.filter-bar .field { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.filter-bar label {
+  color: var(--muted); font-size: 0.75rem; text-transform: uppercase;
+  letter-spacing: 0.03em; font-weight: 600;
+}
+.filter-bar select, .filter-bar input[type="search"] {
+  font: inherit; font-size: 0.9rem; color: inherit; background: var(--bg);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 0.45rem 0.6rem; min-width: 12rem; max-width: 100%;
+}
+.filter-bar select:focus-visible, .filter-bar input:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+.field-grow { flex: 1 1 14rem; }
+.field-check { justify-content: flex-end; }
+.field-check label { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 0.82rem; }
+.field-actions { flex-direction: row; align-items: center; gap: 0.75rem; }
+.clear-filter { font-size: 0.85rem; }
+
+/* --- the model report card ----------------------------------------------- */
+
+.report-head {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem 2rem; align-items: start;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); padding: 1.25rem 1.4rem;
+}
+.report-head .panel-head { grid-column: 1 / -1; }
+.report-title { margin: 0; font-size: 1.6rem; }
+.report-score { text-align: right; }
+.report-score-label {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;
+  font-weight: 600; margin-bottom: 0.15rem;
+}
+.report-score .scorebar-track { margin-left: auto; }
+.report-stats { grid-column: 1 / -1; margin: 0.5rem 0 0; padding-top: 1rem; border-top: 1px solid var(--border); }
+.report-weighting { grid-column: 1 / -1; margin-top: 0.4rem; }
+
+.outcome-cell-heading { font-weight: 600; }
+.outcome-cell-statement {
+  margin: 0.25rem 0 0; font-size: 0.8rem; line-height: 1.45;
+  max-width: 46ch; border-left: 2px solid var(--border); padding-left: 0.6rem;
+}
+
+/* --- run detail: samples grouped, not scrolled --------------------------- */
+
+.sample-group {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); margin-bottom: 0.7rem;
+}
+.sample-group[open] { background: var(--bg); }
+.sample-group-head {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: baseline;
+  justify-content: space-between; cursor: pointer;
+  padding: 0.7rem 0.9rem; font-size: 0.9rem;
+}
+.sample-group-head::-webkit-details-marker { display: none; }
+.sample-group-head::marker { content: ""; }
+.sample-group-name { font-weight: 600; font-family: var(--mono); font-size: 0.88rem; }
+.sample-group-name::before { content: "▸ "; color: var(--muted); font-family: inherit; }
+.sample-group[open] .sample-group-name::before { content: "▾ "; }
+.sample-group-stats { display: flex; flex-wrap: wrap; gap: 0.9rem; font-size: 0.8rem; }
+.sample-group-mean { font-variant-numeric: tabular-nums; color: var(--fg); font-weight: 600; }
+.sample-group .table-scroll { padding: 0 0.9rem 0.6rem; }
+.sample-group table { min-width: 720px; }
+
+/* --- responsive ---------------------------------------------------------- */
+
+/* A pill that wraps stops being a pill: the border boxes two ragged lines and
+   reads as a rendering fault. Badges stay on one line and let their container
+   scroll instead. */
+.badge { white-space: nowrap; }
+
+@media (max-width: 760px) {
+  main { padding: 1.5rem 1rem 3rem; }
+  .col-optional { display: none; }
+  /* The model's name is already the link to its report card, so the duplicate
+     call-to-action column is the first thing to go when width is scarce. */
+  .col-go { display: none; }
+  .table-scroll > table { min-width: 0; }
+  .report-head { grid-template-columns: minmax(0, 1fr); }
+  .report-score { text-align: left; }
+  .report-score .scorebar-track { margin-left: 0; }
+  .filter-bar select, .filter-bar input[type="search"] { min-width: 0; width: 100%; }
+  .filter-bar .field { flex: 1 1 100%; }
+  .scorebar-large .scorebar-value { font-size: 1.9rem; }
+}
+
+/* --- one browse table, with the outcome as a spanning row ---------------- */
+
+.group-row > th {
+  padding-top: 1.5rem; text-transform: none; letter-spacing: 0;
+  border-bottom: 2px solid var(--border); color: var(--fg);
+}
+.task-table tbody:first-of-type .group-row > th { padding-top: 0.6rem; }
+.group-row-heading { display: block; font-size: 0.95rem; font-weight: 700; }
+.group-row-statement {
+  display: block; font-weight: 400; font-size: 0.82rem; line-height: 1.45;
+  margin-top: 0.25rem; max-width: 76ch; text-transform: none;
+}
+
+/* A receipt link that wraps puts its ▸ on a line of its own, which reads as a
+   rendering fault rather than as a link. */
+.outcome-table td:last-child a,
+.task-table td:last-child a,
+.col-go a { white-space: nowrap; }

@@ -1,32 +1,53 @@
 /**
- * The results view — the front door of the product.
+ * The front door — MODEL-FIRST, with the task catalogue one control below it.
  *
- * **Task-first, deliberately** (direction B from the sprint-planning session).
- * A professor arrives asking *"can it grade my quizzes?"*, not *"rank these
- * seven models"*. So the page opens with a task chooser, and a cross-model
- * ranking is what you find *inside* a task rather than what you land on. The
- * raw run log still exists, one link away at `/runs`, as the "show me the data"
- * drill-down it always was.
+ * ⚠ THIS PAGE USED TO BE TASK-FIRST AND IT DID NOT SURVIVE CONTACT. The chooser
+ * rendered one chip per task (~70 of them) above a second chip row for the nine
+ * outcomes, so the first two screens of the product were pills. The single most
+ * common question — "which model is best?" — had no answer anywhere on the site,
+ * and the leaderboard a visitor came for was something you assembled yourself by
+ * clicking a chip and reading one task at a time.
  *
- * **Two rules this page never breaks.**
+ * The fix is not smaller chips. It is: LEAD WITH THE ANSWER, and demote browsing
+ * to a compact control.
  *
- * 1. It never invents a number. With no runs in the database it says so in
- *    words and tells you how to start one — an empty table would read as a
- *    broken page, and a placeholder number would be a lie.
- * 2. Every score carries its trust tell and a link to the run that produced it.
- *    That pairing is the whole credibility argument; a score shown without it
- *    is the thing every other AI leaderboard already does.
+ *   1. Models ranked across the whole benchmark, immediately, above the fold.
+ *   2. One dropdown and one search box where the chip wall was.
+ *   3. Each model's name links to `/models/<key>` — its whole report card in one
+ *      place, which is the thing that genuinely did not exist before.
  *
- * Server-rendered with the filter in the URL, so no client bundle is needed to
- * pick a task, and any view a professor is looking at is a link they can send
- * to a colleague.
+ * ⚠ THE TWO RULES THIS PAGE STILL NEVER BREAKS, and an overall ranking is where
+ * they are easiest to break:
+ *
+ *   1. It never invents a number. A model with no measurement on a task
+ *      contributes nothing to its mean — not a zero — and the ranking says how
+ *      many tasks and outcomes each model actually covers, so a strong score on
+ *      two tasks cannot pass for a strong score on twenty.
+ *   2. Every number keeps its trust tell and its receipt. The overall score
+ *      carries the WEAKEST confidence of the measurements inside it, because an
+ *      aggregate is exactly as good as its shakiest constituent.
+ *
+ * ONE FETCH. `/leaderboard` with no filters already returns every task × model
+ * pairing, which is what the rollup needs; the outcome and search filters are
+ * applied to that same response in this file rather than as a second round trip.
+ * The filter still lives in the URL, so every view is a link you can send.
  */
 
 import Link from "next/link";
 
 import { ModelResultCard } from "@/components/model-result-card";
-import { TrustLegend } from "@/components/trust-badges";
+import { ScoreBar } from "@/components/score-bar";
+import { ConfidenceTell, ResidencyBadge, TrustLegend } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
+import { formatCost, formatScore } from "@/lib/format";
+import {
+  confidenceLabel,
+  filterTasks,
+  isRanked,
+  rollupByModel,
+  WEIGHTING_NOTE,
+  type ModelRollup,
+} from "@/lib/rollup";
 import {
   groupByOutcome,
   outcomeHeading,
@@ -49,77 +70,245 @@ function one(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-/**
- * "I want help with: [ … ]" — the entry point, as links rather than a dropdown.
- *
- * A `<select>` would need client JS to navigate, and this page is otherwise
- * fully server-rendered. Links also mean each task view is addressable, which
- * is how a professor forwards "look at this" to a colleague.
- */
-function TaskChooser({
-  board,
-  selected,
-}: {
-  board: LeaderboardResponse;
-  selected?: string;
-}) {
-  const measured = board.tasks.filter((task) => task.has_results);
-  const unmeasured = board.tasks.filter((task) => !task.has_results);
-
+/** Why an aggregate carries the confidence it does — never a server sentence. */
+function aggregateReason(rollup: ModelRollup): string {
+  const { measured_tasks, scored_samples, verifiable_share } = rollup.overall;
+  if (measured_tasks === 0) {
+    return "Nothing has been measured for this model yet, so there is no number to be confident about.";
+  }
+  const checked = Math.round(verifiable_share * 100);
   return (
-    <div className="chooser">
-      <div className="chooser-label">I want help with</div>
-      <div className="chips">
-        <Link
-          href="/"
-          className={`chip${selected ? "" : " chip-active"}`}
-          aria-current={selected ? undefined : "page"}
-        >
-          Everything
-        </Link>
-        {measured.map((task) => (
-          <Link
-            key={task.task_id}
-            href={`/?task=${encodeURIComponent(task.task_id)}`}
-            className={`chip${selected === task.task_id ? " chip-active" : ""}`}
-            aria-current={selected === task.task_id ? "page" : undefined}
-            title={task.description}
-          >
-            {task.title}
-          </Link>
-        ))}
-      </div>
-      {unmeasured.length > 0 ? (
-        <details className="chooser-more">
-          <summary className="muted">
-            {unmeasured.length} more task{unmeasured.length === 1 ? "" : "s"} in the
-            catalog that nothing has been measured on yet
-          </summary>
-          <div className="chips">
-            {unmeasured.map((task) => (
-              <Link
-                key={task.task_id}
-                href={`/?task=${encodeURIComponent(task.task_id)}`}
-                className={`chip chip-empty${selected === task.task_id ? " chip-active" : ""}`}
-                title={task.description}
-              >
-                {task.title}
-              </Link>
-            ))}
-          </div>
-        </details>
-      ) : null}
-    </div>
+    `The weakest confidence among the ${measured_tasks} measurement` +
+    `${measured_tasks === 1 ? "" : "s"} behind this number, not an average of them — ` +
+    `an overall score is only as good as its shakiest part. ${scored_samples} scored ` +
+    `sample${scored_samples === 1 ? "" : "s"} in total, ${checked}% of that weight ` +
+    `from programmatically-checked tasks.`
   );
 }
 
 /**
- * A task's axes and descriptive tags.
+ * The lead: every model, ranked across the whole benchmark.
  *
- * The use mode is captioned from the curriculum, never from a table in this
- * file — `assistive` is the programme's word, and an invented caption is a
- * caption that disagrees with it.
+ * Test stubs and unmeasured models appear BELOW the ranking rather than inside
+ * it. They are real rows in the database and hiding them would be the thing this
+ * project exists to replace — but a leaderboard whose #1 is a deterministic mock
+ * is the same lie one row higher, and `best_model_key` already excludes stubs
+ * for exactly that reason.
  */
+function OverallLeaderboard({
+  rollups,
+  outcomeCount,
+}: {
+  rollups: ModelRollup[];
+  outcomeCount: number;
+}) {
+  const ranked = rollups.filter(isRanked);
+  const unranked = rollups.filter((rollup) => !isRanked(rollup));
+
+  return (
+    <section className="panel panel-lead">
+      <div className="panel-head">
+        <h2>Models, ranked across the whole benchmark</h2>
+        <p className="muted panel-note">{WEIGHTING_NOTE}</p>
+      </div>
+
+      {ranked.length === 0 ? (
+        <div className="notice">
+          <strong>No model has a rankable score yet.</strong> Every measured
+          pairing so far is either a test stub or produced no score, so there is
+          nothing honest to rank.
+        </div>
+      ) : (
+        <div className="table-scroll">
+          <table className="leaderboard">
+            <thead>
+              <tr>
+                <th className="col-rank">#</th>
+                <th>Model</th>
+                <th className="col-score">Overall</th>
+                <th className="num col-optional">Outcomes</th>
+                <th className="num col-optional">Tasks</th>
+                <th className="num col-optional">Samples</th>
+                <th className="col-optional">Confidence</th>
+                <th className="num col-optional">Cost</th>
+                <th aria-label="Report card" />
+              </tr>
+            </thead>
+            <tbody>
+              {ranked.map((rollup, index) => (
+                <ModelRow
+                  key={rollup.model_key}
+                  rollup={rollup}
+                  rank={index + 1}
+                  outcomeCount={outcomeCount}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {unranked.length > 0 ? (
+        <details className="also-measured">
+          <summary className="muted">
+            {unranked.length} more model{unranked.length === 1 ? "" : "s"} in the
+            registry — test stubs and models nothing has scored yet. Shown, but
+            never ranked.
+          </summary>
+          <div className="table-scroll">
+            <table className="leaderboard leaderboard-muted">
+              <tbody>
+                {unranked.map((rollup) => (
+                  <ModelRow
+                    key={rollup.model_key}
+                    rollup={rollup}
+                    rank={null}
+                    outcomeCount={outcomeCount}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      ) : null}
+    </section>
+  );
+}
+
+function ModelRow({
+  rollup,
+  rank,
+  outcomeCount,
+}: {
+  rollup: ModelRollup;
+  rank: number | null;
+  outcomeCount: number;
+}) {
+  const { overall } = rollup;
+  return (
+    <tr className={rank === null ? "row-muted" : undefined}>
+      <td className="col-rank num mono">{rank ?? "—"}</td>
+      <td>
+        <Link href={`/models/${encodeURIComponent(rollup.model_key)}`} className="model-link">
+          {rollup.display_name}
+        </Link>
+        <div className="model-sub">
+          <span className="mono muted">{rollup.model_key}</span>
+          <ResidencyBadge
+            residency={rollup.data_residency}
+            label={rollup.data_residency_label}
+          />
+          {!rollup.enabled ? (
+            <span className="badge" title="These measurements stand, but the registry has since disabled the model.">
+              not currently runnable
+            </span>
+          ) : null}
+        </div>
+      </td>
+      <td className="col-score">
+        <ScoreBar
+          score={overall.score}
+          note={
+            overall.score === null
+              ? "nothing scored yet"
+              : `${overall.scored_samples} scored samples`
+          }
+        />
+      </td>
+      <td className="num col-optional">
+        {rollup.slos_measured.length}
+        <span className="muted"> / {outcomeCount}</span>
+      </td>
+      <td className="num col-optional">
+        {overall.measured_tasks}
+        <span className="muted"> / {overall.covered_tasks}</span>
+      </td>
+      <td className="num col-optional">{overall.scored_samples}</td>
+      <td className="col-optional">
+        <ConfidenceTell
+          confidence={overall.confidence}
+          label={confidenceLabel(overall.confidence)}
+          reason={aggregateReason(rollup)}
+        />
+      </td>
+      <td className="num col-optional">{formatCost(overall.total_cost_usd)}</td>
+      <td className="col-go">
+        <Link href={`/models/${encodeURIComponent(rollup.model_key)}`}>
+          Report card ▸
+        </Link>
+      </td>
+    </tr>
+  );
+}
+
+/**
+ * What replaced the chip wall: one dropdown, one search box.
+ *
+ * A plain GET form, submitted by a button — no client bundle, and the result is
+ * still an addressable URL a professor can forward. A `<select>` that navigated
+ * on change would need JS for what a submit button does for free.
+ */
+function FilterBar({
+  board,
+  slo,
+  query,
+  includeUnmeasured,
+  active,
+}: {
+  board: LeaderboardResponse;
+  slo?: string;
+  query?: string;
+  includeUnmeasured: boolean;
+  active: boolean;
+}) {
+  return (
+    <form className="filter-bar" method="get" action="/">
+      <div className="field">
+        <label htmlFor="slo">Learning outcome</label>
+        <select id="slo" name="slo" defaultValue={slo ?? ""}>
+          <option value="">Every outcome</option>
+          {board.slos.map((id) => (
+            <option key={id} value={id}>
+              {outcomeHeading(board.curriculum, id)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="field field-grow">
+        <label htmlFor="q">Search tasks</label>
+        <input
+          id="q"
+          name="q"
+          type="search"
+          placeholder="break-even, ethics, citation…"
+          defaultValue={query ?? ""}
+        />
+      </div>
+      <div className="field field-check">
+        <label htmlFor="unmeasured">
+          <input
+            id="unmeasured"
+            name="unmeasured"
+            type="checkbox"
+            value="1"
+            defaultChecked={includeUnmeasured}
+          />{" "}
+          Include tasks nothing has measured
+        </label>
+      </div>
+      <div className="field field-actions">
+        <button type="submit">Apply</button>
+        {active ? (
+          <Link href="/" className="clear-filter">
+            Clear
+          </Link>
+        ) : null}
+      </div>
+    </form>
+  );
+}
+
+/** A task's axes and descriptive tags. Captioned from the curriculum, never a table here. */
 function FacetRow({
   task,
   curriculum,
@@ -151,14 +340,7 @@ function FacetRow({
   );
 }
 
-/**
- * The heading for one Student Learning Outcome, with the programme's own words.
- *
- * This is the credibility claim of the whole SLO framing rendered: we are not
- * measuring against *our* opinion of what matters, we are measuring against the
- * outcome the programme published — so the outcome is quoted, not paraphrased,
- * and it comes off the wire rather than out of this component.
- */
+/** The programme's own words, quoted — that quotation IS the SLO claim. */
 function OutcomeHeading({
   slo,
   curriculum,
@@ -169,7 +351,7 @@ function OutcomeHeading({
   if (slo === null) {
     return (
       <div className="outcome-heading">
-        <h2>Not part of the SLO benchmark</h2>
+        <h3>Not part of the SLO benchmark</h3>
         <p className="muted">
           These families predate the curriculum-anchored benchmark. They are real
           measurements; they are just not filed under an outcome.
@@ -180,17 +362,9 @@ function OutcomeHeading({
   const outcome = outcomeOf(curriculum, slo);
   return (
     <div className="outcome-heading">
-      <h2>{outcomeHeading(curriculum, slo)}</h2>
+      <h3>{outcomeHeading(curriculum, slo)}</h3>
       {outcome ? (
-        <>
-          <blockquote className="outcome-statement">{outcome.statement}</blockquote>
-          <p className="muted outcome-note">
-            The programme&rsquo;s own published outcome
-            {curriculum.program ? ` for ${curriculum.program}` : ""}. Everything
-            below asks: how well can a model do what this outcome says a student
-            should be able to do?
-          </p>
-        </>
+        <blockquote className="outcome-statement">{outcome.statement}</blockquote>
       ) : (
         /* Never invent a statement. An id we cannot look up is a tagging error
            the task-schema CI gate reports — surfacing it is how it gets fixed. */
@@ -204,6 +378,7 @@ function OutcomeHeading({
   );
 }
 
+/** One task, expanded: every model ranked on it. Reached by picking a task. */
 function TaskSection({
   task,
   curriculum,
@@ -242,6 +417,100 @@ function TaskSection({
   );
 }
 
+/**
+ * The catalogue as ONE table rather than seventy chips.
+ *
+ * ⚠ ONE TABLE, NOT ONE PER OUTCOME. A table per group repeats its header nine
+ * times down the page, which reads as nine unrelated widgets rather than one
+ * catalogue — the chip wall's problem in a different shape. The outcome becomes
+ * a spanning row inside a single table instead, which also lets the outcome
+ * column disappear: printing the heading again on every row under it said the
+ * same thing twice.
+ *
+ * The programme's own statement is quoted in that spanning row rather than
+ * paraphrased. That quotation IS the credibility claim of the SLO framing.
+ */
+function TaskTable({
+  groups,
+  curriculum,
+}: {
+  groups: { slo: string | null; tasks: TaskLeaderboard[] }[];
+  curriculum: CurriculumView;
+}) {
+  return (
+    <div className="table-scroll">
+      <table className="task-table">
+        <thead>
+          <tr>
+            <th>Task</th>
+            <th className="col-optional">Evidence</th>
+            <th>Best measured</th>
+            <th className="num">Score</th>
+          </tr>
+        </thead>
+        {groups.map((group) => (
+          <tbody key={group.slo ?? "untagged"}>
+            <tr className="group-row">
+              <th colSpan={4} scope="colgroup">
+                <span className="group-row-heading">
+                  {group.slo ? outcomeHeading(curriculum, group.slo) : "Outside the SLO benchmark"}
+                </span>
+                <span className="muted group-row-statement">
+                  {group.slo
+                    ? (outcomeOf(curriculum, group.slo)?.statement ??
+                      (curriculum.available
+                        ? `No outcome ${group.slo} in the curriculum map — a tagging error \`make lint-tasks\` will name.`
+                        : "Outcome statements are unavailable in this deployment."))
+                    : "Real measurements, from families that predate the curriculum-anchored benchmark."}
+                </span>
+              </th>
+            </tr>
+            {group.tasks.map((task) => {
+              const best = task.results.find(
+                (result) => result.model_key === task.best_model_key,
+              );
+              return (
+                <tr key={task.task_id}>
+                  <td>
+                    <Link href={`/?task=${encodeURIComponent(task.task_id)}`}>
+                      {task.title}
+                    </Link>
+                    <div className="mono muted task-id">{task.task_id}</div>
+                  </td>
+                  <td className="col-optional muted">{task.kind}</td>
+                  <td>
+                    {best ? (
+                      <Link href={`/models/${encodeURIComponent(best.model_key)}`}>
+                        {best.display_name}
+                      </Link>
+                    ) : (
+                      <span className="muted">
+                        {task.has_results ? "no scored result" : "not measured yet"}
+                      </span>
+                    )}
+                  </td>
+                  <td className="num">
+                    {best?.mean_score !== undefined && best.mean_score !== null ? (
+                      <>
+                        {formatScore(best.mean_score)}{" "}
+                        <span className="muted score-of">
+                          ({best.scored_count}/{best.sample_count})
+                        </span>
+                      </>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        ))}
+      </table>
+    </div>
+  );
+}
+
 /** What a fresh install sees. Honest, and actionable. */
 function NothingMeasuredYet({ taskCount }: { taskCount: number }) {
   return (
@@ -271,62 +540,6 @@ function NothingMeasuredYet({ taskCount }: { taskCount: number }) {
   );
 }
 
-/**
- * The outcome filter — one link per SLO, plus the whole-benchmark filter.
- *
- * Rendered from the ids the API found in the catalog and captioned from the
- * curriculum. Nine outcomes are never listed here: a task tagged to an outcome
- * nobody has benchmarked would produce a filter chip leading to an empty page.
- */
-function OutcomeFilter({
-  board,
-  selectedSlo,
-  benchmarkOnly,
-}: {
-  board: LeaderboardResponse;
-  selectedSlo?: string;
-  benchmarkOnly: boolean;
-}) {
-  if (board.slos.length === 0) return null;
-  return (
-    <div className="chooser">
-      <div className="chooser-label">Or by learning outcome</div>
-      <div className="chips">
-        <Link
-          href="/"
-          className={`chip${!selectedSlo && !benchmarkOnly ? " chip-active" : ""}`}
-        >
-          Any
-        </Link>
-        {board.benchmark_task_count > 0 ? (
-          <Link
-            href="/?benchmark=1"
-            className={`chip${benchmarkOnly && !selectedSlo ? " chip-active" : ""}`}
-            title="Every task in the curriculum-anchored benchmark — one tag, one filter."
-          >
-            The whole SLO benchmark ({board.benchmark_task_count})
-          </Link>
-        ) : null}
-        {board.slos.map((slo) => (
-          <Link
-            key={slo}
-            href={`/?slo=${encodeURIComponent(slo)}`}
-            className={`chip${selectedSlo === slo ? " chip-active" : ""}`}
-            title={outcomeOf(board.curriculum, slo)?.statement ?? slo}
-          >
-            {outcomeHeading(board.curriculum, slo)}
-          </Link>
-        ))}
-      </div>
-      {!board.curriculum.available ? (
-        <p className="muted" style={{ fontSize: "0.8rem", marginTop: "0.5rem" }}>
-          {board.curriculum.unavailable_reason}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
 export default async function ResultsPage({
   searchParams,
 }: {
@@ -337,78 +550,118 @@ export default async function ResultsPage({
   const selectedSlo = one(params.slo);
   const selectedUseMode = one(params.use_mode);
   const benchmarkOnly = one(params.benchmark) === "1";
+  const query = one(params.q);
+  const includeUnmeasured = one(params.unmeasured) === "1";
 
-  // Filtering happens in the API, on the same parsed axes the CI gate
-  // validates — never by re-deriving tags in the browser.
-  const board = await getLeaderboard({
-    slo: selectedSlo,
-    useMode: selectedUseMode,
-    benchmark: benchmarkOnly,
-  });
+  // ONE fetch, unfiltered. The model rollup needs the whole board anyway, and
+  // the filters below are the same field equality the API applies — a second
+  // round trip would buy latency and a chance to disagree with itself.
+  const board = await getLeaderboard();
 
-  const shown = selected
+  const rollups = rollupByModel(board);
+  const outcomeCount = board.curriculum.available
+    ? board.curriculum.outcomes.length
+    : board.slos.length;
+
+  const filtered = selected
     ? board.tasks.filter((task) => task.task_id === selected)
-    : selectedSlo || selectedUseMode || benchmarkOnly
-      ? board.tasks
-      : board.tasks.filter((task) => task.has_results);
-  const groups = groupByOutcome(shown, board.slos);
-  const filtered = Boolean(selectedSlo || selectedUseMode || benchmarkOnly || selected);
+    : filterTasks(board.tasks, {
+        slo: selectedSlo,
+        useMode: selectedUseMode,
+        benchmark: benchmarkOnly,
+        query,
+        // Asking for one outcome means wanting to see its gaps too.
+        includeUnmeasured: includeUnmeasured || Boolean(selectedSlo),
+      });
+
+  const filterActive = Boolean(
+    selectedSlo || selectedUseMode || benchmarkOnly || query || includeUnmeasured,
+  );
+  const groups = groupByOutcome(filtered, board.slos);
 
   return (
     <>
-      <p className="subtitle">
-        Which model does what you need — measured against your programme&rsquo;s
-        own learning outcomes, with the evidence behind every number one click
-        away.
-      </p>
-
-      <div className="cta-row">
-        <Link href="/recommend" className="cta">
-          Not sure what you need? Answer a few questions ▸
-        </Link>
-      </div>
-
-      <TaskChooser board={board} selected={selected} />
-      <OutcomeFilter
-        board={board}
-        selectedSlo={selectedSlo}
-        benchmarkOnly={benchmarkOnly}
-      />
-      <TrustLegend />
-
-      {!board.has_any_results && !filtered ? (
-        <NothingMeasuredYet taskCount={board.task_count} />
-      ) : shown.length === 0 ? (
-        <div className="notice">
-          <strong>Nothing matches that.</strong> No task in the catalog matches
-          this filter.{" "}
-          <Link href="/">Show everything measured</Link>.
+      <section className="hero">
+        <p className="subtitle">
+          Which model does what you need — measured against your programme&rsquo;s
+          own learning outcomes, with the evidence behind every number one click
+          away.
+        </p>
+        <div className="cta-row">
+          <Link href="/recommend" className="cta">
+            Not sure what you need? Answer a few questions ▸
+          </Link>
+          <span className="muted hero-meta">
+            {board.measured_task_count} of {board.task_count} tasks measured ·{" "}
+            {board.runs_considered} run{board.runs_considered === 1 ? "" : "s"}{" "}
+            read (the newest finished run per task and model) ·{" "}
+            <Link href="/runs">see every run</Link>
+          </span>
         </div>
+      </section>
+
+      {!board.has_any_results ? (
+        <NothingMeasuredYet taskCount={board.task_count} />
       ) : (
         <>
-          <p className="muted results-meta">
-            Showing {shown.length} task{shown.length === 1 ? "" : "s"} ·{" "}
-            {board.measured_task_count} of {board.task_count} measured ·{" "}
-            {board.runs_considered} run
-            {board.runs_considered === 1 ? "" : "s"} read (the newest finished run
-            per task and model) · <Link href="/runs">see every run</Link>
-          </p>
-          {groups.map((group) => (
-            <section key={group.slo ?? "untagged"} className="outcome-group">
-              {/* Only worth a heading when there is more than one group, or
-                  when the reader explicitly asked for one outcome. */}
-              {groups.length > 1 || selectedSlo ? (
-                <OutcomeHeading slo={group.slo} curriculum={board.curriculum} />
-              ) : null}
-              {group.tasks.map((task) => (
-                <TaskSection
-                  key={task.task_id}
-                  task={task}
-                  curriculum={board.curriculum}
-                />
-              ))}
-            </section>
-          ))}
+          <OverallLeaderboard rollups={rollups} outcomeCount={outcomeCount} />
+
+          <TrustLegend />
+
+          <section className="panel">
+            <div className="panel-head">
+              <h2>Browse the benchmark</h2>
+              <p className="muted panel-note">
+                {board.task_count} tasks in the catalogue, grouped by the
+                outcome each one measures. Pick a task to see every model ranked
+                on it.
+              </p>
+            </div>
+
+            <FilterBar
+              board={board}
+              slo={selectedSlo}
+              query={query}
+              includeUnmeasured={includeUnmeasured}
+              active={filterActive || Boolean(selected)}
+            />
+
+            {selected ? (
+              filtered.length === 0 ? (
+                <div className="notice">
+                  <strong>No such task.</strong> Nothing in the catalogue has the
+                  id <span className="mono">{selected}</span>.{" "}
+                  <Link href="/">Back to everything measured</Link>.
+                </div>
+              ) : (
+                groups.map((group) => (
+                  <section key={group.slo ?? "untagged"} className="outcome-group">
+                    <OutcomeHeading slo={group.slo} curriculum={board.curriculum} />
+                    {group.tasks.map((task) => (
+                      <TaskSection
+                        key={task.task_id}
+                        task={task}
+                        curriculum={board.curriculum}
+                      />
+                    ))}
+                  </section>
+                ))
+              )
+            ) : filtered.length === 0 ? (
+              <div className="notice">
+                <strong>Nothing matches that.</strong> No task in the catalogue
+                matches this filter. <Link href="/">Show everything measured</Link>.
+              </div>
+            ) : (
+              <>
+                <p className="muted results-meta">
+                  {filtered.length} task{filtered.length === 1 ? "" : "s"}
+                  {filterActive ? " match this filter" : " measured so far"}.
+                </p>
+                <TaskTable groups={groups} curriculum={board.curriculum} />
+              </>
+            )}
+          </section>
         </>
       )}
     </>

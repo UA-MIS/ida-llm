@@ -13,7 +13,7 @@
  */
 
 import { confidenceColorVar, confidencePips, residencyGlyph, trustGlyph } from "@/lib/trust";
-import type { DataResidency, TrustTell } from "@/lib/types";
+import type { Confidence, DataResidency, TrustTell } from "@/lib/types";
 
 /**
  * Verifiable or AI-judged. The single most important thing on the page.
@@ -39,14 +39,37 @@ export function TrustBadge({ trust }: { trust: TrustTell }) {
  * numbers correctly.
  */
 export function ConfidenceMeter({ trust }: { trust: TrustTell }) {
-  const { filled, total } = confidencePips(trust.confidence);
-  const color = confidenceColorVar(trust.confidence);
   return (
-    <span
-      className="confidence"
-      title={trust.confidence_reason}
-      aria-label={`${trust.confidence_label}. ${trust.confidence_reason}`}
-    >
+    <ConfidenceTell
+      confidence={trust.confidence}
+      label={trust.confidence_label}
+      reason={trust.confidence_reason}
+    />
+  );
+}
+
+/**
+ * The same meter, from a bare tier.
+ *
+ * An AGGREGATE confidence has no `TrustTell` behind it — it is the weakest tier
+ * among several measurements (see `lib/rollup.ts`), and there is no single
+ * server-computed sentence to quote. Drawing it with the identical pips is the
+ * point: a reader must not have to learn two scales, one for a task row and one
+ * for a model's overall standing.
+ */
+export function ConfidenceTell({
+  confidence,
+  label,
+  reason,
+}: {
+  confidence: Confidence;
+  label: string;
+  reason: string;
+}) {
+  const { filled, total } = confidencePips(confidence);
+  const color = confidenceColorVar(confidence);
+  return (
+    <span className="confidence" title={reason} aria-label={`${label}. ${reason}`}>
       <span className="confidence-pips" aria-hidden="true">
         {Array.from({ length: total }, (_, index) => (
           <span
@@ -59,7 +82,7 @@ export function ConfidenceMeter({ trust }: { trust: TrustTell }) {
           />
         ))}
       </span>
-      <span style={{ color }}>{trust.confidence_label}</span>
+      <span style={{ color }}>{label}</span>
     </span>
   );
 }
