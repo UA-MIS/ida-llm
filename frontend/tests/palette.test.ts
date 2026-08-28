@@ -160,6 +160,39 @@ describe.each([
   });
 });
 
+describe("every colour comes from a token", () => {
+  /** The sheet with its comments removed — a hex inside prose is not a colour. */
+  function rulesOnly(): string {
+    const body = CSS.slice(CSS.indexOf("* { box-sizing"));
+    return body.replace(/\/\*[\s\S]*?\*\//g, " ");
+  }
+
+  it("declares no colour literal outside the two token blocks", () => {
+    // ⚠ THIS IS THE ONE THAT ACTUALLY CAUGHT SOMETHING. The filled-button rule
+    // carried `color: #fff`, typed in back when --accent was dark in both
+    // themes. Warming the palette gave dark mode a LIGHT indigo accent, and that
+    // literal silently became white-on-light-indigo at roughly 1.5:1.
+    //
+    // No token-level assertion can see it: the value is not a token, so every
+    // contrast check in this file passed while a real control was unreadable.
+    // The rule that catches it is structural — if a colour is not a token, the
+    // palette does not actually control it, and no amount of tuning on staging
+    // will fix it.
+    const literals = rulesOnly().match(/#[0-9a-fA-F]{3,8}\b|\brgba?\([^)]*\)/g) ?? [];
+    expect(literals).toEqual([]);
+  });
+
+  it("would notice a colour typed straight into a rule", () => {
+    // The detector, checked against a sample of the exact mistake — so this
+    // suite cannot pass by failing to look.
+    const sample = "* { box-sizing: border-box; } button { color: #fff; }";
+    expect(sample.match(/#[0-9a-fA-F]{3,8}\b/g)).toEqual(["#fff"]);
+    // …and is not fooled by a hex mentioned in a comment.
+    const commented = "* { box-sizing: border-box; } /* not #fff, ever */ a { color: var(--accent); }";
+    expect(commented.replace(/\/\*[\s\S]*?\*\//g, " ").match(/#[0-9a-fA-F]{3,8}\b/g)).toBeNull();
+  });
+});
+
 describe("contrast arithmetic", () => {
   it("agrees with the WCAG reference extremes", () => {
     expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21, 5);

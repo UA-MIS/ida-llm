@@ -189,9 +189,15 @@ main { max-width: 1140px; }
   border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;
 }
 
+/* ⚠ THE LABEL IS var(--bg), NOT #fff. A filled button inverts, and in dark mode
+   --accent is a LIGHT indigo — white-on-light-indigo lands around 1.5:1, which
+   is the palette warm-up quietly breaking a control that was fine when the
+   accent was dark. Painting the label with the page's own background colour
+   inverts correctly in both themes, and tests/palette.test.ts asserts the pair
+   clears AA so a future re-tune cannot reintroduce it. */
 button {
   font: inherit; font-weight: 600; cursor: pointer;
-  background: var(--accent); color: #fff; border: 1px solid transparent;
+  background: var(--accent); color: var(--bg); border: 1px solid transparent;
   border-radius: var(--radius); padding: 0.5rem 1rem;
 }
 button:disabled { opacity: 0.6; cursor: progress; }
