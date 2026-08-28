@@ -1,31 +1,87 @@
 /* Minimal, dependency-free styling. No Tailwind, no CSS framework: the skeleton
    should not commit the project to a design system before there is a design. */
 
+/* ===========================================================================
+   THE PALETTE. Every colour on this site is one of the tokens below, and both
+   themes are defined here rather than scattered through the sheet — which is
+   what makes the whole thing tunable from one screen of CSS.
+
+   ⚠ NO PURE #fff AND NO PURE #000, in either direction. A stark white page and
+   a pure-black dark mode are what made this read as clinical: pure neutrals have
+   no temperature, so nothing on the page feels considered. Light mode is warm
+   PAPER; dark mode is warm INK. Every neutral below carries the same faint warm
+   cast, so surfaces separate from the background by tone rather than by a hard
+   line.
+
+   ⚠ TWO ACCENTS, AND THEY DO DIFFERENT JOBS. This is not decoration:
+
+     --accent   INTERACTIVE. Links, focus rings, score bars, active controls.
+                A deep scholarly indigo, because "this responds to a click" has
+                to be unmistakable and unmistakably NOT a status.
+     --brand    IDENTITY. UA crimson, used sparingly and structurally: the build
+                badge, the rule under the lead panel, the quoted outcome
+                statement, the primary call to action. It marks what this thing
+                IS; it never marks what a number MEANS.
+
+   ⚠ WHY CRIMSON IS NOT THE INTERACTIVE ACCENT, even though it is the university's
+   colour. `--fail` is red, and this site spends colour on confidence — a "low
+   confidence" pip sits inches from a link on the leaderboard. Crimson links
+   would put the brand and the failure signal in the same hue, on the same
+   screen, on a page whose entire argument is that its signals are honest.
+   Crimson is therefore kept to structure and CTAs, where nothing semantic lives
+   and nothing is adjacent to a pip.
+
+   ⚠ CONTRAST IS TESTED, NOT EYEBALLED. `tests/palette.test.ts` parses this file
+   and asserts WCAG AA (4.5:1) for every text token against both the page
+   background and the raised surface, in BOTH themes. Tune these values freely —
+   the test is what tells you when a tweak has quietly made something unreadable.
+   =========================================================================== */
+
 :root {
-  --bg: #ffffff;
-  --fg: #16181d;
-  --muted: #61656e;
-  --border: #e3e5e9;
-  --surface: #f7f8fa;
-  --accent: #2b5fd9;
-  --pass: #17794a;
-  --fail: #c0392b;
-  --pending: #8a6d1f;
-  --radius: 6px;
+  /* Paper, not white. */
+  --bg: #fbf9f6;
+  --surface: #f3efea;
+  --surface-2: #eae4dc;
+  --fg: #1f1c1a;
+  --muted: #6e6862;
+  --border: #e6dfd6;
+  --border-strong: #d2c8bb;
+
+  --accent: #2f4c8a;
+  --brand: #9e1b32;
+
+  --pass: #2c6e49;
+  --fail: #b3392c;
+  --pending: #8a6212;
+
+  /* Gentle separation for raised surfaces. Light mode only carries a real
+     shadow; in dark mode a cast shadow is invisible and the tone step does the
+     work instead. */
+  --shadow: 0 1px 2px rgba(31, 28, 26, 0.05), 0 1px 8px rgba(31, 28, 26, 0.03);
+
+  --radius: 8px;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14161a;
-    --fg: #e8eaee;
-    --muted: #9aa0aa;
-    --border: #2a2e35;
-    --surface: #1b1e24;
-    --accent: #7aa2f7;
-    --pass: #4cc38a;
-    --fail: #f07171;
-    --pending: #e2b93d;
+    /* Ink, not black — the same warm cast as the paper above. */
+    --bg: #191714;
+    --surface: #211e1b;
+    --surface-2: #2a2622;
+    --fg: #ede7df;
+    --muted: #a69d93;
+    --border: #322e2a;
+    --border-strong: #474139;
+
+    --accent: #93abee;
+    --brand: #e0657e;
+
+    --pass: #5fc08d;
+    --fail: #f08a7c;
+    --pending: #e5b84f;
+
+    --shadow: none;
   }
 }
 
@@ -47,6 +103,12 @@ h2 { font-size: 1.1rem; margin: 2rem 0 0.75rem; }
 h3 { font-size: 0.95rem; margin: 0 0 0.5rem; }
 
 a { color: var(--accent); }
+/* One visible focus ring for every interactive thing on the site. The default
+   ring is the browser's, which disappears against a warm surface. */
+a:focus-visible, button:focus-visible, summary:focus-visible,
+select:focus-visible, input:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px;
+}
 
 .subtitle { color: var(--muted); margin: 0 0 1.5rem; }
 
@@ -54,6 +116,10 @@ table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 th, td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--border); }
 th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
 tbody tr:hover { background: var(--surface); }
+.leaderboard tbody tr:hover,
+.task-table tbody tr:hover,
+.outcome-table tbody tr:hover { background: var(--surface); }
+.task-table .group-row:hover { background: transparent; }
 
 .mono { font-family: var(--mono); font-size: 0.85em; }
 .muted { color: var(--muted); }
@@ -63,8 +129,10 @@ tbody tr:hover { background: var(--surface); }
   display: inline-block; padding: 0.1rem 0.45rem; border-radius: 999px;
   font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border);
 }
+/* The build badge is BRAND furniture, not a link and not a status — crimson is
+   exactly right here and nothing semantic sits near it. */
 .badge-version {
-  color: var(--accent); border-color: currentColor;
+  color: var(--brand); border-color: currentColor;
   margin-left: 0.6rem; vertical-align: middle;
   font-family: var(--mono); letter-spacing: 0.02em;
 }
@@ -77,6 +145,7 @@ tbody tr:hover { background: var(--surface); }
 .card {
   border: 1px solid var(--border); border-radius: var(--radius);
   background: var(--surface); padding: 1rem; margin-bottom: 1rem;
+  box-shadow: var(--shadow);
 }
 
 .grid {
@@ -129,9 +198,14 @@ button:disabled { opacity: 0.6; cursor: progress; }
 button.secondary { background: transparent; color: var(--accent); border-color: var(--border); }
 
 .cta-row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin: 1.25rem 0; }
+/* The one call to action on the front page, in the brand colour. A CTA is a
+   button with words in it — it can carry crimson without ever being mistaken
+   for a failure signal. */
 .cta {
   display: inline-block; padding: 0.55rem 1rem; border-radius: var(--radius);
-  border: 1px solid var(--accent); font-weight: 600; text-decoration: none;
+  border: 1px solid var(--brand); color: var(--brand);
+  font-weight: 600; text-decoration: none;
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
 /* --- the task chooser: "I want help with: [ ... ]" ----------------------- */
@@ -162,7 +236,7 @@ button.secondary { background: transparent; color: var(--accent); border-color: 
   display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 0.75rem 1.5rem; border: 1px solid var(--border);
   border-radius: var(--radius); background: var(--surface);
-  padding: 0.9rem 1rem; margin: 1.5rem 0;
+  padding: 0.9rem 1rem; margin: 1.5rem 0; box-shadow: var(--shadow);
 }
 .legend strong { display: block; font-size: 0.85rem; }
 .legend p { margin: 0.15rem 0 0; font-size: 0.8rem; line-height: 1.45; }
@@ -196,6 +270,7 @@ button.secondary { background: transparent; color: var(--accent); border-color: 
 .result-card {
   border: 1px solid var(--border); border-radius: var(--radius);
   background: var(--surface); padding: 0.85rem 1rem; margin-bottom: 0.6rem;
+  box-shadow: var(--shadow);
 }
 /* De-emphasised, never hidden: a test stub and an unmeasured pair are real
    facts about the benchmark, and a results page that drops inconvenient rows
@@ -272,10 +347,11 @@ button.secondary { background: transparent; color: var(--accent); border-color: 
 .outcome-heading { margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 2px solid var(--border); }
 .outcome-heading h2 { margin: 0 0 0.4rem; font-size: 1.25rem; }
 /* The programme's own wording, quoted rather than paraphrased — that quotation
-   IS the credibility claim of the SLO framing. */
+   IS the credibility claim of the SLO framing, so it gets the brand stroke: it
+   is the university's own text, not ours. */
 .outcome-statement {
   margin: 0; padding: 0.5rem 0 0.5rem 0.9rem;
-  border-left: 3px solid var(--accent);
+  border-left: 3px solid var(--brand);
   font-size: 0.92rem; line-height: 1.5;
 }
 .outcome-note { font-size: 0.8rem; margin: 0.5rem 0 0; }
@@ -311,7 +387,7 @@ h2 { font-size: 1.15rem; }
 
 /* --- the version badge --------------------------------------------------- */
 
-/* An unidentified build is muted rather than accented: it is still information,
+/* An unidentified build is muted rather than branded: it is still information,
    but it must not read as a release string somebody can quote. */
 .badge-version-unknown { color: var(--muted); border-color: var(--border); }
 
@@ -321,7 +397,7 @@ h2 { font-size: 1.15rem; }
 .hero .subtitle { font-size: 1.05rem; max-width: 62ch; margin-bottom: 1rem; }
 .hero-meta { font-size: 0.82rem; }
 
-.cta:hover { background: var(--accent); color: var(--bg); }
+.cta:hover { background: var(--brand); color: var(--bg); }
 
 /* --- panels: the section unit -------------------------------------------- */
 
@@ -332,7 +408,10 @@ h2 { font-size: 1.15rem; }
 }
 .panel-head h2 { margin: 0 0 0.3rem; }
 .panel-note { font-size: 0.82rem; margin: 0; max-width: 78ch; line-height: 1.5; }
-.panel-lead .panel-head { border-bottom-color: var(--accent); }
+/* One crimson rule under the page's lead panel. It is the only heavy stroke on
+   the page, which is what makes it read as "start here" rather than as
+   decoration. */
+.panel-lead .panel-head { border-bottom-color: var(--brand); }
 
 /* --- tables: scroll inside the box, never widen the page ----------------- */
 
@@ -371,7 +450,7 @@ h2 { font-size: 1.15rem; }
 
 .scorebar-value { font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
 .scorebar-track {
-  height: 6px; border-radius: 999px; background: var(--border);
+  height: 6px; border-radius: 999px; background: var(--border-strong);
   margin: 0.3rem 0 0.25rem; overflow: hidden; max-width: 8.5rem;
 }
 .scorebar-fill { height: 100%; background: var(--accent); border-radius: 999px; }
@@ -385,6 +464,7 @@ h2 { font-size: 1.15rem; }
   display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: flex-end;
   border: 1px solid var(--border); border-radius: var(--radius);
   background: var(--surface); padding: 0.9rem 1rem; margin-bottom: 1.25rem;
+  box-shadow: var(--shadow);
 }
 .filter-bar .field { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
 .filter-bar label {
@@ -412,6 +492,11 @@ h2 { font-size: 1.15rem; }
   gap: 1rem 2rem; align-items: start;
   border: 1px solid var(--border); border-radius: var(--radius);
   background: var(--surface); padding: 1.25rem 1.4rem;
+  box-shadow: var(--shadow);
+  /* The brand stroke, carried onto the report card so the two lead surfaces on
+     the site (the leaderboard's rule and this) are recognisably the same
+     gesture rather than two unrelated headers. */
+  border-top: 3px solid var(--brand);
 }
 .report-head .panel-head { grid-column: 1 / -1; }
 .report-title { margin: 0; font-size: 1.6rem; }
@@ -435,6 +520,7 @@ h2 { font-size: 1.15rem; }
 .sample-group {
   border: 1px solid var(--border); border-radius: var(--radius);
   background: var(--surface); margin-bottom: 0.7rem;
+  box-shadow: var(--shadow);
 }
 .sample-group[open] { background: var(--bg); }
 .sample-group-head {
