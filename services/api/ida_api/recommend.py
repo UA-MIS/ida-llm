@@ -111,21 +111,17 @@ QUESTIONS: list[IntakeQuestion] = [
             ),
             IntakeOption(
                 value="researcher", label="Research", detail="Papers, data, grants, literature."
-            ),  
-            IntakeOption(value="teacher + researcher", label="Both", detail="We will ask about each in turn."),
+            ),
+            IntakeOption(value="both", label="Both", detail="We will ask about each in turn."),
         ],
     ),
     IntakeQuestion(
         id="beneficiary",
         prompt="Is this for your own work, or for your students to use?",
         why_it_matters="A tool you use yourself and a tool you put in front of students need different settings, different guardrails, and sometimes a different model.",
-        depends_on=IntakeCondition(question_id="role", values=["teacher", "teacher + researcher"]),
+        depends_on=IntakeCondition(question_id="role", values=["teacher", "both"]),
         options=[
-            IntakeOption(
-                value="for_me", 
-                label="For me", 
-                detail="I will be the one using it."
-            ),
+            IntakeOption(value="for_me", label="For me", detail="I will be the one using it."),
             IntakeOption(
                 value="for_students",
                 label="For my students",
@@ -138,7 +134,7 @@ QUESTIONS: list[IntakeQuestion] = [
         id="teaching_task",
         prompt="What do you want help with?",
         why_it_matters="This is what we look up in the benchmark. Everything after it is about which of the measured models fits your situation.",
-        depends_on=IntakeCondition(question_id="role", values=["for_me"]),
+        depends_on=IntakeCondition(question_id="role", values=["teacher", "both"]),
         options=[
             IntakeOption(
                 value="grading",
@@ -168,7 +164,7 @@ QUESTIONS: list[IntakeQuestion] = [
         id="research_task",
         prompt="What part of your research do you want help with?",
         why_it_matters="Research tasks are benchmarked separately from teaching tasks; a model that grades well is not automatically a good literature reviewer.",
-        depends_on=IntakeCondition(question_id="role", values=["researcher", "teacher + researcher"]),
+        depends_on=IntakeCondition(question_id="role", values=["researcher", "both"]),
         options=[
             IntakeOption(value="literature_review", label="Literature review and summarising"),
             IntakeOption(value="drafting_editing", label="Drafting and editing papers"),
@@ -181,7 +177,7 @@ QUESTIONS: list[IntakeQuestion] = [
         id="student_data",
         prompt="Will this touch student work, grades, or anything that identifies a student?",
         why_it_matters="This is the question that most often changes the answer. It decides whether a cloud model is on the table at all.",
-        depends_on=IntakeCondition(question_id="role", values=["teacher", "teacher + researcher"]),
+        depends_on=IntakeCondition(question_id="role", values=["teacher", "both"]),
         options=[
             IntakeOption(value="yes", label="Yes"),
             IntakeOption(
@@ -225,7 +221,7 @@ QUESTIONS: list[IntakeQuestion] = [
         id="unpublished_data",
         prompt="Would you be putting in unpublished data, or work you have not released yet?",
         why_it_matters="It is not FERPA, but it is the same shape of problem: some vendors' terms allow training on what you send. Unpublished work is worth keeping on campus for exactly the same reason student data is.",
-        depends_on=IntakeCondition(question_id="role", values=["researcher", "teacher + researcher"]),
+        depends_on=IntakeCondition(question_id="role", values=["researcher", "both"]),
         options=[
             IntakeOption(value="yes", label="Yes"),
             IntakeOption(value="no", label="No — it is already public"),
