@@ -83,8 +83,7 @@ samples:
       dinar per unit and the spot rate is 8.00 dinar per US dollar; ocean
       freight is 14,000 US dollars per year in total; Marenna exports attract an
       import duty of 8% of the customs value, and the customs value is defined
-      as the ex-works value in US dollars plus freight. Sourcing from Costa
-      Verde: the ex-works price is 4.50 Cadrenne pesos per unit and the spot
+      as the ex-works value in US dollars plus freight. Sourcing from Cadrenne: the ex-works price is 4.50 Cadrenne pesos per unit and the spot
       rate is 4.00 pesos per US dollar; ocean freight is 9,000 US dollars per
       year in total; the goods qualify for a 0% preferential duty rate under a
       trade agreement. What is the customs value of the annual Marenna
@@ -104,8 +103,7 @@ samples:
       dinar per unit and the spot rate is 8.00 dinar per US dollar; ocean
       freight is 14,000 US dollars per year in total; Marenna exports attract an
       import duty of 8% of the customs value, and the customs value is defined
-      as the ex-works value in US dollars plus freight. Sourcing from Costa
-      Verde: the ex-works price is 4.50 Cadrenne pesos per unit and the spot
+      as the ex-works value in US dollars plus freight. Sourcing from Cadrenne: the ex-works price is 4.50 Cadrenne pesos per unit and the spot
       rate is 4.00 pesos per US dollar; ocean freight is 9,000 US dollars per
       year in total; the goods qualify for a 0% preferential duty rate under a
       trade agreement. What is the total annual landed cost of sourcing from
@@ -126,12 +124,10 @@ samples:
       dinar per unit and the spot rate is 8.00 dinar per US dollar; ocean
       freight is 14,000 US dollars per year in total; Marenna exports attract an
       import duty of 8% of the customs value, and the customs value is defined
-      as the ex-works value in US dollars plus freight. Sourcing from Costa
-      Verde: the ex-works price is 4.50 Cadrenne pesos per unit and the spot
+      as the ex-works value in US dollars plus freight. Sourcing from Cadrenne: the ex-works price is 4.50 Cadrenne pesos per unit and the spot
       rate is 4.00 pesos per US dollar; ocean freight is 9,000 US dollars per
       year in total; the goods qualify for a 0% preferential duty rate under a
-      trade agreement. What is the landed cost PER UNIT of sourcing from Costa
-      Verde, in US dollars?
+      trade agreement. What is the landed cost PER UNIT of sourcing from Cadrenne, in US dollars?
     # From the shared derivation: 54,000 / 40,000 = 1.35 exactly.
     # Omitting freight gives 45,000 / 40,000 = 1.125 -> 1.13: 0.22 away.
     # Applying Marenna's 8% duty to Cadrenne, ignoring the preferential rate
@@ -148,8 +144,7 @@ samples:
       dinar per unit and the spot rate is 8.00 dinar per US dollar; ocean
       freight is 14,000 US dollars per year in total; Marenna exports attract an
       import duty of 8% of the customs value, and the customs value is defined
-      as the ex-works value in US dollars plus freight. Sourcing from Costa
-      Verde: the ex-works price is 4.50 Cadrenne pesos per unit and the spot
+      as the ex-works value in US dollars plus freight. Sourcing from Cadrenne: the ex-works price is 4.50 Cadrenne pesos per unit and the spot
       rate is 4.00 pesos per US dollar; ocean freight is 9,000 US dollars per
       year in total; the goods qualify for a 0% preferential duty rate under a
       trade agreement. By how many US dollars per year is the cheaper country
@@ -173,14 +168,12 @@ samples:
       dinar per unit and the spot rate is 8.00 dinar per US dollar; ocean
       freight is 14,000 US dollars per year in total; Marenna exports attract an
       import duty of 8% of the customs value, and the customs value is defined
-      as the ex-works value in US dollars plus freight. Sourcing from Costa
-      Verde: the ex-works price is 4.50 Cadrenne pesos per unit and the spot
+      as the ex-works value in US dollars plus freight. Sourcing from Cadrenne: the ex-works price is 4.50 Cadrenne pesos per unit and the spot
       rate is 4.00 pesos per US dollar; ocean freight is 9,000 US dollars per
       year in total; the goods qualify for a 0% preferential duty rate under a
       trade agreement. Holding the Marenna ex-works price, the freight charge
       and the duty rate constant, at what spot rate -- in Marenna dinar per US
-      dollar -- would Marenna's total annual landed cost exactly equal Costa
-      Verde's?
+      dollar -- would Marenna's total annual landed cost exactly equal Cadrenne's?
     # Let x be dinar per US dollar. The Marenna ex-works total is 480,000 dinar
     # regardless of x, so the ex-works value in USD is 480,000 / x.
     #   (480,000 / x + 14,000) * 1.08 = 54,000       <- Cadrenne's total

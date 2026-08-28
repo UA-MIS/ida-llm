@@ -61,10 +61,10 @@ rubric:
         0.5 -- one such factor is missing, or one is named so vaguely
                ("international issues", "global conditions") that it cannot be
                matched to anything in the scenario.
-        0.0 -- two or more are missing, or the response names no factor that
-               can be traced to a fact in the scenario WHERE THE SCENARIO
-               SUPPLIES ONE, or asserts an operative factor in a scenario that
-               supplies none.
+        0.0 -- two or more are missing; or, in a scenario that does supply
+               operative factors, the response names none that can be traced to
+               a stated fact; or, in a scenario that supplies none, the response
+               asserts one anyway.
       weight: 3.0
     - name: precision-against-invented-factors
       description: |-
@@ -86,7 +86,9 @@ rubric:
         decision it touches, rather than restating that the factor exists?
 
         1.0 -- every factor is tied to a named element of the decision (a cost
-               line, a lead time, a price, a site choice, a contract term).
+               line, a lead time, a price, a site choice, a contract term);
+               where the response finds no operative factor, the elements of
+               the decision it checked are named just as specifically.
         0.5 -- some factors are tied to a specific element and others are left
                as bare labels.
         0.0 -- factors are listed as labels with no link to the decision, or the

@@ -505,6 +505,7 @@ class TestPublishedSampleFieldsDoNotCarryTheVerdict:
 COUNTERWEIGHT_BRANCHES = {
     "slo3-global-analysis/l1-factor-identification": {
         "recall-of-operative-factors": "where the scenario supplies facts about none",
+        "touchpoint-is-specific": "where the response finds no operative factor",
     },
     "slo3-global-analysis/l2-transmission-mechanism": {
         "chain-is-complete": "where a stated fact breaks the chain",
@@ -564,3 +565,42 @@ class TestTheUndramaticAnswerCanStillScoreFull:
                         f"{task_id}/{criterion_name}: names sample {sample.id!r} in a "
                         "published rubric"
                     )
+
+
+#: Real entities these families were renamed AWAY from, after a web search
+#: matched each to a real company or a real place: `Kestrel Foods` is a UK
+#: snack-food company, `Costa Verde` is an actively marketed coastal region in
+#: several countries, `Tavros` is a suburb of Athens.
+#:
+#: This test exists because the first rename MISSED nine occurrences. YAML
+#: folded scalars wrap prose mid-phrase, so `Costa Verde` was sitting in the
+#: files as ``Costa\n      Verde`` and a `\bCosta Verde\b` search reported the
+#: rename complete when it was not. One occurrence was ``TAVROS``, upper-cased
+#: for contrast, which a case-sensitive search also missed.
+#:
+#: So the check has to be whitespace- AND case-insensitive, and it has to run
+#: against the raw file text rather than the parsed prose -- a name can hide in
+#: a comment, an id or a tag as easily as in a sample input.
+RENAMED_REAL_ENTITIES = ("kestrel", "costa verde", "tavros")
+
+
+class TestRenamedRealEntitiesDoNotComeBack:
+    def test_no_real_entity_name_survives_anywhere_in_the_family_files(self) -> None:
+        import re
+
+        tasks_dir = repo_root() / "tasks"
+        offenders = []
+        for path in sorted(tasks_dir.rglob("*.yaml")):
+            if not str(path.relative_to(tasks_dir)).startswith(("slo3", "slo4")):
+                continue
+            text = path.read_text()
+            for name in RENAMED_REAL_ENTITIES:
+                # \s+ between words: the name may be wrapped across lines.
+                pattern = r"\b" + r"\s+".join(map(re.escape, name.split())) + r"\b"
+                for match in re.finditer(pattern, text, re.IGNORECASE):
+                    line = text[: match.start()].count("\n") + 1
+                    offenders.append(f"{path.name}:{line} {' '.join(match.group(0).split())!r}")
+        assert not offenders, (
+            "these families were renamed away from real companies and real places; "
+            "the following occurrences came back: " + "; ".join(offenders)
+        )

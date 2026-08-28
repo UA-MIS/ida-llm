@@ -96,8 +96,7 @@ samples:
     input: >-
       Vasterly Foods runs one office in Marenna, which observes UTC+3, and one in
       Cadrenne, which observes UTC-5. The Marenna office works 09:00 to 17:00
-      Marenna local time. The Cadrenne office works 08:00 to 16:00 Costa
-      Verde local time. Neither country observes daylight saving. How many whole
+      Marenna local time. The Cadrenne office works 08:00 to 16:00 Cadrenne local time. Neither country observes daylight saving. How many whole
       hours of the working day do the two offices have in common?
     # Marenna 09:00-17:00 at UTC+3 is 06:00-14:00 UTC.
     # Cadrenne 08:00-16:00 at UTC-5 is 13:00-21:00 UTC.
