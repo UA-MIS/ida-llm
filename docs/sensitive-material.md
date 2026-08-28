@@ -78,9 +78,18 @@ on intake, not later.**
 
 **In our own database**, de-identified on intake. We have permission to hold it.
 
-The intake pipeline is a real piece of work, not a promise — it is tracked as its
-own story. Material that has not been through it is **not** yet cleaned material
-and must not be used as task content or sent to a model.
+The intake pipeline is a real piece of work, not a promise. The **cleaning and
+the gate now exist** — `ida_core.deid` (the redaction) and `ida_core.intake`
+(provenance, the cleaned/uncleaned flag, `require_cleaned`), driven by
+`tools/deid_material.py`; see [`intake-pipeline.md`](intake-pipeline.md). What
+does *not* exist yet is an automated ingest endpoint and a table to persist
+cleaned material into: intake today is a person running that tool.
+
+Material that has not been through it is **not** yet cleaned material and must
+not be used as task content or sent to a model. That is enforced by type rather
+than by a flag somebody has to remember to set — `require_cleaned` refuses a
+`str`, a `dict` or a `RawMaterial`, so material that skipped intake cannot reach
+a store, a prompt or a publish path by omission.
 
 ### 2. Cleaning on intake is the gate
 
@@ -117,9 +126,12 @@ share:
 
 - author the task body as a **synthetic stand-in** imitating the shape of the real
   item — this is what `tasks/conceptual-grading/` already does;
-- carry the provenance sentence `tasks/SCHEMA.md` § 3 requires;
+- carry the provenance sentence `tasks/SCHEMA.md` § 3 requires —
+  `CleanedMaterial.provenance_sentence()` generates it;
 - name the source in per-sample `metadata` by **reference and SHA-256**, never by
-  content.
+  content — `CleanedMaterial.provenance_metadata()` produces exactly that shape,
+  and refuses to let a caller overwrite it (a forged pointer reads as verified,
+  which is worse than no pointer).
 
 The hash lets someone with authorised access confirm which item a task derives
 from without the repo carrying the item.
@@ -185,7 +197,9 @@ referencing a key Vault does not hold yet keeps the pods in
 | gap | consequence | owner |
 |---|---|---|
 | ~~**Run execution is unauthenticated**~~ — **closed in code**: `auth_mode=token` drops `runner` from anonymous | the *deployed* default is still `disabled`, so the containment is still "no public route" until an operator seeds the Vault key and flips the flag (§6 has the three steps) | this repo (code done); ops (enable) |
-| Intake cleaning pipeline not built yet | no material is "cleaned material" until it exists | this repo (tracked as its own story) |
+| Intake cleaning **module** built; no automated **ingest endpoint** or table to persist cleaned material | intake runs only when a human runs `tools/deid_material.py`; nothing ingests on its own, and cleaned material has no row to live in | this repo |
+| De-identification is pattern-based: it cannot detect **re-identification by content** | a short answer can identify its author through what it says; cleaned ≠ anonymous, so a human must read cleaned material before it is published | standing limit, restated in every `DeidReport` |
+| Personal names in free text need a **roster** to be caught reliably | material cleaned without one keeps mid-sentence names; re-ingesting with a roster finds them | whoever runs intake |
 | Local inference unreachable (egress netpol) | no option for material we choose not to clean | `platform-infra` |
 | `tasks/SCHEMA.md` says the repo is public; it is currently **private** | rules are correct either way, but the stated premise is wrong today | this repo (docs) |
 

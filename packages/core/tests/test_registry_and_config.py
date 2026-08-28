@@ -44,7 +44,11 @@ class TestLoadRegistry:
 
     def test_shipped_registry_loads(self) -> None:
         registry = load_registry(repo_root() / "models.yaml")
-        assert registry.enabled_keys() == ["mock"]
+        # `luna` was deliberately enabled for #48 on a $25 test-only budget; the
+        # cost guard that says WHICH models may be on lives in
+        # packages/harness/tests/test_registry_examples.py, so this one only
+        # asserts the file parses and both entries survive it.
+        assert registry.enabled_keys() == ["mock", "luna"]
 
     def test_shipped_mock_entry_needs_no_api_key(self) -> None:
         """The whole point: `make dev` and CI must work with zero secrets."""
