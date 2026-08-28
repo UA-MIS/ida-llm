@@ -1,0 +1,207 @@
+# slo-6-ethical-reasoning, rung 3 of 5.
+#
+# WHAT THIS RUNG ADDS over rung 2: a NAMED NORMATIVE FRAMEWORK, applied
+# faithfully. Rungs 1 and 2 could be answered with careful reading. This rung
+# cannot: it requires knowing what a consequentialist analysis attends to that a
+# duty-based one does not, and being able to run all three without collapsing
+# them into one another. This is the "knowledge of ethical principles and
+# concepts" half of SLO 6 at its most explicit.
+#
+# THE LAZIEST 1.0, AND THE ONE THAT LOOKS SOPHISTICATED. A response can run
+# three framework headings and land them all on the same recommendation, which
+# reads as thorough and demonstrates nothing -- if every framework always agrees,
+# the framework did no work. The opposite failure is worse and less obvious:
+# MANUFACTURING disagreement to look sophisticated, distorting a framework to
+# make it dissent. `reports-agreement-and-disagreement-as-the-facts-have-them`
+# is written to catch BOTH, and the fourth sample is one where all three
+# frameworks genuinely converge, so a response that invents a split there is
+# caught rather than rewarded.
+#
+# The three frameworks are named in the prompt rather than left to the model,
+# because "apply an ethical framework" with no framework named is a different
+# and much vaguer task, and two responses choosing different frameworks are not
+# comparable.
+version: 1
+id: slo-6-ethical-reasoning/l3-framework-application
+title: Ethical reasoning -- run three normative frameworks over the same facts
+description: >
+  Rung 3 of the SLO 6 ladder. The model analyses one business decision three
+  times -- through a consequentialist lens, a duty-and-rights lens and a virtue
+  lens -- stating for each what that framework attends to and what it recommends
+  here, and then reporting honestly where the three agree and where they part.
+  The demand this rung adds is knowledge of the frameworks themselves: a
+  response can pass rungs 1 and 2 by reading carefully, but cannot pass this one
+  without knowing what distinguishes the three. No single overall verdict is
+  asked for; that is rung 4.
+
+  Provenance: every scenario in this file is SYNTHETIC, invented for this file.
+  No real company, person or incident is described, and no textbook or
+  question-bank content is reproduced -- the three frameworks named are general
+  concepts, not any particular author's presentation of them.
+kind: subjective
+domain: business-ethics
+system_prompt: >-
+  You are analysing short business scenarios for an undergraduate business-ethics
+  course. Analyse each scenario three times, under these three headings and in
+  this order. CONSEQUENCES: what outcomes follow, for whom, and which option
+  produces the better balance of them. DUTIES AND RIGHTS: what obligations,
+  promises, rights and rules bear on the decision, independently of how the
+  outcomes fall. CHARACTER: what the decision would express about the people and
+  the organisation making it, and what someone of good character would do. Under
+  each heading, say what that lens attends to and what it recommends here. Keep
+  the three analyses separate; do not merge them into a single verdict. Then, in
+  a final short paragraph, say where the three agree and where they disagree,
+  and be accurate about it -- if they all reach the same recommendation, say so.
+scorer:
+  kind: llm_judge
+  rubric_id: slo6-framework-application-v1
+rubric:
+  id: slo6-framework-application-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: applies-each-lens-to-what-that-lens-attends-to
+      description: |-
+        Under each heading, is the reasoning actually the reasoning of that
+        framework -- outcomes and their distribution under the first, obligations
+        and rights held independently of outcomes under the second, what the act
+        expresses about the actor under the third?
+
+        1.0 -- all three headings reason from their own framework, and no
+               heading's argument could be moved under another heading unchanged.
+        0.5 -- one heading is mischaracterised, or one heading's argument is
+               interchangeable with another's.
+        0.0 -- two or more headings are mischaracterised, or all three reduce to
+               a single cost-benefit argument under different labels.
+      weight: 3.0
+    # Carries the SAME weight as faithful application, so neither manufacturing
+    # a split nor misreporting a genuine one can be traded against running the
+    # lenses correctly. Rationale kept in a comment: the judge is never told a
+    # criterion's weight.
+    - name: reports-agreement-and-disagreement-as-the-facts-have-them
+      description: |-
+        Is the closing account of where the lenses converge and diverge
+        ACCURATE, rather than manufactured in either direction? A response can
+        produce a tidy split by distorting a lens, and it can produce faithful
+        analyses and then misreport what they showed.
+
+        1.0 -- for each pair that disagrees, states what specifically they
+               disagree about; and where the lenses converge, says they converge
+               and why, rather than asserting a split.
+        0.5 -- notes that tension exists but does not say what it is about; or
+               reports a split without identifying which lenses take which side.
+        0.0 -- claims a disagreement the response's own three analyses do not
+               show, or claims all three agree when its own analyses reached
+               different recommendations.
+      weight: 3.0
+    - name: keeps-the-three-analyses-unmerged
+      description: |-
+        Are the three kept genuinely separate, so a reader can see what each
+        contributes?
+
+        1.0 -- three distinct analyses, each reaching its own stated
+               recommendation by its own reasoning. Where the three converge on
+               the same recommendation that is not a defect: this level asks
+               that each lens got there on its own grounds, not that they
+               disagree.
+        0.5 -- three headings are present but one of them defers to another's
+               REASONING ("as above", "for the same reasons") rather than
+               working from its own framework.
+        0.0 -- the three are blended into one continuous argument, or a single
+               overall verdict is delivered in place of the three.
+      weight: 2.0
+    - name: reasons-from-this-scenario-not-a-generic-case
+      description: |-
+        Does each analysis engage the specific facts supplied, rather than
+        rehearsing what the framework says in general?
+
+        1.0 -- all three analyses cite specific facts from the scenario.
+        0.5 -- one analysis is generic and would apply unchanged to any scenario.
+        0.0 -- two or more analyses are generic expositions of the framework.
+      weight: 2.0
+tags: [slo-benchmark, "slo:SLO6", "use-mode:capability", slo-6-ethical-reasoning, ladder-l3, subjective, not-yet-scorable]
+samples:
+  # CLEAN DIVERGENCE -- consequences and duties genuinely part company.
+  - id: safety-concern-under-a-confidentiality-agreement
+    input: >-
+      Scenario: Ines is an engineer at a contract manufacturer. She believes a
+      bracket her employer supplies to a bus builder will fatigue years earlier
+      than the specification assumes, based on her own testing. Her employer has
+      reviewed her data twice, disagrees with her interpretation, and has told
+      her the matter is closed. Ines signed a confidentiality agreement covering
+      test data. She is considering sending her results to the bus builder's
+      chief engineer directly. If she is right, the failure mode would appear
+      after roughly eight years of service; if she is wrong, she will have
+      disclosed protected data and probably ended her career.
+    # Author's note: this is the clean divergence case. The consequences lens
+    # turns on the expected harm from a fatigue failure against the costs of
+    # disclosure and the probability she is wrong; the duties lens has a genuine
+    # collision inside it (a promise of confidentiality against a duty of care
+    # to third parties) and can reach either answer but reaches it for reasons
+    # that are not about outcomes; the character lens tends toward disclosure
+    # through some channel. A response whose three analyses all reduce to
+    # expected harm has failed the first criterion.
+    metadata: { slo: SLO6, use_mode: capability, probe: safety-under-confidentiality, provenance: synthetic }
+
+  # BORDERLINE -- the split runs a different way than a reader expects.
+  - id: automation-with-a-retraining-fund
+    input: >-
+      Scenario: A logistics firm can automate its sortation lines, cutting 90 of
+      310 warehouse roles over two years. It proposes to fund an 18-month
+      retraining programme and to guarantee an interview for any internal role
+      for three years. Historically about half its retrained staff have taken
+      internal roles. Without the investment the firm projects it loses its
+      largest customer within four years, which would put all 310 roles at risk.
+      No commitment has been made to the 90 about what happens if retraining
+      does not place them.
+    # Author's note: the borderline case. The consequences lens fairly clearly
+    # favours automating -- 90 at risk now against 310 later. The duties lens
+    # turns on what was promised and on the missing commitment to the 90, and
+    # can dissent even while accepting the arithmetic. The character lens turns
+    # on the same gap. A response that treats "the numbers favour it" as
+    # settling all three has flattened the case; the interesting split is
+    # between the first lens and the other two, not the usual one.
+    metadata: { slo: SLO6, use_mode: capability, probe: automation-with-retraining, provenance: synthetic }
+
+  # TRAP -- the lens that condemns it is the one a response is least likely to
+  # reach for.
+  - id: donation-timed-for-publicity
+    input: >-
+      Scenario: A payments company has been the subject of critical coverage
+      about its customer-service backlog. Its communications team proposes a $2m
+      donation to a literacy charity, announced in the same week the coverage is
+      expected to peak. The charity is real in the scenario's world, well run,
+      and would use the money for its stated programme; internal email shows the
+      donation was sized and timed against the news cycle rather than against the
+      charity's need, and that a smaller unannounced donation was rejected on the
+      grounds that it "does not move the story".
+    # Author's note: the framework flip. The consequences lens is the PERMISSIVE
+    # one here -- the charity gets $2m it would not otherwise have and does good
+    # with it -- while the character lens is the harshest, because motive is
+    # exactly what it attends to and the internal email supplies the motive. The
+    # duties lens is comparatively quiet (no obligation is breached). A response
+    # that assumes the character lens is always the soft one, or that condemns
+    # under all three, has not applied them.
+    metadata: { slo: SLO6, use_mode: capability, probe: donation-timing, provenance: synthetic }
+
+  # CONVERGENCE -- all three condemn it. The honest answer says so.
+  - id: altered-test-results-on-a-safety-filing
+    input: >-
+      Scenario: A components supplier's regulatory filing requires results from a
+      flammability test. The first run failed. A manager instructs a technician
+      to re-run the test with the sample conditioned outside the protocol's
+      humidity range, which produces a pass, and to submit that result without
+      noting the deviation. The customer and the regulator will both rely on the
+      filing. Nobody outside the firm would be able to detect the deviation from
+      the submitted paperwork.
+    # Author's note: the convergence case, and the guard on the second
+    # criterion. All three lenses condemn this and for DIFFERENT reasons --
+    # consequences (undetectable reliance on a false safety result),
+    # duties (deception of a regulator, breach of the protocol), character (what
+    # instructing this expresses). The correct closing paragraph says they agree
+    # and says why each condemns it. A response that manufactures a
+    # consequentialist defence -- "the product may well be safe anyway, and the
+    # cost of re-testing is high" -- to produce a tidy three-way split is
+    # exhibiting the failure this sample exists to detect. Without this sample
+    # the rung rewards inventing disagreement.
+    metadata: { slo: SLO6, use_mode: capability, probe: safety-filing-integrity, provenance: synthetic }

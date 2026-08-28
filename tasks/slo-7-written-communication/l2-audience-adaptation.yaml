@@ -1,0 +1,228 @@
+# slo-7-written-communication, rung 2 of 5.
+#
+# WHAT THIS RUNG ADDS over rung 1: A NAMED READER whose needs differ from the
+# source material's. Rung 1's messages were written from facts to a colleague.
+# Here the model is handed a piece of writing pitched at one audience and must
+# re-pitch it for another -- which is the first genuinely STRATEGIC demand in
+# the ladder, and the most common single act of business writing there is.
+#
+# THE TENSION, PUT IN THE RUBRIC. Simplifying for a reader and staying true to
+# the source pull directly against each other: the fastest way to make a
+# technical finding readable is to drop the hedges, and dropping the hedges is
+# how a provisional result becomes a promise. `speaks-the-named-readers-language`
+# and `does-not-overstate-what-the-source-supports` are therefore weighted
+# EQUALLY at 3.0. A response cannot buy readability with accuracy.
+#
+# THE FOURTH SAMPLE'S READER NEEDS ALMOST NO ADAPTATION, on purpose. A family
+# in which every source must be simplified teaches a model to simplify
+# reflexively, including for readers who need the detail.
+version: 1
+id: slo-7-written-communication/l2-audience-adaptation
+title: Written communication -- re-pitch the same content for a different reader
+description: >
+  Rung 2 of the SLO 7 ladder. The model is given a piece of source writing
+  pitched at one audience, and a different named reader with a stated reason for
+  needing it, and must produce the version that reader needs. The demand this
+  rung adds over rung 1 is strategic rather than professional: the facts are all
+  supplied, and what is being measured is whether the model can hold a specific
+  reader in mind -- their vocabulary, their decision, their relationship to the
+  sender -- while not letting the act of simplifying quietly upgrade a hedged
+  finding into a certain one.
+
+  Provenance: every source document, company, person and business detail in this
+  file is SYNTHETIC, invented for this file. No real organisation's material is
+  reproduced or paraphrased, no real business or technical data is used, and no
+  textbook or question-bank content is reproduced.
+kind: subjective
+domain: business-communication
+system_prompt: >-
+  You are drafting workplace correspondence on behalf of a colleague at a
+  mid-sized company. Each scenario gives you a piece of source writing and names
+  the reader you must now write for, along with the decision or action that
+  reader faces. Produce the message that reader needs: a subject line where the
+  channel has one, then the body. Every claim you make must be supported by the
+  source -- where the source hedges, qualifies or reports something as
+  provisional, your version must carry that too, in language the named reader
+  will follow. Do not add findings the source does not contain, and do not
+  soften a limitation out of existence to make the message read more cleanly.
+  Write only the message.
+scorer:
+  kind: llm_judge
+  rubric_id: slo7-audience-adaptation-v1
+rubric:
+  id: slo7-audience-adaptation-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: speaks-the-named-readers-language
+      description: |-
+        Would the named reader understand every sentence without looking
+        something up or asking what a term means?
+
+        1.0 -- every term that survives is one the named reader is said to use,
+               and any term outside their stated vocabulary is explained or
+               replaced. Where the named reader is a specialist in the source's
+               own field, leaving the terminology intact is what this level
+               looks like.
+        0.5 -- one term outside the named reader's stated vocabulary survives
+               unexplained, or one sentence assumes background the named reader
+               was not said to have.
+        0.0 -- two or more terms outside the named reader's stated vocabulary
+               survive unexplained, or the source is passed on substantially
+               unchanged where this reader needed it recast.
+      weight: 3.0
+    # Carries the SAME weight as speaking the reader's language, so readability
+    # cannot be bought with accuracy. Rationale kept in a comment: the judge is
+    # never told a criterion's weight.
+    - name: does-not-overstate-what-the-source-supports
+      description: |-
+        Does every claim survive comparison with the source, with its
+        qualifications intact? Dropping the hedges is the fastest route to a
+        clean-reading message.
+
+        1.0 -- every claim is traceable to the source, and every hedge,
+               limitation, sample-size caveat or provisional status in the source
+               that bears on the reader's decision is carried across.
+        0.5 -- one qualification is dropped, or one quantity is rounded or
+               restated in a way that reads stronger than the source.
+        0.0 -- something the source presents as provisional, partial or uncertain
+               is presented as settled, or a claim appears that the source does
+               not support.
+      weight: 3.0
+    - name: leads-with-what-this-reader-must-decide
+      description: |-
+        Is the message organised around the named reader's decision, rather than
+        around the source's structure?
+
+        1.0 -- opens with the thing this reader needs in order to act, and the
+               order of the message follows that reader's needs rather than the
+               source's.
+        0.5 -- contains what the reader needs, but keeps the source's ordering so
+               the reader must hunt for it.
+        0.0 -- reproduces the source's structure and priorities, leaving the
+               reader to work out what it means for them.
+      weight: 2.0
+    - name: pitches-the-register-to-the-relationship
+      description: |-
+        Does the message sound right coming from this sender to this reader,
+        given the relationship the scenario describes?
+
+        1.0 -- the level of formality, the amount of deference and the assumed
+               shared context all match the stated relationship.
+        0.5 -- the register is off in one respect, such as excessive formality
+               with a close colleague or unearned familiarity with a customer.
+        0.0 -- the register would be noticed as wrong by the recipient, or the
+               message adopts a stance the sender is not in a position to take.
+      weight: 2.0
+tags: [slo-benchmark, "slo:SLO7", "use-mode:capability", slo-7-written-communication, ladder-l2, subjective, not-yet-scorable]
+samples:
+  # CLEAN -- technical to executive. The archetypal case.
+  - id: engineering-memo-to-a-non-technical-executive
+    input: >-
+      Source (an engineering note, written for other engineers): "Load testing of
+      the v4 checkout service at 3x projected peak sustained p99 latency of
+      412ms against a 500ms SLO, with no error-rate degradation. Two runs of six
+      were excluded owing to a misconfigured connection pool on the test rig;
+      those runs are being repeated. The result therefore rests on four runs and
+      should be treated as provisional pending the reruns. Separately, the
+      session-store shard remains a single point of failure; it was not exercised
+      under load in this round."
+
+      Now write to: Angela, the chief operating officer, who is not
+      technical. She must decide by Friday whether to approve the v4 launch for
+      the holiday trading period. She has asked, in her words, "will it hold up
+      and what could still bite us". She and the sender are two levels apart and
+      have a cordial working relationship.
+    # Author's note: the archetypal case, and the hedges are the whole test.
+    # THREE qualifications bear on Angela's decision -- the result is
+    # provisional, it rests on four runs not six, and the session-store shard
+    # was never exercised. Each is easy to drop while "simplifying" and each
+    # changes her answer. "p99", "SLO" and "shard" are the terms that must not
+    # survive unexplained. A response that writes "testing shows it will handle
+    # three times peak load comfortably" is fluent, readable, and scores 0.0 on
+    # `does-not-overstate-what-the-source-supports`.
+    metadata: { slo: SLO7, use_mode: capability, genre: executive-brief, probe: technical-memo-to-executive, provenance: synthetic }
+
+  # TRAP -- the reader is a customer, and the source contains internal blame.
+  - id: internal-incident-note-to-an-affected-customer
+    input: >-
+      Source (an internal incident note): "Root cause was a schema migration
+      applied to the production replica without the sign-off the change policy
+      requires. The engineer who applied it was working from a runbook we know to
+      be eighteen months stale; this is the third incident traceable to that
+      runbook and the remediation ticket has been deprioritised twice. Customer
+      impact: order confirmations for 340 accounts were delayed between 09:12 and
+      12:40, all were eventually delivered, and no order was lost or duplicated.
+      Fix shipped 13:05. Runbook rewrite now scheduled and the sign-off gate is
+      being enforced in tooling."
+
+      Now write to: Priya, the operations lead at one affected customer,
+      whom the sender has worked with for two years. She noticed the delay,
+      raised a ticket, and wants to know what happened, whether her orders are
+      safe, and whether it will recur.
+    # Author's note: the trap is that the source contains material that is true,
+    # relevant to the sender's own organisation, and NOT Priya's to receive --
+    # the named engineer's error, the twice-deprioritised ticket, and "the third
+    # incident". A response that transcribes those into a customer message has
+    # been faithful to the source and has still written the wrong message; a
+    # response that omits them has not "dropped a hedge". The distinction the
+    # rubric needs the judge to hold is between omitting internal blame (correct)
+    # and omitting a qualification bearing on Priya's decision (a 0.5 or 0.0).
+    # What Priya must get: the impact and window, that nothing was lost or
+    # duplicated, that it is fixed, and a recurrence answer that does not
+    # overclaim -- the tooling gate is real, the runbook rewrite is only
+    # scheduled.
+    metadata: { slo: SLO7, use_mode: capability, genre: customer-message, probe: incident-note-to-customer, provenance: synthetic }
+
+  # BORDERLINE -- downward to a frontline team who must act, not decide.
+  - id: policy-change-to-the-frontline-team-who-must-apply-it
+    input: >-
+      Source (an extract from a revised returns policy): "Effective the 1st, the
+      goodwill returns window for non-defective merchandise is reduced from 90 to
+      45 days from delivery, save that (a) items in the seasonal-gift category
+      retain a 90-day window through 15 January, (b) the reduction does not apply
+      to orders placed before the 1st, and (c) store managers retain existing
+      discretion to accept a late return where the customer presents a delivery
+      exception. Defective-goods rights are unaffected by this change."
+
+      Now write to: the 60 store colleagues who will have to apply this at the
+      counter, several of whom are seasonal hires in their first month. They need
+      to know what to do when a customer arrives with a return. Their manager is
+      the sender and they see her daily.
+    # Author's note: borderline because the failure mode is not jargon -- the
+    # source is plain enough -- but STRUCTURE. Three carve-outs and one
+    # unaffected right, delivered to a first-month hire at a counter with a
+    # customer in front of them. Reproducing the policy's (a)/(b)/(c) ordering
+    # is the 0.5 case for `leads-with-what-this-reader-must-decide`; reorganising
+    # it around the question the colleague actually faces is the 1.0. Note the
+    # easiest simplification -- "the window is now 45 days" -- silently deletes
+    # all four exceptions and is the 0.0 case for the accuracy criterion, which
+    # is why this sample sits under that criterion too.
+    metadata: { slo: SLO7, use_mode: capability, genre: team-instruction, probe: policy-change-to-frontline-team, provenance: synthetic }
+
+  # LITTLE ADAPTATION NEEDED -- the reader is a peer specialist. Catches
+  # reflexive simplification.
+  - id: findings-passed-to-a-peer-specialist
+    input: >-
+      Source (a note from a data scientist): "The uplift model's holdout AUC is
+      0.71, down from 0.78 at training, and calibration drifts badly above the
+      0.6 decile -- predicted uplift there overstates realised uplift by roughly
+      a third. Feature importance has shifted onto recency at the expense of
+      basket composition, which is consistent with the promotional period in the
+      training window. Recommend refitting on a window excluding the promotion
+      before the model is used for the spring campaign."
+
+      Now write to: Dev, a senior data scientist on a sister team who will
+      inherit this model next week and refit it himself. He asked for "whatever
+      you have". He and the sender are peers who exchange work regularly.
+    # Author's note: the counterweight sample. Dev needs the AUC numbers, the
+    # decile, the calibration direction and the feature-importance shift --
+    # every one of them is load-bearing for the refit he is about to do, and
+    # translating them into plain English destroys the message's usefulness. The
+    # correct artefact is close to the source, perhaps reordered to lead with
+    # the recommendation and with the handover framed. A response that removes
+    # "AUC", "calibration" and "decile" because the rung is called audience
+    # adaptation has adapted to the wrong reader and should score 0.0 on
+    # `speaks-the-named-readers-language` -- the criterion is about the NAMED
+    # reader, not about simplification.
+    metadata: { slo: SLO7, use_mode: capability, genre: peer-handover, probe: findings-to-peer-specialist, provenance: synthetic }

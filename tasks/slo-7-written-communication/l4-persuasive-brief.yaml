@@ -1,0 +1,220 @@
+# slo-7-written-communication, rung 4 of 5.
+#
+# WHAT THIS RUNG ADDS over rung 3: PERSUASION UNDER CONSTRAINT. Rungs 1-3 moved
+# information -- wanted or unwanted. Here the reader must be moved to a
+# decision, the reader is sceptical, and there is a hard word limit. The limit
+# is not decoration: it is what forces selection, and selection under pressure
+# is where persuasive writing is actually won or lost. It is also the one demand
+# on this ladder a judge can check by counting.
+#
+# THE TENSION, PUT IN THE RUBRIC. Persuasive force and honest treatment of the
+# counter-case pull against each other, and the cheap brief resolves it by
+# omitting the objection or by answering a weaker one nobody holds.
+# `makes-the-case-the-evidence-supports` and
+# `states-the-strongest-objection-in-a-form-its-holder-would-accept` are
+# weighted EQUALLY at 3.0.
+#
+# THE FOURTH SAMPLE'S EVIDENCE DOES NOT SUPPORT THE ASK. A rung whose every
+# sample rewards advocacy teaches a model to advocate regardless of what it was
+# given, so one scenario hands over evidence that is genuinely too thin and the
+# honest brief says so. That is what stops the first criterion from reducing to
+# "argue hard".
+version: 1
+id: slo-7-written-communication/l4-persuasive-brief
+title: Written communication -- a decision brief for a sceptical reader, under a word limit
+description: >
+  Rung 4 of the SLO 7 ladder. The model writes a short decision brief that must
+  move a named, sceptical decision-maker, using only the evidence supplied and
+  within a stated word limit. The demands this rung adds over rung 3 are
+  persuasion and selection: the brief must lead with its recommendation, marshal
+  the supplied evidence behind it, and meet the strongest objection honestly
+  rather than a convenient weaker one -- all inside a budget that makes the
+  writer choose what to leave out. The rung measures judgement about when to
+  advocate as well as skill in advocating.
+
+  Provenance: every scenario, company, person, figure and quoted objection in
+  this file is SYNTHETIC, invented for this file. No real business data, vendor,
+  proposal or internal document is reproduced, and no textbook or question-bank
+  content is reproduced.
+kind: subjective
+domain: business-communication
+system_prompt: >-
+  You are writing a decision brief for a named decision-maker at a mid-sized
+  company. Open with your recommendation in the first sentence, then support it
+  using only the evidence the scenario supplies. Identify the strongest
+  objection a reasonable sceptic would raise against your recommendation, state
+  it fairly, and answer it. Close with the specific decision you are asking for.
+  Observe the word limit the scenario states; it is a hard limit and it excludes
+  any heading or title. Do not invent figures, and do not assert a benefit the
+  supplied evidence does not support -- if the evidence does not support the ask
+  you were handed, say so and recommend what it does support. Write only the
+  brief.
+scorer:
+  kind: llm_judge
+  rubric_id: slo7-persuasive-brief-v1
+rubric:
+  id: slo7-persuasive-brief-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: makes-the-case-the-evidence-supports
+      description: |-
+        Is the recommendation carried by the evidence supplied, with each claim
+        doing work rather than filling space?
+
+        1.0 -- every supporting claim is drawn from the supplied evidence, the
+               strongest available evidence is used, and the recommendation is
+               proportionate to it -- including recommending less than asked
+               where the evidence supports less.
+        0.5 -- the case rests mainly on the supplied evidence but one claim is
+               unsupported or overstated, or the strongest available evidence is
+               left unused.
+        0.0 -- figures or benefits are asserted that the scenario does not
+               supply, or the brief argues for the full ask where the supplied
+               evidence plainly does not reach it.
+      weight: 3.0
+    # Carries the SAME weight as making the case, so persuasive force cannot be
+    # bought by suppressing the counter-argument. Rationale kept in a comment:
+    # the judge is never told a criterion's weight.
+    - name: states-the-strongest-objection-in-a-form-its-holder-would-accept
+      description: |-
+        Does the brief meet the real counter-argument, put in terms a sceptic
+        would recognise as their own? Omitting the objection, or substituting a
+        weaker one, is the cheapest way to make a brief look strong.
+
+        1.0 -- names the strongest objection available on these facts, states it
+               without diminishing it, and answers it with evidence or by
+               conceding what must be conceded.
+        0.5 -- names a real but secondary objection while the strongest goes
+               unmentioned, or states the strongest objection and then does not
+               answer it.
+        0.0 -- no objection is acknowledged, or the objection stated is a weak
+               version nobody holds, set up so it can be dismissed.
+      weight: 3.0
+    - name: puts-the-recommendation-in-the-opening-sentence
+      description: |-
+        Can the decision-maker learn what is being asked of them without reading
+        past the first sentence or two?
+
+        1.0 -- the recommendation is the first sentence, and is specific enough
+               to act on.
+        0.5 -- the recommendation appears within the opening paragraph but after
+               background or context.
+        0.0 -- the recommendation appears only at the end, or the brief never
+               states plainly what decision is sought.
+      weight: 2.0
+    - name: respects-the-stated-word-limit
+      description: |-
+        Count the words of the brief, excluding any heading or title. Does it
+        come in at or under the limit the scenario stated?
+
+        1.0 -- at or under the stated limit.
+        0.5 -- over the limit by not more than about a tenth of it.
+        0.0 -- over the limit by more than about a tenth, or so far under it that
+               required elements are missing.
+      weight: 2.0
+tags: [slo-benchmark, "slo:SLO7", "use-mode:capability", slo-7-written-communication, ladder-l4, subjective, not-yet-scorable]
+samples:
+  # CLEAN -- the evidence is good, the objection is obvious and real.
+  - id: capital-request-for-a-second-packing-line
+    input: >-
+      Write a brief of no more than 200 words to Iris, the finance
+      director, who is sceptical of capital requests and has declined two from
+      this plant in three years. Evidence available to you: the single packing
+      line ran at 94% of rated capacity across the last two quarters; overtime to
+      cover peaks cost $310,000 last year; the plant turned away four orders
+      worth about $1.1m because it could not commit to the delivery dates; a
+      second line costs $780,000 installed, with a 14-week lead time; the line
+      would be idle roughly 30% of the year outside peaks; maintenance on the
+      existing line requires a four-day annual shutdown during which the plant
+      currently ships nothing.
+    # Author's note: the clean case. The strongest objection is plainly the 30%
+    # idle time against a $780,000 outlay -- a brief that instead raises "the
+    # lead time is long" has substituted a secondary objection and is the 0.5
+    # case. The answer to the real objection is available in the evidence: the
+    # four-day shutdown currently stops shipping entirely, and $310,000 of
+    # overtime plus $1.1m of turned-away orders is the recurring cost of the
+    # status quo. Note the $1.1m is orders TURNED AWAY, not margin -- a brief
+    # that treats it as profit has overstated, which is the 0.5 case on the
+    # first criterion.
+    metadata: { slo: SLO7, use_mode: capability, genre: decision-brief, probe: capital-request, provenance: synthetic }
+
+  # BORDERLINE -- the decision-maker has a stake in the status quo.
+  - id: switch-the-payroll-vendor
+    input: >-
+      Write a brief of no more than 180 words to Tom, the chief
+      operating officer, who selected the current payroll vendor four years ago
+      and has defended it publicly since. Evidence available to you: the current
+      vendor's contract renews in five months at a 22% price increase; it has
+      missed the agreed pay-run cutoff three times in twelve months, twice
+      delaying payment for staff paid weekly; the alternative vendor quotes 15%
+      below the current renewal price and has a 99.9% on-time record across its
+      published customer base; migration would take an estimated eleven weeks and
+      requires about 200 hours from the payroll team, who are two people; the
+      current vendor has offered to hold the price flat for a year if the company
+      commits to three.
+    # Author's note: borderline because the strongest objection is not in the
+    # numbers -- it is the switching risk carried by a TWO-PERSON payroll team
+    # absorbing 200 hours over eleven weeks, on the process that pays everyone.
+    # A brief that treats the price hold as the main objection has picked the
+    # easier one. The register matters too: Tom chose the incumbent, so a brief
+    # that scores points off that choice loses him, while one that never
+    # acknowledges he has a position is naive. The three-year commitment is the
+    # fact that makes the price hold answerable.
+    metadata: { slo: SLO7, use_mode: capability, genre: decision-brief, probe: payroll-vendor-switch, provenance: synthetic }
+
+  # HARD -- a tight limit and an ask that must be narrowed to be defensible.
+  - id: exception-to-a-hiring-freeze
+    input: >-
+      Write a brief of no more than 150 words to the executive committee, which
+      imposed a company-wide hiring freeze six weeks ago and has refused every
+      exception so far. You have been asked to seek three exceptions for the
+      customer-support team. Evidence available to you: support headcount is 14
+      against a plan of 19; median first-response time has risen from 2.4 hours
+      to 9.1 hours since the freeze; the contractual response commitment for
+      enterprise customers is 4 hours and three enterprise accounts, worth $2.4m
+      in annual recurring revenue combined, have now cited it in writing; two of
+      the five vacancies are backfills for people who left after the freeze; a
+      contractor route exists at roughly 1.6x salary cost with a three-week
+      start; the freeze was imposed to protect a cash position that the most
+      recent forecast shows improving but still tight.
+    # Author's note: the hardest of the four on selection, because 150 words
+    # cannot hold everything and the ask itself should probably narrow. The
+    # contractual breach on $2.4m of ARR is the strongest evidence and must
+    # survive the cut; the strongest objection is the cash position the freeze
+    # exists to protect, which the evidence concedes is still tight. The
+    # contractor route at 1.6x is the lever that answers it -- higher unit cost,
+    # no permanent commitment, three-week start. A brief that asks for all three
+    # permanent hires without engaging the cash objection has ignored the reason
+    # for the freeze; one that proposes contractors for some and hires for the
+    # contractual gap is doing the rung's actual work.
+    metadata: { slo: SLO7, use_mode: capability, genre: decision-brief, probe: hiring-freeze-exception, provenance: synthetic }
+
+  # THE EVIDENCE DOES NOT SUPPORT THE ASK. The honest brief says so. Without
+  # this sample the rung rewards advocacy regardless of the evidence.
+  - id: rebrand-investment-request
+    input: >-
+      Write a brief of no more than 200 words to Marguerite, the chief
+      executive, who is sceptical of marketing spend. You have been asked to make
+      the case for a $600,000 rebrand. Evidence available to you: an unprompted
+      brand-awareness survey of 180 respondents, all recruited at one trade show,
+      in which 31% could not correctly describe what the company does; the sales
+      team reports that the name is "often confused" with a competitor's, with no
+      count of instances and no lost-deal analysis; the current visual identity
+      is nine years old; a design agency's proposal quotes $600,000 and projects
+      "a 10-15% lift in qualified inbound", with the projection sourced to the
+      agency's own prior engagements and no comparable case supplied; the
+      company's inbound volume has grown 8% year on year with no brand change.
+    # Author's note: the counterweight, and the sample that keeps
+    # `makes-the-case-the-evidence-supports` honest. Every piece of evidence
+    # here is weak in a nameable way -- a 180-person convenience sample from one
+    # trade show, an anecdotal confusion claim with no lost-deal analysis, a
+    # vendor-sourced lift projection with no comparable, and a control-ish fact
+    # (inbound grew 8% with no brand change) that cuts directly against the ask.
+    # The honest brief declines to argue for $600,000 and recommends what the
+    # evidence supports: a properly sampled study, or a lost-deal analysis of the
+    # naming confusion, at a fraction of the cost. A polished, confident case
+    # for the full spend is the 0.0 case on the first criterion no matter how
+    # well written it is -- and that is the discrimination this rung exists to
+    # make.
+    metadata: { slo: SLO7, use_mode: capability, genre: decision-brief, probe: rebrand-proposal, provenance: synthetic }
