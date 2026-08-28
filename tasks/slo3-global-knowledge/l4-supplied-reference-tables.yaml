@@ -81,7 +81,7 @@ samples:
     # 12,040 -- 3,870 away.
     # Decoy MT-0401 (bulk, but unsweetened) gives 3,440 -- 4,730 away.
     target: "8170"
-    metadata: { skill: tariff-line-classification, factor: trade-policy, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: tariff-line-classification, factor: trade-policy, provenance: synthetic }
 
   - id: delivery-terms-cost-allocation
     input: |-
@@ -104,7 +104,7 @@ samples:
     # The four cost figures are all supplied precisely so that selecting the
     # wrong term produces a clean, confident, wrong number rather than an error.
     target: "10200"
-    metadata: { skill: delivery-terms-allocation, factor: global-logistics, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: delivery-terms-allocation, factor: global-logistics, provenance: synthetic }
 
   - id: preferential-origin-rate-band
     input: |-
@@ -131,7 +131,7 @@ samples:
     # 52.0 sits comfortably inside the band, well clear of both the 45 and 60
     # edges, so the item does not turn on how the endpoints are read.
     target: "9600"
-    metadata: { skill: preferential-origin-band, factor: trade-agreements, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: preferential-origin-band, factor: trade-agreements, provenance: synthetic }
 
   - id: treaty-withholding-net-dividend
     input: |-
@@ -155,7 +155,7 @@ samples:
     # Reporting the tax withheld (15,000) instead of the net receipt is
     # 120,000 away, so the item also enforces which quantity was asked for.
     target: "135000"
-    metadata: { skill: treaty-rate-selection, factor: multinational-tax, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: treaty-rate-selection, factor: multinational-tax, provenance: synthetic }
 
   - id: sovereign-risk-band-premium
     input: |-
@@ -180,4 +180,4 @@ samples:
     # 58 is not on a band boundary, so the item does not turn on whether the
     # bands are read as inclusive.
     target: "12.6"
-    metadata: { skill: risk-band-selection, factor: country-risk, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: risk-band-selection, factor: country-risk, provenance: synthetic }

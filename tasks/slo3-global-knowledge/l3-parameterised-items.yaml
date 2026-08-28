@@ -63,7 +63,7 @@ samples:
     # which is 1.13 away: 113x the tolerance, and the smallest gap in this file.
     # 26.21696 is not near a .xx5 boundary.
     target: "26.22"
-    metadata: { skill: template-binding, template: landed-unit-cost, factor: global-sourcing, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: template-binding, template: landed-unit-cost, factor: global-sourcing, provenance: synthetic }
 
   - id: template-ppp-adjusted-salary
     input: >-
@@ -77,7 +77,7 @@ samples:
     # 73,304.65 away. Inversion is the only plausible mis-binding here, and it
     # is unmissable.
     target: "49530"
-    metadata: { skill: template-binding, template: ppp-adjusted-salary, factor: cost-of-living-differentials, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: template-binding, template: ppp-adjusted-salary, factor: cost-of-living-differentials, provenance: synthetic }
 
   - id: template-country-risk-cost-of-equity
     input: >-
@@ -99,7 +99,7 @@ samples:
     # sits exactly on a .xx5 rounding boundary and would have two defensible
     # keys under round-half-up and round-half-even.
     target: "12.1"
-    metadata: { skill: template-binding, template: country-risk-cost-of-equity, factor: country-risk, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: template-binding, template: country-risk-cost-of-equity, factor: country-risk, provenance: synthetic }
 
   - id: template-tariff-rate-quota
     input: >-
@@ -117,7 +117,7 @@ samples:
     # Applying the out-quota rate to the whole quantity gives 72,900 --
     # 43,200 away.
     target: "29700"
-    metadata: { skill: template-binding, template: tariff-rate-quota, factor: trade-policy, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: template-binding, template: tariff-rate-quota, factor: trade-policy, provenance: synthetic }
 
   - id: template-weighted-blended-margin
     input: >-
@@ -138,4 +138,4 @@ samples:
     # (0.22 + 0.155 + 0.09) / 3 = 0.155 -> 15.50, which is 1.30 away:
     # 130x the tolerance.
     target: "16.8"
-    metadata: { skill: template-binding, template: weighted-blended-margin, factor: multi-market-portfolio, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: template-binding, template: weighted-blended-margin, factor: multi-market-portfolio, provenance: synthetic }

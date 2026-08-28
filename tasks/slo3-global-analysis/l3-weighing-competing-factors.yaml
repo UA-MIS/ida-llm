@@ -145,7 +145,7 @@ samples:
     # What is NOT defensible is treating the currency exposure as unbounded --
     # the scenario bounds it at 25%, and the response that says "unlimited
     # currency risk" should lose respects-the-supplied-magnitudes.
-    metadata: { probe: sized-conflict, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, probe: sized-conflict, provenance: synthetic }
 
   # BORDERLINE. Genuinely close, and deliberately so: the two options are near
   # enough that the recommendation follows from which factor the responder
@@ -173,7 +173,7 @@ samples:
     # is decisive and why; what loses it is listing all four and concluding
     # "it depends on Kestrel's risk appetite", which is the non-answer
     # commits-to-a-recommendation exists to catch.
-    metadata: { probe: genuinely-balanced, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, probe: genuinely-balanced, provenance: synthetic }
 
   # TRAP. One factor is salient, alarming and CAPPED by a stated fact. A
   # responder who anchors on the salient number without reading the cap will
@@ -204,7 +204,7 @@ samples:
     # not size. The strongest responses recommend the move, name the levy risk
     # as bounded and immaterial, and make the lead-time and inventory question
     # the reversing condition.
-    metadata: { probe: salient-but-capped, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, probe: salient-but-capped, provenance: synthetic }
 
   # NO-REAL-TRADEOFF. Every global factor points the same way. The honest answer
   # is short and decisive, and the reversing condition has to be a genuine one
@@ -235,4 +235,4 @@ samples:
     # laboratory qualification is Kestrel's own and covers specification, not
     # production-scale performance, so a failure at scale would reverse the
     # recommendation. A response that finds that has read the scenario closely.
-    metadata: { probe: no-genuine-tradeoff, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, probe: no-genuine-tradeoff, provenance: synthetic }

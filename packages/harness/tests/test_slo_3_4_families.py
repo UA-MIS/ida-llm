@@ -99,6 +99,67 @@ class TestTagConvention:
         for task in slo_tasks:
             assert "slo-benchmark" in task.tags, f"{task.id} is missing the slo-benchmark tag"
 
+    def test_every_sample_carries_the_drilldown_metadata(self, slo_tasks) -> None:
+        """The same two facts again, per sample, as the dashboard's drill-down.
+
+        Task `tags` group a whole task under an outcome; sample `metadata` is
+        what lets a consumer filter individual result rows. Both are published by
+        the API, so both have to be right.
+        """
+        for task in slo_tasks:
+            expected_slo, _ = FAMILIES[_family_of(task)]
+            for sample in task.samples:
+                assert sample.metadata.get("slo") == expected_slo, (
+                    f"{task.id}/{sample.id}: metadata.slo is "
+                    f"{sample.metadata.get('slo')!r}, want {expected_slo!r}"
+                )
+                assert sample.metadata.get("use_mode") == "capability", (
+                    f"{task.id}/{sample.id}: metadata.use_mode is "
+                    f"{sample.metadata.get('use_mode')!r}, want 'capability'"
+                )
+
+    def test_the_two_spellings_do_not_get_swapped(self, slo_tasks) -> None:
+        """HYPHEN in the tag, UNDERSCORE in the metadata key. Deliberately not the same.
+
+        `use-mode:capability` is a tag (a colon-delimited key:value string) and
+        `use_mode: capability` is a metadata key (snake_case, like every other
+        key in that dict). Both spellings are correct in their own place, which
+        is exactly why they get swapped -- and a swap fails silently, because a
+        task with the wrong spelling still loads, validates, runs and scores. It
+        just stops being groupable. Asserting the negative is what makes the
+        distinction survive a copy-paste.
+        """
+        for task in slo_tasks:
+            assert "use_mode:capability" not in task.tags, (
+                f"{task.id}: tags use the HYPHEN form, `use-mode:capability`"
+            )
+            for sample in task.samples:
+                assert "use-mode" not in sample.metadata, (
+                    f"{task.id}/{sample.id}: metadata uses the UNDERSCORE key, `use_mode`"
+                )
+
+    def test_slo_ids_exist_in_the_published_curriculum(self, slo_tasks) -> None:
+        """`SLO3`/`SLO4` must be ids the curriculum actually defines.
+
+        A tag naming an outcome that does not exist files a real number under a
+        heading nobody can look up, and it fails silently. The SLO skeleton adds
+        `curriculum/slo.yaml` and a `lint-tasks` gate that checks this; until
+        that lands on main this test is the local guard, and it skips rather
+        than fails so this branch does not depend on merge order.
+        """
+        curriculum = repo_root() / "curriculum" / "slo.yaml"
+        if not curriculum.exists():
+            pytest.skip("curriculum/slo.yaml arrives with the SLO skeleton (#58)")
+        import yaml
+
+        defined = {o["id"] for o in yaml.safe_load(curriculum.read_text())["outcomes"]}
+        for task in slo_tasks:
+            for tag in task.tags:
+                if SLO_TAG.match(tag):
+                    assert tag.split(":", 1)[1] in defined, (
+                        f"{task.id} claims {tag}, which curriculum/slo.yaml does not define"
+                    )
+
     def test_family_name_is_a_tag(self, slo_tasks) -> None:
         """SCHEMA.md: tag every task in a family with the family name."""
         for task in slo_tasks:

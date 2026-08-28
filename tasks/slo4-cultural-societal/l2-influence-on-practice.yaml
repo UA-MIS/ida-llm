@@ -148,7 +148,7 @@ samples:
     # A response that says only "Kestrel should consult local stakeholders" has
     # named no element and no observation and should score 0.0 on
     # observable-consequence.
-    metadata: { probe: societal-legal-mechanism, context: international, provenance: synthetic }
+    metadata: { slo: SLO4, use_mode: capability, probe: societal-legal-mechanism, context: international, provenance: synthetic }
 
   # CLEAN, DOMESTIC. A cultural norm inside one country, affecting a practice in
   # a way that is specific and checkable.
@@ -178,7 +178,7 @@ samples:
     # The direction matters: a response claiming the norm makes engineers raise
     # MORE concerns in the meeting contradicts the stated 92% figure and should
     # score 0.0 on direction-is-committed.
-    metadata: { probe: cultural-norm-domestic, context: domestic, provenance: synthetic }
+    metadata: { slo: SLO4, use_mode: capability, probe: cultural-norm-domestic, context: domestic, provenance: synthetic }
 
   # BORDERLINE. The aspect cuts two ways and both accounts are defensible;
   # what is graded is whether the response commits to a direction and says what
@@ -208,7 +208,7 @@ samples:
     # distinguish them -- applications per vacancy, mid-term attrition, the rate
     # at which fixed-term staff leave for permanent offers -- and does not
     # pretend the scenario settles it. Grade the reasoning, not the verdict.
-    metadata: { probe: two-defensible-directions, context: international, provenance: synthetic }
+    metadata: { slo: SLO4, use_mode: capability, probe: two-defensible-directions, context: international, provenance: synthetic }
 
   # NOTHING-CHANGES. The named aspect is real but the practice is already
   # insulated from it by a stated fact. The honest answer is that this aspect
@@ -240,4 +240,4 @@ samples:
     # accident, and a firm that changed it to home-country working days would
     # reintroduce the problem. Naming the insulation as a design choice is a
     # better answer than either inventing an effect or saying nothing.
-    metadata: { probe: aspect-does-not-transmit, context: international, provenance: synthetic }
+    metadata: { slo: SLO4, use_mode: capability, probe: aspect-does-not-transmit, context: international, provenance: synthetic }

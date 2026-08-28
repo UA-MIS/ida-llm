@@ -171,7 +171,7 @@ samples:
     # hold, though it interacts with the cultural norms because a rating
     # disclosed among colleagues who will work together for another decade
     # carries differently than among colleagues who will not.
-    metadata: { probe: both-categories-explicit, context: international, provenance: synthetic }
+    metadata: { slo: SLO4, use_mode: capability, probe: both-categories-explicit, context: international, provenance: synthetic }
 
   # CLEAN, DOMESTIC. Same analysis, no border. This sample exists because a
   # family whose scenarios are all cross-border teaches that "cultural" means
@@ -202,7 +202,7 @@ samples:
     # confused a symptom with a cause.
     # A response that says this scenario has no cultural dimension because it is
     # single-country should score 0.0 on applies-to-domestic-scenarios-too.
-    metadata: { probe: domestic-and-dense, context: domestic, provenance: synthetic }
+    metadata: { slo: SLO4, use_mode: capability, probe: domestic-and-dense, context: domestic, provenance: synthetic }
 
   # TRAP. The scenario is cross-border and reads as though culture explains the
   # outcome, but every fact it supplies is structural: a societal-aspect
@@ -234,7 +234,7 @@ samples:
     # on it should lose no-appeal-to-national-stereotype -- and this is the
     # sample that most directly rehearses rung 5, where evaluating exactly this
     # kind of attribution is the whole task.
-    metadata: { probe: structural-dressed-as-cultural, context: international, provenance: synthetic }
+    metadata: { slo: SLO4, use_mode: capability, probe: structural-dressed-as-cultural, context: international, provenance: synthetic }
 
   # THIN, DOMESTIC. Very little genuine cultural or societal content, and the
   # honest list is short. Without this sample the rubric rewards a model that
@@ -263,4 +263,4 @@ samples:
     # character, community identity, the symbolism of the location -- should
     # lose recall-of-operative-aspects and no-appeal-to-national-stereotype
     # both, since nothing in the scenario supports any of it.
-    metadata: { probe: little-to-find, context: domestic, provenance: synthetic }
+    metadata: { slo: SLO4, use_mode: capability, probe: little-to-find, context: domestic, provenance: synthetic }

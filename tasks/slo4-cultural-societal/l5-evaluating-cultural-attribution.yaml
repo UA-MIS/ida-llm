@@ -182,7 +182,7 @@ samples:
     # culture programme is premature. A response that accepts the vice-
     # president's account and discusses how to transplant craftsmanship has
     # laundered an unexamined claim into an analysis.
-    metadata: { probe: measurement-artefact, verdict_direction: cultural-claim-weak, provenance: synthetic }
+    metadata: { slo: SLO4, use_mode: capability, probe: measurement-artefact, verdict_direction: cultural-claim-weak, provenance: synthetic }
 
   # CULTURE IS THE BEST EXPLANATION. The scenario rules out the structural
   # rivals one by one, and the cultural account is what survives. This sample
@@ -226,7 +226,7 @@ samples:
     # the explanation is the best answer. Rejecting the explanation outright
     # should score 0.0 on calibrated-verdict, and this is the sample that
     # catches a model whose verdict does not depend on the evidence.
-    metadata: { probe: culture-is-the-answer, verdict_direction: cultural-claim-strong, provenance: synthetic }
+    metadata: { slo: SLO4, use_mode: capability, probe: culture-is-the-answer, verdict_direction: cultural-claim-strong, provenance: synthetic }
 
   # UNDERDETERMINED. The honest verdict is that the scenario does not settle it,
   # and the value of the response is in naming the test. A response that reaches
@@ -260,7 +260,7 @@ samples:
     # A response that confidently rejects the cultural explanation is as
     # miscalibrated as one that accepts it, and this sample is here to catch the
     # first as much as the second.
-    metadata: { probe: insufficient-evidence, verdict_direction: undetermined, provenance: synthetic }
+    metadata: { slo: SLO4, use_mode: capability, probe: insufficient-evidence, verdict_direction: undetermined, provenance: synthetic }
 
   # SELECTION EFFECT. The comparison that generated the cultural claim is
   # between groups that were never comparable, and the scenario says how they
@@ -299,4 +299,4 @@ samples:
     # A response that names it has understood the structure of the problem; a
     # response that only says "correlation is not causation" has not, because it
     # has not said what to correlate instead.
-    metadata: { probe: selection-not-treatment, verdict_direction: cultural-claim-weak, provenance: synthetic }
+    metadata: { slo: SLO4, use_mode: capability, probe: selection-not-treatment, verdict_direction: cultural-claim-weak, provenance: synthetic }
