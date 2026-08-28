@@ -111,15 +111,15 @@ QUESTIONS: list[IntakeQuestion] = [
             ),
             IntakeOption(
                 value="researcher", label="Research", detail="Papers, data, grants, literature."
-            ),
-            IntakeOption(value="teacher"+"researcher", label="Both", detail="We will ask about each in turn."),
+            ),  
+            IntakeOption(value="teacher + researcher", label="Both", detail="We will ask about each in turn."),
         ],
     ),
     IntakeQuestion(
         id="beneficiary",
         prompt="Is this for your own work, or for your students to use?",
         why_it_matters="A tool you use yourself and a tool you put in front of students need different settings, different guardrails, and sometimes a different model.",
-        depends_on=IntakeCondition(question_id="role", values=["teacher"]),
+        depends_on=IntakeCondition(question_id="role", values=["teacher", "teacher+researcher"]),
         options=[
             IntakeOption(
                 value="for_me", 
