@@ -1,0 +1,125 @@
+# slo3-global-knowledge, rung 1 of 6 -- the floor.
+#
+# SLO 3 (Global Perspective): "students demonstrate knowledge of global factors,
+# global systems, & cross-cultural variations and their role in business
+# decisions." This family is the VERIFIABLE half of SLO 3: global-systems
+# knowledge expressed as a number a program can check. The subjective half --
+# reasoning about the ROLE a global factor plays in a decision -- lives in
+# tasks/slo3-global-analysis/, because SCHEMA.md requires one kind per family.
+# Both families carry the tag `slo:SLO3`, which is what groups them.
+#
+# What this rung measures: can the model apply ONE global-business operation it
+# has been handed all the inputs for? Its job is to prove that a low score
+# higher up the ladder is about difficulty and not about the answer format
+# being unparseable. If every model scores 1.00 here, rung 1 is working.
+#
+# Every country, firm, currency and rate below is INVENTED. That is deliberate
+# and not merely hygiene: real tariff rates and real spot rates move, so an item
+# keyed to one would silently start marking correct answers wrong. Marenna
+# (currency: the dinar, MRD) and Costa Verde (currency: the peso, CVP) recur
+# across the whole family.
+version: 1
+id: slo3-global-knowledge/l1-global-cost-basics
+title: Global business figures -- single-step conversions, duties and shares
+description: >
+  Rung 1 of the slo3-global-knowledge ladder, and its floor. One global-business
+  operation per item, with every input supplied: a currency conversion, an
+  ad valorem duty, a per-unit freight allocation, a working-hours overlap across
+  two time zones, and a regional-value-content share. Each item is a single step
+  once the right quantities are identified.
+
+  This rung exists so that a poor score on rungs 2-6 can be attributed to
+  difficulty rather than to a broken prompt format.
+
+  Provenance: every country, firm, currency, rate and figure is synthetic,
+  invented for this file. No real tariff schedule, exchange rate, company or
+  trade agreement is referenced, and no textbook or question-bank content is
+  reproduced.
+kind: verifiable
+domain: international-business
+system_prompt: >-
+  You are a business analyst preparing figures for an international-operations
+  briefing. Use exactly the convention, rate or table row the item names. Every
+  reference value you need is supplied in the item; do not substitute
+  real-world data. Round to two decimal places. Put the final numeric answer
+  alone on the last line, with no units, no currency symbol, no label and no
+  other text on that line.
+scorer:
+  kind: numeric_match
+  # Two decimal places -> at most 0.005 of rounding error, so 0.01 is the
+  # smallest tolerance that never fails a correctly-rounded answer. The
+  # smallest distance to a nearest-wrong-method answer in this file is 1.00
+  # (overlap-hours-across-time-zones is 6 hours away; the tightest money item is
+  # freight-cost-per-unit, whose inverted form is three orders of magnitude
+  # off). Every gap here is at least 100x the tolerance.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [slo:SLO3, use_mode:capability, slo3-global-knowledge, ladder-l1, international-business, verifiable]
+samples:
+  - id: invoice-converted-at-spot
+    input: >-
+      Kestrel Foods receives an invoice from a supplier in the Republic of
+      Marenna for 4,250 Marenna dinar (MRD). The spot exchange rate is
+      1 US dollar = 8.50 MRD. What is the invoice worth in US dollars?
+    # 4250 / 8.50 = 500.00 exactly.
+    # The nearest wrong method is multiplying instead of dividing:
+    # 4250 * 8.50 = 36,125 -- 35,625 away, and obviously absurd, which is what
+    # a floor item should be.
+    target: "500"
+    metadata: { skill: spot-rate-conversion, factor: exchange-rates, provenance: synthetic }
+
+  - id: ad-valorem-duty-on-customs-value
+    input: >-
+      A consignment entering Marenna has a declared customs value of 12,400 US
+      dollars. Marenna applies an ad valorem import duty of 6.5% of the customs
+      value. What is the duty payable, in US dollars?
+    # 12,400 * 0.065 = 806.00 exactly.
+    # Reading "6.5%" as a flat 6.5 dollars gives 6.50 -- 799.50 away.
+    # Applying 65% (a decimal-place slip) gives 8,060 -- 7,254 away.
+    target: "806"
+    metadata: { skill: ad-valorem-duty, factor: trade-policy, provenance: synthetic }
+
+  - id: freight-cost-per-unit
+    input: >-
+      Kestrel Foods shipped 3,200 units from Marenna in a single ocean
+      container. The total ocean freight charge for the shipment was 18,560 US
+      dollars. What was the ocean freight cost per unit, in US dollars?
+    # 18,560 / 3,200 = 5.80 exactly.
+    # Inverting the division gives 3,200 / 18,560 = 0.1724 -- 5.63 away.
+    target: "5.8"
+    metadata: { skill: freight-allocation, factor: global-logistics, provenance: synthetic }
+
+  - id: overlap-hours-across-time-zones
+    input: >-
+      Kestrel Foods runs one office in Marenna, which observes UTC+3, and one in
+      Costa Verde, which observes UTC-5. The Marenna office works 09:00 to 17:00
+      Marenna local time. The Costa Verde office works 08:00 to 16:00 Costa
+      Verde local time. Neither country observes daylight saving. How many whole
+      hours of the working day do the two offices have in common?
+    # Marenna 09:00-17:00 at UTC+3 is 06:00-14:00 UTC.
+    # Costa Verde 08:00-16:00 at UTC-5 is 13:00-21:00 UTC.
+    # The intersection is 13:00-14:00 UTC = 1 hour.
+    # The nearest wrong method is comparing the LOCAL clock times as if they
+    # were the same zone: 09:00-16:00 = 7 hours -- 6 away, 600x the tolerance.
+    # That is precisely the error the item exists to catch, and it is a global
+    # factor in the plainest sense: it constrains how a distributed team can be
+    # staffed.
+    target: "1"
+    metadata: { skill: time-zone-overlap, factor: global-operations, provenance: synthetic }
+
+  - id: regional-value-content-share
+    input: >-
+      Under the Marenna-Costa Verde trade agreement, a good's regional value
+      content is the value of components sourced inside the bloc expressed as a
+      percentage of the good's total ex-works value. A Kestrel Foods appliance
+      has an ex-works value of 21,000 US dollars, of which 14,700 US dollars is
+      components sourced inside the bloc. What is its regional value content, as
+      a percentage?
+    # 14,700 / 21,000 = 0.70 -> 70.00 percent.
+    # Using the non-bloc remainder instead gives 6,300 / 21,000 = 30 -- 40 away.
+    # Inverting gives 21,000 / 14,700 = 142.86 -- 72.86 away.
+    target: "70"
+    metadata: { skill: regional-value-content, factor: trade-agreements, provenance: synthetic }

@@ -1,0 +1,200 @@
+# slo3-global-knowledge, rung 6 of 6 -- the top of the ladder.
+#
+# What this rung adds over rung 5: the five items are CHAINED. They are stages
+# of one sourcing decision, an error made at an early stage propagates into
+# every later one, and the last item inverts the whole chain -- it asks what
+# exchange rate would make the two countries' landed costs equal, which cannot
+# be reached without having built the chain correctly first.
+#
+# ALL FIVE SAMPLES SHARE ONE SCENARIO. It is restated in full in every `input`
+# because a sample is a standalone prompt and nothing carries between them, but
+# a REVIEWER checks one scenario, not five: the block below is derived once here
+# and each sample's comment only picks up from that derivation.
+#
+#   SHARED SCENARIO, DERIVED ONCE
+#   40,000 units per year.
+#   Marenna:     ex-works 12.00 MRD/unit; spot 8.00 MRD per USD;
+#                freight 14,000 USD/yr; duty 8% of customs value,
+#                customs value = ex-works value in USD + freight.
+#     ex-works total = 40,000 * 12.00       = 480,000 MRD
+#     ex-works in USD = 480,000 / 8.00      =  60,000 USD
+#     customs value   = 60,000 + 14,000     =  74,000 USD
+#     duty            = 0.08 * 74,000       =   5,920 USD
+#     total landed    = 74,000 + 5,920      =  79,920 USD
+#   Costa Verde: ex-works 4.50 CVP/unit; spot 4.00 CVP per USD;
+#                freight 9,000 USD/yr; 0% duty under the trade agreement.
+#     ex-works total = 40,000 * 4.50        = 180,000 CVP
+#     ex-works in USD = 180,000 / 4.00      =  45,000 USD
+#     total landed    = 45,000 + 9,000      =  54,000 USD
+#     unit landed     = 54,000 / 40,000     =    1.35 USD
+#   Cost advantage of Costa Verde = 79,920 - 54,000 = 25,920 USD.
+#
+# This is the rung that should have a ceiling. If a frontier model scores 1.00
+# on every rung of this family the ladder has stopped discriminating and a rung
+# 7 is owed.
+version: 1
+id: slo3-global-knowledge/l6-chained-sourcing-decision
+title: Global business figures -- a chained two-country sourcing comparison
+description: >
+  Rung 6 of the slo3-global-knowledge ladder, and the top of it. Five items work
+  through one global sourcing decision between two countries whose ex-works
+  prices, currencies, freight costs and duty treatment all differ: the customs
+  value in the dutiable country, its total landed cost, the other country's
+  landed cost per unit, the annual cost advantage between them, and finally the
+  exchange rate at which the advantage would disappear.
+
+  The items are chained, so an error in an early stage propagates. The last item
+  inverts the chain and is the hardest thing in the family: it solves for the
+  spot rate that equalises the two countries' landed costs, which requires the
+  duty to be handled correctly on a quantity that is itself unknown.
+
+  Provenance: every country, firm, currency, rate, freight charge and figure is
+  synthetic, invented for this file. No real tariff schedule, exchange rate,
+  company or trade agreement is referenced, and no textbook or question-bank
+  content is reproduced.
+kind: verifiable
+domain: international-business
+system_prompt: >-
+  You are a business analyst preparing figures for an international-operations
+  briefing. Use exactly the convention, rate or table row the item names. Every
+  reference value you need is supplied in the item; do not substitute
+  real-world data. Round to two decimal places. Put the final numeric answer
+  alone on the last line, with no units, no currency symbol, no label and no
+  other text on that line.
+scorer:
+  kind: numeric_match
+  # Two decimal places -> 0.005 worst-case rounding; 0.01 admits it. Every
+  # intermediate in the shared scenario is exact except the final item's
+  # 13.3333..., which is not near a .xx5 boundary, so no key here is sensitive
+  # to where a solver rounds. The smallest distance to a wrong-method answer is
+  # 1.33 (equalising-spot-rate with the duty dropped), 133x the tolerance.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [slo:SLO3, use_mode:capability, slo3-global-knowledge, ladder-l6, international-business, verifiable, chained]
+samples:
+  # STAGE 1 of the chain. Everything downstream depends on this number.
+  - id: marenna-customs-value
+    input: >-
+      Kestrel Foods will buy 40,000 units per year and is comparing two supply
+      countries. Sourcing from Marenna: the ex-works price is 12.00 Marenna
+      dinar per unit and the spot rate is 8.00 dinar per US dollar; ocean
+      freight is 14,000 US dollars per year in total; Marenna exports attract an
+      import duty of 8% of the customs value, and the customs value is defined
+      as the ex-works value in US dollars plus freight. Sourcing from Costa
+      Verde: the ex-works price is 4.50 Costa Verde pesos per unit and the spot
+      rate is 4.00 pesos per US dollar; ocean freight is 9,000 US dollars per
+      year in total; the goods qualify for a 0% preferential duty rate under a
+      trade agreement. What is the customs value of the annual Marenna
+      consignment, in US dollars?
+    # From the shared derivation: 60,000 + 14,000 = 74,000.
+    # Omitting freight from the customs value -- the FOB-basis convention, which
+    # this scenario explicitly does not use -- gives 60,000: 14,000 away.
+    # Multiplying by the spot rate instead of dividing gives 3,840,000.
+    target: "74000"
+    metadata: { skill: customs-valuation, stage: one, factor: trade-policy, provenance: synthetic }
+
+  # STAGE 2. Depends on stage 1; an error there lands here scaled by 1.08.
+  - id: marenna-total-landed-cost
+    input: >-
+      Kestrel Foods will buy 40,000 units per year and is comparing two supply
+      countries. Sourcing from Marenna: the ex-works price is 12.00 Marenna
+      dinar per unit and the spot rate is 8.00 dinar per US dollar; ocean
+      freight is 14,000 US dollars per year in total; Marenna exports attract an
+      import duty of 8% of the customs value, and the customs value is defined
+      as the ex-works value in US dollars plus freight. Sourcing from Costa
+      Verde: the ex-works price is 4.50 Costa Verde pesos per unit and the spot
+      rate is 4.00 pesos per US dollar; ocean freight is 9,000 US dollars per
+      year in total; the goods qualify for a 0% preferential duty rate under a
+      trade agreement. What is the total annual landed cost of sourcing from
+      Marenna, in US dollars -- that is, the customs value plus the duty?
+    # From the shared derivation: 74,000 + 5,920 = 79,920.
+    # Levying the duty on the ex-works value only gives 74,000 + 4,800 =
+    # 78,800 -- 1,120 away.
+    # Omitting the duty gives 74,000 -- 5,920 away.
+    target: "79920"
+    metadata: { skill: landed-cost-buildup, stage: two, factor: global-sourcing, provenance: synthetic }
+
+  # STAGE 3. The other branch of the comparison, and the only per-unit figure
+  # asked for -- 54,000 / 40,000 is exactly 1.35, so no rounding is involved.
+  - id: costa-verde-unit-landed-cost
+    input: >-
+      Kestrel Foods will buy 40,000 units per year and is comparing two supply
+      countries. Sourcing from Marenna: the ex-works price is 12.00 Marenna
+      dinar per unit and the spot rate is 8.00 dinar per US dollar; ocean
+      freight is 14,000 US dollars per year in total; Marenna exports attract an
+      import duty of 8% of the customs value, and the customs value is defined
+      as the ex-works value in US dollars plus freight. Sourcing from Costa
+      Verde: the ex-works price is 4.50 Costa Verde pesos per unit and the spot
+      rate is 4.00 pesos per US dollar; ocean freight is 9,000 US dollars per
+      year in total; the goods qualify for a 0% preferential duty rate under a
+      trade agreement. What is the landed cost PER UNIT of sourcing from Costa
+      Verde, in US dollars?
+    # From the shared derivation: 54,000 / 40,000 = 1.35 exactly.
+    # Omitting freight gives 45,000 / 40,000 = 1.125 -> 1.13: 0.22 away.
+    # Applying Marenna's 8% duty to Costa Verde, ignoring the preferential rate
+    # -- the trade-agreement fact the item turns on -- gives 58,320 / 40,000 =
+    # 1.458 -> 1.46: 0.11 away, still 11x the tolerance.
+    target: "1.35"
+    metadata: { skill: preferential-rate-application, stage: three, factor: trade-agreements, provenance: synthetic }
+
+  # STAGE 4. The first genuinely chained item: it needs stage 2 AND stage 3.
+  - id: annual-cost-advantage
+    input: >-
+      Kestrel Foods will buy 40,000 units per year and is comparing two supply
+      countries. Sourcing from Marenna: the ex-works price is 12.00 Marenna
+      dinar per unit and the spot rate is 8.00 dinar per US dollar; ocean
+      freight is 14,000 US dollars per year in total; Marenna exports attract an
+      import duty of 8% of the customs value, and the customs value is defined
+      as the ex-works value in US dollars plus freight. Sourcing from Costa
+      Verde: the ex-works price is 4.50 Costa Verde pesos per unit and the spot
+      rate is 4.00 pesos per US dollar; ocean freight is 9,000 US dollars per
+      year in total; the goods qualify for a 0% preferential duty rate under a
+      trade agreement. By how many US dollars per year is the cheaper country
+      cheaper, on total annual landed cost?
+    # From the shared derivation: 79,920 - 54,000 = 25,920.
+    # Comparing ex-works values only -- ignoring freight and duty, that is,
+    # ignoring every global factor in the scenario -- gives 60,000 - 45,000 =
+    # 15,000: 10,920 away. That is the comparison a naive buyer makes and it
+    # understates the advantage by 42%.
+    # Comparing customs values gives 74,000 - 54,000 = 20,000: 5,920 away.
+    target: "25920"
+    metadata: { skill: chained-comparison, stage: four, factor: global-sourcing, provenance: synthetic }
+
+  # STAGE 5. The hardest item in the family: the chain inverted. The unknown
+  # sits inside the quantity the duty is levied on, so the duty cannot be
+  # applied as an afterthought.
+  - id: equalising-spot-rate
+    input: >-
+      Kestrel Foods will buy 40,000 units per year and is comparing two supply
+      countries. Sourcing from Marenna: the ex-works price is 12.00 Marenna
+      dinar per unit and the spot rate is 8.00 dinar per US dollar; ocean
+      freight is 14,000 US dollars per year in total; Marenna exports attract an
+      import duty of 8% of the customs value, and the customs value is defined
+      as the ex-works value in US dollars plus freight. Sourcing from Costa
+      Verde: the ex-works price is 4.50 Costa Verde pesos per unit and the spot
+      rate is 4.00 pesos per US dollar; ocean freight is 9,000 US dollars per
+      year in total; the goods qualify for a 0% preferential duty rate under a
+      trade agreement. Holding the Marenna ex-works price, the freight charge
+      and the duty rate constant, at what spot rate -- in Marenna dinar per US
+      dollar -- would Marenna's total annual landed cost exactly equal Costa
+      Verde's?
+    # Let x be dinar per US dollar. The Marenna ex-works total is 480,000 dinar
+    # regardless of x, so the ex-works value in USD is 480,000 / x.
+    #   (480,000 / x + 14,000) * 1.08 = 54,000       <- Costa Verde's total
+    #    480,000 / x + 14,000         = 50,000       <- 54,000 / 1.08, exact
+    #    480,000 / x                  = 36,000
+    #                               x = 13.3333... -> 13.33
+    # Sanity: a HIGHER dinar-per-dollar rate is a WEAKER dinar, which makes
+    # Marenna cheaper -- so a rate above the current 8.00 is the right
+    # direction, and 13.33 is a 40% depreciation. A model that returns something
+    # below 8.00 has the direction backwards.
+    # Dropping the duty from the equation gives 480,000 / x = 40,000 and
+    # x = 12.00 -- 1.33 away, 133x the tolerance.
+    # Setting Marenna's CUSTOMS value rather than its LANDED cost equal to
+    # 54,000 gives the same 12.00.
+    # 13.3333... is not near a .xx5 boundary.
+    target: "13.33"
+    metadata: { skill: inverted-chain-solve, stage: five, factor: exchange-rate-sensitivity, provenance: synthetic }

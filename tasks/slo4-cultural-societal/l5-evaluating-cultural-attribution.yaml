@@ -1,0 +1,302 @@
+# slo4-cultural-societal, rung 5 of 5 -- the top of the ladder.
+#
+# WHY THIS RUNG IS THE POINT OF THE FAMILY.
+# SLO 4's verb is "EVALUATE": students evaluate how cultural and societal
+# aspects influence business decisions and practices. Rungs 1 to 4 ask the model
+# to identify aspects, trace them, compare contexts and decide between them --
+# all of which take the cultural account as given. Evaluating means asking
+# whether the cultural account is TRUE, and that is a different and harder
+# thing.
+#
+# Somebody in each scenario below has explained a business outcome by appealing
+# to culture. Sometimes they are right. Usually there is a structural
+# explanation -- an incentive, a rule, a queue, a selection effect -- that fits
+# the same facts and was never considered, because "it is cultural" is a
+# comfortable place for an investigation to stop. The task is to say which, and
+# to say what evidence would settle it.
+#
+# THE TWO FAILURE MODES, AND WHY BOTH ARE SCORED.
+# A model can fail here by credulity -- accepting the cultural claim and
+# elaborating it, which is how a stereotype gets laundered into an analysis. It
+# can also fail by reflex -- debunking every cultural claim it is shown, which
+# is not evaluation either, and which would score well against a rubric that
+# only punished credulity. Sample two is a case where culture IS the best
+# available explanation, and it is in the file specifically so that reflexive
+# debunking cannot score 1.00 across it. `calibrated-verdict` is what reads
+# both directions.
+#
+# If a frontier model scores 1.00 on every rung of this family, this is the rung
+# to harden first: add a scenario where the cultural claim is partly right, and
+# the structural factor explains its magnitude but not its existence.
+version: 1
+id: slo4-cultural-societal/l5-evaluating-cultural-attribution
+title: Cultural and societal perspective -- evaluating whether a cultural explanation is the right one
+description: >
+  Rung 5 of the slo4-cultural-societal ladder, and the top of it. In each
+  scenario somebody has explained a business outcome by appealing to culture.
+  The task is to evaluate that explanation: state the claim, generate the rival
+  explanations the facts also support, say what evidence would discriminate
+  between them, and reach a verdict calibrated to how much the scenario actually
+  establishes. In one of the four scenarios the cultural explanation is the best
+  one available, so a response that debunks every cultural claim scores no
+  better than one that accepts every claim.
+
+  It is the top rung because it is the only one that asks whether the cultural
+  account is true rather than what follows from it, which is what SLO 4's verb
+  "evaluate" requires.
+
+  Every society in this family is invented and every cultural or societal fact a
+  scenario depends on is stated in the scenario. No claim about any real
+  national culture is asserted or rewarded.
+
+  This is a subjective task. With no judge model configured it will load, run
+  and store transcripts, and report no score -- see docs/llm-judge.md.
+
+  Provenance: every firm, country, society and scenario is synthetic, invented
+  for this file. No real company, country or culture is described, no student
+  work is used, and no textbook or question-bank content is reproduced.
+kind: subjective
+domain: organisational-behaviour
+system_prompt: >-
+  You are advising the management team of a mid-sized firm. In each scenario
+  somebody has explained an outcome by appealing to culture. Evaluate that
+  explanation. State the claim being made, set out the other explanations the
+  stated facts would also support, say what specific evidence would tell those
+  explanations apart, and give your verdict on how well supported the cultural
+  explanation is. Where the cultural explanation is the best one available, say
+  so. Use only what the scenario states, and do not supply general claims about
+  any national culture as though they were evidence.
+scorer:
+  kind: llm_judge
+  rubric_id: slo4-cultural-societal-attribution-v1
+rubric:
+  id: slo4-cultural-societal-attribution-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: states-the-claim-precisely
+      description: |-
+        Does the response identify what is actually being asserted -- which
+        outcome is being explained, and by which cultural feature -- rather than
+        responding to the topic?
+
+        1.0 -- names the outcome and the cultural feature offered to explain it.
+        0.5 -- names one of the two.
+        0.0 -- responds to the general subject without isolating the claim.
+      weight: 2.0
+    - name: generates-rival-explanations
+      description: |-
+        Does the response produce alternative explanations that the stated facts
+        support -- incentives, rules, queues, sampling, measurement, selection --
+        rather than only assessing the cultural one on its own terms?
+
+        1.0 -- at least two rival explanations are given and each is grounded in
+               a fact the scenario states.
+        0.5 -- one rival explanation is given, or two are given but at least one
+               rests on a fact the scenario does not supply.
+        0.0 -- no rival explanation is offered, or the rivals are generic
+               possibilities with no anchor in the scenario.
+      weight: 3.0
+    - name: names-discriminating-evidence
+      description: |-
+        Does the response say what specific observation would distinguish the
+        cultural explanation from its rivals -- evidence that would come out
+        differently depending on which is true?
+
+        1.0 -- names at least one observation, comparison or record that would
+               come out differently under the competing explanations.
+        0.5 -- calls for more data or further investigation without saying what
+               would be diagnostic.
+        0.0 -- names no evidence, or names evidence consistent with every
+               explanation on the table.
+      weight: 3.0
+    - name: calibrated-verdict
+      description: |-
+        Is the verdict proportionate to what the scenario establishes -- and
+        does the response endorse the cultural explanation where it is the best
+        one available? This criterion reads in BOTH directions: reflexively
+        rejecting cultural explanations is as poorly calibrated as accepting
+        them.
+
+        1.0 -- the verdict matches the evidence: the cultural claim is rejected
+               where a stated fact undercuts it, endorsed where the scenario
+               rules out the rivals, and left open where the scenario does not
+               settle it.
+        0.5 -- the verdict leans the right way but is stated with more or less
+               confidence than the stated facts carry.
+        0.0 -- the cultural claim is accepted although a stated fact undercuts
+               it, or rejected although the scenario rules out the rivals, or
+               every claim is treated the same way regardless of the evidence.
+      weight: 3.0
+    - name: no-appeal-to-national-stereotype
+      description: |-
+        Does the response avoid introducing general claims about how people in a
+        country, region, ethnic or religious group behave as though they were
+        evidence? Scored as a reasoning defect: such a claim cannot be checked
+        against the scenario, so it cannot support a verdict about it.
+
+        1.0 -- no generalisation about a group is used as evidence; claims about
+               the society are traceable to stated facts.
+        0.5 -- a generalisation appears but is flagged as an assumption and does
+               not carry the verdict.
+        0.0 -- a generalisation about a group is asserted as evidence and
+               supports part of the verdict -- including where it is used to
+               SUPPORT the cultural explanation.
+      weight: 2.0
+tags: [slo:SLO4, use_mode:capability, slo4-cultural-societal, ladder-l5, organisational-behaviour, subjective, not-yet-scorable]
+samples:
+  # STRUCTURAL EXPLANATION DOMINATES. The cultural claim is offered by a senior
+  # person, sounds reasonable, and is undercut by two facts sitting in the same
+  # paragraph. This is the sample that separates evaluating from elaborating.
+  - id: incentive-explains-what-culture-was-blamed-for
+    input: >-
+      Kestrel Foods' Aldenmark plant reports quality defects at roughly a fifth
+      the rate of its home-country plants. Kestrel's operations vice-president
+      has told the board this reflects "a strong local culture of craftsmanship
+      and personal responsibility for quality" in Aldenmark, and has proposed a
+      culture programme to import it to the home plants. The following are also
+      true. At the Aldenmark plant, defects are recorded by the operator who
+      finds them and a team bonus is reduced by a fixed amount for each defect
+      recorded; at the home plants, defects are recorded by an independent
+      inspection team and no bonus is affected. Aldenmark's warranty claim rate,
+      measured after sale by the same group process in both countries, is within
+      2% of the home plants'. Kestrel's group quality director has never
+      compared the two recording processes. What should the board make of the
+      vice-president's explanation?
+    # Author's note: the cultural claim is undercut by facts already on the
+    # table. The two plants are not measuring the same thing -- Aldenmark has
+    # self-reporting under a bonus penalty, which is an incentive to under-record;
+    # the home plants have independent inspection, which is not. And the
+    # downstream measure taken the SAME way in both countries -- warranty claims
+    # -- shows no difference at all. So the "fifth the rate" is very likely a
+    # recording artefact rather than a quality difference, and there may be no
+    # outcome here for culture to explain.
+    # Rival explanations grounded in stated facts: (a) under-recording driven by
+    # the bonus penalty, (b) the difference in who records -- operator versus
+    # independent inspector -- irrespective of the bonus.
+    # Discriminating evidence: run independent inspection at Aldenmark for a
+    # period and compare against operator-recorded defects for the same output;
+    # or compare defect categories that a warranty claim would surface against
+    # those it would not.
+    # The verdict should be that the explanation is poorly supported and the
+    # culture programme is premature. A response that accepts the vice-
+    # president's account and discusses how to transplant craftsmanship has
+    # laundered an unexamined claim into an analysis.
+    metadata: { probe: measurement-artefact, verdict_direction: cultural-claim-weak, provenance: synthetic }
+
+  # CULTURE IS THE BEST EXPLANATION. The scenario rules out the structural
+  # rivals one by one, and the cultural account is what survives. This sample
+  # exists so that reflexive debunking cannot score well across the file, and it
+  # is the sample most likely to be answered badly by a model that has learned
+  # the shape of the previous one.
+  - id: rivals-ruled-out-culture-survives
+    input: >-
+      Kestrel Foods runs the same anonymous employee suggestion scheme at its
+      Marenna and Tavros plants, with identical rules, identical rewards paid in
+      each country's currency at equivalent purchasing power, identical
+      publicity, and the same submission software. Marenna employees submit
+      suggestions at four times the Tavros rate. The two plants make the same
+      product on the same equipment, have workforces matched on age, tenure and
+      job grade, pay at the same position relative to their local labour
+      markets, and report the same scores on Kestrel's engagement survey. Both
+      countries' labour law is silent on suggestion schemes and neither has a
+      works council. Kestrel commissioned an independent research firm to run
+      structured interviews at both plants; the Tavros interviews record that
+      employees believe proposing a change to a process a colleague designed
+      implies that colleague did it badly, and that 68% of Tavros respondents
+      said they had withheld a suggestion for that reason, against 9% in
+      Marenna. Kestrel's Tavros country manager says the difference is cultural.
+      What should the board make of that explanation?
+    # Author's note: the scenario systematically removes the structural rivals.
+    # Same scheme rules, same reward in PPP terms, same software, same publicity
+    # -- so no incentive or access difference. Same product, equipment, age,
+    # tenure, grade and relative pay -- so no workforce composition difference.
+    # Same engagement scores -- so not a general morale difference. No legal or
+    # works-council difference. And the interview evidence is independently
+    # collected, quantified, and directly about the mechanism: 68% against 9%
+    # withholding for a stated reason.
+    # The cultural explanation is the best one available and the honest verdict
+    # says so. It is a claim about a norm evidenced in this workforce by
+    # independent structured interviews -- not a general claim about Tavros
+    # people -- and a response should be able to endorse it on that basis
+    # without stereotyping.
+    # Remaining rivals a strong response may still raise: the interview
+    # instrument may itself differ in how it lands in the two plants, and
+    # "withheld a suggestion" is self-report. Naming those and still endorsing
+    # the explanation is the best answer. Rejecting the explanation outright
+    # should score 0.0 on calibrated-verdict, and this is the sample that
+    # catches a model whose verdict does not depend on the evidence.
+    metadata: { probe: culture-is-the-answer, verdict_direction: cultural-claim-strong, provenance: synthetic }
+
+  # UNDERDETERMINED. The honest verdict is that the scenario does not settle it,
+  # and the value of the response is in naming the test. A response that reaches
+  # a confident verdict either way is miscalibrated.
+  - id: underdetermined-name-the-test
+    input: >-
+      Kestrel Foods' Marenna sales team's average deal size is 40% below the
+      home-country team's. Kestrel's sales director attributes this to a Marenna
+      norm of "starting small and building trust before committing", which she
+      encountered in three customer meetings. The Marenna team sells the same
+      products at the same list prices. Kestrel does not track deal size by
+      customer size in Marenna, does not know the size distribution of Marenna
+      buyers relative to home-country buyers, and its Marenna team has been
+      operating for fourteen months against the home team's twenty years.
+      Marenna's market is served by four competitors whose pricing Kestrel has
+      not surveyed. What should the board make of the sales director's
+      explanation?
+    # Author's note: the scenario deliberately supplies no evidence either way.
+    # The cultural claim rests on three meetings, which is anecdote. But the
+    # rivals are equally unevidenced: buyer size distribution is unknown, so
+    # smaller deals may simply reflect smaller customers; a fourteen-month-old
+    # team has not yet had time to land the large accounts a twenty-year-old
+    # team has; and competitor pricing is unsurveyed, so the gap may be
+    # discounting.
+    # The honest verdict is that nothing here supports any explanation, and the
+    # response's value lies in the test: segment Marenna deal size by customer
+    # size and compare like with like; compare Marenna's deal-size curve at
+    # fourteen months against the home team's own first fourteen months;
+    # survey competitor pricing. Each would come out differently under the
+    # different explanations.
+    # A response that confidently rejects the cultural explanation is as
+    # miscalibrated as one that accepts it, and this sample is here to catch the
+    # first as much as the second.
+    metadata: { probe: insufficient-evidence, verdict_direction: undetermined, provenance: synthetic }
+
+  # SELECTION EFFECT. The comparison that generated the cultural claim is
+  # between groups that were never comparable, and the scenario says how they
+  # were assembled. This is the subtlest sample: nothing is measured wrongly and
+  # no incentive is skewed -- the two populations were selected differently.
+  - id: selection-effect-behind-the-comparison
+    input: >-
+      Kestrel Foods' home-country managers who have completed international
+      assignments are promoted at twice the rate of those who have not. Kestrel's
+      head of talent has concluded that international assignments build
+      "cultural agility" that the promotion process rewards, and proposes making
+      an assignment a prerequisite for senior roles. The following are also
+      true. Assignments are allocated by nomination from a manager's own
+      director, and Kestrel's HR records show nominees' most recent performance
+      ratings averaged in the top quintile at the time of nomination. Assignments
+      require relocation, and Kestrel's own exit data show that managers with
+      caring responsibilities decline them at four times the rate of others.
+      Kestrel has never compared promotion rates between managers who were
+      nominated and went and managers who were nominated and declined. What
+      should the board make of the head of talent's conclusion?
+    # Author's note: nothing is mis-measured and no incentive is distorted. The
+    # problem is that the two groups were never comparable: assignees are
+    # nominated by their own director from the top performance quintile, so they
+    # were already on a promotion track before the assignment. The apparent
+    # effect of the assignment is partly or wholly the effect of the selection
+    # that preceded it.
+    # There is a second and more serious point available: because managers with
+    # caring responsibilities decline at four times the rate, making an
+    # assignment a PREREQUISITE would convert a selection artefact into a
+    # structural barrier with a foreseeable adverse impact -- so the proposal is
+    # not merely unsupported, it is harmful on the facts given.
+    # The discriminating evidence is stated in the scenario by its absence:
+    # compare promotion rates of managers who were nominated and went against
+    # those who were nominated and DECLINED. That comparison holds the selection
+    # constant and is the one test that would isolate the assignment's effect.
+    # A response that names it has understood the structure of the problem; a
+    # response that only says "correlation is not causation" has not, because it
+    # has not said what to correlate instead.
+    metadata: { probe: selection-not-treatment, verdict_direction: cultural-claim-weak, provenance: synthetic }

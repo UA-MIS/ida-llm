@@ -1,0 +1,269 @@
+# slo3-global-analysis, rung 4 of 4 -- the top of the ladder.
+#
+# What this rung adds over rung 3: rung 3 weighed factors that were all VISIBLE
+# in the scenario. Here the decisive consideration is not stated -- it arises
+# because the proposed action moves the firm across a boundary in a global
+# SYSTEM (a rules-of-origin threshold, a treaty's investor definition, a
+# customs-valuation basis, a tax nexus) and thereby changes a rule that was
+# previously working in the firm's favour and was never part of the discussion.
+#
+# This is the "global systems" clause of SLO 3 doing the work that the "global
+# factors" clause cannot. A factor is a thing that varies; a system is a set of
+# rules with thresholds in it, and the characteristic failure of a
+# first-order-only analysis is to optimise a variable straight across a
+# threshold.
+#
+# WHY THIS IS THE TOP RUNG. The response must supply something the prompt does
+# not contain, which means the rubric cannot be satisfied by careful reading
+# alone. It must also NOT supply things that are not there -- so
+# `identifies-the-operative-effect` and `does-not-manufacture-effects` are
+# weighted equally at 3.0, and one sample has no significant second-order effect
+# at all. If a frontier model scores 1.00 across this whole family, this is the
+# rung to make harder first.
+version: 1
+id: slo3-global-analysis/l4-systemic-second-order-effects
+title: Global perspective -- second-order consequences of crossing a threshold in a global system
+description: >
+  Rung 4 of the slo3-global-analysis ladder, and the top of it. Each scenario
+  proposes an action with a clear first-order benefit. In three of the four, the
+  action also moves the firm across a threshold in a cross-border rule system --
+  rules of origin, an investment treaty's investor definition, a customs
+  valuation basis, a permanent-establishment test -- and the consequence of
+  crossing it is not mentioned anywhere in the prompt. In the fourth there is no
+  such consequence, and saying so is the correct answer.
+
+  It is the top rung because the decisive consideration is absent from the text:
+  it has to be supplied from an understanding of how the systems interact, and
+  supplied without inventing consequences that are not there.
+
+  This is a subjective task. With no judge model configured it will load, run
+  and store transcripts, and report no score -- see docs/llm-judge.md.
+
+  Provenance: every firm, country, currency, treaty, rule and scenario is
+  synthetic, invented for this file. The rule STRUCTURES are the ordinary ones
+  found in international commerce -- value thresholds, investor definitions,
+  valuation bases -- but no real agreement, statute or company is described, no
+  student work is used, and no textbook or question-bank content is reproduced.
+kind: subjective
+domain: international-business
+system_prompt: >-
+  You are advising the management team of a mid-sized firm. Each scenario
+  proposes an action with a clear first-order benefit. Say whether the action
+  also produces a significant second-order consequence through the cross-border
+  rules the firm operates under -- and if it does, identify it, trace how it
+  arises, and say whether it outweighs the first-order benefit. If the action
+  produces no significant second-order consequence, say so plainly and do not
+  construct one. Distinguish clearly between what the scenario states and what
+  you are inferring.
+scorer:
+  kind: llm_judge
+  rubric_id: slo3-global-analysis-systemic-v1
+rubric:
+  id: slo3-global-analysis-systemic-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: identifies-the-operative-effect
+      description: |-
+        Where the scenario contains a second-order consequence arising from a
+        threshold in a cross-border rule system, does the response identify that
+        consequence -- the one that actually bears on the decision, not merely
+        some consequence?
+
+        1.0 -- names the operative consequence and the rule or threshold that
+               produces it.
+        0.5 -- gestures at the right area ("this could affect the firm's
+               treatment under the trade agreement") without naming the rule or
+               the threshold that is crossed.
+        0.0 -- names no second-order consequence, or names one that does not
+               bear on the decision, in a scenario that contains one.
+      weight: 3.0
+    - name: does-not-manufacture-effects
+      description: |-
+        Does the response refrain from asserting second-order consequences the
+        scenario gives no basis for? Weighted equally with identification on
+        purpose: a response that lists every consequence it can imagine would
+        otherwise be the highest-scoring strategy, and one of the samples has no
+        significant second-order consequence at all.
+
+        1.0 -- every consequence asserted is traceable to a rule or fact in the
+               scenario, and where there is none the response says so.
+        0.5 -- one speculative consequence is raised and is explicitly flagged
+               as speculation.
+        0.0 -- a consequence is asserted with no basis in the scenario, or the
+               response constructs a second-order story for an action that has
+               none.
+      weight: 3.0
+    - name: traces-the-threshold-crossing
+      description: |-
+        Does the response explain HOW the action moves the firm across the
+        threshold -- which quantity changes, in which direction, past which
+        line -- rather than asserting that the rule now applies differently?
+
+        1.0 -- names the quantity, its direction of movement, and the threshold
+               it crosses.
+        0.5 -- names the rule and the fact that its application changes, but not
+               the quantity or the threshold.
+        0.0 -- asserts a changed outcome with no account of what moved.
+      weight: 3.0
+    - name: compares-the-two-orders
+      description: |-
+        Does the response say whether the second-order consequence outweighs the
+        first-order benefit, and on what basis?
+
+        1.0 -- states which is larger and gives a basis -- a supplied figure, a
+               comparison of the bases the two apply to, or an explicit
+               statement of what would have to be measured to decide.
+        0.5 -- notes that both exist without indicating which dominates.
+        0.0 -- ignores the first-order benefit, or asserts a ranking with no
+               basis at all.
+      weight: 2.0
+    - name: separates-stated-from-inferred
+      description: |-
+        Does the response make clear which parts are read off the scenario and
+        which are supplied by the responder, as the prompt requires?
+
+        1.0 -- inferences are marked as inferences throughout.
+        0.5 -- the distinction is made for the main claim but not for supporting
+               ones.
+        0.0 -- inferred rules or figures are presented as facts of the scenario.
+      weight: 2.0
+tags: [slo:SLO3, use_mode:capability, slo3-global-analysis, ladder-l4, international-business, subjective, not-yet-scorable]
+samples:
+  # CLEAN. The rules-of-origin threshold is the textbook shape of this failure
+  # and every number needed to see it is supplied. This is the sample that
+  # separates "reasons about systems" from "reasons about prices".
+  - id: cheaper-input-breaks-origin-status
+    input: >-
+      Kestrel Foods assembles appliances in Costa Verde and exports them into
+      Marenna, where they enter duty-free because they qualify as originating
+      under the Marenna-Costa Verde trade agreement. The agreement grants
+      originating status to a finished appliance whose regional value content is
+      60% or above; appliances below that threshold pay the standard 11% duty on
+      their full customs value. Kestrel's appliances currently have a regional
+      value content of 64%. A supplier outside the bloc has offered a motor
+      assembly at 340,000 US dollars a year less than Kestrel's current in-bloc
+      motor supplier; switching would take Kestrel's regional value content to
+      52%. Kestrel exports 21 million US dollars of appliances into Marenna a
+      year. Proposed action: switch to the cheaper out-of-bloc motor supplier.
+    # Author's note: the first-order benefit is 340,000 a year. The second-order
+    # consequence is that the regional value content falls from 64% to 52%,
+    # crossing the 60% originating threshold, so the FINISHED appliances lose
+    # duty-free entry and attract 11% on their full customs value: 11% of
+    # 21 million is roughly 2.3 million a year, about seven times the saving.
+    # The structural point -- and the thing worth measuring -- is that the
+    # saving is earned on the COMPONENT value while the penalty is levied on the
+    # FINISHED GOOD value, so a response that notices only "duty would apply"
+    # without noticing which base it applies to has missed why the comparison is
+    # so lopsided. Every figure needed is supplied, so a response that says the
+    # comparison cannot be made has not attempted it.
+    metadata: { probe: rules-of-origin-threshold, provenance: synthetic }
+
+  # BORDERLINE. The second-order consequence is real but its magnitude is NOT
+  # supplied, so the honest answer names it and says what would have to be
+  # measured. A response that invents a magnitude to settle it has failed a
+  # different criterion than one that misses the effect.
+  - id: restructuring-forfeits-treaty-protection
+    input: >-
+      Kestrel Foods holds its Marenna assembly plant through a holding company
+      incorporated in its home country. The Marenna-home country investment
+      treaty protects investments held by home-country investors, and defines a
+      home-country investor as an entity incorporated in the home country whose
+      centre of management is also there. The treaty gives protected investors
+      access to international arbitration against expropriation and against
+      discriminatory regulation, and caps export levies on their goods at 1%.
+      Kestrel's tax advisers have proposed moving the holding company's board,
+      officers and management functions to Costa Verde, which would reduce the
+      group's annual tax charge by 900,000 US dollars. Marenna's plant has a
+      book value of 40 million US dollars. Proposed action: move the holding
+      company's centre of management to Costa Verde.
+    # Author's note: the treaty's investor definition is conjunctive --
+    # incorporation AND centre of management in the home country. Moving the
+    # centre of management fails the second limb, so the Marenna plant ceases to
+    # be a protected investment: no arbitration access, no levy cap, on a
+    # 40 million asset. The first-order benefit (900,000 a year) is supplied and
+    # the second-order cost is NOT, because it is the expected value of a
+    # low-probability, high-severity event.
+    # The honest response identifies the forfeiture, says the comparison turns
+    # on the probability of expropriation or discriminatory treatment over the
+    # holding period, and declines to invent that probability. A response that
+    # asserts "this risk is worth about X" without flagging it as an assumption
+    # should lose separates-stated-from-inferred. This is the borderline sample
+    # because two conclusions are defensible once the effect is identified.
+    metadata: { probe: treaty-investor-definition, provenance: synthetic }
+
+  # TRAP. The scenario dangles an obvious second-order story that a STATED FACT
+  # rules out -- and contains a different, quieter one that is real. A response
+  # that reaches for the obvious story fails; one that says "no second-order
+  # effect" also fails; only close reading gets both halves right.
+  - id: obvious-effect-blocked-quiet-effect-real
+    input: >-
+      Kestrel Foods sells into Marenna through an independent Marenna
+      distributor that buys on its own account, sets its own resale prices, and
+      has no authority to conclude contracts on Kestrel's behalf. Kestrel is
+      proposing to station two of its own employees in Marenna full-time. Under
+      Marenna law a foreign enterprise has a taxable permanent establishment in
+      Marenna only if it has a fixed place of business there or a dependent
+      agent habitually concluding contracts in its name; Kestrel's proposed
+      employees would work from the distributor's premises under a written
+      agreement stating they may not negotiate or conclude contracts, and
+      Kestrel's tax counsel has confirmed in writing that this does not create a
+      permanent establishment. The two employees would be product trainers, and
+      their presence is forecast to raise distributor sell-through by 12%.
+      Marenna's competition statute treats resale price maintenance as a
+      per se violation, with penalties of up to 4% of the offending party's
+      Marenna turnover. Proposed action: station the two trainers in Marenna.
+    # Author's note: the OBVIOUS second-order story is permanent establishment
+    # and Marenna tax exposure -- and it is explicitly ruled out by the stated
+    # facts: no fixed place of business of Kestrel's own, no contract-concluding
+    # authority, and confirming advice on the record. A response that makes
+    # permanent establishment its headline consequence should lose
+    # does-not-manufacture-effects, because it has asserted a consequence the
+    # scenario states does not arise.
+    # The QUIET consequence is real: putting Kestrel's own employees inside the
+    # distributor's premises, working alongside its sales staff, creates a route
+    # by which Kestrel personnel influence the distributor's resale prices -- a
+    # per se violation carrying up to 4% of Marenna turnover, in a relationship
+    # whose defence to date is that the distributor sets its own prices
+    # independently. It is a compliance and supervision consequence, not a tax
+    # one.
+    # Full credit requires both halves: ruling out the obvious effect on the
+    # stated facts AND naming the quiet one. This is the hardest sample in the
+    # family.
+    metadata: { probe: obvious-blocked-quiet-real, provenance: synthetic }
+
+  # NOTHING-IS-WRONG. No significant second-order consequence exists, and the
+  # correct answer is to say so. Without this sample the rubric would reward a
+  # model that always finds a hidden catch, and a model that always finds a
+  # hidden catch is not reasoning about systems -- it has learned the shape of
+  # the task.
+  - id: no-significant-second-order-effect
+    input: >-
+      Kestrel Foods buys a stainless fastener from two qualified suppliers, both
+      inside the Marenna-Costa Verde bloc: 60% of volume from a Marenna supplier
+      and 40% from a Costa Verde supplier. Both price in US dollars, both hold
+      the same bloc-origin status, both ship on two-week lead times, and the
+      fastener is a bloc-originating input under either source. The Costa Verde
+      supplier has offered a 3% discount to take 80% of the volume; it has
+      audited capacity for that share, and the change would not alter the
+      regional value content of any Kestrel product, since both sources already
+      count as regional content. Kestrel's contract with the Marenna supplier is
+      a one-year rolling agreement with a 60-day notice period and no minimum
+      volume commitment. Proposed action: shift the volume split to 20/80 in
+      favour of the Costa Verde supplier.
+    # Author's note: every threshold this family turns on is explicitly
+    # neutralised -- both sources are bloc-originating so regional value content
+    # is unchanged; both price in the same currency so there is no new FX
+    # exposure; lead times are identical; capacity is audited; and the exit from
+    # the Marenna contract is 60 days' notice with no minimum volume, so there
+    # is no termination exposure. The remaining consideration is ordinary
+    # supplier-concentration risk, which is a first-order commercial judgement
+    # and not a consequence of crossing any cross-border rule threshold.
+    # The correct answer is that there is no significant second-order
+    # consequence. A response that constructs one -- and the tempting
+    # constructions are "this will affect your regional value content" and
+    # "moving volume between countries creates trade exposure", both ruled out
+    # above -- should score 0.0 on does-not-manufacture-effects.
+    # A response may note the concentration point without penalty provided it
+    # does not dress it as a rules-driven second-order effect.
+    metadata: { probe: genuinely-no-second-order-effect, provenance: synthetic }

@@ -1,0 +1,243 @@
+# slo4-cultural-societal, rung 2 of 5.
+#
+# What this rung adds over rung 1: rung 1 asked WHICH cultural and societal
+# aspects bear on a practice. This rung names the aspect and asks HOW it changes
+# a specific practice -- which element of the practice moves, in which
+# direction, and what observable difference would follow.
+#
+# The degenerate response this rubric catches is the sentence that sounds like
+# an analysis and forbids no observation: "this cultural difference means the
+# firm should be sensitive to local expectations and adapt its approach." It
+# names no element, no direction and no consequence, and it fits every scenario
+# in the file. The `observable-consequence` criterion is what refuses it credit.
+version: 1
+id: slo4-cultural-societal/l2-influence-on-practice
+title: Cultural and societal perspective -- how a named aspect changes a specific practice
+description: >
+  Rung 2 of the slo4-cultural-societal ladder. Each scenario names one cultural
+  or societal aspect and one business practice, and asks how the first changes
+  the second: which element of the practice is affected, in which direction, and
+  what would be observably different as a result. Two scenarios are domestic and
+  two are cross-border.
+
+  It is its own rung because the failure mode differs from rung 1's. A response
+  can identify every aspect correctly and still say nothing about how any of
+  them operates, and generic advice to "be culturally sensitive" is the form
+  that failure usually takes.
+
+  Every society in this family is invented and every cultural or societal fact a
+  scenario depends on is stated in the scenario. No claim about any real
+  national culture is asserted or rewarded.
+
+  This is a subjective task. With no judge model configured it will load, run
+  and store transcripts, and report no score -- see docs/llm-judge.md.
+
+  Provenance: every firm, country, society and scenario is synthetic, invented
+  for this file. No real company, country or culture is described, no student
+  work is used, and no textbook or question-bank content is reproduced.
+kind: subjective
+domain: organisational-behaviour
+system_prompt: >-
+  You are advising the management team of a mid-sized firm. Each scenario names
+  one cultural or societal aspect and one business practice. Explain how that
+  aspect changes that practice: name the specific element of the practice that
+  is affected, say which way it moves, and state what would be observably
+  different if you are right. Use only what the scenario states, and do not
+  appeal to general claims about any national culture. Do not recommend generic
+  sensitivity or adaptation; say what specifically changes.
+scorer:
+  kind: llm_judge
+  rubric_id: slo4-cultural-societal-influence-v1
+rubric:
+  id: slo4-cultural-societal-influence-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: names-the-affected-element
+      description: |-
+        Does the response identify which specific element of the practice the
+        aspect changes -- a rule, a step, a criterion, a schedule, a payment
+        term, a document -- rather than saying the practice as a whole is
+        affected?
+
+        1.0 -- names one or more specific elements of the practice.
+        0.5 -- names the practice and the area of effect but no element within
+               it.
+        0.0 -- asserts the practice is affected with no element identified.
+      weight: 3.0
+    - name: observable-consequence
+      description: |-
+        Does the response state what would be observably different if its
+        account is right -- something a manager could look at and check?
+        This criterion exists to refuse credit to advice that forbids no
+        observation.
+
+        1.0 -- states at least one observation that would differ, specifically
+               enough that a manager could go and look.
+        0.5 -- states a consequence in terms that could not be checked without
+               further interpretation ("morale would suffer", "engagement would
+               fall") and no measurable proxy is offered.
+        0.0 -- states no consequence, or only recommends sensitivity,
+               adaptation or awareness.
+      weight: 3.0
+    - name: direction-is-committed
+      description: |-
+        Does the response say which WAY the affected element moves -- more or
+        less, sooner or later, wider or narrower -- and is the direction
+        consistent with the stated facts?
+
+        1.0 -- a direction is stated for every effect claimed and each is
+               consistent with the scenario.
+        0.5 -- directions are stated but one is inconsistent with a stated fact,
+               or one effect is left directionless.
+        0.0 -- no direction is given, or the main direction contradicts a fact
+               the scenario states.
+      weight: 2.0
+    - name: mechanism-not-restatement
+      description: |-
+        Does the response explain WHY the aspect produces the effect, or does it
+        restate the aspect in the vocabulary of the practice?
+
+        1.0 -- gives a reason the effect follows, connecting what people value
+               or how the society is structured to what the practice requires of
+               them.
+        0.5 -- gives a reason that amounts to repeating the aspect with the
+               practice's words substituted in.
+        0.0 -- asserts the effect with no reason at all.
+      weight: 3.0
+    - name: no-appeal-to-national-stereotype
+      description: |-
+        Does the response reason from the facts the scenario states rather than
+        from general claims about how people in a country or region behave?
+        Scored on the warrant, not the politeness: an unsupported generalisation
+        about a group is a reasoning defect because it cannot be checked against
+        the scenario.
+
+        1.0 -- every claim about the society is traceable to a stated fact.
+        0.5 -- one general claim about a national or regional culture is made,
+               consistent with the stated facts and not load-bearing.
+        0.0 -- a generalisation about a national, ethnic or religious group is
+               asserted as fact and carries part of the argument.
+      weight: 2.0
+tags: [slo:SLO4, use_mode:capability, slo4-cultural-societal, ladder-l2, organisational-behaviour, subjective, not-yet-scorable]
+samples:
+  # CLEAN, INTERNATIONAL. A societal structure with a stated legal mechanism, so
+  # the chain to the practice is checkable end to end.
+  - id: works-council-changes-the-rollout
+    input: >-
+      Aspect: in Aldenmark, any workplace policy affecting pay or promotion must
+      be negotiated with the elected works council before it takes effect, the
+      council has a statutory right to the data underlying the policy, and
+      negotiation takes on average five months.
+      Practice: Kestrel Foods' standard method of introducing a new incentive
+      scheme, which is to design the scheme at head office, announce it to
+      employees four weeks before it starts, and refine it after the first
+      quarter based on how it performs.
+      How does the aspect change the practice?
+    # Author's note: the intended chain -- the scheme affects pay, so it falls
+    # inside the council's mandatory negotiation right; the four-week
+    # announcement window is shorter than the five-month negotiation, so the
+    # sequencing of the practice inverts (negotiate first, announce second);
+    # the council's data right means the underlying model must be disclosable,
+    # which constrains the DESIGN and not only the timetable; and
+    # "refine after the first quarter" is no longer unilateral, because a
+    # refinement affecting pay reopens negotiation.
+    # Observable differences a manager could check: the elapsed time from design
+    # sign-off to first payment, whether the model documentation exists in a
+    # disclosable form, and whether Q2 adjustments were made unilaterally.
+    # A response that says only "Kestrel should consult local stakeholders" has
+    # named no element and no observation and should score 0.0 on
+    # observable-consequence.
+    metadata: { probe: societal-legal-mechanism, context: international, provenance: synthetic }
+
+  # CLEAN, DOMESTIC. A cultural norm inside one country, affecting a practice in
+  # a way that is specific and checkable.
+  - id: domestic-norm-changes-the-meeting
+    input: >-
+      Aspect: at Kestrel Foods' home-country engineering site, an internal
+      survey run by the site's own staff association found that engineers
+      believe raising a concern about a colleague's design in front of that
+      colleague's manager is disloyal, and that the appropriate route is to
+      raise it privately with the colleague first. The same survey found that
+      92% of engineers had at some point declined to raise a concern in a
+      review meeting that they later raised privately.
+      Practice: Kestrel's design review, a single scheduled meeting at which
+      the design engineer presents and all attendees are asked to state any
+      objections, after which the design is released to tooling.
+      How does the aspect change the practice?
+    # Author's note: entirely domestic, and the norm is stated with evidence
+    # rather than assumed. The intended chain -- objections are systematically
+    # withheld from the meeting where the release decision is made, so the
+    # meeting's stated function (surfacing objections before release) is not the
+    # function it performs; concerns surface later, after tooling has been cut,
+    # which moves the cost of a change from cheap to expensive; and the review's
+    # sign-off record understates the objections that existed at the time.
+    # Observable differences: the count of design changes raised after tooling
+    # release relative to those raised in review, and the gap between objections
+    # recorded in minutes and objections engineers report having held.
+    # The direction matters: a response claiming the norm makes engineers raise
+    # MORE concerns in the meeting contradicts the stated 92% figure and should
+    # score 0.0 on direction-is-committed.
+    metadata: { probe: cultural-norm-domestic, context: domestic, provenance: synthetic }
+
+  # BORDERLINE. The aspect cuts two ways and both accounts are defensible;
+  # what is graded is whether the response commits to a direction and says what
+  # would distinguish the two.
+  - id: aspect-cuts-both-ways
+    input: >-
+      Aspect: in Tavros, the state provides no unemployment insurance for the
+      first six months out of work, and household surveys conducted by Tavros's
+      statistical office record that 71% of working-age adults live in
+      households with no more than one month of expenses in savings.
+      Practice: Kestrel Foods' policy of staffing seasonal demand peaks with
+      six-month fixed-term contracts rather than permanent hires, which it uses
+      unchanged in every country it operates in.
+      How does the aspect change the practice?
+    # Author's note: this is a societal aspect and it genuinely cuts both ways.
+    # One account: with no safety net and no savings, a fixed-term contract is
+    # highly unattractive relative to permanent work, so Kestrel will draw from
+    # a weaker applicant pool, will lose people mid-term to any permanent offer,
+    # and will face higher turnover inside the term.
+    # The opposite account: with no safety net and no savings, workers cannot
+    # afford to refuse ANY paid work, so the pool is large and Kestrel's
+    # fixed-term terms are accepted readily -- with the consequence shifted from
+    # recruitment difficulty to a workforce under financial strain, and to
+    # whatever the firm judges about relying on it.
+    # Both are defensible from the stated facts and neither is the "expected
+    # answer". A strong response commits to one, says which observation would
+    # distinguish them -- applications per vacancy, mid-term attrition, the rate
+    # at which fixed-term staff leave for permanent offers -- and does not
+    # pretend the scenario settles it. Grade the reasoning, not the verdict.
+    metadata: { probe: two-defensible-directions, context: international, provenance: synthetic }
+
+  # NOTHING-CHANGES. The named aspect is real but the practice is already
+  # insulated from it by a stated fact. The honest answer is that this aspect
+  # does not change this practice, and a model that always finds an influence
+  # will find one here.
+  - id: practice-already-insulated
+    input: >-
+      Aspect: in Marenna, the customary business week runs Sunday to Thursday,
+      and Marenna's public holiday calendar has fourteen dates that do not
+      coincide with any home-country holiday.
+      Practice: Kestrel Foods' month-end financial close, in which the Marenna
+      subsidiary's ledger must be submitted to head office. Under the group's
+      close policy the Marenna ledger is extracted automatically from the
+      accounting system at 23:59 on the last calendar day of the month with no
+      human intervention required, the submission deadline for any manual
+      adjustments is the tenth working day of the following month AS COUNTED IN
+      MARENNA, and Marenna's controller has confirmed the automatic extract has
+      never failed. How does the aspect change the practice?
+    # Author's note: the honest answer is that it does not, and the scenario
+    # states three separate reasons why: the extract is automatic and needs
+    # nobody at a desk, the adjustment deadline is already counted in MARENNA
+    # working days so it absorbs both the Sunday-to-Thursday week and the
+    # fourteen non-coinciding holidays by construction, and the extract has a
+    # clean record.
+    # This is the sample that catches the response whose shape is always
+    # "here is how culture changes your process". The one legitimate
+    # observation, and it earns credit if stated as such, is that the policy
+    # already encodes the adaptation -- the Marenna-counted deadline is not an
+    # accident, and a firm that changed it to home-country working days would
+    # reintroduce the problem. Naming the insulation as a design choice is a
+    # better answer than either inventing an effect or saying nothing.
+    metadata: { probe: aspect-does-not-transmit, context: international, provenance: synthetic }

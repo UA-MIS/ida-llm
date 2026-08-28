@@ -1,0 +1,312 @@
+# slo4-cultural-societal, rung 4 of 5.
+#
+# What this rung adds over rung 3: rung 3's contrasts had no conflict in them.
+# Here local practice and a standard the firm holds pull in opposite directions,
+# and the response must decide.
+#
+# THE TENSION IS IN THE RUBRIC ON PURPOSE, AND IT IS A REAL ONE.
+# The cheapest way to look principled is to refuse every local adaptation and
+# call it integrity -- which is ethnocentrism with better public relations, and
+# sample two is the case where it produces the wrong answer. The cheapest way to
+# look culturally competent is to accommodate whatever is asked and call it
+# respect -- which abandons the standard, and sample one is the case where that
+# produces the wrong answer. So `adapts-to-local-context` and
+# `holds-the-non-negotiable-floor` are weighted EQUALLY at 3.0 and a response
+# cannot buy one with the other.
+#
+# The third load-bearing criterion is `distinguishes-norm-from-law-from-floor`.
+# Most of the difficulty in these cases is not deciding what to do once the
+# categories are straight -- it is that a local NORM, a local LAW, a
+# counterparty's PREFERENCE and a genuine ethical FLOOR all arrive wearing the
+# same clothes, and the response that cannot tell them apart will trade away the
+# floor to accommodate a preference, or refuse a norm as though it were a
+# bribe.
+#
+# The laziest response that could otherwise score 1.0 is "respect local culture
+# where you can and hold your principles where you must", which decides nothing.
+# `reaches-an-operable-decision` refuses it credit.
+version: 1
+id: slo4-cultural-societal/l4-adaptation-versus-floor
+title: Cultural and societal perspective -- adapting to local practice against a standard the firm holds
+description: >
+  Rung 4 of the slo4-cultural-societal ladder. Each scenario places a local
+  cultural or societal practice against a standard Kestrel holds, and asks for a
+  decision. The rubric weights adapting to the local context and holding a
+  genuine floor equally, so neither reflexive accommodation nor reflexive
+  refusal scores well; a further criterion turns on distinguishing a local norm
+  from a local law, a counterparty's commercial preference, and an ethical
+  floor, which is where most of these cases are actually decided.
+
+  It is its own rung because rungs 1 to 3 never require the response to give
+  anything up. Here something has to yield, and which thing is the graded
+  judgement.
+
+  Every society in this family is invented and every cultural or societal fact a
+  scenario depends on is stated in the scenario. No claim about any real
+  national culture is asserted or rewarded.
+
+  This is a subjective task. With no judge model configured it will load, run
+  and store transcripts, and report no score -- see docs/llm-judge.md.
+
+  Provenance: every firm, country, society and scenario is synthetic, invented
+  for this file. No real company, country or culture is described, no student
+  work is used, and no textbook or question-bank content is reproduced.
+kind: subjective
+domain: business-ethics
+system_prompt: >-
+  You are advising the management team of a mid-sized firm. Each scenario places
+  a local practice against a standard the firm holds. Decide what the firm
+  should do and say so plainly. In your answer, distinguish which elements are
+  local custom, which are local law, which are a counterparty's commercial
+  preference, and which engage a standard the firm should not trade away -- and
+  say why each falls where you put it. Where the firm can meet the local
+  practice without giving up the standard, say how. Use only what the scenario
+  states, and do not appeal to general claims about any national culture.
+scorer:
+  kind: llm_judge
+  rubric_id: slo4-cultural-societal-adaptation-floor-v1
+rubric:
+  id: slo4-cultural-societal-adaptation-floor-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: adapts-to-local-context
+      description: |-
+        Where the scenario's local practice engages no standard worth holding,
+        does the response accommodate it rather than refusing it? Weighted
+        equally with the floor criterion on purpose: refusing everything is the
+        cheapest way to appear principled and this rubric must not reward it.
+
+        1.0 -- every element that is local custom or preference without ethical
+               weight is accommodated, or a specific reason is given for not
+               accommodating it that does not rest on it being unfamiliar.
+        0.5 -- one such element is refused, and the refusal is reasoned rather
+               than reflexive.
+        0.0 -- local practice is refused because it differs from the firm's
+               habit, or the response treats the firm's own customs as the
+               standard against which the local practice is judged.
+      weight: 3.0
+    - name: holds-the-non-negotiable-floor
+      description: |-
+        Where the scenario engages a standard that should not be traded away --
+        physical safety, deception of a third party, bribery, misrepresentation
+        to a regulator -- does the response hold it? Weighted equally with
+        adaptation: accommodating everything is the cheapest way to appear
+        culturally competent.
+
+        1.0 -- every such standard in the scenario is held, and the response
+               says what the firm does if the counterparty will not move.
+        0.5 -- the standard is held in principle but the response leaves the
+               consequence of a refusal unaddressed.
+        0.0 -- a standard of this kind is traded away, or its abandonment is
+               justified as cultural adaptation or as the cost of doing
+               business.
+      weight: 3.0
+    - name: distinguishes-norm-from-law-from-floor
+      description: |-
+        Does the response sort the elements of the scenario into local custom,
+        local law, counterparty preference, and standards not to be traded --
+        and are the placements defensible on the stated facts?
+
+        1.0 -- every element the scenario raises is placed, and every placement
+               is defensible.
+        0.5 -- the categories are used and exactly one element is misplaced, or
+               one element is left unplaced.
+        0.0 -- the categories are not distinguished, or a counterparty's
+               commercial preference is treated as a cultural norm, or a
+               cultural norm is treated as an ethical breach.
+      weight: 3.0
+    - name: finds-the-both-and-option
+      description: |-
+        Where an option exists that meets the local practice AND keeps the
+        standard, does the response find it rather than presenting the choice as
+        binary?
+
+        1.0 -- where such an option exists in the scenario, it is identified
+               concretely; where none exists, the response says so explicitly.
+        0.5 -- the response notes that a compromise might exist without
+               specifying one.
+        0.0 -- the choice is presented as binary where the scenario supports a
+               third option.
+      weight: 2.0
+    - name: reaches-an-operable-decision
+      description: |-
+        Could the management team act on the response on Monday? This criterion
+        refuses credit to the balanced-sounding non-answer.
+
+        1.0 -- states what the firm does, who does it, and what happens if the
+               counterparty does not agree.
+        0.5 -- states what the firm should do in principle but leaves the
+               execution or the refusal path unspecified.
+        0.0 -- offers only that the firm should balance respect for local
+               culture against its principles, or defers the decision to further
+               consultation.
+      weight: 2.0
+tags: [slo:SLO4, use_mode:capability, slo4-cultural-societal, ladder-l4, business-ethics, subjective, not-yet-scorable]
+samples:
+  # THE FLOOR MUST HOLD -- and the scenario is built so that the accommodating
+  # answer is genuinely tempting: the request is framed in cultural terms by a
+  # local partner, the cost of refusing is stated and large, and one element of
+  # the request is a legitimate custom that SHOULD be accommodated.
+  - id: floor-must-hold-with-a-legitimate-element
+    input: >-
+      Kestrel Foods' Marenna joint-venture partner has told Kestrel that the
+      customs clearance of Kestrel's inbound shipments will continue to take
+      nine weeks unless Kestrel adopts what the partner calls "the normal way of
+      working here". Specifically, the partner asks Kestrel to agree to three
+      things. First, that Kestrel pay a 4,000 US dollar monthly "facilitation
+      retainer" in cash to an intermediary the partner names, who the partner
+      says will ensure files are processed; the intermediary would issue no
+      invoice and the payment would be recorded in Kestrel's books as a
+      consulting fee. Second, that Kestrel's country manager attend the
+      partner's family celebrations and reciprocate hospitality, which the
+      partner says is how business relationships are maintained in Marenna and
+      which the partner regards as more important than any contract clause.
+      Third, that Kestrel stop sending its home-country auditors to the joint
+      venture unannounced, because the partner says surprise visits are read
+      locally as an accusation of dishonesty, and instead agree a visit schedule
+      two weeks in advance. Kestrel's delayed shipments are costing it an
+      estimated 60,000 US dollars a month. What should Kestrel do?
+    # Author's note: three elements, three different categories, and a response
+    # that treats them as one package fails whichever way it decides.
+    # (1) The facilitation retainer is a bribe and a books-and-records
+    # falsification -- cash, no invoice, deliberately mischaracterised in the
+    # ledger as consulting. The mischaracterisation is the tell: an ordinary
+    # expediting service does not need to be booked as something else. This is
+    # the floor and it holds regardless of the 60,000 a month, and the response
+    # must say what Kestrel does instead -- escalate to the customs authority's
+    # published process, engage a licensed broker, put the delay to the JV board,
+    # and be willing to lose the volume.
+    # (2) The hospitality is ordinary relationship custom with no ethical weight
+    # as described -- reciprocated hospitality, not a transfer of value to
+    # secure an official act. Refusing it is ethnocentric and costs Kestrel
+    # something real. A response that refuses it, or that lumps it in with the
+    # bribe because both were presented as "how things work here", should lose
+    # adapts-to-local-context.
+    # (3) The audit scheduling is the genuinely interesting one: unannounced
+    # audit is a control, not a custom, and giving up surprise is giving up the
+    # control -- but the scenario supports a both-and option, which is agreeing
+    # an announced schedule IN ADDITION to retaining an unannounced right, or
+    # announcing the visit window while not announcing the scope. A response
+    # that either concedes surprise entirely or refuses any scheduling has
+    # missed it.
+    metadata: { probe: three-categories-one-package, provenance: synthetic }
+
+  # THE REFUSAL IS THE ERROR. Nothing here engages a floor at all; the "standard"
+  # Kestrel is holding is a home-country habit that it has mistaken for a
+  # principle. A model that has learned "cultural adaptation scenarios are about
+  # resisting pressure" will resist here and be wrong.
+  - id: refusal-dressed-as-principle
+    input: >-
+      Kestrel Foods requires that every supplier contract be signed by a single
+      authorised signatory and that negotiations be conducted with one named
+      counterpart who has decision authority, on the grounds that this is
+      "professional practice" and protects against ambiguity. Its prospective
+      supplier in Aldenmark negotiates through a four-person committee including
+      a works council representative, requires that draft terms be circulated
+      internally for a week between sessions, and signs through two directors
+      jointly as Aldenmark company law requires for commitments above a
+      threshold this contract exceeds. Kestrel's procurement director has
+      objected that this is inefficient, that "we do not negotiate by
+      committee", and that agreeing to it would set a precedent that weakens
+      Kestrel's negotiating position across the group. The Aldenmark supplier is
+      the only qualified source for the component within Kestrel's lead-time
+      requirement, its pricing is competitive, and its quality audit passed
+      without findings. What should Kestrel do?
+    # Author's note: NOTHING in the Aldenmark practice engages a floor. The
+    # two-director signature is local LAW and not negotiable by either party --
+    # a response that treats it as a custom Kestrel might push back on has
+    # misplaced it. The committee, the works council representative and the
+    # week-long circulation are local custom and institutional structure, and
+    # they cost Kestrel time, not integrity.
+    # Kestrel's own single-signatory rule is a home-country HABIT that the
+    # procurement director has relabelled as professional practice. The
+    # "precedent" argument is a preference dressed as a principle, and it is the
+    # thing this sample is really testing: a response that credits it, or that
+    # frames the decision as Kestrel making a concession, has treated the home
+    # practice as the standard.
+    # The correct answer is to adapt: negotiate the way the counterparty and its
+    # law require, adjust Kestrel's internal timetable for the circulation
+    # weeks, and drop the single-signatory requirement for this contract. A
+    # response that refuses, or that accommodates while framing it as a
+    # regrettable compromise of Kestrel's standards, should score at most 0.5 on
+    # adapts-to-local-context.
+    metadata: { probe: no-floor-engaged-refusal-is-wrong, provenance: synthetic }
+
+  # BORDERLINE. A genuine conflict with no clean resolution, where two verdicts
+  # are defensible and the reasoning is what is graded. Deliberately NOT a
+  # bribery case: the tension is between a societal structure Kestrel cannot
+  # change and a standard it holds for good reasons.
+  - id: genuine-conflict-no-clean-answer
+    input: >-
+      Kestrel Foods holds a group standard that no employee works more than 48
+      hours in a week, adopted after a fatigue-related injury at a home-country
+      plant. At its Tavros plant, the statutory maximum is 60 hours, the
+      sector-wide agreement Kestrel is party to sets pay rates that assume a
+      54-hour week, and Kestrel's own survey of the Tavros workforce found that
+      82% of employees oppose the 48-hour cap because it reduces their take-home
+      pay by roughly a sixth, in a society where the scenario's household survey
+      records that most working-age adults hold under one month of savings. The
+      Tavros works council has formally requested that Kestrel apply the
+      statutory 60-hour maximum instead. Kestrel's injury data from Tavros shows
+      no fatigue-related incidents in four years of operation at the current
+      54-hour average. What should Kestrel do?
+    # Author's note: genuinely hard, and both verdicts are defensible.
+    # Holding the cap: the standard was adopted after an injury, safety
+    # standards that bend to local pressure are not standards, employee consent
+    # to a hazard does not make it safe, and the four-year clean record is weak
+    # evidence for a low-frequency high-severity event.
+    # Relaxing it: the cap is not tracking a hazard here -- it is transferring
+    # income away from workers with no savings buffer to satisfy a rule written
+    # for a different plant's circumstances, over the formal objection of the
+    # body that represents them, in a society whose wage structure assumes the
+    # longer week.
+    # What SHOULD earn credit either way: recognising that the 48-hour figure is
+    # a proxy for fatigue risk rather than the risk itself, and that the
+    # both-and option is to hold a fatigue-outcome standard while letting the
+    # hours proxy move -- shift-pattern limits, rest-period rules, monitoring --
+    # or to raise the cap while compensating for the income effect. A response
+    # that reaches for "respect the local culture" as the whole argument has
+    # missed that a works council request is an institutional demand, not a
+    # cultural preference, and should lose
+    # distinguishes-norm-from-law-from-floor.
+    metadata: { probe: both-verdicts-defensible, provenance: synthetic }
+
+  # BOTH-AND AVAILABLE. The scenario looks binary and is not: an option exists
+  # that fully meets the local practice and fully keeps the standard. The
+  # criterion finds-the-both-and-option exists for this sample, and a response
+  # that picks a side -- either side -- has left value on the table.
+  - id: both-and-option-available
+    input: >-
+      Kestrel Foods' policy is that whistleblower reports be made through a named
+      individual in group compliance, on the grounds that anonymous reports
+      cannot be investigated properly and that naming the recipient builds
+      trust. At its Marenna plant, an employee survey run by an independent firm
+      found that 74% of employees would not report a safety concern through a
+      named individual, citing the risk of being identified to their supervisor,
+      and that the plant's three reports in two years compare to a group average
+      of one report per forty employees per year, which would predict about
+      twenty. Marenna law requires employers above 50 staff to operate a
+      reporting channel and expressly permits anonymous reporting. The Marenna
+      plant manager has proposed that the plant simply keep Kestrel's named-
+      recipient policy because "people here settle things through their
+      supervisor", and the group compliance director has proposed that Marenna
+      be exempted from the group policy entirely. What should Kestrel do?
+    # Author's note: both proposals on the table are wrong, and the scenario
+    # supports an option that neither party has named. Keeping the named
+    # recipient preserves a policy that the survey shows is not functioning --
+    # three reports where twenty would be predicted is the finding, and the plant
+    # manager's cultural explanation is an assertion the survey directly
+    # contradicts, since employees say they are deterred by identification risk,
+    # not that they prefer to use their supervisor. Exempting Marenna abandons
+    # the group standard and creates a two-tier compliance regime.
+    # The both-and option: operate an anonymous intake channel -- which Marenna
+    # law expressly permits and which addresses the identification risk the
+    # survey found -- while keeping the group standard for what happens AFTER
+    # intake, which is where the "anonymous reports cannot be investigated"
+    # concern actually lives. Anonymity at intake and rigour at investigation are
+    # not in conflict; the original policy conflated them.
+    # Full credit requires naming that conflation. This is the hardest sample in
+    # the file and the one a response is most likely to answer by choosing
+    # between the two options it was handed.
+    metadata: { probe: third-option-exists, provenance: synthetic }
