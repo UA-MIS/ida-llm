@@ -16,7 +16,7 @@
 # Every country, firm, currency and rate below is INVENTED. That is deliberate
 # and not merely hygiene: real tariff rates and real spot rates move, so an item
 # keyed to one would silently start marking correct answers wrong. Marenna
-# (currency: the dinar, MRD) and Costa Verde (currency: the peso, CVP) recur
+# (currency: the dinar, MRD) and Cadrenne (currency: the peso, CQZ) recur
 # across the whole family.
 version: 1
 id: slo3-global-knowledge/l1-global-cost-basics
@@ -61,7 +61,7 @@ tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-knowledge, 
 samples:
   - id: invoice-converted-at-spot
     input: >-
-      Kestrel Foods receives an invoice from a supplier in the Republic of
+      Vasterly Foods receives an invoice from a supplier in the Republic of
       Marenna for 4,250 Marenna dinar (MRD). The spot exchange rate is
       1 US dollar = 8.50 MRD. What is the invoice worth in US dollars?
     # 4250 / 8.50 = 500.00 exactly.
@@ -84,7 +84,7 @@ samples:
 
   - id: freight-cost-per-unit
     input: >-
-      Kestrel Foods shipped 3,200 units from Marenna in a single ocean
+      Vasterly Foods shipped 3,200 units from Marenna in a single ocean
       container. The total ocean freight charge for the shipment was 18,560 US
       dollars. What was the ocean freight cost per unit, in US dollars?
     # 18,560 / 3,200 = 5.80 exactly.
@@ -94,13 +94,13 @@ samples:
 
   - id: overlap-hours-across-time-zones
     input: >-
-      Kestrel Foods runs one office in Marenna, which observes UTC+3, and one in
-      Costa Verde, which observes UTC-5. The Marenna office works 09:00 to 17:00
-      Marenna local time. The Costa Verde office works 08:00 to 16:00 Costa
+      Vasterly Foods runs one office in Marenna, which observes UTC+3, and one in
+      Cadrenne, which observes UTC-5. The Marenna office works 09:00 to 17:00
+      Marenna local time. The Cadrenne office works 08:00 to 16:00 Costa
       Verde local time. Neither country observes daylight saving. How many whole
       hours of the working day do the two offices have in common?
     # Marenna 09:00-17:00 at UTC+3 is 06:00-14:00 UTC.
-    # Costa Verde 08:00-16:00 at UTC-5 is 13:00-21:00 UTC.
+    # Cadrenne 08:00-16:00 at UTC-5 is 13:00-21:00 UTC.
     # The intersection is 13:00-14:00 UTC = 1 hour.
     # The nearest wrong method is comparing the LOCAL clock times as if they
     # were the same zone: 09:00-16:00 = 7 hours -- 6 away, 600x the tolerance.
@@ -112,9 +112,9 @@ samples:
 
   - id: regional-value-content-share
     input: >-
-      Under the Marenna-Costa Verde trade agreement, a good's regional value
+      Under the Marenna-Cadrenne trade agreement, a good's regional value
       content is the value of components sourced inside the bloc expressed as a
-      percentage of the good's total ex-works value. A Kestrel Foods appliance
+      percentage of the good's total ex-works value. A Vasterly Foods appliance
       has an ex-works value of 21,000 US dollars, of which 14,700 US dollars is
       components sourced inside the bloc. What is its regional value content, as
       a percentage?

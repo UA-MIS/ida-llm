@@ -21,13 +21,13 @@
 #     customs value   = 60,000 + 14,000     =  74,000 USD
 #     duty            = 0.08 * 74,000       =   5,920 USD
 #     total landed    = 74,000 + 5,920      =  79,920 USD
-#   Costa Verde: ex-works 4.50 CVP/unit; spot 4.00 CVP per USD;
+#   Cadrenne: ex-works 4.50 CQZ/unit; spot 4.00 CQZ per USD;
 #                freight 9,000 USD/yr; 0% duty under the trade agreement.
-#     ex-works total = 40,000 * 4.50        = 180,000 CVP
+#     ex-works total = 40,000 * 4.50        = 180,000 CQZ
 #     ex-works in USD = 180,000 / 4.00      =  45,000 USD
 #     total landed    = 45,000 + 9,000      =  54,000 USD
 #     unit landed     = 54,000 / 40,000     =    1.35 USD
-#   Cost advantage of Costa Verde = 79,920 - 54,000 = 25,920 USD.
+#   Cost advantage of Cadrenne = 79,920 - 54,000 = 25,920 USD.
 #
 # This is the rung that should have a ceiling. If a frontier model scores 1.00
 # on every rung of this family the ladder has stopped discriminating and a rung
@@ -78,13 +78,13 @@ samples:
   # STAGE 1 of the chain. Everything downstream depends on this number.
   - id: marenna-customs-value
     input: >-
-      Kestrel Foods will buy 40,000 units per year and is comparing two supply
+      Vasterly Foods will buy 40,000 units per year and is comparing two supply
       countries. Sourcing from Marenna: the ex-works price is 12.00 Marenna
       dinar per unit and the spot rate is 8.00 dinar per US dollar; ocean
       freight is 14,000 US dollars per year in total; Marenna exports attract an
       import duty of 8% of the customs value, and the customs value is defined
       as the ex-works value in US dollars plus freight. Sourcing from Costa
-      Verde: the ex-works price is 4.50 Costa Verde pesos per unit and the spot
+      Verde: the ex-works price is 4.50 Cadrenne pesos per unit and the spot
       rate is 4.00 pesos per US dollar; ocean freight is 9,000 US dollars per
       year in total; the goods qualify for a 0% preferential duty rate under a
       trade agreement. What is the customs value of the annual Marenna
@@ -99,13 +99,13 @@ samples:
   # STAGE 2. Depends on stage 1; an error there lands here scaled by 1.08.
   - id: marenna-total-landed-cost
     input: >-
-      Kestrel Foods will buy 40,000 units per year and is comparing two supply
+      Vasterly Foods will buy 40,000 units per year and is comparing two supply
       countries. Sourcing from Marenna: the ex-works price is 12.00 Marenna
       dinar per unit and the spot rate is 8.00 dinar per US dollar; ocean
       freight is 14,000 US dollars per year in total; Marenna exports attract an
       import duty of 8% of the customs value, and the customs value is defined
       as the ex-works value in US dollars plus freight. Sourcing from Costa
-      Verde: the ex-works price is 4.50 Costa Verde pesos per unit and the spot
+      Verde: the ex-works price is 4.50 Cadrenne pesos per unit and the spot
       rate is 4.00 pesos per US dollar; ocean freight is 9,000 US dollars per
       year in total; the goods qualify for a 0% preferential duty rate under a
       trade agreement. What is the total annual landed cost of sourcing from
@@ -119,22 +119,22 @@ samples:
 
   # STAGE 3. The other branch of the comparison, and the only per-unit figure
   # asked for -- 54,000 / 40,000 is exactly 1.35, so no rounding is involved.
-  - id: costa-verde-unit-landed-cost
+  - id: cadrenne-unit-landed-cost
     input: >-
-      Kestrel Foods will buy 40,000 units per year and is comparing two supply
+      Vasterly Foods will buy 40,000 units per year and is comparing two supply
       countries. Sourcing from Marenna: the ex-works price is 12.00 Marenna
       dinar per unit and the spot rate is 8.00 dinar per US dollar; ocean
       freight is 14,000 US dollars per year in total; Marenna exports attract an
       import duty of 8% of the customs value, and the customs value is defined
       as the ex-works value in US dollars plus freight. Sourcing from Costa
-      Verde: the ex-works price is 4.50 Costa Verde pesos per unit and the spot
+      Verde: the ex-works price is 4.50 Cadrenne pesos per unit and the spot
       rate is 4.00 pesos per US dollar; ocean freight is 9,000 US dollars per
       year in total; the goods qualify for a 0% preferential duty rate under a
       trade agreement. What is the landed cost PER UNIT of sourcing from Costa
       Verde, in US dollars?
     # From the shared derivation: 54,000 / 40,000 = 1.35 exactly.
     # Omitting freight gives 45,000 / 40,000 = 1.125 -> 1.13: 0.22 away.
-    # Applying Marenna's 8% duty to Costa Verde, ignoring the preferential rate
+    # Applying Marenna's 8% duty to Cadrenne, ignoring the preferential rate
     # -- the trade-agreement fact the item turns on -- gives 58,320 / 40,000 =
     # 1.458 -> 1.46: 0.11 away, still 11x the tolerance.
     target: "1.35"
@@ -143,13 +143,13 @@ samples:
   # STAGE 4. The first genuinely chained item: it needs stage 2 AND stage 3.
   - id: annual-cost-advantage
     input: >-
-      Kestrel Foods will buy 40,000 units per year and is comparing two supply
+      Vasterly Foods will buy 40,000 units per year and is comparing two supply
       countries. Sourcing from Marenna: the ex-works price is 12.00 Marenna
       dinar per unit and the spot rate is 8.00 dinar per US dollar; ocean
       freight is 14,000 US dollars per year in total; Marenna exports attract an
       import duty of 8% of the customs value, and the customs value is defined
       as the ex-works value in US dollars plus freight. Sourcing from Costa
-      Verde: the ex-works price is 4.50 Costa Verde pesos per unit and the spot
+      Verde: the ex-works price is 4.50 Cadrenne pesos per unit and the spot
       rate is 4.00 pesos per US dollar; ocean freight is 9,000 US dollars per
       year in total; the goods qualify for a 0% preferential duty rate under a
       trade agreement. By how many US dollars per year is the cheaper country
@@ -168,13 +168,13 @@ samples:
   # applied as an afterthought.
   - id: equalising-spot-rate
     input: >-
-      Kestrel Foods will buy 40,000 units per year and is comparing two supply
+      Vasterly Foods will buy 40,000 units per year and is comparing two supply
       countries. Sourcing from Marenna: the ex-works price is 12.00 Marenna
       dinar per unit and the spot rate is 8.00 dinar per US dollar; ocean
       freight is 14,000 US dollars per year in total; Marenna exports attract an
       import duty of 8% of the customs value, and the customs value is defined
       as the ex-works value in US dollars plus freight. Sourcing from Costa
-      Verde: the ex-works price is 4.50 Costa Verde pesos per unit and the spot
+      Verde: the ex-works price is 4.50 Cadrenne pesos per unit and the spot
       rate is 4.00 pesos per US dollar; ocean freight is 9,000 US dollars per
       year in total; the goods qualify for a 0% preferential duty rate under a
       trade agreement. Holding the Marenna ex-works price, the freight charge
@@ -183,7 +183,7 @@ samples:
       Verde's?
     # Let x be dinar per US dollar. The Marenna ex-works total is 480,000 dinar
     # regardless of x, so the ex-works value in USD is 480,000 / x.
-    #   (480,000 / x + 14,000) * 1.08 = 54,000       <- Costa Verde's total
+    #   (480,000 / x + 14,000) * 1.08 = 54,000       <- Cadrenne's total
     #    480,000 / x + 14,000         = 50,000       <- 54,000 / 1.08, exact
     #    480,000 / x                  = 36,000
     #                               x = 13.3333... -> 13.33

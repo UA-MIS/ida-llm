@@ -53,8 +53,8 @@ tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-knowledge, 
 samples:
   - id: margin-not-markup
     input: >-
-      Kestrel Foods manufactures a unit at a full cost of 24.00 US dollars. Its
-      Costa Verde distributor contracts for a gross MARGIN of 35% of the SELLING
+      Vasterly Foods manufactures a unit at a full cost of 24.00 US dollars. Its
+      Cadrenne distributor contracts for a gross MARGIN of 35% of the SELLING
       PRICE -- not a 35% mark-up on cost. What selling price per unit satisfies
       the contract, in US dollars?
     # Margin on price: price * (1 - 0.35) = 24.00, so price = 24 / 0.65
@@ -100,7 +100,7 @@ samples:
 
   - id: transfer-price-markup-on-cost
     input: >-
-      Kestrel Foods' Marenna subsidiary manufactures a unit at a full cost of
+      Vasterly Foods' Marenna subsidiary manufactures a unit at a full cost of
       62.50 US dollars and transfers it to the parent company. The group's
       transfer-pricing policy is cost-plus with a mark-up of 12% ON FULL COST.
       What is the transfer price per unit, in US dollars?
@@ -114,7 +114,7 @@ samples:
 
   - id: real-growth-exact-fisher
     input: >-
-      Kestrel Foods' Marenna revenue grew 14.0% over the year measured in
+      Vasterly Foods' Marenna revenue grew 14.0% over the year measured in
       nominal Marenna dinar. Marenna consumer price inflation over the same year
       was 6.0%. Compute the REAL growth rate as a percentage using the exact
       relation (1 + nominal) / (1 + inflation) - 1. Do not use the

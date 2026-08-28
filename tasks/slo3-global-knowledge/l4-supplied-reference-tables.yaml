@@ -65,42 +65,42 @@ samples:
     input: |-
       The Republic of Marenna's import tariff schedule contains these lines:
 
-        MT-0401  Fruit puree, unsweetened, in bulk containers      4.0%
-        MT-0402  Fruit puree, sweetened, in bulk containers        9.5%
-        MT-0403  Fruit puree, sweetened, in retail packs          14.0%
-        MT-0404  Fruit juice concentrate, in bulk containers       6.0%
+        line 0401  Fruit puree, unsweetened, in bulk containers      4.0%
+        line 0402  Fruit puree, sweetened, in bulk containers        9.5%
+        line 0403  Fruit puree, sweetened, in retail packs          14.0%
+        line 0404  Fruit juice concentrate, in bulk containers       6.0%
 
-      Kestrel Foods is importing sweetened mango puree into Marenna in
+      Vasterly Foods is importing sweetened mango puree into Marenna in
       200-litre drums for sale to industrial food manufacturers. The
       consignment's customs value is 86,000 US dollars. What import duty is
       payable, in US dollars?
     # 200-litre drums sold to industrial buyers are bulk containers, not retail
-    # packs, and the puree is sweetened -> line MT-0402 at 9.5%.
+    # packs, and the puree is sweetened -> line 0402 at 9.5%.
     # 86,000 * 0.095 = 8,170.00.
-    # Decoy MT-0403 (sweetened, but retail packs) gives 86,000 * 0.14 =
+    # Decoy line 0403 (sweetened, but retail packs) gives 86,000 * 0.14 =
     # 12,040 -- 3,870 away.
-    # Decoy MT-0401 (bulk, but unsweetened) gives 3,440 -- 4,730 away.
+    # Decoy line 0401 (bulk, but unsweetened) gives 3,440 -- 4,730 away.
     target: "8170"
     metadata: { skill: tariff-line-classification, factor: trade-policy, provenance: synthetic }
 
   - id: delivery-terms-cost-allocation
     input: |-
-      Marenna Delivery Terms (MDT) allocate shipment costs between seller and
+      Marenna Delivery Terms allocate shipment costs between seller and
       buyer as follows:
 
-        MDT-A  Seller pays inland carriage to the port of export only.
-        MDT-B  Seller pays inland carriage to the port of export and ocean
-               freight.
-        MDT-C  Seller pays inland carriage to the port of export, ocean freight,
-               marine insurance and import duty.
+        Terms A  Seller pays inland carriage to the port of export only.
+        Terms B  Seller pays inland carriage to the port of export and ocean
+                 freight.
+        Terms C  Seller pays inland carriage to the port of export, ocean
+                 freight, marine insurance and import duty.
 
-      Kestrel Foods has contracted on MDT-B terms. The shipment's costs are:
+      Vasterly Foods has contracted on Terms B. The shipment's costs are:
       inland carriage 2,400 US dollars; ocean freight 7,800 US dollars; marine
       insurance 1,150 US dollars; import duty 5,600 US dollars. What is the
       seller's total cost under the contracted terms, in US dollars?
-    # MDT-B = inland carriage + ocean freight = 2,400 + 7,800 = 10,200.00
-    # Decoy MDT-C gives 2,400 + 7,800 + 1,150 + 5,600 = 16,950 -- 6,750 away.
-    # Decoy MDT-A gives 2,400 -- 7,800 away.
+    # Terms B = inland carriage + ocean freight = 2,400 + 7,800 = 10,200.00
+    # Decoy Terms C gives 2,400 + 7,800 + 1,150 + 5,600 = 16,950 -- 6,750 away.
+    # Decoy Terms A gives 2,400 -- 7,800 away.
     # The four cost figures are all supplied precisely so that selecting the
     # wrong term produces a clean, confident, wrong number rather than an error.
     target: "10200"
@@ -108,7 +108,7 @@ samples:
 
   - id: preferential-origin-rate-band
     input: |-
-      The Marenna-Costa Verde trade agreement sets import duty on finished
+      The Marenna-Cadrenne trade agreement sets import duty on finished
       appliances by the exporter's origin status and the consignment's regional
       value content (RVC):
 
@@ -118,8 +118,8 @@ samples:
                 60%                                                 4.0%
         Band D  Member state, RVC of 60% or above                    0.0%
 
-      Costa Verde is a member state of the agreement. A consignment of finished
-      appliances exported from Costa Verde into Marenna has a regional value
+      Cadrenne is a member state of the agreement. A consignment of finished
+      appliances exported from Cadrenne into Marenna has a regional value
       content of 52.0% and a customs value of 240,000 US dollars. What import
       duty is payable, in US dollars?
     # Member state, RVC 52.0% falls in [45%, 60%) -> Band C at 4.0%.
@@ -135,19 +135,19 @@ samples:
 
   - id: treaty-withholding-net-dividend
     input: |-
-      Withholding tax on outbound dividends under Marenna and Costa Verde law:
+      Withholding tax on outbound dividends under Marenna and Cadrenne law:
 
         Payer Marenna     -> recipient in the home country, treaty applies    5.0%
         Payer Marenna     -> recipient elsewhere, no treaty                  20.0%
-        Payer Costa Verde -> recipient in the home country, treaty applies   10.0%
-        Payer Costa Verde -> recipient elsewhere, no treaty                  25.0%
+        Payer Cadrenne -> recipient in the home country, treaty applies   10.0%
+        Payer Cadrenne -> recipient elsewhere, no treaty                  25.0%
 
-      Kestrel Foods' Costa Verde subsidiary pays a dividend of 150,000 US
+      Vasterly Foods' Cadrenne subsidiary pays a dividend of 150,000 US
       dollars to the home-country parent, which qualifies for treaty benefits.
       What amount does the parent receive net of withholding tax, in US dollars?
-    # Payer is Costa Verde and the treaty applies -> 10.0%.
+    # Payer is Cadrenne and the treaty applies -> 10.0%.
     # 150,000 * (1 - 0.10) = 135,000.00
-    # Decoy: the Costa Verde non-treaty row gives 150,000 * 0.75 = 112,500 --
+    # Decoy: the Cadrenne non-treaty row gives 150,000 * 0.75 = 112,500 --
     # 22,500 away.
     # Decoy: the Marenna treaty row -- right treaty status, wrong payer country
     # -- gives 150,000 * 0.95 = 142,500 -- 7,500 away. This is the decoy the
@@ -159,7 +159,7 @@ samples:
 
   - id: sovereign-risk-band-premium
     input: |-
-      Kestrel Foods' treasury adds a country risk premium to the cost of equity
+      Vasterly Foods' treasury adds a country risk premium to the cost of equity
       of any project outside the home country, taken from this band table:
 
         Sovereign score 80 to 100      0.5%

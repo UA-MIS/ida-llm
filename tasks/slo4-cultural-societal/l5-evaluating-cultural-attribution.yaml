@@ -37,9 +37,9 @@ description: >
   The task is to evaluate that explanation: state the claim, generate the rival
   explanations the facts also support, say what evidence would discriminate
   between them, and reach a verdict calibrated to how much the scenario actually
-  establishes. In one of the four scenarios the cultural explanation is the best
-  one available, so a response that debunks every cultural claim scores no
-  better than one that accepts every claim.
+  establishes. The cultural explanation is not always the weakest one
+  available, so a response that debunks every cultural claim scores no better
+  than one that accepts every claim.
 
   It is the top rung because it is the only one that asks whether the cultural
   account is true rather than what follows from it, which is what SLO 4's verb
@@ -148,10 +148,10 @@ samples:
   # STRUCTURAL EXPLANATION DOMINATES. The cultural claim is offered by a senior
   # person, sounds reasonable, and is undercut by two facts sitting in the same
   # paragraph. This is the sample that separates evaluating from elaborating.
-  - id: incentive-explains-what-culture-was-blamed-for
+  - id: plant-defect-rate-gap
     input: >-
-      Kestrel Foods' Aldenmark plant reports quality defects at roughly a fifth
-      the rate of its home-country plants. Kestrel's operations vice-president
+      Vasterly Foods' Aldenmark plant reports quality defects at roughly a fifth
+      the rate of its home-country plants. Vasterly's operations vice-president
       has told the board this reflects "a strong local culture of craftsmanship
       and personal responsibility for quality" in Aldenmark, and has proposed a
       culture programme to import it to the home plants. The following are also
@@ -160,7 +160,7 @@ samples:
       recorded; at the home plants, defects are recorded by an independent
       inspection team and no bonus is affected. Aldenmark's warranty claim rate,
       measured after sale by the same group process in both countries, is within
-      2% of the home plants'. Kestrel's group quality director has never
+      2% of the home plants'. Vasterly's group quality director has never
       compared the two recording processes. What should the board make of the
       vice-president's explanation?
     # Author's note: the cultural claim is undercut by facts already on the
@@ -182,30 +182,30 @@ samples:
     # culture programme is premature. A response that accepts the vice-
     # president's account and discusses how to transplant craftsmanship has
     # laundered an unexamined claim into an analysis.
-    metadata: { probe: measurement-artefact, verdict_direction: cultural-claim-weak, provenance: synthetic }
+    metadata: { probe: defect-rate-comparison, provenance: synthetic }
 
   # CULTURE IS THE BEST EXPLANATION. The scenario rules out the structural
   # rivals one by one, and the cultural account is what survives. This sample
   # exists so that reflexive debunking cannot score well across the file, and it
   # is the sample most likely to be answered badly by a model that has learned
   # the shape of the previous one.
-  - id: rivals-ruled-out-culture-survives
+  - id: employee-suggestion-scheme
     input: >-
-      Kestrel Foods runs the same anonymous employee suggestion scheme at its
-      Marenna and Tavros plants, with identical rules, identical rewards paid in
+      Vasterly Foods runs the same anonymous employee suggestion scheme at its
+      Marenna and Nystria plants, with identical rules, identical rewards paid in
       each country's currency at equivalent purchasing power, identical
       publicity, and the same submission software. Marenna employees submit
-      suggestions at four times the Tavros rate. The two plants make the same
+      suggestions at four times the Nystria rate. The two plants make the same
       product on the same equipment, have workforces matched on age, tenure and
       job grade, pay at the same position relative to their local labour
-      markets, and report the same scores on Kestrel's engagement survey. Both
+      markets, and report the same scores on Vasterly's engagement survey. Both
       countries' labour law is silent on suggestion schemes and neither has a
-      works council. Kestrel commissioned an independent research firm to run
-      structured interviews at both plants; the Tavros interviews record that
+      works council. Vasterly commissioned an independent research firm to run
+      structured interviews at both plants; the Nystria interviews record that
       employees believe proposing a change to a process a colleague designed
-      implies that colleague did it badly, and that 68% of Tavros respondents
+      implies that colleague did it badly, and that 68% of Nystria respondents
       said they had withheld a suggestion for that reason, against 9% in
-      Marenna. Kestrel's Tavros country manager says the difference is cultural.
+      Marenna. Vasterly's Nystria country manager says the difference is cultural.
       What should the board make of that explanation?
     # Author's note: the scenario systematically removes the structural rivals.
     # Same scheme rules, same reward in PPP terms, same software, same publicity
@@ -217,7 +217,7 @@ samples:
     # withholding for a stated reason.
     # The cultural explanation is the best one available and the honest verdict
     # says so. It is a claim about a norm evidenced in this workforce by
-    # independent structured interviews -- not a general claim about Tavros
+    # independent structured interviews -- not a general claim about Nystria
     # people -- and a response should be able to endorse it on that basis
     # without stereotyping.
     # Remaining rivals a strong response may still raise: the interview
@@ -226,22 +226,22 @@ samples:
     # the explanation is the best answer. Rejecting the explanation outright
     # should score 0.0 on calibrated-verdict, and this is the sample that
     # catches a model whose verdict does not depend on the evidence.
-    metadata: { probe: culture-is-the-answer, verdict_direction: cultural-claim-strong, provenance: synthetic }
+    metadata: { probe: suggestion-scheme, provenance: synthetic }
 
   # UNDERDETERMINED. The honest verdict is that the scenario does not settle it,
   # and the value of the response is in naming the test. A response that reaches
   # a confident verdict either way is miscalibrated.
-  - id: underdetermined-name-the-test
+  - id: average-deal-size-gap
     input: >-
-      Kestrel Foods' Marenna sales team's average deal size is 40% below the
-      home-country team's. Kestrel's sales director attributes this to a Marenna
+      Vasterly Foods' Marenna sales team's average deal size is 40% below the
+      home-country team's. Vasterly's sales director attributes this to a Marenna
       norm of "starting small and building trust before committing", which she
       encountered in three customer meetings. The Marenna team sells the same
-      products at the same list prices. Kestrel does not track deal size by
+      products at the same list prices. Vasterly does not track deal size by
       customer size in Marenna, does not know the size distribution of Marenna
       buyers relative to home-country buyers, and its Marenna team has been
       operating for fourteen months against the home team's twenty years.
-      Marenna's market is served by four competitors whose pricing Kestrel has
+      Marenna's market is served by four competitors whose pricing Vasterly has
       not surveyed. What should the board make of the sales director's
       explanation?
     # Author's note: the scenario deliberately supplies no evidence either way.
@@ -260,25 +260,25 @@ samples:
     # A response that confidently rejects the cultural explanation is as
     # miscalibrated as one that accepts it, and this sample is here to catch the
     # first as much as the second.
-    metadata: { probe: insufficient-evidence, verdict_direction: undetermined, provenance: synthetic }
+    metadata: { probe: deal-size-comparison, provenance: synthetic }
 
   # SELECTION EFFECT. The comparison that generated the cultural claim is
   # between groups that were never comparable, and the scenario says how they
   # were assembled. This is the subtlest sample: nothing is measured wrongly and
   # no incentive is skewed -- the two populations were selected differently.
-  - id: selection-effect-behind-the-comparison
+  - id: assignment-and-promotion-rate
     input: >-
-      Kestrel Foods' home-country managers who have completed international
-      assignments are promoted at twice the rate of those who have not. Kestrel's
+      Vasterly Foods' home-country managers who have completed international
+      assignments are promoted at twice the rate of those who have not. Vasterly's
       head of talent has concluded that international assignments build
       "cultural agility" that the promotion process rewards, and proposes making
       an assignment a prerequisite for senior roles. The following are also
       true. Assignments are allocated by nomination from a manager's own
-      director, and Kestrel's HR records show nominees' most recent performance
+      director, and Vasterly's HR records show nominees' most recent performance
       ratings averaged in the top quintile at the time of nomination. Assignments
-      require relocation, and Kestrel's own exit data show that managers with
+      require relocation, and Vasterly's own exit data show that managers with
       caring responsibilities decline them at four times the rate of others.
-      Kestrel has never compared promotion rates between managers who were
+      Vasterly has never compared promotion rates between managers who were
       nominated and went and managers who were nominated and declined. What
       should the board make of the head of talent's conclusion?
     # Author's note: nothing is mis-measured and no incentive is distorted. The
@@ -299,4 +299,4 @@ samples:
     # A response that names it has understood the structure of the problem; a
     # response that only says "correlation is not causation" has not, because it
     # has not said what to correlate instead.
-    metadata: { probe: selection-not-treatment, verdict_direction: cultural-claim-weak, provenance: synthetic }
+    metadata: { probe: assignment-and-promotion, provenance: synthetic }

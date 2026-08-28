@@ -411,3 +411,156 @@ class TestDatasetHygiene:
                     assert country not in sample.input, (
                         f"{task.id}/{sample.id} names {country}; use an invented society"
                     )
+
+
+#: Verdict vocabulary that must never reach a PUBLISHED sample field.
+#:
+#: ``GET /tasks/{id}`` returns each sample's ``id`` and ``metadata`` verbatim and
+#: unauthenticated, and returns the whole ``rubric`` too -- only ``target`` is
+#: redacted (see ``TaskDetail`` in ``services/api/ida_api/schemas.py``). So an id
+#: or a metadata value that STATES the expected answer -- ``factor-does-not-
+#: transmit``, ``home-is-the-outlier``, a ``verdict_direction`` of
+#: ``cultural-claim-weak`` -- hands out the verdict beside the scenario. That is
+#: a contamination leak of exactly the kind the target redaction exists to
+#: prevent, and for a subjective task it is the ONLY leak available, because
+#: there is no target to redact in the first place.
+#:
+#: The design role each sample plays still lives beside it, in a YAML COMMENT --
+#: not parsed, not part of ``content_sha``, never published. That is the
+#: placement SCHEMA.md prescribes for expected verdicts.
+LEAKY_VERDICT_TOKENS = (
+    "does-not-transmit",
+    "no-genuine",
+    "nothing-should",
+    "already-insulated",
+    "is-the-outlier",
+    "transfers-unchanged",
+    "no-significant",
+    "genuinely-no",
+    "cultural-claim",
+    "culture-is-the-answer",
+    "rivals-ruled-out",
+    "insufficient-evidence",
+    "little-to-find",
+    "thin-cultural",
+    "exactly-one",
+    "surface-detail",
+    "correct",
+    "defensible",
+    "refusal-is-wrong",
+    "both-verdicts",
+    "no-clean-answer",
+    "breaks-origin",
+    "forfeits-treaty",
+    "hurts-the-exporter",
+    "mostly-domestic",
+)
+
+
+class TestPublishedSampleFieldsDoNotCarryTheVerdict:
+    """For a subjective task the verdict is the only answer there is to leak."""
+
+    def test_no_sample_id_states_the_expected_answer(self, slo_tasks) -> None:
+        for task in slo_tasks:
+            for sample in task.samples:
+                for token in LEAKY_VERDICT_TOKENS:
+                    assert token not in sample.id, (
+                        f"{task.id}/{sample.id}: sample id carries the verdict token "
+                        f"{token!r}; sample ids are published unauthenticated"
+                    )
+
+    def test_no_metadata_value_states_the_expected_answer(self, slo_tasks) -> None:
+        for task in slo_tasks:
+            for sample in task.samples:
+                for key, value in sample.metadata.items():
+                    for token in LEAKY_VERDICT_TOKENS:
+                        assert token not in str(value), (
+                            f"{task.id}/{sample.id}: metadata.{key} is {value!r}, which "
+                            f"carries the verdict token {token!r}; metadata is published "
+                            "verbatim and unauthenticated"
+                        )
+
+    def test_no_sample_publishes_a_verdict_field(self, slo_tasks) -> None:
+        """``verdict_direction`` published the answer under its own key."""
+        for task in slo_tasks:
+            for sample in task.samples:
+                for key in sample.metadata:
+                    assert "verdict" not in key, (
+                        f"{task.id}/{sample.id}: metadata key {key!r} publishes a verdict"
+                    )
+
+
+#: The criteria whose 1.0 anchor had to be widened so that the mandated
+#: counterweight sample -- the one whose correct answer is "no factor is
+#: operative", "the aspect changes nothing", "nothing should differ" -- can
+#: still score full marks.
+#:
+#: A rubric that phrases its top criterion as a positive-existence demand
+#: ("every step ... is present and each names something that changes") scores
+#: the CORRECT null answer 0.0, which inverts the measurement: the models that
+#: read the insulating fact correctly are the ones marked down. Each branch below
+#: is conditional -- "where the scenario supplies none ..." -- so it fixes the
+#: gradability without telling a reader WHICH sample is the null one, which
+#: matters because the rubric is published unauthenticated too.
+COUNTERWEIGHT_BRANCHES = {
+    "slo3-global-analysis/l1-factor-identification": {
+        "recall-of-operative-factors": "where the scenario supplies facts about none",
+    },
+    "slo3-global-analysis/l2-transmission-mechanism": {
+        "chain-is-complete": "where a stated fact breaks the chain",
+        "direction-and-sign-committed": "where the chain does not reach the decision at all",
+    },
+    "slo3-global-analysis/l3-weighing-competing-factors": {
+        "states-the-reversing-condition": "leave no such condition",
+    },
+    "slo3-global-analysis/l4-systemic-second-order-effects": {
+        "identifies-the-operative-effect": "where the scenario contains no such consequence",
+        "traces-the-threshold-crossing": "where no threshold is crossed",
+        "compares-the-two-orders": "no second-order consequence to weigh",
+    },
+    "slo4-cultural-societal/l2-influence-on-practice": {
+        "names-the-affected-element": "no element is affected",
+        "observable-consequence": "where the aspect changes nothing",
+        "direction-is-committed": "where no effect is claimed",
+        "mechanism-not-restatement": "where the aspect does not reach the practice",
+    },
+    "slo4-cultural-societal/l3-domestic-international-contrast": {
+        "separates-what-transfers-from-what-does-not": 'nothing on the "differs" list',
+        "differences-are-specific": "where the response finds no difference",
+    },
+    "slo4-cultural-societal/l4-adaptation-versus-floor": {
+        "holds-the-non-negotiable-floor": "engages no such standard",
+    },
+}
+
+
+class TestTheUndramaticAnswerCanStillScoreFull:
+    """A correct "nothing changes here" answer must be able to reach 1.0."""
+
+    def test_each_widened_anchor_still_carries_its_alternative_branch(self, slo_tasks) -> None:
+        by_id = {task.id: task for task in slo_tasks}
+        for task_id, criteria in COUNTERWEIGHT_BRANCHES.items():
+            task = by_id[task_id]
+            named = {c.name: c for c in task.rubric.criteria}
+            for criterion_name, branch in criteria.items():
+                assert criterion_name in named, f"{task_id}: no criterion {criterion_name!r}"
+                flat = " ".join(named[criterion_name].description.split())
+                assert branch in flat, (
+                    f"{task_id}/{criterion_name}: the alternative branch that lets the "
+                    f"undramatic answer reach 1.0 is gone (looked for {branch!r})"
+                )
+
+    def test_the_branch_is_conditional_not_a_named_sample(self, slo_tasks) -> None:
+        """The fix must not become the next leak: a branch that says WHICH
+        sample is the null one would put in the published rubric exactly what
+        the sample ids above had to give up."""
+        by_id = {task.id: task for task in slo_tasks}
+        for task_id, criteria in COUNTERWEIGHT_BRANCHES.items():
+            named = {c.name: c for c in by_id[task_id].rubric.criteria}
+            for criterion_name in criteria:
+                flat = " ".join(named[criterion_name].description.split())
+                for sample in by_id[task_id].samples:
+                    assert sample.id not in flat, (
+                        f"{task_id}/{criterion_name}: names sample {sample.id!r} in a "
+                        "published rubric"
+                    )

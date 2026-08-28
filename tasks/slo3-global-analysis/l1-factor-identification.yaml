@@ -22,8 +22,7 @@ description: >
   business scenario, identify the global factors that actually bear on the
   decision. The rubric weights precision equally with recall, because a response
   that lists every global factor it can think of would otherwise score highly on
-  recall alone; one of the four samples is a decision with very few genuine
-  global factors, so an exhaustive lister is caught.
+  recall alone, and an exhaustive lister is caught by it.
 
   This is a subjective task. With no judge model configured it will load, run
   and store transcripts, and report no score -- see docs/llm-judge.md.
@@ -56,12 +55,16 @@ rubric:
         an exchange rate that is quoted, a tariff that is mentioned, a supply
         route that is described, a regulatory regime that is named.
 
-        1.0 -- every global factor the scenario supplies facts about is named.
+        1.0 -- every global factor the scenario supplies facts about is named;
+               where the scenario supplies facts about none, the response
+               reports that none is operative rather than supplying one.
         0.5 -- one such factor is missing, or one is named so vaguely
                ("international issues", "global conditions") that it cannot be
                matched to anything in the scenario.
         0.0 -- two or more are missing, or the response names no factor that
-               can be traced to a fact in the scenario.
+               can be traced to a fact in the scenario WHERE THE SCENARIO
+               SUPPLIES ONE, or asserts an operative factor in a scenario that
+               supplies none.
       weight: 3.0
     - name: precision-against-invented-factors
       description: |-
@@ -107,9 +110,9 @@ samples:
   # CLEAN. The global factors are numerous, explicit and each attached to a
   # stated fact: currency, tariff, freight lead time, and a local-content rule.
   # An adequate response should find all four.
-  - id: sourcing-shift-explicit-factors
+  - id: contract-manufacturing-shift
     input: >-
-      Kestrel Foods currently makes its blender housings at its home-country
+      Vasterly Foods currently makes its blender housings at its home-country
       plant. It is considering moving that production to a contract
       manufacturer in the Republic of Marenna. The contract would be priced in
       Marenna dinar, and the dinar has moved between 7.10 and 9.40 to the US
@@ -118,7 +121,7 @@ samples:
       to the replenishment lead time, against three days from the home plant.
       Marenna's investment code requires that at least 30% of the value of goods
       produced under a contract-manufacturing licence be sourced from Marenna
-      suppliers. Should Kestrel move the production?
+      suppliers. Should Vasterly move the production?
     # Author's note: four operative factors, each with a supplied fact --
     # exchange-rate volatility (the 7.10-9.40 range), trade policy (the 6%
     # duty), global logistics (eleven weeks vs three days), and a host-country
@@ -127,22 +130,22 @@ samples:
     # instability" or "cultural differences" -- neither of which the scenario
     # supports -- should lose precision, and that is the trade this sample
     # exists to expose.
-    metadata: { probe: dense-and-explicit, provenance: synthetic }
+    metadata: { probe: sourcing-shift, provenance: synthetic }
 
   # BORDERLINE. Global factors are present but they are second-order: the
   # decision is mostly about home-market demand. Two verdicts on how much weight
   # to give the global content are defensible; what is being graded is whether
   # the response distinguishes the central factor from the marginal ones.
-  - id: capacity-expansion-mostly-domestic
+  - id: home-capacity-expansion
     input: >-
-      Kestrel Foods' home-market sales have grown 9% a year for three years and
+      Vasterly Foods' home-market sales have grown 9% a year for three years and
       its single home-country plant is at 94% of capacity. Management is
       deciding whether to add a second shift or build a second line. Both
       options serve the home market only. The steel used in the product frames
       is bought on a world commodity market and its price has risen 18% over the
       same period. The specialist machine tools for a second line have an
       eighteen-week delivery time from their only manufacturer, which is
-      overseas. Which option should Kestrel choose?
+      overseas. Which option should Vasterly choose?
     # Author's note: the decision is a domestic capacity question. Two genuine
     # global factors touch it -- world commodity pricing on an input, and a
     # single overseas source for capital equipment with a long lead time -- and
@@ -150,24 +153,24 @@ samples:
     # frames this as a fundamentally global decision should lose
     # calibrated-list-length, and so should one that finds no global factor at
     # all, since two are stated.
-    metadata: { probe: second-order-factors, provenance: synthetic }
+    metadata: { probe: capacity-expansion, provenance: synthetic }
 
   # TRAP. The scenario is dressed in international surface detail -- a
   # foreign-sounding supplier name, a trade fair abroad, an executive relocating
   # -- none of which bears on the decision. The decision itself turns on a
   # domestic contract term. A response that mines the surface detail for global
   # factors has failed precision.
-  - id: international-surface-detail
+  - id: packaging-supplier-renewal
     input: >-
-      Kestrel Foods buys its packaging from Vantario Packaging, a supplier whose
-      founder emigrated from Costa Verde and which is incorporated, staffed and
-      wholly operated in Kestrel's home country from a single home-country
-      plant. Kestrel's purchasing director met Vantario at an industry trade
+      Vasterly Foods buys its packaging from Vantario Packaging, a supplier whose
+      founder emigrated from Cadrenne and which is incorporated, staffed and
+      wholly operated in Vasterly's home country from a single home-country
+      plant. Vasterly's purchasing director met Vantario at an industry trade
       fair in Marenna two years ago. Vantario's home-country contract is up for
       renewal; it offers a 4% discount for a three-year exclusive commitment,
-      against the one-year rolling terms Kestrel has now, and Kestrel's
+      against the one-year rolling terms Vasterly has now, and Vasterly's
       packaging specification is expected to change within eighteen months as it
-      moves to a new product size. Should Kestrel sign the three-year exclusive?
+      moves to a new product size. Should Vasterly sign the three-year exclusive?
     # Author's note: NOTHING here is a global factor. The supplier is domestic
     # in incorporation, staffing and operations; the founder's origin and the
     # location of a trade fair two years ago touch no part of the decision,
@@ -176,21 +179,21 @@ samples:
     # and says so. This is the sample that catches a model which pattern-matches
     # on foreign proper nouns, and it is the reason precision is weighted at
     # 3.0.
-    metadata: { probe: foreign-nouns-no-global-factor, provenance: synthetic }
+    metadata: { probe: packaging-contract-renewal, provenance: synthetic }
 
   # NOTHING-IS-WRONG variant for an identification task: a decision with exactly
   # ONE genuine global factor. The honest list has one item on it. A family
   # whose scenarios are all factor-rich teaches a model to always produce a long
   # list, and a model that always produces a long list is measuring nothing.
-  - id: single-genuine-factor
+  - id: domestic-logistics-tender
     input: >-
-      Kestrel Foods is choosing between two home-country logistics providers for
+      Vasterly Foods is choosing between two home-country logistics providers for
       its domestic distribution. Both quote in the home currency, both operate
       only within the home country, and their service levels are equivalent.
       Provider A quotes a flat annual fee. Provider B quotes a lower base fee
       plus a fuel surcharge indexed to the world crude oil price, which has
       moved by more than 40% within a single year twice in the past decade.
-      Which provider should Kestrel choose?
+      Which provider should Vasterly choose?
     # Author's note: exactly one global factor -- exposure to a world commodity
     # price through the indexed surcharge, which converts a domestic logistics
     # contract into a position on crude. Everything else is deliberately
@@ -200,4 +203,4 @@ samples:
     # geopolitical risk -- none of which the scenario supports -- should lose
     # precision, and one that produces a six-item list should lose
     # calibrated-list-length as well.
-    metadata: { probe: exactly-one-factor, provenance: synthetic }
+    metadata: { probe: domestic-logistics-choice, provenance: synthetic }

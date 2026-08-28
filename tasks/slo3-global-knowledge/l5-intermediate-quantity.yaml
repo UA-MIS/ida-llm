@@ -61,7 +61,7 @@ tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-knowledge, 
 samples:
   - id: hedged-receivable-at-forward-rate
     input: >-
-      Kestrel Foods holds a receivable of 528,000 Marenna dinar due in one year
+      Vasterly Foods holds a receivable of 528,000 Marenna dinar due in one year
       and will hedge it with a one-year forward contract. The spot rate is 8.20
       dinar per US dollar. The one-year interest rate is 10.0% in Marenna and
       2.5% in the United States. The forward rate satisfies covered interest
@@ -108,12 +108,12 @@ samples:
 
   - id: export-breakeven-net-of-duty
     input: >-
-      Kestrel Foods is considering serving the Marenna market by export. The
+      Vasterly Foods is considering serving the Marenna market by export. The
       unit selling price delivered into Marenna is 60.00 US dollars and the unit
       variable cost of production is 36.00 US dollars. Marenna levies an ad
       valorem import duty of 10% of the selling price on each unit, payable by
-      Kestrel. The fixed cost of establishing and running the export channel is
-      90,000 US dollars per year. How many units must Kestrel sell per year to
+      Vasterly. The fixed cost of establishing and running the export channel is
+      90,000 US dollars per year. How many units must Vasterly sell per year to
       break even on the export channel?
     # Intermediate: duty per unit = 0.10 * 60.00 = 6.00, so the contribution
     # margin per unit is 60.00 - 36.00 - 6.00 = 18.00 exactly.
@@ -127,7 +127,7 @@ samples:
 
   - id: net-repatriated-dividend
     input: >-
-      Kestrel Foods' Marenna subsidiary earns a pre-tax profit of 480,000
+      Vasterly Foods' Marenna subsidiary earns a pre-tax profit of 480,000
       Marenna dinar. Marenna levies corporate income tax at 25% of pre-tax
       profit. The subsidiary distributes 60% of its AFTER-TAX profit to the
       parent as a dividend. Marenna then levies a dividend withholding tax of
@@ -148,10 +148,10 @@ samples:
 
   - id: cross-rate-settlement
     input: >-
-      Neither the Marenna dinar nor the Costa Verde peso is quoted directly
+      Neither the Marenna dinar nor the Cadrenne peso is quoted directly
       against the other; both are quoted against the US dollar. The spot rates
       are 8.00 dinar per US dollar and 4.00 pesos per US dollar. A Marenna firm
-      must settle an invoice of 96,000 Costa Verde pesos. How many Marenna dinar
+      must settle an invoice of 96,000 Cadrenne pesos. How many Marenna dinar
       does the firm need?
     # Intermediate: the cross rate is (dinar per dollar) / (pesos per dollar)
     # = 8.00 / 4.00 = 2.00 dinar per peso, exactly.

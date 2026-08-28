@@ -77,7 +77,9 @@ rubric:
         cheapest way to appear decisive is to suppress the counter-case.
 
         1.0 -- names one specific condition, tied to a fact in this scenario,
-               that would reverse the recommendation if it were different.
+               that would reverse the recommendation if it were different;
+               where the scenario's facts leave no such condition, says which
+               fact would have to change and by roughly how much.
         0.5 -- names a condition that would weaken the recommendation without
                reversing it, or one so general it would apply to any decision.
         0.0 -- names no reversing condition, or asserts the recommendation holds
@@ -125,43 +127,43 @@ tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-analysis, l
 samples:
   # CLEAN CONFLICT. Cost points one way, currency and lead-time risk the other,
   # and the magnitudes are supplied so the comparison can actually be made.
-  - id: cheap-but-volatile-versus-dear-but-stable
+  - id: component-supplier-choice
     input: >-
-      Kestrel Foods must choose one supplier for a component it buys 200,000 of
+      Vasterly Foods must choose one supplier for a component it buys 200,000 of
       a year. The Marenna supplier quotes 6.00 US dollars a unit, prices in
       Marenna dinar, requires payment 90 days after shipment, and ships on an
       eleven-week ocean lead time; the dinar has moved by up to 25% against the
-      dollar within a single year in four of the past ten years, and Kestrel
-      does not currently hedge. The Costa Verde supplier quotes 7.20 US dollars
+      dollar within a single year in four of the past ten years, and Vasterly
+      does not currently hedge. The Cadrenne supplier quotes 7.20 US dollars
       a unit, prices in US dollars, and ships on a two-week lead time under a
       trade agreement that has been in force for eleven years and has three
-      years left to run. Which supplier should Kestrel choose?
+      years left to run. Which supplier should Vasterly choose?
     # Author's note: the cost gap is 1.20 a unit on 200,000 units = 240,000 a
     # year, which is supplied enough to size. Against it: an unhedged 25% dinar
     # move on a 90-day payable, and an eleven-week lead time that ties up
     # working capital and slows response. A response that recommends Marenna and
     # names hedging as the condition is defensible; so is one that recommends
-    # Costa Verde and names the cost gap widening as the reversing condition.
+    # Cadrenne and names the cost gap widening as the reversing condition.
     # What is NOT defensible is treating the currency exposure as unbounded --
     # the scenario bounds it at 25%, and the response that says "unlimited
     # currency risk" should lose respects-the-supplied-magnitudes.
-    metadata: { probe: sized-conflict, provenance: synthetic }
+    metadata: { probe: cost-against-currency-risk, provenance: synthetic }
 
   # BORDERLINE. Genuinely close, and deliberately so: the two options are near
   # enough that the recommendation follows from which factor the responder
   # treats as decisive. Grade the weighing, not the verdict.
-  - id: genuinely-close-call
+  - id: marenna-market-entry
     input: >-
-      Kestrel Foods can enter the Marenna market either through a distributor,
-      which requires no capital and yields Kestrel 22% of the retail price, or
+      Vasterly Foods can enter the Marenna market either through a distributor,
+      which requires no capital and yields Vasterly 22% of the retail price, or
       by establishing its own sales subsidiary, which requires 1.4 million US
-      dollars of capital and would yield Kestrel 38% of the retail price at the
+      dollars of capital and would yield Vasterly 38% of the retail price at the
       volumes it forecasts. Marenna restricts the repatriation of subsidiary
       profits to 70% of after-tax earnings in any year, with the remainder
       releasable only on exit. The distributor holds the customer relationships
       and has a two-year notice period. Marenna's market is forecast to grow 11%
-      a year for five years, and Kestrel's forecasts for the last three markets
-      it entered were each within 15% of outturn. Which route should Kestrel
+      a year for five years, and Vasterly's forecasts for the last three markets
+      it entered were each within 15% of outturn. Which route should Vasterly
       take?
     # Author's note: this is close on purpose and both verdicts are defensible.
     # For the subsidiary: a 16-point margin difference on a market growing 11% a
@@ -171,27 +173,27 @@ samples:
     # the customer relationships, which makes the switch slow and the
     # relationships non-transferable. What earns credit is naming which factor
     # is decisive and why; what loses it is listing all four and concluding
-    # "it depends on Kestrel's risk appetite", which is the non-answer
+    # "it depends on Vasterly's risk appetite", which is the non-answer
     # commits-to-a-recommendation exists to catch.
-    metadata: { probe: genuinely-balanced, provenance: synthetic }
+    metadata: { probe: market-entry-mode, provenance: synthetic }
 
   # TRAP. One factor is salient, alarming and CAPPED by a stated fact. A
   # responder who anchors on the salient number without reading the cap will
   # let it dominate a decision it cannot actually dominate.
-  - id: salient-risk-with-a-stated-cap
+  - id: assembly-relocation-decision
     input: >-
-      Kestrel Foods is deciding whether to move final assembly for its
+      Vasterly Foods is deciding whether to move final assembly for its
       home-market product line to Marenna, which would cut assembly cost by
       2.1 million US dollars a year. Marenna's government has in the past
       imposed export levies on manufactured goods. Under the Marenna-home
       country investment treaty, to which Marenna is a party and which runs for
       a further twelve years and cannot be unilaterally denounced, any such levy
       on goods produced by a treaty-protected investor is capped at 1% of export
-      value; Kestrel's export value under the proposal would be 30 million US
+      value; Vasterly's export value under the proposal would be 30 million US
       dollars a year. Separately, the move would extend the replenishment lead
-      time from four days to nine weeks, and Kestrel's home market has
+      time from four days to nine weeks, and Vasterly's home market has
       historically required it to serve 30% of annual volume from stock held
-      against unforecast demand. Should Kestrel move assembly to Marenna?
+      against unforecast demand. Should Vasterly move assembly to Marenna?
     # Author's note: the export-levy risk is the salient, alarming factor, and
     # it is CAPPED: 1% of 30 million is at most 300,000 a year against a
     # 2.1 million saving, under a treaty that has twelve years to run and cannot
@@ -204,23 +206,23 @@ samples:
     # not size. The strongest responses recommend the move, name the levy risk
     # as bounded and immaterial, and make the lead-time and inventory question
     # the reversing condition.
-    metadata: { probe: salient-but-capped, provenance: synthetic }
+    metadata: { probe: capped-exposure, provenance: synthetic }
 
   # NO-REAL-TRADEOFF. Every global factor points the same way. The honest answer
   # is short and decisive, and the reversing condition has to be a genuine one
   # rather than a manufactured counter-case. This is the sample that catches the
   # response whose shape is always "on the one hand, on the other hand".
-  - id: factors-all-point-one-way
+  - id: packaging-film-sourcing
     input: >-
-      Kestrel Foods sources a packaging film from a single supplier in Marenna.
+      Vasterly Foods sources a packaging film from a single supplier in Marenna.
       Marenna has announced an export licensing regime for that film effective
       in six months, with no published criteria for granting a licence. The
       dinar has appreciated 22% against the dollar in the past year, raising
-      Kestrel's landed cost. Ocean freight on the lane has doubled. An
-      equivalent film, qualified by Kestrel's own laboratory as meeting the same
+      Vasterly's landed cost. Ocean freight on the lane has doubled. An
+      equivalent film, qualified by Vasterly's own laboratory as meeting the same
       specification, is available from a home-country supplier at a landed cost
-      4% below Kestrel's current Marenna landed cost, on two-week lead times,
-      with capacity for Kestrel's full volume. Should Kestrel move the film to
+      4% below Vasterly's current Marenna landed cost, on two-week lead times,
+      with capacity for Vasterly's full volume. Should Vasterly move the film to
       the home-country supplier?
     # Author's note: every factor points the same way -- supply-security risk
     # from an opaque licensing regime, an adverse currency move, doubled
@@ -232,7 +234,7 @@ samples:
     # creates its own concentration risk" -- neither supported by anything in
     # the scenario) should lose no-manufactured-balance.
     # The reversing condition still has to be real, and one is available: the
-    # laboratory qualification is Kestrel's own and covers specification, not
+    # laboratory qualification is Vasterly's own and covers specification, not
     # production-scale performance, so a failure at scale would reverse the
     # recommendation. A response that finds that has read the scenario closely.
-    metadata: { probe: no-genuine-tradeoff, provenance: synthetic }
+    metadata: { probe: export-licensing-risk, provenance: synthetic }

@@ -25,12 +25,11 @@ id: slo3-global-analysis/l4-systemic-second-order-effects
 title: Global perspective -- second-order consequences of crossing a threshold in a global system
 description: >
   Rung 4 of the slo3-global-analysis ladder, and the top of it. Each scenario
-  proposes an action with a clear first-order benefit. In three of the four, the
-  action also moves the firm across a threshold in a cross-border rule system --
-  rules of origin, an investment treaty's investor definition, a customs
-  valuation basis, a permanent-establishment test -- and the consequence of
-  crossing it is not mentioned anywhere in the prompt. In the fourth there is no
-  such consequence, and saying so is the correct answer.
+  proposes an action with a clear first-order benefit. The action may also move the firm across a
+  threshold in a cross-border rule system -- rules of origin, an investment
+  treaty's investor definition, a customs valuation basis, a
+  permanent-establishment test -- and any consequence of crossing it is not
+  mentioned anywhere in the prompt.
 
   It is the top rung because the decisive consideration is absent from the text:
   it has to be supplied from an understanding of how the systems interact, and
@@ -71,7 +70,9 @@ rubric:
         some consequence?
 
         1.0 -- names the operative consequence and the rule or threshold that
-               produces it.
+               produces it; where the scenario contains no such consequence,
+               reports that and names the rule systems checked and found not to
+               be engaged.
         0.5 -- gestures at the right area ("this could affect the firm's
                treatment under the trade agreement") without naming the rule or
                the threshold that is crossed.
@@ -101,10 +102,12 @@ rubric:
         line -- rather than asserting that the rule now applies differently?
 
         1.0 -- names the quantity, its direction of movement, and the threshold
-               it crosses.
+               it crosses; where no threshold is crossed, names the quantity
+               that moves and shows it stays the relevant side of the line.
         0.5 -- names the rule and the fact that its application changes, but not
                the quantity or the threshold.
-        0.0 -- asserts a changed outcome with no account of what moved.
+        0.0 -- asserts a changed outcome with no account of what moved, or
+               asserts a crossing the stated quantities do not produce.
       weight: 3.0
     - name: compares-the-two-orders
       description: |-
@@ -113,7 +116,9 @@ rubric:
 
         1.0 -- states which is larger and gives a basis -- a supplied figure, a
                comparison of the bases the two apply to, or an explicit
-               statement of what would have to be measured to decide.
+               statement of what would have to be measured to decide; where
+               there is no second-order consequence to weigh, says so and lets
+               the first-order benefit stand.
         0.5 -- notes that both exist without indicating which dominates.
         0.0 -- ignores the first-order benefit, or asserts a ranking with no
                basis at all.
@@ -133,18 +138,18 @@ samples:
   # CLEAN. The rules-of-origin threshold is the textbook shape of this failure
   # and every number needed to see it is supplied. This is the sample that
   # separates "reasons about systems" from "reasons about prices".
-  - id: cheaper-input-breaks-origin-status
+  - id: cheaper-assembly-input
     input: >-
-      Kestrel Foods assembles appliances in Costa Verde and exports them into
+      Vasterly Foods assembles appliances in Cadrenne and exports them into
       Marenna, where they enter duty-free because they qualify as originating
-      under the Marenna-Costa Verde trade agreement. The agreement grants
+      under the Marenna-Cadrenne trade agreement. The agreement grants
       originating status to a finished appliance whose regional value content is
       60% or above; appliances below that threshold pay the standard 11% duty on
-      their full customs value. Kestrel's appliances currently have a regional
+      their full customs value. Vasterly's appliances currently have a regional
       value content of 64%. A supplier outside the bloc has offered a motor
-      assembly at 340,000 US dollars a year less than Kestrel's current in-bloc
-      motor supplier; switching would take Kestrel's regional value content to
-      52%. Kestrel exports 21 million US dollars of appliances into Marenna a
+      assembly at 340,000 US dollars a year less than Vasterly's current in-bloc
+      motor supplier; switching would take Vasterly's regional value content to
+      52%. Vasterly exports 21 million US dollars of appliances into Marenna a
       year. Proposed action: switch to the cheaper out-of-bloc motor supplier.
     # Author's note: the first-order benefit is 340,000 a year. The second-order
     # consequence is that the regional value content falls from 64% to 52%,
@@ -157,26 +162,26 @@ samples:
     # without noticing which base it applies to has missed why the comparison is
     # so lopsided. Every figure needed is supplied, so a response that says the
     # comparison cannot be made has not attempted it.
-    metadata: { probe: rules-of-origin-threshold, provenance: synthetic }
+    metadata: { probe: input-substitution, provenance: synthetic }
 
   # BORDERLINE. The second-order consequence is real but its magnitude is NOT
   # supplied, so the honest answer names it and says what would have to be
   # measured. A response that invents a magnitude to settle it has failed a
   # different criterion than one that misses the effect.
-  - id: restructuring-forfeits-treaty-protection
+  - id: holding-company-restructure
     input: >-
-      Kestrel Foods holds its Marenna assembly plant through a holding company
+      Vasterly Foods holds its Marenna assembly plant through a holding company
       incorporated in its home country. The Marenna-home country investment
       treaty protects investments held by home-country investors, and defines a
       home-country investor as an entity incorporated in the home country whose
       centre of management is also there. The treaty gives protected investors
       access to international arbitration against expropriation and against
       discriminatory regulation, and caps export levies on their goods at 1%.
-      Kestrel's tax advisers have proposed moving the holding company's board,
-      officers and management functions to Costa Verde, which would reduce the
+      Vasterly's tax advisers have proposed moving the holding company's board,
+      officers and management functions to Cadrenne, which would reduce the
       group's annual tax charge by 900,000 US dollars. Marenna's plant has a
       book value of 40 million US dollars. Proposed action: move the holding
-      company's centre of management to Costa Verde.
+      company's centre of management to Cadrenne.
     # Author's note: the treaty's investor definition is conjunctive --
     # incorporation AND centre of management in the home country. Moving the
     # centre of management fails the second limb, so the Marenna plant ceases to
@@ -190,24 +195,24 @@ samples:
     # asserts "this risk is worth about X" without flagging it as an assumption
     # should lose separates-stated-from-inferred. This is the borderline sample
     # because two conclusions are defensible once the effect is identified.
-    metadata: { probe: treaty-investor-definition, provenance: synthetic }
+    metadata: { probe: holding-restructure, provenance: synthetic }
 
   # TRAP. The scenario dangles an obvious second-order story that a STATED FACT
   # rules out -- and contains a different, quieter one that is real. A response
   # that reaches for the obvious story fails; one that says "no second-order
   # effect" also fails; only close reading gets both halves right.
-  - id: obvious-effect-blocked-quiet-effect-real
+  - id: distributor-arrangement-change
     input: >-
-      Kestrel Foods sells into Marenna through an independent Marenna
+      Vasterly Foods sells into Marenna through an independent Marenna
       distributor that buys on its own account, sets its own resale prices, and
-      has no authority to conclude contracts on Kestrel's behalf. Kestrel is
+      has no authority to conclude contracts on Vasterly's behalf. Vasterly is
       proposing to station two of its own employees in Marenna full-time. Under
       Marenna law a foreign enterprise has a taxable permanent establishment in
       Marenna only if it has a fixed place of business there or a dependent
-      agent habitually concluding contracts in its name; Kestrel's proposed
+      agent habitually concluding contracts in its name; Vasterly's proposed
       employees would work from the distributor's premises under a written
       agreement stating they may not negotiate or conclude contracts, and
-      Kestrel's tax counsel has confirmed in writing that this does not create a
+      Vasterly's tax counsel has confirmed in writing that this does not create a
       permanent establishment. The two employees would be product trainers, and
       their presence is forecast to raise distributor sell-through by 12%.
       Marenna's competition statute treats resale price maintenance as a
@@ -215,14 +220,14 @@ samples:
       Marenna turnover. Proposed action: station the two trainers in Marenna.
     # Author's note: the OBVIOUS second-order story is permanent establishment
     # and Marenna tax exposure -- and it is explicitly ruled out by the stated
-    # facts: no fixed place of business of Kestrel's own, no contract-concluding
+    # facts: no fixed place of business of Vasterly's own, no contract-concluding
     # authority, and confirming advice on the record. A response that makes
     # permanent establishment its headline consequence should lose
     # does-not-manufacture-effects, because it has asserted a consequence the
     # scenario states does not arise.
-    # The QUIET consequence is real: putting Kestrel's own employees inside the
+    # The QUIET consequence is real: putting Vasterly's own employees inside the
     # distributor's premises, working alongside its sales staff, creates a route
-    # by which Kestrel personnel influence the distributor's resale prices -- a
+    # by which Vasterly personnel influence the distributor's resale prices -- a
     # per se violation carrying up to 4% of Marenna turnover, in a relationship
     # whose defence to date is that the distributor sets its own prices
     # independently. It is a compliance and supervision consequence, not a tax
@@ -230,27 +235,27 @@ samples:
     # Full credit requires both halves: ruling out the obvious effect on the
     # stated facts AND naming the quiet one. This is the hardest sample in the
     # family.
-    metadata: { probe: obvious-blocked-quiet-real, provenance: synthetic }
+    metadata: { probe: distribution-channel-change, provenance: synthetic }
 
   # NOTHING-IS-WRONG. No significant second-order consequence exists, and the
   # correct answer is to say so. Without this sample the rubric would reward a
   # model that always finds a hidden catch, and a model that always finds a
   # hidden catch is not reasoning about systems -- it has learned the shape of
   # the task.
-  - id: no-significant-second-order-effect
+  - id: dual-sourced-fastener
     input: >-
-      Kestrel Foods buys a stainless fastener from two qualified suppliers, both
-      inside the Marenna-Costa Verde bloc: 60% of volume from a Marenna supplier
-      and 40% from a Costa Verde supplier. Both price in US dollars, both hold
+      Vasterly Foods buys a stainless fastener from two qualified suppliers, both
+      inside the Marenna-Cadrenne bloc: 60% of volume from a Marenna supplier
+      and 40% from a Cadrenne supplier. Both price in US dollars, both hold
       the same bloc-origin status, both ship on two-week lead times, and the
-      fastener is a bloc-originating input under either source. The Costa Verde
+      fastener is a bloc-originating input under either source. The Cadrenne
       supplier has offered a 3% discount to take 80% of the volume; it has
       audited capacity for that share, and the change would not alter the
-      regional value content of any Kestrel product, since both sources already
-      count as regional content. Kestrel's contract with the Marenna supplier is
+      regional value content of any Vasterly product, since both sources already
+      count as regional content. Vasterly's contract with the Marenna supplier is
       a one-year rolling agreement with a 60-day notice period and no minimum
       volume commitment. Proposed action: shift the volume split to 20/80 in
-      favour of the Costa Verde supplier.
+      favour of the Cadrenne supplier.
     # Author's note: every threshold this family turns on is explicitly
     # neutralised -- both sources are bloc-originating so regional value content
     # is unchanged; both price in the same currency so there is no new FX
@@ -266,4 +271,4 @@ samples:
     # above -- should score 0.0 on does-not-manufacture-effects.
     # A response may note the concentration point without penalty provided it
     # does not dress it as a rules-driven second-order effect.
-    metadata: { probe: genuinely-no-second-order-effect, provenance: synthetic }
+    metadata: { probe: dual-source-fastener, provenance: synthetic }
