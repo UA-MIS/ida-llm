@@ -55,7 +55,7 @@ class TestQuestionTree:
     def test_a_teacher_is_never_asked_about_unpublished_data(self) -> None:
         asked = {q.id for q in applicable_questions({"role": "teacher"})}
         assert "unpublished_data" not in asked
-        assert "teaching_task" in asked
+        assert "beneficiary" in asked
 
     def test_the_ferpa_branch_opens_only_once_student_data_is_admitted(self) -> None:
         base = {"role": "teacher"}
