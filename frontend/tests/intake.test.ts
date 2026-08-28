@@ -97,6 +97,37 @@ describe("missingRequired", () => {
     });
     expect(missing).toEqual([]);
   });
+
+  it("treats teaching_task and student_task as either/or for a teacher", () => {
+    const tree: IntakeQuestion[] = [
+      question("role", {
+        options: [
+          { value: "teacher", label: "Teaching", detail: null },
+          { value: "both", label: "Both", detail: null },
+        ],
+      }),
+      question("teaching_task"),
+      question("student_task"),
+      question("stakes"),
+    ];
+    expect(
+      missingRequired(tree, {
+        role: "teacher",
+        teaching_task: "yes",
+        stakes: "yes",
+      }).map((q) => q.id),
+    ).toEqual([]);
+    expect(
+      missingRequired(tree, {
+        role: "both",
+        student_task: "yes",
+        stakes: "yes",
+      }).map((q) => q.id),
+    ).toEqual([]);
+    expect(
+      missingRequired(tree, { role: "teacher", stakes: "yes" }).map((q) => q.id),
+    ).toEqual(["teaching_task", "student_task"]);
+  });
 });
 
 describe("nextQuestion", () => {

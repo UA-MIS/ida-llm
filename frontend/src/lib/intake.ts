@@ -16,6 +16,21 @@ import type { IntakeQuestion } from "./types";
 
 export type Answers = Record<string, string>;
 
+const TEACHING_SIDE_TASK_IDS = new Set(["teaching_task", "student_task"]);
+
+function hasTeachingSideTask(answers: Answers): boolean {
+  return Boolean(answers.teaching_task || answers.student_task);
+}
+
+function skipPairedTaskQuestion(question: IntakeQuestion, answers: Answers): boolean {
+  const role = answers.role;
+  return (
+    (role === "teacher" || role === "both") &&
+    hasTeachingSideTask(answers) &&
+    TEACHING_SIDE_TASK_IDS.has(question.id)
+  );
+}
+
 /**
  * The questions that apply given what has been answered so far.
  *
@@ -42,7 +57,10 @@ export function missingRequired(
   answers: Answers,
 ): IntakeQuestion[] {
   return applicableQuestions(questions, answers).filter(
-    (question) => question.required && !answers[question.id],
+    (question) =>
+      question.required &&
+      !answers[question.id] &&
+      !skipPairedTaskQuestion(question, answers),
   );
 }
 
@@ -58,7 +76,10 @@ export function nextQuestion(
   answers: Answers,
 ): IntakeQuestion | null {
   const applicable = applicableQuestions(questions, answers);
-  const unanswered = applicable.filter((question) => !answers[question.id]);
+  const unanswered = applicable.filter(
+    (question) =>
+      !answers[question.id] && !skipPairedTaskQuestion(question, answers),
+  );
   return (
     unanswered.find((question) => question.required) ?? unanswered[0] ?? null
   );

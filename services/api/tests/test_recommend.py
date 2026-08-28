@@ -57,6 +57,21 @@ class TestQuestionTree:
         assert "unpublished_data" not in asked
         assert "beneficiary" in asked
 
+    def test_a_teaching_task_branch_open(self) -> None:
+        asked = {q.id for q in applicable_questions({"beneficiary": "for_me"})}
+        assert "student_task" not in asked
+        assert "teaching_task" in asked
+
+    def test_a_student_task_branch_open(self) -> None:
+        asked = {q.id for q in applicable_questions({"beneficiary": "for_students"})}
+        assert "student_task" in asked
+        assert "teaching_task" not in asked
+
+    def test_a_both_task_branch_open(self) -> None:
+        asked = {q.id for q in applicable_questions({"beneficiary": "both"})}
+        assert "student_task" in asked
+        assert "teaching_task" in asked
+
     def test_the_ferpa_branch_opens_only_once_student_data_is_admitted(self) -> None:
         base = {"role": "teacher"}
         assert "ferpa_hard_requirement" not in {q.id for q in applicable_questions(base)}
@@ -106,6 +121,88 @@ class TestRefusalOnThinContext:
         assert QUESTIONS_BY_ID["ai_trust"].required is False
         body = recommend(client, COMPLETE_TEACHING_ANSWERS)
         assert body["status"] != "need_more_context"
+
+    def test_a_student_task_is_enough_for_a_teacher(self, client: TestClient) -> None:
+        """A teacher who named a student-facing task has told us what to look up."""
+        body = recommend(
+            client,
+            {
+                "role": "teacher",
+                "beneficiary": "for_students",
+                "student_task": "notetaking",
+                "student_data": "no",
+                "subject_level": "intro_undergrad",
+                "stakes": "medium",
+                "budget": "modest_paid",
+            },
+        )
+        assert body["status"] != "need_more_context"
+
+    def test_either_teaching_side_task_suffices_when_both_apply(self, client: TestClient) -> None:
+        """Beneficiary 'both' opens both task questions; answering one is enough."""
+        base = {
+            "role": "teacher",
+            "beneficiary": "both",
+            "student_data": "no",
+            "subject_level": "intro_undergrad",
+            "stakes": "medium",
+            "budget": "modest_paid",
+        }
+        teaching_only = recommend(client, {**base, "teaching_task": "quiz_generation"})
+        assert teaching_only["status"] != "need_more_context"
+        student_only = recommend(client, {**base, "student_task": "notetaking"})
+        assert student_only["status"] != "need_more_context"
+
+    def test_role_both_still_needs_a_research_task(self, client: TestClient) -> None:
+        body = recommend(
+            client,
+            {
+                "role": "both",
+                "beneficiary": "for_me",
+                "teaching_task": "quiz_generation",
+                "student_data": "no",
+                "unpublished_data": "no",
+                "subject_level": "intro_undergrad",
+                "stakes": "medium",
+                "budget": "modest_paid",
+            },
+        )
+        assert body["status"] == "need_more_context"
+        assert {g["question_id"] for g in body["gaps"]} == {"research_task"}
+
+    def test_role_both_accepts_student_task_in_place_of_teaching_task(
+        self, client: TestClient
+    ) -> None:
+        body = recommend(
+            client,
+            {
+                "role": "both",
+                "beneficiary": "for_students",
+                "student_task": "notetaking",
+                "research_task": "literature_review",
+                "student_data": "no",
+                "unpublished_data": "no",
+                "subject_level": "intro_undergrad",
+                "stakes": "medium",
+                "budget": "modest_paid",
+            },
+        )
+        assert body["status"] != "need_more_context"
+
+    def test_a_teacher_with_no_task_still_needs_one(self, client: TestClient) -> None:
+        body = recommend(
+            client,
+            {
+                "role": "teacher",
+                "beneficiary": "for_me",
+                "student_data": "no",
+                "subject_level": "intro_undergrad",
+                "stakes": "medium",
+                "budget": "modest_paid",
+            },
+        )
+        assert body["status"] == "need_more_context"
+        assert "teaching_task" in {g["question_id"] for g in body["gaps"]}
 
     def test_a_bogus_option_value_is_rejected_outright(self, client: TestClient) -> None:
         response = client.post("/recommend", json={"answers": {"role": "vice-chancellor"}})
