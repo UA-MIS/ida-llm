@@ -134,7 +134,7 @@ QUESTIONS: list[IntakeQuestion] = [
         id="teaching_task",
         prompt="What do you want help with?",
         why_it_matters="This is what we look up in the benchmark. Everything after it is about which of the measured models fits your situation.",
-        depends_on=IntakeCondition(question_id="role", values=["teacher", "both"]),
+        depends_on=IntakeCondition(question_id="beneficiary", values=["for_me", "both"]),
         options=[
             IntakeOption(
                 value="grading",
