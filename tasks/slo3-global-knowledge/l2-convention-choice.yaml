@@ -61,7 +61,7 @@ samples:
     # = 36.9230769... -> 36.92.
     # Mark-up on cost would give 24 * 1.35 = 32.40 -- 4.52 away, 452x tolerance.
     target: "36.92"
-    metadata: { skill: margin-versus-markup, factor: cross-border-pricing, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: margin-versus-markup, factor: cross-border-pricing, provenance: synthetic }
 
   - id: indirect-quote-conversion
     input: >-
@@ -76,7 +76,7 @@ samples:
     # This is the item most likely to be got wrong by a model that pattern-
     # matches "exchange rate" to "multiply", which is the point.
     target: "51200"
-    metadata: { skill: direct-versus-indirect-quote, factor: exchange-rates, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: direct-versus-indirect-quote, factor: exchange-rates, provenance: synthetic }
 
   - id: duty-on-cif-not-fob
     input: >-
@@ -96,7 +96,7 @@ samples:
     # CIF-basis customs valuation are both real conventions, so an item that
     # left it implicit would have two defensible keys.
     target: "46300.80"
-    metadata: { skill: customs-valuation-basis, factor: trade-policy, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: customs-valuation-basis, factor: trade-policy, provenance: synthetic }
 
   - id: transfer-price-markup-on-cost
     input: >-
@@ -110,7 +110,7 @@ samples:
     # -> 71.02, which is 1.02 away: 102x the tolerance. The gap is the narrowest
     # in this file and is stated here so a reviewer does not have to find it.
     target: "70"
-    metadata: { skill: transfer-pricing-basis, factor: multinational-tax, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: transfer-pricing-basis, factor: multinational-tax, provenance: synthetic }
 
   - id: real-growth-exact-fisher
     input: >-
@@ -126,4 +126,4 @@ samples:
     # 7.547169 is nowhere near a .xx5 rounding boundary, so round-half-up and
     # round-half-even agree.
     target: "7.55"
-    metadata: { skill: nominal-versus-real-growth, factor: inflation-differentials, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: nominal-versus-real-growth, factor: inflation-differentials, provenance: synthetic }

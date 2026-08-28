@@ -161,7 +161,7 @@ samples:
     # A response that treats the home five-point scale as "the" screen and
     # Marenna as lacking one has missed that the scale is itself a local
     # institution.
-    metadata: { probe: graduate-recruitment, provenance: synthetic }
+    metadata: { slo: SLO4, use_mode: capability, probe: graduate-recruitment, provenance: synthetic }
 
   # THE HOME PRACTICE IS THE OUTLIER. This is the sample the
   # home-context-not-treated-as-neutral criterion exists for. A response that
@@ -197,7 +197,7 @@ samples:
     # revealed it. A response that recommends keeping the practice at home and
     # waiving it in Aldenmark has treated the home context as neutral and should
     # score 0.0 on that criterion, however fluent the rest is.
-    metadata: { probe: reference-checking, provenance: synthetic }
+    metadata: { slo: SLO4, use_mode: capability, probe: reference-checking, provenance: synthetic }
 
   # BORDERLINE. Two defensible standards, and the difference is genuine rather
   # than one setting being wrong. What is graded is whether the response
@@ -231,7 +231,7 @@ samples:
     # as "more relationship-oriented" or the home country as "more transactional"
     # has substituted a cultural stereotype for a structural account that the
     # facts fully support, and should lose no-appeal-to-national-stereotype.
-    metadata: { probe: closure-notice-period, provenance: synthetic }
+    metadata: { slo: SLO4, use_mode: capability, probe: closure-notice-period, provenance: synthetic }
 
   # TRANSFERS UNCHANGED. The correct answer is that nothing should differ. A
   # family whose every item produces a difference teaches that difference is
@@ -265,4 +265,4 @@ samples:
     # waiver as a cultural adaptation has confused adapting to a society with
     # deferring to a counterparty's commercial preference -- which is the
     # distinction rung 4 is built around.
-    metadata: { probe: product-safety-recall, provenance: synthetic }
+    metadata: { slo: SLO4, use_mode: capability, probe: product-safety-recall, provenance: synthetic }

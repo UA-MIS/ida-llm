@@ -69,7 +69,7 @@ samples:
     # 4250 * 8.50 = 36,125 -- 35,625 away, and obviously absurd, which is what
     # a floor item should be.
     target: "500"
-    metadata: { skill: spot-rate-conversion, factor: exchange-rates, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: spot-rate-conversion, factor: exchange-rates, provenance: synthetic }
 
   - id: ad-valorem-duty-on-customs-value
     input: >-
@@ -80,7 +80,7 @@ samples:
     # Reading "6.5%" as a flat 6.5 dollars gives 6.50 -- 799.50 away.
     # Applying 65% (a decimal-place slip) gives 8,060 -- 7,254 away.
     target: "806"
-    metadata: { skill: ad-valorem-duty, factor: trade-policy, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: ad-valorem-duty, factor: trade-policy, provenance: synthetic }
 
   - id: freight-cost-per-unit
     input: >-
@@ -90,7 +90,7 @@ samples:
     # 18,560 / 3,200 = 5.80 exactly.
     # Inverting the division gives 3,200 / 18,560 = 0.1724 -- 5.63 away.
     target: "5.8"
-    metadata: { skill: freight-allocation, factor: global-logistics, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: freight-allocation, factor: global-logistics, provenance: synthetic }
 
   - id: overlap-hours-across-time-zones
     input: >-
@@ -107,7 +107,7 @@ samples:
     # factor in the plainest sense: it constrains how a distributed team can be
     # staffed.
     target: "1"
-    metadata: { skill: time-zone-overlap, factor: global-operations, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: time-zone-overlap, factor: global-operations, provenance: synthetic }
 
   - id: regional-value-content-share
     input: >-
@@ -121,4 +121,4 @@ samples:
     # Using the non-bloc remainder instead gives 6,300 / 21,000 = 30 -- 40 away.
     # Inverting gives 21,000 / 14,700 = 142.86 -- 72.86 away.
     target: "70"
-    metadata: { skill: regional-value-content, factor: trade-agreements, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: regional-value-content, factor: trade-agreements, provenance: synthetic }

@@ -93,7 +93,7 @@ samples:
     # this scenario explicitly does not use -- gives 60,000: 14,000 away.
     # Multiplying by the spot rate instead of dividing gives 3,840,000.
     target: "74000"
-    metadata: { skill: customs-valuation, stage: one, factor: trade-policy, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: customs-valuation, stage: one, factor: trade-policy, provenance: synthetic }
 
   # STAGE 2. Depends on stage 1; an error there lands here scaled by 1.08.
   - id: marenna-total-landed-cost
@@ -113,7 +113,7 @@ samples:
     # 78,800 -- 1,120 away.
     # Omitting the duty gives 74,000 -- 5,920 away.
     target: "79920"
-    metadata: { skill: landed-cost-buildup, stage: two, factor: global-sourcing, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: landed-cost-buildup, stage: two, factor: global-sourcing, provenance: synthetic }
 
   # STAGE 3. The other branch of the comparison, and the only per-unit figure
   # asked for -- 54,000 / 40,000 is exactly 1.35, so no rounding is involved.
@@ -134,7 +134,7 @@ samples:
     # -- the trade-agreement fact the item turns on -- gives 58,320 / 40,000 =
     # 1.458 -> 1.46: 0.11 away, still 11x the tolerance.
     target: "1.35"
-    metadata: { skill: preferential-rate-application, stage: three, factor: trade-agreements, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: preferential-rate-application, stage: three, factor: trade-agreements, provenance: synthetic }
 
   # STAGE 4. The first genuinely chained item: it needs stage 2 AND stage 3.
   - id: annual-cost-advantage
@@ -156,7 +156,7 @@ samples:
     # understates the advantage by 42%.
     # Comparing customs values gives 74,000 - 54,000 = 20,000: 5,920 away.
     target: "25920"
-    metadata: { skill: chained-comparison, stage: four, factor: global-sourcing, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: chained-comparison, stage: four, factor: global-sourcing, provenance: synthetic }
 
   # STAGE 5. The hardest item in the family: the chain inverted. The unknown
   # sits inside the quantity the duty is levied on, so the duty cannot be
@@ -190,4 +190,4 @@ samples:
     # 54,000 gives the same 12.00.
     # 13.3333... is not near a .xx5 boundary.
     target: "13.33"
-    metadata: { skill: inverted-chain-solve, stage: five, factor: exchange-rate-sensitivity, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: inverted-chain-solve, stage: five, factor: exchange-rate-sensitivity, provenance: synthetic }

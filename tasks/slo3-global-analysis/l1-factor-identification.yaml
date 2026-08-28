@@ -132,7 +132,7 @@ samples:
     # instability" or "cultural differences" -- neither of which the scenario
     # supports -- should lose precision, and that is the trade this sample
     # exists to expose.
-    metadata: { probe: sourcing-shift, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, probe: sourcing-shift, provenance: synthetic }
 
   # BORDERLINE. Global factors are present but they are second-order: the
   # decision is mostly about home-market demand. Two verdicts on how much weight
@@ -155,7 +155,7 @@ samples:
     # frames this as a fundamentally global decision should lose
     # calibrated-list-length, and so should one that finds no global factor at
     # all, since two are stated.
-    metadata: { probe: capacity-expansion, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, probe: capacity-expansion, provenance: synthetic }
 
   # TRAP. The scenario is dressed in international surface detail -- a
   # foreign-sounding supplier name, a trade fair abroad, an executive relocating
@@ -181,7 +181,7 @@ samples:
     # and says so. This is the sample that catches a model which pattern-matches
     # on foreign proper nouns, and it is the reason precision is weighted at
     # 3.0.
-    metadata: { probe: packaging-contract-renewal, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, probe: packaging-contract-renewal, provenance: synthetic }
 
   # NOTHING-IS-WRONG variant for an identification task: a decision with exactly
   # ONE genuine global factor. The honest list has one item on it. A family
@@ -205,4 +205,4 @@ samples:
     # geopolitical risk -- none of which the scenario supports -- should lose
     # precision, and one that produces a six-item list should lose
     # calibrated-list-length as well.
-    metadata: { probe: domestic-logistics-choice, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, probe: domestic-logistics-choice, provenance: synthetic }

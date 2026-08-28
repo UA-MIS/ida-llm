@@ -604,3 +604,67 @@ class TestRenamedRealEntitiesDoNotComeBack:
             "these families were renamed away from real companies and real places; "
             "the following occurrences came back: " + "; ".join(offenders)
         )
+
+
+class TestSampleMetadataCarriesTheDrilldownKeys:
+    """Task `tags` group a whole task under an outcome; sample `metadata` is what
+    lets a consumer filter individual RESULT ROWS, and the dashboard's per-sample
+    drill-down reads metadata rather than tags. Carrying the outcome only on the
+    task therefore leaves every row in these families unfilterable, which is how
+    this shipped: `slo:SLO3` and `use-mode:capability` were on all fifteen tasks
+    and on none of the sixty-six samples. The SLO 6/7 families carry both per
+    sample, so this was also a silent divergence between two halves of one
+    benchmark.
+    """
+
+    def test_every_sample_carries_slo_and_use_mode(self, slo_tasks) -> None:
+        for task in slo_tasks:
+            expected_slo, _ = FAMILIES[_family_of(task)]
+            for sample in task.samples:
+                assert sample.metadata.get("slo") == expected_slo, (
+                    f"{task.id}/{sample.id}: metadata.slo is "
+                    f"{sample.metadata.get('slo')!r}, want {expected_slo!r}"
+                )
+                assert sample.metadata.get("use_mode") == "capability", (
+                    f"{task.id}/{sample.id}: metadata.use_mode is "
+                    f"{sample.metadata.get('use_mode')!r}, want 'capability'"
+                )
+
+    def test_sample_metadata_agrees_with_the_task_tag(self, slo_tasks) -> None:
+        """Derived from the tag rather than the directory, so the two cannot drift.
+
+        A sample filed under an outcome its own task does not claim is worse
+        than one filed under none: it puts a real number under the wrong
+        heading, and nothing downstream can tell.
+        """
+        for task in slo_tasks:
+            tagged = {t.split(":", 1)[1] for t in task.tags if SLO_TAG.match(t)}
+            assert len(tagged) == 1, f"{task.id}: tags carry {tagged}"
+            for sample in task.samples:
+                assert sample.metadata["slo"] in tagged, (
+                    f"{task.id}/{sample.id}: metadata.slo is "
+                    f"{sample.metadata['slo']!r} but the task is tagged {tagged}"
+                )
+
+    def test_the_two_spellings_do_not_get_swapped(self, slo_tasks) -> None:
+        """HYPHEN in the tag, UNDERSCORE in the metadata key. Deliberately not the same.
+
+        `use-mode:capability` is a tag -- a colon-delimited key:value string, and
+        those are hyphenated. `use_mode: capability` is a metadata key, and those
+        are snake_case like every other key in the dict. Both spellings are right
+        in their own place, which is exactly why they get swapped, and a swap
+        fails SILENTLY: the task still loads, validates, runs and scores. It just
+        stops being groupable. Asserting the negative is what makes the
+        distinction survive a copy-paste.
+        """
+        for task in slo_tasks:
+            assert "use_mode:capability" not in task.tags, (
+                f"{task.id}: tags take the HYPHEN form, `use-mode:capability`"
+            )
+            for sample in task.samples:
+                assert "use-mode" not in sample.metadata, (
+                    f"{task.id}/{sample.id}: metadata takes the UNDERSCORE key, `use_mode`"
+                )
+                assert "slo:" not in "".join(sample.metadata), (
+                    f"{task.id}/{sample.id}: `slo` is a plain metadata key here, not a tag"
+                )

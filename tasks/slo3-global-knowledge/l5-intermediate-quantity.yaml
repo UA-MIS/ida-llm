@@ -80,7 +80,7 @@ samples:
     # Reporting the forward rate itself (8.80) instead of the dollar proceeds is
     # 59,991.20 away, so the item also enforces which quantity was asked for.
     target: "60000"
-    metadata: { skill: covered-interest-parity, factor: currency-risk-management, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: covered-interest-parity, factor: currency-risk-management, provenance: synthetic }
 
   - id: ppp-implied-overvaluation
     input: >-
@@ -104,7 +104,7 @@ samples:
     # tolerance, and the units instruction rules it out.
     # 8.8888... is not near a .xx5 boundary.
     target: "8.89"
-    metadata: { skill: purchasing-power-parity, factor: exchange-rate-misalignment, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: purchasing-power-parity, factor: exchange-rate-misalignment, provenance: synthetic }
 
   - id: export-breakeven-net-of-duty
     input: >-
@@ -123,7 +123,7 @@ samples:
     # away. That understatement of the breakeven volume by a quarter is exactly
     # the decision error the item is about.
     target: "5000"
-    metadata: { skill: breakeven-with-trade-barrier, factor: trade-policy, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: breakeven-with-trade-barrier, factor: trade-policy, provenance: synthetic }
 
   - id: net-repatriated-dividend
     input: >-
@@ -144,7 +144,7 @@ samples:
     # Both wrong answers are clean round numbers, which is deliberate: a
     # plausible-looking wrong answer is what makes the item discriminate.
     target: "24300"
-    metadata: { skill: profit-repatriation-chain, factor: multinational-tax, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: profit-repatriation-chain, factor: multinational-tax, provenance: synthetic }
 
   - id: cross-rate-settlement
     input: >-
@@ -162,4 +162,4 @@ samples:
     # Multiplying the two quotes together (8.00 * 4.00 = 32) gives 3,072,000 --
     # far outside anything defensible.
     target: "192000"
-    metadata: { skill: cross-rate-derivation, factor: exchange-rates, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, skill: cross-rate-derivation, factor: exchange-rates, provenance: synthetic }

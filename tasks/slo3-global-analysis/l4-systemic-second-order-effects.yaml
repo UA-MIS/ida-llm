@@ -162,7 +162,7 @@ samples:
     # without noticing which base it applies to has missed why the comparison is
     # so lopsided. Every figure needed is supplied, so a response that says the
     # comparison cannot be made has not attempted it.
-    metadata: { probe: input-substitution, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, probe: input-substitution, provenance: synthetic }
 
   # BORDERLINE. The second-order consequence is real but its magnitude is NOT
   # supplied, so the honest answer names it and says what would have to be
@@ -195,7 +195,7 @@ samples:
     # asserts "this risk is worth about X" without flagging it as an assumption
     # should lose separates-stated-from-inferred. This is the borderline sample
     # because two conclusions are defensible once the effect is identified.
-    metadata: { probe: holding-restructure, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, probe: holding-restructure, provenance: synthetic }
 
   # TRAP. The scenario dangles an obvious second-order story that a STATED FACT
   # rules out -- and contains a different, quieter one that is real. A response
@@ -235,7 +235,7 @@ samples:
     # Full credit requires both halves: ruling out the obvious effect on the
     # stated facts AND naming the quiet one. This is the hardest sample in the
     # family.
-    metadata: { probe: distribution-channel-change, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, probe: distribution-channel-change, provenance: synthetic }
 
   # NOTHING-IS-WRONG. No significant second-order consequence exists, and the
   # correct answer is to say so. Without this sample the rubric would reward a
@@ -271,4 +271,4 @@ samples:
     # above -- should score 0.0 on does-not-manufacture-effects.
     # A response may note the concentration point without penalty provided it
     # does not dress it as a rules-driven second-order effect.
-    metadata: { probe: dual-source-fastener, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, probe: dual-source-fastener, provenance: synthetic }

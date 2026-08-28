@@ -146,7 +146,7 @@ samples:
     # duty is levied on a transaction value that recalculates. Note the trap for
     # no-fabricated-quantities -- the scenario gives the rates but no prices, so
     # a response that computes a specific landed cost has invented one.
-    metadata: { probe: currency-to-sourcing, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, probe: currency-to-sourcing, provenance: synthetic }
 
   # TRAP: the direction most responses get backwards. A home-currency
   # APPRECIATION helps an importer and hurts an exporter, and the scenario is
@@ -174,7 +174,7 @@ samples:
     # A breaking condition that earns 1.0: costs are not in fact all
     # home-currency (local sourcing or a natural hedge in the export markets),
     # or the export contracts are denominated in the home currency after all.
-    metadata: { probe: currency-to-export-margin, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, probe: currency-to-export-margin, provenance: synthetic }
 
   # BORDERLINE. Two chains are defensible and they run in opposite directions;
   # the grading is of the reasoning, not the verdict. This is the sample that
@@ -198,7 +198,7 @@ samples:
     # depends on volume the scenario does not supply, and a response that
     # asserts a volume figure to settle it should lose
     # no-fabricated-quantities. Grade the chain, not the verdict.
-    metadata: { probe: tariff-on-a-competitor-input, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, probe: tariff-on-a-competitor-input, provenance: synthetic }
 
   # NOTHING-IS-WRONG: the named factor genuinely does NOT reach this decision,
   # because a stated contract term insulates it. The honest mechanism is a short
@@ -228,4 +228,4 @@ samples:
     # scenario. Every subjective family needs at least one sample where the
     # honest answer is "this factor does not do what you would expect", and this
     # is that sample.
-    metadata: { probe: ocean-freight-and-renewal, provenance: synthetic }
+    metadata: { slo: SLO3, use_mode: capability, probe: ocean-freight-and-renewal, provenance: synthetic }
