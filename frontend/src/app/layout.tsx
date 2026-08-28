@@ -1,8 +1,74 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { Fraunces, IBM_Plex_Sans } from "next/font/google";
+
 import "./globals.css";
 
-import { resolveVersion } from "@/lib/version";
+/**
+ * ⚠ THE ROOT LAYOUT CARRIES NO CHROME. It used to render the header, the nav
+ * and the `<main>` wrapper, which meant every route in the app was inside a
+ * 1080px column under a "Capstone-IDA" h1.
+ *
+ * The landing page is a full-bleed editorial page with its own masthead, so it
+ * cannot live inside that column. Rather than conditionally suppress the chrome
+ * from a layout that does not know which route it is rendering — the usual way
+ * this goes wrong — the chrome moved down one level into `(site)/layout.tsx`,
+ * and every product route moved into that route group with it.
+ *
+ * A route group `(site)` adds NO path segment: `/leaderboard` is still
+ * `/leaderboard`. What it buys is exactly one thing — a layout boundary the
+ * landing page sits outside of.
+ */
+
+/**
+ * ⚠ SELF-HOSTED AT BUILD TIME, NOT LINKED TO GOOGLE AT RUNTIME.
+ *
+ * `next/font/google` downloads these during `next build` and emits them as
+ * same-origin assets under `/_next/static/media`. The browser therefore makes
+ * NO request to fonts.googleapis.com or fonts.gstatic.com, which matters for
+ * three separate reasons:
+ *
+ *   1. There is no CSP on this app today, but `apps/agile` already ships one and
+ *      pins it by test. When this app grows the same headers, a `<link>` to
+ *      Google would break at that moment — and the failure would be a silent
+ *      fallback to Times New Roman, not an error. Self-hosting is immune.
+ *   2. No third-party request means no third party able to see who reads the
+ *      page, which a site arguing about data residency should not concede.
+ *   3. No render-blocking round trip to a host we do not control.
+ *
+ * The cost is that `next build` needs egress to fonts.gstatic.com. The Docker
+ * build already reaches the network (`npm ci`), so this adds no new class of
+ * dependency — but if a future airgapped build fails here, THIS is the reason,
+ * and the fix is `next/font/local` with the .woff2 files vendored into the repo.
+ *
+ * ⚠ THE VARIABLE NAMES ARE THE CONTRACT. `--font-display` and `--font-body` are
+ * consumed by the Landing block in globals.css; renaming one here silently
+ * drops the page back to the fallback stack.
+ */
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  display: "swap",
+  // `opsz` is what lets one family work at both 60px and 14px; `SOFT` rounds the
+  // terminals just enough to read warm rather than institutional. Both axes are
+  // set per-rule in the stylesheet.
+  //
+  // ⚠ NO `weight` HERE, AND THAT IS REQUIRED, NOT AN OVERSIGHT. `next/font`
+  // rejects `axes` combined with an explicit weight list — "Axes can only be
+  // defined for variable fonts when the weight property is nonexistent or set
+  // to `variable`" — because naming weights pins the static instances, which is
+  // exactly what having axes means we do not want. Omitting it ships the full
+  // variable weight range, which the stylesheet uses from 300 to 600.
+  axes: ["SOFT", "WONK", "opsz"],
+  style: ["normal", "italic"],
+  variable: "--font-display",
+});
+
+const plex = IBM_Plex_Sans({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["300", "400", "500", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-body",
+});
 
 export const metadata: Metadata = {
   title: "Capstone-IDA",
@@ -10,59 +76,14 @@ export const metadata: Metadata = {
     "Which AI can actually do the work — measured against real academic tasks, with the evidence behind every number.",
 };
 
-/**
- * Three destinations, named for what a professor gets rather than what we call
- * it internally.
- *
- * "Results" was the front door's old label and it described a shape, not an
- * answer — a visitor could not tell it from "All runs". The front door is a
- * LEADERBOARD now, so it says so; the recommendation flow keeps its verb; and
- * the raw run log stays last because it is the drill-down for someone who
- * already believes the numbers and wants to check them.
- */
-const NAV = [
-  { href: "/", label: "Leaderboard" },
-  { href: "/recommend", label: "Recommend a model" },
-  { href: "/runs", label: "All runs" },
-];
-
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // ⚠ Resolved, never typed. This badge used to be a hardcoded `v0.1.4` that no
-  // release step ever wrote to — see lib/version.ts for both halves of the
-  // wiring and for why the fallback is loudly labelled rather than empty.
-  const version = resolveVersion();
-
   return (
-    <html lang="en">
-      <body>
-        <main>
-          <header>
-            <h1>
-              <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>
-                Capstone-IDA
-              </Link>
-              <span
-                className={`badge badge-version${version.identified ? "" : " badge-version-unknown"}`}
-                title={version.detail}
-              >
-                {version.label}
-              </span>
-            </h1>
-            <nav className="nav">
-              {NAV.map((item) => (
-                <Link key={item.href} href={item.href}>
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-          </header>
-          {children}
-        </main>
-      </body>
+    <html lang="en" className={`${fraunces.variable} ${plex.variable}`}>
+      <body>{children}</body>
     </html>
   );
 }

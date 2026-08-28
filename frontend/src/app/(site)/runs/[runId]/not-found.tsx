@@ -8,7 +8,7 @@ export default function NotFound() {
         No run with that id exists. It may have been deleted, or the id may be
         mistyped.
       </p>
-      <Link href="/">← All runs</Link>
+      <Link href="/runs">← All runs</Link>
     </div>
   );
 }

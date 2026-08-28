@@ -61,6 +61,50 @@
 
   --radius: 8px;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* -----------------------------------------------------------------------
+     THE LANDING PALETTE (`--ld-*`). A SECOND, DELIBERATELY DIFFERENT PALETTE,
+     and the difference is the whole point rather than an oversight.
+
+     The tool pages above are warm paper: a reading surface someone stares at
+     while comparing numbers, where a warm cast keeps a dense table from
+     reading as clinical. The landing page is not that. It is the front door,
+     it is read once, on a phone, by a professor deciding whether to trust
+     this at all — and it was reviewed as BROWN and hard to read at exactly
+     that job. So the landing runs a brighter, cool-neutral ground with higher
+     contrast throughout.
+
+     ⚠ THESE ARE SCOPED TO `.ld` AND NOTHING ELSE. Nothing above this comment
+     changes; the dashboard, the leaderboard and the run views keep the warm
+     palette they were tuned in. The visible consequence is a temperature shift
+     when a visitor clicks from the landing into the leaderboard — that is a
+     known, flagged seam, not an accident. See the note in the Landing block.
+
+     ⚠ NO PURE WHITE, same rule as above — `--ld-raise` is #fdfeff, not #fff,
+     and `tests/palette.test.ts` enforces it across every token here.
+     ----------------------------------------------------------------------- */
+  --ld-paper: #fbfcfd;
+  --ld-band: #eff3f7;
+  --ld-raise: #fdfeff;
+  --ld-ink: #14171a;
+  --ld-ink-soft: #414b55;
+  --ld-ink-faint: #556270;
+  --ld-rule: #ccd4dc;
+  --ld-rule-soft: #e1e7ec;
+
+  /* Crimson is the university's, and on the landing it is the ONLY accent that
+     carries brand weight. It marks structure and calls to action — never a
+     status, exactly as `--brand` does above. */
+  --ld-accent: #9e1b32;
+  /* Hover goes DARKER, not lighter: a lighter crimson under white text was the
+     weakest contrast pair in the reviewed concept. */
+  --ld-accent-deep: #82132a;
+  --ld-on-accent: #fbfcfd;
+  /* One quiet second hue, used on exactly one mark — the reading about whether
+     a model helps a student learn. It means something or it would not be here. */
+  --ld-pine: #1f5449;
+
+  --ld-shadow: 0 1px 2px rgba(20, 23, 26, 0.06), 0 12px 28px -18px rgba(20, 23, 26, 0.40);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -82,6 +126,24 @@
     --pending: #e5b84f;
 
     --shadow: none;
+
+    /* The landing in dark: cool near-black rather than the warm ink above, and
+       lifted well clear of muddy. Same reasoning as the light block. */
+    --ld-paper: #0e1114;
+    --ld-band: #161a1f;
+    --ld-raise: #1a1f25;
+    --ld-ink: #f2f5f8;
+    --ld-ink-soft: #b8c2cc;
+    --ld-ink-faint: #94a1ad;
+    --ld-rule: #2e363f;
+    --ld-rule-soft: #222930;
+
+    --ld-accent: #fb7b93;
+    --ld-accent-deep: #ff9cad;
+    --ld-on-accent: #0e1114;
+    --ld-pine: #63cfae;
+
+    --ld-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 14px 32px -18px rgba(0, 0, 0, 0.85);
   }
 }
 
@@ -584,3 +646,354 @@ h2 { font-size: 1.15rem; }
 .outcome-table td:last-child a,
 .task-table td:last-child a,
 .col-go a { white-space: nowrap; }
+
+/* ===========================================================================
+   LANDING. Everything below is scoped under `.ld` and styles exactly one route:
+   `/`, the front door. It is the only editorial page on the site.
+
+   ⚠ WHY IT IS A SEPARATE BLOCK RATHER THAN NEW VARIANTS OF THE RULES ABOVE.
+   The tool pages are an INSTRUMENT: dense, scanned, operated. The landing is an
+   ARGUMENT: read once, top to bottom, mostly on a phone, by someone deciding
+   whether to trust the instrument at all. The two want opposite things from
+   type size, measure, whitespace and colour temperature, and every attempt to
+   serve both from one set of rules ends with a page that is mediocre at each.
+
+   ⚠ NO COLOUR LITERALS BELOW THIS LINE. `tests/palette.test.ts` parses this
+   file and fails on any hex or rgba() outside the two token blocks at the top —
+   it is the assertion that already caught a hardcoded `color: #fff` going
+   unreadable when the palette was re-tuned. Every colour here is a `--ld-*`.
+
+   ⚠ TWO THEMES, NOT THREE. The rest of this sheet is `:root` plus one
+   `prefers-color-scheme` block, and the landing matches that. The reviewed
+   concept also carried `[data-theme]` overrides for a host that stamps an
+   explicit choice; this app has no theme toggle, so those rules would be dead
+   code that the palette test's block-slicing would then mis-attribute.
+
+   THE LAYOUT is a scholarly margin apparatus: a persistent left rail carrying
+   eyebrows and side notes, against a single ~62ch reading column, left-biased
+   with air on the right. Below 62rem the rail collapses above its section as a
+   small label. Hairlines and negative space do the separating — there are no
+   rounded feature cards here, deliberately.
+   =========================================================================== */
+
+/* The landing paints the whole viewport, including the overscroll area, so the
+   warm `--bg` behind it never shows through at the edges on a phone. */
+body:has(.ld) { background: var(--ld-paper); }
+
+.ld {
+  background: var(--ld-paper);
+  color: var(--ld-ink);
+  font-family: var(--font-body), "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.62;
+  letter-spacing: 0.002em;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+}
+
+.ld h1, .ld h2, .ld h3 {
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  font-variation-settings: "SOFT" 28, "WONK" 1, "opsz" 96;
+  letter-spacing: -0.012em;
+  line-height: 1.12;
+  text-wrap: balance;
+  margin: 0;
+}
+.ld p { margin: 0; }
+.ld a { color: inherit; }
+
+.ld a:focus-visible,
+.ld button:focus-visible {
+  outline: 2px solid var(--ld-accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* --- layout ------------------------------------------------------------- */
+.ld-wrap { width: min(100% - 2.5rem, 66rem); margin-inline: auto; }
+
+.ld-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 62ch);
+  gap: 1.15rem;
+  align-items: start;
+}
+@media (min-width: 62rem) {
+  .ld-grid {
+    grid-template-columns: 13rem minmax(0, 62ch);
+    gap: 0 3.25rem;
+    justify-content: start;
+  }
+}
+
+.ld-rail {
+  font-size: 0.735rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ld-ink-faint);
+  line-height: 1.5;
+  padding-top: 0.5rem;
+}
+@media (min-width: 62rem) {
+  .ld-rail { text-align: right; padding-top: 0.68rem; border-top: 1px solid var(--ld-rule); }
+}
+/* Collapsed rail keeps a short rule so it still reads as an apparatus label
+   rather than as a stray line of small caps. */
+@media (max-width: 61.99rem) {
+  .ld-rail::after {
+    content: ""; display: block; width: 2.25rem; height: 1px;
+    background: var(--ld-rule); margin-top: 0.55rem;
+  }
+}
+
+.ld-note {
+  display: block; margin-top: 1.1rem;
+  font-family: var(--font-display), Georgia, serif;
+  font-variation-settings: "SOFT" 40, "opsz" 14;
+  font-size: 0.78rem; font-style: italic; font-weight: 400;
+  letter-spacing: 0.005em; text-transform: none;
+  color: var(--ld-ink-faint); line-height: 1.5;
+}
+
+.ld-col { min-width: 0; }
+.ld-section { padding-block: 4.75rem; }
+@media (min-width: 62rem) { .ld-section { padding-block: 6.5rem; } }
+.ld-band { background: var(--ld-band); }
+
+.ld-lede { font-size: 1.2rem; line-height: 1.6; color: var(--ld-ink-soft); max-width: 54ch; }
+.ld-h2 { font-size: clamp(1.85rem, 1.15rem + 2.3vw, 2.6rem); margin-bottom: 1.5rem; }
+.ld-stack > * + * { margin-top: 1.15rem; }
+.ld-stack p { color: var(--ld-ink-soft); }
+.ld-stack strong { color: var(--ld-ink); font-weight: 600; }
+
+/* --- masthead ----------------------------------------------------------- */
+.ld-mast { padding-block: 1.6rem 0; }
+.ld-mast-inner {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap;
+}
+.ld-logo {
+  font-family: var(--font-display), Georgia, serif;
+  font-variation-settings: "SOFT" 28, "WONK" 1, "opsz" 24;
+  font-size: 1.22rem; font-weight: 600; letter-spacing: -0.01em;
+  text-decoration: none; color: var(--ld-ink);
+}
+.ld-logo-dot { color: var(--ld-accent); }
+.ld-mast-meta {
+  font-size: 0.74rem; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ld-ink-faint); font-weight: 500;
+}
+
+/* --- hero --------------------------------------------------------------- */
+.ld-hero { padding-block: 3.5rem 3.25rem; }
+@media (min-width: 62rem) { .ld-hero { padding-block: 5.5rem 4.5rem; } }
+
+.ld h1 {
+  font-size: clamp(2.35rem, 1.05rem + 4.6vw, 4.05rem);
+  font-variation-settings: "SOFT" 34, "WONK" 1, "opsz" 144;
+  font-weight: 400; line-height: 1.06; letter-spacing: -0.025em; max-width: 19ch;
+}
+/* The turn in the argument, and the only place the headline changes colour. */
+.ld-turn {
+  display: block; font-style: italic; font-weight: 500;
+  font-variation-settings: "SOFT" 48, "WONK" 1, "opsz" 144;
+  color: var(--ld-accent); margin-top: 0.12em;
+}
+.ld-hero .ld-lede { margin-top: 1.9rem; font-size: 1.24rem; }
+
+.ld-cta-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem; margin-top: 2.4rem;
+}
+
+.ld-btn {
+  display: inline-flex; align-items: center; gap: 0.6rem;
+  font-family: inherit; font-size: 0.955rem; font-weight: 500;
+  text-decoration: none; padding: 0.82rem 1.5rem; border-radius: 3px;
+  background: var(--ld-accent); color: var(--ld-on-accent);
+  border: 1px solid var(--ld-accent);
+  transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+.ld-btn:hover {
+  background: var(--ld-accent-deep); border-color: var(--ld-accent-deep);
+  transform: translateY(-1px); box-shadow: var(--ld-shadow);
+}
+.ld-btn-quiet {
+  background: transparent; color: var(--ld-ink); border: 1px solid var(--ld-rule);
+}
+.ld-btn-quiet:hover {
+  background: transparent; border-color: var(--ld-ink-soft); color: var(--ld-ink);
+}
+.ld-link {
+  font-size: 0.95rem; color: var(--ld-ink-soft); text-decoration: none;
+  border-bottom: 1px solid var(--ld-rule); padding-bottom: 1px;
+  transition: border-color 0.18s ease, color 0.18s ease;
+}
+.ld-link:hover { color: var(--ld-ink); border-color: var(--ld-accent); }
+
+/* --- the specimen: one outcome, quoted and marked up -------------------- */
+.ld-specimen { border-top: 1px solid var(--ld-rule); padding-top: 2.25rem; }
+.ld-slo-src {
+  font-size: 0.74rem; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ld-ink-faint); font-weight: 500; margin-bottom: 1.1rem;
+}
+.ld-slo {
+  font-family: var(--font-display), Georgia, serif;
+  font-variation-settings: "SOFT" 42, "WONK" 0, "opsz" 60;
+  font-style: italic; font-weight: 300;
+  font-size: clamp(1.35rem, 0.95rem + 1.5vw, 1.9rem);
+  line-height: 1.38; letter-spacing: -0.008em; color: var(--ld-ink);
+}
+/* The one flourish on the page: a drawn underline, as if a professor had
+   marked the operative phrase on their own syllabus. */
+.ld-mark { position: relative; white-space: nowrap; }
+.ld-mark svg {
+  position: absolute; left: -1%; bottom: -0.34em; width: 102%; height: 0.42em;
+  overflow: visible; color: var(--ld-accent);
+}
+.ld-mark path {
+  fill: none; stroke: currentColor; stroke-width: 4; stroke-linecap: round;
+  opacity: 0.92; stroke-dasharray: 420; stroke-dashoffset: 420;
+  animation: ld-draw 1.15s cubic-bezier(0.22, 0.75, 0.3, 1) 0.55s forwards;
+}
+@keyframes ld-draw { to { stroke-dashoffset: 0; } }
+
+.ld-readings { display: grid; margin-top: 2.75rem; border-top: 1px solid var(--ld-rule-soft); }
+.ld-reading {
+  display: grid; grid-template-columns: 1.9rem minmax(0, 1fr); gap: 0 1rem;
+  padding: 1.35rem 0; border-bottom: 1px solid var(--ld-rule-soft); align-items: start;
+}
+.ld-glyph { color: var(--ld-ink-faint); padding-top: 0.16rem; }
+/* Colour here is semantic, not decorative: crimson marks the reading about
+   whether a model can simply DO the outcome (the exposure a professor needs to
+   know about), pine the one about helping a student learn. The middle reading
+   stays neutral because it is neither. */
+.ld-reading-capability .ld-glyph { color: var(--ld-accent); }
+.ld-reading-assistive .ld-glyph { color: var(--ld-pine); }
+.ld-q {
+  font-family: var(--font-display), Georgia, serif;
+  font-variation-settings: "SOFT" 30, "WONK" 0, "opsz" 24;
+  font-size: 1.06rem; font-weight: 600; letter-spacing: -0.004em; margin-bottom: 0.3rem;
+}
+.ld-a { color: var(--ld-ink-soft); font-size: 0.985rem; line-height: 1.58; }
+.ld-verdict { color: var(--ld-ink); font-weight: 600; }
+/* An unmeasured reading is stated, never dimmed into invisibility — the whole
+   argument of the page is that the gaps are shown. */
+.ld-verdict-none { color: var(--ld-ink-soft); font-weight: 600; font-style: italic; }
+.ld-receipt {
+  display: inline-block; margin-top: 0.45rem; font-size: 0.9rem;
+  color: var(--ld-accent); text-decoration: none;
+  border-bottom: 1px solid var(--ld-rule); padding-bottom: 1px;
+}
+.ld-receipt:hover { border-color: var(--ld-accent); }
+.ld-specimen-foot {
+  margin-top: 1.5rem; font-size: 0.875rem; color: var(--ld-ink-faint); line-height: 1.55;
+}
+
+/* --- how it works ------------------------------------------------------- */
+.ld-steps { display: grid; margin-top: 0.5rem; }
+.ld-step {
+  display: grid; grid-template-columns: 2.6rem minmax(0, 1fr); gap: 0 1.15rem;
+  padding: 1.65rem 0; border-bottom: 1px solid var(--ld-rule); align-items: baseline;
+}
+.ld-step:first-child { border-top: 1px solid var(--ld-rule); }
+/* Numbered because this genuinely IS a sequence — step 2 cannot precede step 1.
+   Nothing else on the page is numbered. */
+.ld-step-n {
+  font-family: var(--font-display), Georgia, serif;
+  font-variation-settings: "SOFT" 28, "WONK" 0, "opsz" 30;
+  font-size: 1.35rem; font-weight: 400; color: var(--ld-accent);
+  line-height: 1; font-variant-numeric: tabular-nums;
+}
+.ld-step h3 {
+  font-size: 1.22rem; font-weight: 600;
+  font-variation-settings: "SOFT" 30, "WONK" 0, "opsz" 30; margin-bottom: 0.38rem;
+}
+.ld-step p { color: var(--ld-ink-soft); font-size: 0.99rem; }
+
+/* --- the two doors ------------------------------------------------------ */
+.ld-doors { display: grid; gap: 1.15rem; margin-top: 0.35rem; }
+@media (min-width: 46rem) {
+  /* The primary door is wider as well as tinted — weight, not just colour, so
+     the choice still reads as a choice in a monochrome or high-contrast mode. */
+  .ld-doors { grid-template-columns: 1.08fr 1fr; gap: 1.4rem; }
+}
+.ld-door {
+  display: flex; flex-direction: column; gap: 0.7rem;
+  padding: 1.85rem 1.7rem 1.7rem;
+  background: var(--ld-raise); border: 1px solid var(--ld-rule);
+  border-radius: 4px; text-decoration: none; color: inherit;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.ld-door:hover {
+  transform: translateY(-2px); box-shadow: var(--ld-shadow); border-color: var(--ld-ink-faint);
+}
+.ld-door-primary { background: var(--ld-band); }
+.ld-eyebrow {
+  font-size: 0.715rem; letter-spacing: 0.11em; text-transform: uppercase;
+  font-weight: 600; color: var(--ld-ink-faint);
+}
+.ld-door h3 {
+  font-size: 1.36rem; font-weight: 600;
+  font-variation-settings: "SOFT" 32, "WONK" 0, "opsz" 36; line-height: 1.2;
+}
+.ld-door p { color: var(--ld-ink-soft); font-size: 0.955rem; }
+.ld-go {
+  margin-top: auto; padding-top: 1rem; display: inline-flex; align-items: center;
+  gap: 0.5rem; font-size: 0.92rem; font-weight: 500; color: var(--ld-accent);
+}
+.ld-arrow { transition: transform 0.2s ease; }
+.ld-door:hover .ld-arrow { transform: translateX(3px); }
+
+/* --- trust -------------------------------------------------------------- */
+.ld-trust { display: grid; margin-top: 0.25rem; }
+.ld-trust-item { padding: 1.3rem 0; border-bottom: 1px solid var(--ld-rule-soft); }
+.ld-trust-item:first-child { border-top: 1px solid var(--ld-rule-soft); }
+.ld-trust-item b {
+  font-family: var(--font-display), Georgia, serif;
+  font-variation-settings: "SOFT" 30, "WONK" 0, "opsz" 20;
+  font-weight: 600; font-size: 1.02rem; color: var(--ld-ink);
+  display: block; margin-bottom: 0.22rem;
+}
+.ld-trust-item span { color: var(--ld-ink-soft); font-size: 0.96rem; }
+.ld-audiences {
+  margin-top: 2.25rem; padding: 1.4rem 1.5rem;
+  border-left: 2px solid var(--ld-accent);
+}
+.ld-audiences p { color: var(--ld-ink-soft); font-size: 0.965rem; }
+.ld-audiences p + p { margin-top: 0.6rem; }
+.ld-audiences strong { color: var(--ld-ink); font-weight: 600; }
+
+/* --- footer ------------------------------------------------------------- */
+.ld-foot { border-top: 1px solid var(--ld-rule); padding-block: 2.5rem 3.5rem; margin-top: 1rem; }
+.ld-foot-inner {
+  display: flex; flex-wrap: wrap; gap: 1.25rem 2.5rem;
+  justify-content: space-between; align-items: baseline;
+  font-size: 0.86rem; color: var(--ld-ink-faint);
+}
+.ld-foot-links { display: flex; flex-wrap: wrap; gap: 1.4rem; }
+.ld-foot-links a { text-decoration: none; color: var(--ld-ink-soft); }
+.ld-foot-links a:hover { color: var(--ld-accent); }
+
+/* --- the load sequence, hero only --------------------------------------- */
+.ld-reveal {
+  opacity: 0; transform: translateY(9px);
+  animation: ld-rise 0.75s cubic-bezier(0.22, 0.75, 0.3, 1) forwards;
+}
+.ld-d1 { animation-delay: 0.06s; }
+.ld-d2 { animation-delay: 0.16s; }
+.ld-d3 { animation-delay: 0.27s; }
+.ld-d4 { animation-delay: 0.38s; }
+@keyframes ld-rise { to { opacity: 1; transform: none; } }
+
+/* ⚠ THE REVEAL MUST END VISIBLE WITHOUT JS AND WITHOUT MOTION. `forwards` holds
+   the final frame, and this block removes the animation entirely rather than
+   speeding it up — a reduced-motion reader gets the finished page, never a
+   permanently transparent one. */
+@media (prefers-reduced-motion: reduce) {
+  .ld-reveal { opacity: 1; transform: none; animation: none; }
+  .ld-mark path { stroke-dashoffset: 0; animation: none; }
+  .ld-door, .ld-btn, .ld-arrow { transition: none; }
+}

@@ -16,7 +16,7 @@ export default function ModelNotFound() {
         model in the registry that no run has used yet.
       </p>
       <p className="muted">
-        <Link href="/">See every model that has been measured</Link>.
+        <Link href="/leaderboard">See every model that has been measured</Link>.
       </p>
     </div>
   );

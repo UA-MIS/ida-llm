@@ -96,7 +96,7 @@ export default async function RunsPage() {
       <p className="subtitle">
         {runs.length} most recent benchmark run{runs.length === 1 ? "" : "s"}. This is the
         raw log — for results by task, start at{" "}
-        <Link href="/">the results view</Link>.
+        <Link href="/leaderboard">the leaderboard</Link>.
       </p>
       <table>
         <thead>
