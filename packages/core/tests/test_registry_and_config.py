@@ -44,7 +44,11 @@ class TestLoadRegistry:
 
     def test_shipped_registry_loads(self) -> None:
         registry = load_registry(repo_root() / "models.yaml")
-        assert registry.enabled_keys() == ["mock"]
+        # `luna` was deliberately enabled for #48 on a $25 test-only budget; the
+        # cost guard that says WHICH models may be on lives in
+        # packages/harness/tests/test_registry_examples.py, so this one only
+        # asserts the file parses and both entries survive it.
+        assert registry.enabled_keys() == ["mock", "luna"]
 
     def test_shipped_mock_entry_needs_no_api_key(self) -> None:
         """The whole point: `make dev` and CI must work with zero secrets."""
@@ -87,8 +91,17 @@ class TestSettings:
         settings = Settings()
         assert settings.s3_access_key == ""
         assert settings.s3_secret_key == ""
+        assert settings.auth_tokens == "", "a credential that gates spend is a secret too"
 
     def test_auth_is_disabled_by_default(self) -> None:
+        """Open by default, and that is a decision, not an oversight.
+
+        Every context that runs on the default -- local dev, CI, PR previews, the
+        tracer bullet -- is pointed at the mock model, so a credential there
+        would buy no safety and cost every contributor a setup step. The gate is
+        armed per deployment (IDA_AUTH_MODE=token); see docs/sensitive-material.md
+        section 6.
+        """
         assert Settings().auth_mode == "disabled"
 
     def test_paths_fall_back_to_repo_root(self) -> None:

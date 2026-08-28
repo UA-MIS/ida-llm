@@ -36,9 +36,16 @@ hosted provider — because they all fall through to the default client. There i
 no code change and no new file.
 
 Adding a genuinely new *wire format* is a new `BaseChatClient` subclass plus one
-row in `CLIENT_BY_SERVING_STACK`.
+row in `CLIENT_BY_SERVING_STACK` — done twice so far, for the Anthropic Messages
+API and for the OpenAI reasoning dialect. Adding a model that *uses* an existing
+wire format is still only a `models.yaml` edit, including a hosted one: `luna`
+picks its client by writing `serving_stack: openai_reasoning`.
 
-## Why two clients (the D-13 resolution)
+If the model needs a key, [`provider-keys.md`](provider-keys.md) is the rest of
+the procedure — naming the variable is step 1 of 6, and the last five are in
+Vault and the chart.
+
+## Why three clients (the D-13 resolution)
 
 The scaffold asserted "there is no per-provider code anywhere", and `models.yaml`
 carried a commented example claiming Anthropic "exposes an OpenAI-compatible
@@ -71,6 +78,30 @@ the Anthropic-*native* client, so its name reads slightly wrong. Renaming it is 
 `packages/core` contract change — the enum, `models.schema.json`, and every
 `serving_config` JSON blob already written to the `results` table — so it was
 deliberately left alone rather than done as a side effect of this story.
+
+### The third: `openai_reasoning`
+
+Added for #48, when `luna` (`gpt-5.6-luna`) became the first hosted model this
+project enables. Same URL, same headers, same response shape as
+chat-completions — so `OpenAIReasoningClient` subclasses `OpenAICompatibleClient`
+and overrides the request body and one parse-time refusal, nothing else.
+
+| chat/completions | the reasoning dialect |
+|---|---|
+| `max_tokens` | `max_completion_tokens` — and `max_tokens` is a 400 |
+| bounds visible output | bounds visible output **plus reasoning tokens** |
+| any `temperature`/`top_p` | only the API default (1.0); anything else is a 400 |
+
+Why a separate stack rather than a flag on the shared client: because a flag
+would put one provider's quirks inside the client every *other*
+OpenAI-compatible server also uses — a campus vLLM box, a laptop llama.cpp —
+and those accept the legacy name. A wire format is exactly what `serving_stack`
+selects, so this is the seam that already existed.
+
+The same D-13 test applies and passes: adding Luna was a `models.yaml` edit plus
+one subclass, **no code anywhere names "luna" or "gpt-5.6"**, and no client
+contains an `if provider == ...`. Selecting the dialect is a value an author
+writes in YAML.
 
 ## Things that will bite you against real endpoints
 
@@ -120,21 +151,62 @@ into `prompt_tokens`, because summing them at the standard rate would misreport
 cost the moment that changes.
 
 **OpenAI — `max_tokens` vs `max_completion_tokens`.** OpenAI has deprecated
-`max_tokens` in favour of `max_completion_tokens`, and the o-series rejects it
-outright:
+`max_tokens` in favour of `max_completion_tokens`, and the reasoning families —
+the o-series and GPT-5/5.4/5.5/5.6 — reject it outright:
 
 ```
 Unsupported parameter: 'max_tokens' is not supported with this model.
 Use 'max_completion_tokens' instead.
 ```
 
-The shared client still sends `max_tokens`, because vLLM, llama.cpp, Ollama and
-the mock model all take that name and most do not accept the new one. Sending
-either name per entry is the right fix and is **not** implemented here — the
-exact set of affected OpenAI models is not documented, and inventing the
-boundary would be a guess baked into a benchmark. Until then, prefer a
-non-reasoning chat model, and note that the provider's own error now reaches the
-operator verbatim.
+**This is now handled, and the fix is a third client** (#48, added when `luna` /
+`gpt-5.6-luna` was enabled — see [Why three clients](#why-three-clients-the-d-13-resolution)).
+
+The earlier note here said sending either name per entry was the right fix but
+was not implemented, because "the exact set of affected OpenAI models is not
+documented, and inventing the boundary would be a guess baked into a benchmark".
+That reasoning was right and is **unchanged**: nothing added since then guesses
+the boundary. `OpenAIReasoningClient` does not sniff model ids. The registry
+author *declares* the dialect by writing `serving_stack: openai_reasoning`, which
+is the same mechanism that already chose between chat-completions and the
+Messages API. We did not discover the boundary; we stopped needing to know it.
+
+The shared `OpenAICompatibleClient` still sends `max_tokens`, and must: vLLM,
+llama.cpp, Ollama and the mock model all take that name and most do not accept
+the new one. Note the direction of the default — an unrecognised stack gets the
+*legacy* name. That is the right failure. A local server that has never heard of
+`max_completion_tokens` would break confusingly under the new name, whereas a
+hosted model that rejects `max_tokens` says so in one loud, self-describing 400.
+
+**The output cap means something different in the reasoning dialect.**
+`max_completion_tokens` bounds visible output tokens **plus reasoning tokens**.
+Two consequences worth knowing before you author an entry:
+
+- A cap that is comfortable for a non-reasoning model can be consumed entirely
+  by thinking, leaving `content: ""` with `finish_reason: "length"`. That
+  response is perfectly well-formed, so the scorer would grade it **0.0** and
+  store "the model got it wrong" — a fabricated measurement. `OpenAIReasoningClient`
+  refuses it instead, with a `PermanentModelError` naming the parameter to raise.
+  The check is narrow on purpose: a *truncated but non-empty* answer is a real
+  response and is returned, and an *empty* answer that stopped normally is honest
+  emptiness (a refusal) and is also returned.
+- Numbers from a reasoning model are not comparable to a non-reasoning model's
+  at the same nominal cap, because the two caps are not measuring the same thing.
+
+**Sampling cannot be pinned on a reasoning model.** They accept only OpenAI's
+default `temperature`/`top_p` of 1.0, so the benchmark default of 0.0 is a 400.
+A parameter already at the default is therefore omitted from the body — the same
+contract the Anthropic client makes, and true for the same reason: the omitted
+value is exactly the value the endpoint then uses, so the stored `ServingConfig`
+still describes what happened. A **non-default** value is always sent, so an
+author who pins 0.0 gets OpenAI's own 400 naming the parameter rather than a
+benchmark quietly run at a temperature nobody chose. `ida_harness.preflight`
+warns about the combination at authoring time, where it is cheap to fix.
+
+The practical consequence: **runs against a reasoning model are not
+bit-reproducible** the way a mock or a seeded vLLM run is. That is a property of
+the model, not a gap in this harness, and it belongs in the interpretation of any
+number produced from one.
 
 ## Failure behaviour
 
@@ -193,3 +265,13 @@ Real staging verification — one real call per provider, against a real key, wi
 credits attached. Nothing in this repo has yet talked to Anthropic or OpenAI.
 The mocked tests prove we send what the documentation describes and read what it
 returns; they cannot prove the documentation is complete.
+
+This is now unblocked for **one** provider and is the explicit next step for
+`luna`: `OPENAI_API_KEY` is in Vault and projected into the deployed runner, so
+the bounded smoke test happens **in staging, after deploy** — never from a dev
+box, which holds no key by design. What it would prove that no mocked test can:
+that `gpt-5.6-luna` accepts `max_completion_tokens` and the omitted sampling
+params, that its response parses, and that reported token counts produce a
+sensible `cost_usd`. Until it has been run, treat "luna works end to end" as
+*designed and unit-proven*, not *observed*. See
+[`provider-keys.md`](provider-keys.md) and [`calibration.md`](calibration.md).

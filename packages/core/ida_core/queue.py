@@ -13,6 +13,13 @@ Redis was chosen over a Postgres-backed queue (D-5) because runners are
 horizontally scaled pods and a blocking list pop gives fair work-stealing for
 free.
 
+The client itself retries at the **transport** layer (:func:`redis_client_from_url`):
+a Redis restart answers ``BusyLoadingError`` for the several seconds it spends
+replaying its AOF, and that is a server being briefly unavailable, not a job
+failing.  It is resolved underneath this module -- it never spends an attempt
+and never dead-letters anything.  The ⚠ note beside
+:data:`DEFAULT_TRANSPORT_RETRIES` is where the two retry budgets are told apart.
+
 Claim / ack / nack
 ------------------
 :meth:`RunQueue.dequeue` **claims** a message: it moves atomically from the
@@ -174,6 +181,62 @@ work is the worse of the two, so this errs high.
 
 DEAD_LETTER_KIND_RETRY_EXHAUSTED = "retry_exhausted"
 """``kind`` of the JSON envelope parked when a message runs out of attempts."""
+
+# ------------------------------------------------------------- transport --
+#
+# ⚠ THE TWO RETRY BUDGETS BELOW ARE NOT THE SAME BUDGET, AND MUST NOT MEET.
+#
+# `DEFAULT_MAX_ATTEMPTS` above counts DELIVERIES OF A JOB. It is spent when a
+# consumer *took* the work and could not finish it, and running out means the
+# job itself is suspect -- so it ends on the dead-letter list
+# (`DEAD_LETTER_KIND_RETRY_EXHAUSTED`), where a human can look at it.
+#
+# The constants here count ROUND TRIPS TO A SERVER THAT IS NOT ANSWERING YET:
+# a Redis restart, a failover, a dropped TCP connection. The job has not been
+# tried at all in that case. Charging it a delivery would dead-letter perfectly
+# good work for the crime of being in flight while Redis rebooted -- which is
+# exactly the failure this section exists to prevent. So the transport retries
+# *underneath* the queue, inside redis-py, and `nack`/`_next_attempt` never see
+# the hiccup.
+
+DEFAULT_TRANSPORT_RETRIES = 10
+"""How many times the transport re-sends a command Redis could not answer.
+
+Sized against the failure it exists for: a restarting Redis replays its AOF
+before it will serve anything, and answers ``BusyLoadingError`` throughout --
+about six seconds on a dataset this size. Ten retries under the backoff below
+spans roughly seven, so a routine restart is invisible to a running eval.
+
+Bounded rather than infinite, for the same reason `DEFAULT_MAX_ATTEMPTS` is:
+past this the server is not "restarting", it is *down*, and a runner blocked
+forever inside a queue call is a runner that never heartbeats, never reports and
+never exits its pod. Failing loudly then is the more useful answer.
+"""
+
+DEFAULT_TRANSPORT_BACKOFF_BASE_S = 0.05
+"""First transport retry delay; doubles per failure up to the cap below.
+
+Not zero. A tight resend loop against a loading Redis is a small denial of
+service aimed at the one process trying to recover.
+"""
+
+DEFAULT_TRANSPORT_BACKOFF_CAP_S = 1.0
+"""Ceiling on the exponential transport backoff.
+
+Capped low because the wait is *dead time on a live runner*. Combined with
+`DEFAULT_TRANSPORT_RETRIES` this is what makes the total span (~7s) legible
+rather than an emergent property of a doubling sequence.
+"""
+
+DEFAULT_HEALTH_CHECK_INTERVAL_S = 30
+"""How stale a pooled connection may be before redis-py PINGs it first.
+
+Retry alone heals the *command that happens to be in flight* during a restart.
+This heals the ones that come after: a pooled connection to a server that went
+away is dead but looks fine, and without a health check the failure is
+rediscovered by every idle connection in turn, one command at a time. The PING
+turns that into one cheap round trip on a connection that has been sitting idle.
+"""
 
 
 class UndecodableMessage(ValueError):
@@ -343,6 +406,86 @@ def _next_attempt(message: RunJobMessage) -> RunJobMessage:
     return message.model_copy(update={"attempt": message.attempt + 1})
 
 
+def redis_client_from_url(
+    url: str,
+    *,
+    transport_retries: int = DEFAULT_TRANSPORT_RETRIES,
+    backoff_base_s: float = DEFAULT_TRANSPORT_BACKOFF_BASE_S,
+    backoff_cap_s: float = DEFAULT_TRANSPORT_BACKOFF_CAP_S,
+    health_check_interval_s: int = DEFAULT_HEALTH_CHECK_INTERVAL_S,
+    **client_kwargs,
+):
+    """A Redis client that survives the server going away and coming back.
+
+    ``redis.Redis.from_url(url)`` -- what this replaced -- has **no** command
+    retry.  A stock ``docker compose restart redis``, a Kubernetes node drain or
+    a managed-Redis failover therefore surfaced as a raw ``ConnectionError`` or
+    ``BusyLoadingError`` out of whichever queue call happened to be in flight,
+    and every run being dequeued, acked or heartbeated at that instant took the
+    exception.  The server was unavailable for about six seconds; the damage
+    outlived it.
+
+    The retry is at the **transport** layer on purpose, and the layering is the
+    design, not an implementation detail -- see the ⚠ note beside
+    :data:`DEFAULT_TRANSPORT_RETRIES`.  A briefly-unavailable *server* is not a
+    failed *job*: it must not spend an attempt from
+    :data:`DEFAULT_MAX_ATTEMPTS`, must not reach :meth:`RunQueue.nack`, and must
+    not park anything on :data:`DEAD_LETTER_KEY`.  Retrying here means the queue
+    above never learns the hiccup happened, which is precisely the point.
+
+    ``retry_on_error`` names both errors even though ``BusyLoadingError`` is a
+    subclass of ``ConnectionError`` in redis-py.  The redundancy is deliberate:
+    the loading case is the one this exists for, and a reader should not have to
+    know redis-py's exception hierarchy to see that it is covered.
+
+    WHAT THIS BUYS, MEASURED RATHER THAN ASSUMED.  redis-py's pool already heals
+    one of the two failures on its own: a connection closed while it sat *idle*
+    is detected by ``get_connection``'s pre-flight check, which reconnects
+    before the command is ever sent.  Verified against a real server -- killing
+    a pooled connection server-side (``CLIENT KILL``) is survived with and
+    without this policy.  So the retry is not what saves an idle client.  It is
+    what saves the two cases the pool cannot see:
+
+    * ``BusyLoadingError`` -- the server is up, answering, and *refusing*
+      commands while it replays its AOF.  Reconnecting is useless here; the only
+      thing that works is waiting and asking again, which is what this does.
+      This is the restart case, and it is the reason this function exists.
+    * a connection that dies **mid-command**, after the send and before the
+      reply.  The pre-flight check passed, so without a retry the failure lands
+      in the runner loop.
+
+    HONEST LIMIT, because it is a real consequence and not a hypothetical.  A
+    retry re-sends the command, and ``BLMOVE`` is not idempotent.  If the
+    connection dies *after* the server moved a message onto this consumer's
+    processing list but *before* the reply arrives, the resend takes a second
+    message and the first stays parked as an unacked claim.  It is not lost --
+    it is on this consumer's own processing list, and
+    :meth:`RunQueue.recover_abandoned` picks it up once this process exits and
+    its liveness key lapses -- but it is *delayed* until then.  That is squarely
+    within the at-least-once contract this module already documents, and it is
+    strictly better than the alternative it replaces, where the same crash threw
+    into the runner loop instead.
+
+    Anything in ``client_kwargs`` wins, so a caller (or a test) can override any
+    of this; the defaults are what production gets.
+    """
+    # Imported lazily, like the callers below, so `ida_core` stays importable
+    # with no redis package and no server running.
+    import redis
+    from redis.backoff import ExponentialBackoff
+    from redis.exceptions import BusyLoadingError
+    from redis.exceptions import ConnectionError as RedisConnectionError
+    from redis.retry import Retry
+
+    client_kwargs.setdefault(
+        "retry",
+        Retry(ExponentialBackoff(cap=backoff_cap_s, base=backoff_base_s), transport_retries),
+    )
+    client_kwargs.setdefault("retry_on_error", [BusyLoadingError, RedisConnectionError])
+    client_kwargs.setdefault("health_check_interval", health_check_interval_s)
+    return redis.Redis.from_url(url, **client_kwargs)
+
+
 class RedisQueue:
     """Production :class:`RunQueue` backed by Redis lists.
 
@@ -378,11 +521,22 @@ class RedisQueue:
         self._inflight: dict[str, bytes] = {}
 
     @classmethod
-    def from_url(cls, url: str, key: str = RUN_QUEUE_KEY, **kwargs) -> RedisQueue:
-        """Build from a ``redis://host:port/db`` URL."""
-        import redis  # imported lazily so ida_core stays importable without redis running
+    def from_url(
+        cls,
+        url: str,
+        key: str = RUN_QUEUE_KEY,
+        *,
+        client_kwargs: dict | None = None,
+        **kwargs,
+    ) -> RedisQueue:
+        """Build from a ``redis://host:port/db`` URL.
 
-        return cls(redis.Redis.from_url(url), key=key, **kwargs)
+        The client is built by :func:`redis_client_from_url`, so every caller
+        gets transport retry without having to remember to ask for it -- which
+        is the only way a policy like this actually holds.  ``client_kwargs``
+        goes to the Redis client; everything else goes to :class:`RedisQueue`.
+        """
+        return cls(redis_client_from_url(url, **(client_kwargs or {})), key=key, **kwargs)
 
     # ------------------------------------------------------------ produce --
 

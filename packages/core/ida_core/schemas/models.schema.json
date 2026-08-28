@@ -35,7 +35,15 @@
         "registry_key": { "type": "string" },
         "serving_stack": {
           "type": "string",
-          "enum": ["openai_api", "anthropic_compat", "vllm", "ollama", "llama_cpp", "mock"]
+          "enum": [
+            "openai_api",
+            "openai_reasoning",
+            "anthropic_compat",
+            "vllm",
+            "ollama",
+            "llama_cpp",
+            "mock"
+          ]
         },
         "serving_version": { "type": ["string", "null"] },
         "quantization": {

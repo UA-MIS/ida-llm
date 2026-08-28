@@ -224,7 +224,19 @@ class TestHealth:
 class TestModelsEndpoint:
     def test_lists_enabled_models(self, client: TestClient) -> None:
         models = client.get("/models").json()
-        assert [m["key"] for m in models] == ["mock"]
+        assert [m["key"] for m in models] == ["mock", "luna"]
+
+    def test_a_disabled_model_is_not_offered(self, client: TestClient) -> None:
+        """`sparks-local` is unreachable from this cluster. Listing it would let
+        the UI enqueue a run that can only fail."""
+        assert "sparks-local" not in {m["key"] for m in client.get("/models").json()}
+
+    def test_no_key_material_is_exposed(self, client: TestClient) -> None:
+        """`luna` is the first listed model with a real key behind it. The
+        endpoint is unauthenticated, so the field whitelist below is now load
+        bearing rather than theoretical."""
+        body = client.get("/models").text
+        assert "sk-" not in body
 
     def test_exposes_only_the_whitelisted_fields(self, client: TestClient) -> None:
         """Pinned literally: adding a field to ModelEntry must not leak it by default."""
@@ -695,7 +707,12 @@ class TestTranscriptEndpoint:
         assert response.status_code != 200
 
 
-class TestAuthPlaceholder:
+class TestAuthSeam:
+    """The mode switch itself. The `token` mode it selects is exercised in full
+    by ``test_auth.py`` -- these are the two properties that must hold whatever
+    the mode is: the default is open for local dev, and an unknown mode is a
+    loud refusal rather than a quiet allow."""
+
     def test_anonymous_principal_when_auth_disabled(self, client: TestClient) -> None:
         assert (
             client.post(
@@ -717,7 +734,10 @@ class TestAuthPlaceholder:
         assert response.status_code == 501
         assert "not implemented" in response.json()["detail"]
 
-    def test_reads_stay_open_in_the_skeleton(self, context: AppContext) -> None:
+    def test_reads_stay_open_whatever_the_mode(self, context: AppContext) -> None:
+        """Even a mode the API cannot implement must not take the public
+        benchmark down with it: the 501 is scoped to the route that spends
+        money. See docs/sensitive-material.md section 1."""
         from ida_api.app import create_app
 
         context.settings.auth_mode = "oidc"

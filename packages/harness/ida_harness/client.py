@@ -403,3 +403,131 @@ class OpenAICompatibleClient(BaseChatClient):
             request_id=body.get("id") or request_id,
             raw=body,
         )
+
+
+OPENAI_REASONING_DEFAULT_TEMPERATURE = 1.0
+OPENAI_REASONING_DEFAULT_TOP_P = 1.0
+"""OpenAI's own defaults for these two parameters.
+
+Named constants rather than literals because the omission logic below is only
+correct while they ARE the endpoint's defaults: we drop a parameter on the claim
+that the server will use this exact value, and the stored
+:class:`~ida_core.contracts.ServingConfig` repeats that claim to anyone reading
+the results table later.
+"""
+
+
+class OpenAIReasoningClient(OpenAICompatibleClient):
+    """Chat-completions as the OpenAI **reasoning** families speak it.
+
+    Same URL, same headers, same response shape -- so everything except
+    :meth:`_build_payload` is inherited.  Two request-shape facts differ, and
+    both are 400s rather than degradations:
+
+    ``max_tokens``
+        Rejected outright: *"Unsupported parameter: 'max_tokens' is not
+        supported with this model. Use 'max_completion_tokens' instead."*  The
+        o-series and the GPT-5/5.4/5.5/5.6 families all refuse it.  The
+        replacement bounds *visible output tokens plus reasoning tokens*, which
+        is a genuinely different quantity from the legacy cap -- another reason
+        this is a separate stack and not a rename.
+
+    ``temperature`` / ``top_p``
+        Only the API default (1.0) is accepted.
+
+    Why a subclass and not a flag on the parent
+    -------------------------------------------
+    Because it is a wire format, and wire formats are what
+    ``serving_stack`` selects (:mod:`ida_harness.factory`).  Adding
+    ``if reasoning:`` to the shared payload builder would put a provider's
+    quirks inside the client every other OpenAI-compatible server also uses --
+    a campus vLLM box, a laptop llama.cpp -- and those accept the legacy name.
+    An entry opts in by writing ``serving_stack: openai_reasoning``, so this
+    stays a YAML decision (**D-13**) and no code names a model.
+
+    What this client deliberately does NOT do
+    -----------------------------------------
+    It does not guess which ``model_id`` values are reasoning models.  The
+    registry author declares the dialect; sniffing model ids would invent a
+    boundary OpenAI does not publish, and would be wrong the day they ship a
+    model that does not match the pattern.  :mod:`ida_harness.preflight` warns
+    about the combinations that cannot work, at authoring time, where it is
+    cheap to fix.
+    """
+
+    def _build_payload(self, messages: list[ChatMessage], sampling: SamplingParams) -> dict:
+        """The chat-completions body, in the reasoning dialect.
+
+        A parameter already at OpenAI's default is omitted -- the same contract
+        :class:`~ida_harness.anthropic_client.AnthropicMessagesClient` makes, and
+        for the same reason: the omitted value is exactly the value the endpoint
+        then uses, so the recorded ``ServingConfig`` stays true.
+
+        A **non-default** value is always sent.  Dropping it would mean storing a
+        result that claims a temperature the run never used, which is the
+        fabricated-measurement failure the whole reproducibility record exists to
+        prevent.  If the target model refuses it, the operator gets OpenAI's own
+        400 naming the parameter.
+        """
+        payload: dict = {
+            "model": self.entry.serving.model_id,
+            "messages": [m.model_dump() for m in messages],
+            # NOT `max_tokens`: see the class docstring. This bounds visible
+            # output PLUS reasoning tokens.
+            "max_completion_tokens": sampling.max_tokens,
+            "stream": False,
+        }
+        if sampling.temperature != OPENAI_REASONING_DEFAULT_TEMPERATURE:
+            payload["temperature"] = sampling.temperature
+        if sampling.top_p != OPENAI_REASONING_DEFAULT_TOP_P:
+            payload["top_p"] = sampling.top_p
+        # chat-completions HAS a seed field, unlike the Messages API, so it is
+        # forwarded rather than refused. Hosted models honour it best-effort at
+        # most; that limitation belongs in the entry's comment, not in a client
+        # that pretends the parameter does not exist.
+        if sampling.seed is not None:
+            payload["seed"] = sampling.seed
+        if sampling.stop:
+            payload["stop"] = sampling.stop
+        return payload
+
+    def _parse(self, body: dict, latency_ms: float, request_id: str | None) -> ChatCompletion:
+        """Inherited parsing, plus one refusal the plain client must not make.
+
+        ``max_completion_tokens`` is shared between reasoning tokens and the
+        visible answer.  When the budget is too small the model spends all of it
+        thinking and stops with ``finish_reason: "length"`` and empty content.
+
+        That response is perfectly well-formed, so the inherited parser returns
+        an honest empty completion -- and the scorer downstream grades it
+        **0.0**, storing "the model got this wrong".  It did not get it wrong; it
+        was never given room to answer.  A benchmark that cannot distinguish
+        those two is manufacturing data, so this is an error, and a permanent
+        one: retrying spends the same budget to hit the same wall.
+
+        The check is deliberately narrow -- empty **and** truncated:
+
+        * a truncated but non-empty answer is a real response that a scorer may
+          legitimately mark wrong, so it is returned;
+        * an empty answer that stopped normally is honest emptiness (a refusal,
+          say) and is also a real measurement;
+        * a missing ``finish_reason`` -- several OpenAI-compatible servers omit
+          it -- is not evidence of truncation and is left alone.
+        """
+        completion = super()._parse(body, latency_ms, request_id)
+        if completion.content:
+            return completion
+        try:
+            finish_reason = body["choices"][0].get("finish_reason")
+        except (KeyError, IndexError, TypeError, AttributeError):
+            return completion
+        if finish_reason != "length":
+            return completion
+        raise PermanentModelError(
+            f"{self.entry.key} returned an EMPTY answer after stopping on 'length': the "
+            f"reasoning budget was consumed before any visible output was produced. This is "
+            f"not a score of 0.0, it is a missing measurement. Raise "
+            f"serving.sampling.max_tokens for {self.entry.key!r} in models.yaml -- it is sent "
+            f"as `max_completion_tokens` and covers reasoning tokens as well as the answer "
+            f"(currently {self.entry.serving.sampling.max_tokens})."
+        )

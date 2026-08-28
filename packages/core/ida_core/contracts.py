@@ -174,6 +174,22 @@ class ServingStack(StrEnum):
     """
 
     OPENAI_API = "openai_api"
+    OPENAI_REASONING = "openai_reasoning"
+    """OpenAI's chat-completions endpoint as the **reasoning** families speak it.
+
+    Same URL and same response shape as :attr:`OPENAI_API`, but a different
+    request dialect, which is why it is a separate stack rather than a flag:
+    the o-series and the GPT-5/5.4/5.5/5.6 families reject the legacy
+    ``max_tokens`` with *"Unsupported parameter: 'max_tokens' is not supported
+    with this model. Use 'max_completion_tokens' instead."*, and reject a
+    non-default ``temperature``/``top_p``.
+
+    It is also part of the reproducibility record in its own right: a reasoning
+    model spends unbilled-to-the-answer thinking tokens inside the same
+    ``max_completion_tokens`` budget, so its numbers are not comparable to a
+    non-reasoning model's at the same nominal cap.
+    """
+
     ANTHROPIC_COMPAT = "anthropic_compat"
     VLLM = "vllm"
     OLLAMA = "ollama"

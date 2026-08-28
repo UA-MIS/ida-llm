@@ -28,6 +28,22 @@ data:
   # --- service-to-service ---
   API_URL: "http://ida-llm-api"
 
+  # ── RUN-EXECUTION AUTH: THE ARMING SWITCH ───────────────────────────────────
+  # Absent, which means the app default `disabled` applies: the anonymous caller
+  # holds `runner` and can enqueue runs. That is correct TODAY only because the
+  # api has no public Ingress — containment by routing, not by design.
+  #
+  # Setting this to "token" is what arms the gate: anonymous keeps `reader` (the
+  # results view stays public by design — docs/sensitive-material.md section 1)
+  # and `POST /runs`, which spends real provider money, requires a bearer token
+  # from the IDA_AUTH_TOKENS secret.
+  #
+  # DO NOT set it here before that secret is seeded and referenced: the api
+  # refuses to start with `token` and no tokens, which is deliberate — a pod that
+  # cannot enforce its auth mode must fail readiness, not serve without the
+  # control. Full procedure: docs/sensitive-material.md section 6.
+  # IDA_AUTH_MODE: "token"
+
   # ── THE CREDIT/HARDWARE SAFETY SWITCH ───────────────────────────────────────
   # MOCK_MODEL_BASE_URL points the harness at the in-namespace deterministic stub
   # instead of a paid provider. Base carries the PROD value, which is EMPTY — prod

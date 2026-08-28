@@ -261,6 +261,47 @@ def scorable_tasks(catalog: TaskCatalog) -> list:
     return [spec for spec in catalog.all() if unscorable_reason(spec) is None]
 
 
+def sweepable_model_keys(
+    registry: ModelRegistry, settings: Settings, *, report: SweepReport
+) -> list[str]:
+    """Enabled models a SCHEDULED sweep may select, in registry order.
+
+    ``enabled: true`` answers "may an operator select this model". It does not
+    answer "may a CronJob select it every night, with nobody watching" -- and
+    the two questions have different answers for a model on a metered test
+    budget. :attr:`Settings.sweep_exclude_tags` is where the second answer
+    lives, keyed off the entry's own ``tags`` so the decision travels with the
+    entry rather than drifting in a second list.
+
+    The live case is ``luna`` (tagged ``testing-only``), whose key carries a $25
+    cap. ``model-sweep`` is the sharp edge: it exists specifically to give a
+    *newly enabled* model a first full set of numbers, so without this filter
+    enabling Luna would schedule a full unattended suite against it the same
+    night.
+
+    **Every held-back model is reported and logged.** A sweep that quietly
+    narrowed its own scope would produce a report reading "nothing left to
+    measure" about a suite it had decided not to measure -- the silent-truncation
+    failure the budget guard already refuses to make.
+    """
+    excluded_tags = settings.sweep_exclude_tag_set
+    keys: list[str] = []
+    held_back: list[str] = []
+    for entry in registry.models:
+        if not entry.enabled:
+            continue
+        hit = sorted(excluded_tags.intersection({tag.lower() for tag in entry.tags}))
+        if hit:
+            held_back.append(f"{entry.key} ({', '.join(hit)})")
+        else:
+            keys.append(entry.key)
+    if held_back:
+        note = "held back by sweep_exclude_tags: " + "; ".join(held_back)
+        report.notes.append(note)
+        log.info("sweep=%s %s", report.sweep, note)
+    return keys
+
+
 def plan_candidates(
     *,
     catalog: TaskCatalog,
@@ -677,7 +718,7 @@ def run_rebenchmark(ctx: SweepContext, *, dry_run: bool = False) -> SweepReport:
     return _enqueueing_sweep(
         ctx,
         name="rebenchmark",
-        model_keys=ctx.registry.enabled_keys(),
+        model_keys=sweepable_model_keys(ctx.registry, ctx.settings, report=report),
         report=report,
         dry_run=dry_run,
         dedupe_model_scope=None,
@@ -698,7 +739,7 @@ def run_model_sweep(ctx: SweepContext, *, dry_run: bool = False) -> SweepReport:
     exists so a model enabled at 09:00 is not invisible until the next 02:00.
     """
     report = SweepReport(sweep="model-sweep")
-    enabled = ctx.registry.enabled_keys()
+    enabled = sweepable_model_keys(ctx.registry, ctx.settings, report=report)
     with session_scope(ctx.session_factory) as session:
         measured = models_with_any_run(session, statuses=MEASURED_STATUSES)
     fresh = [key for key in enabled if key not in measured]

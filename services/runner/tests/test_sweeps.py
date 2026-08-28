@@ -1251,7 +1251,14 @@ class TestRebenchmarkHappyPath:
     def test_it_enqueues_the_full_cross_product_on_a_cold_database(self, ctx) -> None:
         report = run_rebenchmark(ctx)
 
-        expected = len(_scorable(ctx)) * len(ctx.registry.enabled_keys())
+        # SWEEPABLE, not merely enabled: `luna` is enabled so an operator can
+        # select it deliberately, and held back from scheduled sweeps by its
+        # `testing-only` tag because its key carries a $25 cap. See
+        # `sweepable_model_keys` and TestScheduledSweepsRespectExcludeTags.
+        sweepable = sweeps.sweepable_model_keys(
+            ctx.registry, ctx.settings, report=SweepReport(sweep="probe")
+        )
+        expected = len(_scorable(ctx)) * len(sweepable)
         assert report.considered == expected
         assert report.enqueued == expected
         assert ctx.queue.depth() == expected
@@ -1720,3 +1727,75 @@ class TestEnqueuedRowsCarryTheBuildIdentity:
         monkeypatch.setenv("IDA_GIT_SHA", "8" * 40)
         rows = self._enqueued_rows(ctx)
         assert all(len(r.harness_version) == 40 for r in rows)
+
+
+class TestScheduledSweepsRespectExcludeTags:
+    """`enabled: true` must not silently mean "and bill this every night".
+
+    Enabling `luna` (#48) put a metered, $25-capped hosted model into the
+    registry. Both nightly sweeps plan over the enabled set, so without a filter
+    the 02:00 rebenchmark would sweep the full suite against it, and the 03:30
+    `model-sweep` -- whose entire job is giving a *newly enabled* model its first
+    numbers -- would do the same thing again on the very first night.
+
+    These tests pin the filter and, just as importantly, pin that it is LOUD.
+    """
+
+    def _keys(self, ctx, **overrides) -> tuple[list[str], SweepReport]:
+        settings = ctx.settings.model_copy(update=overrides) if overrides else ctx.settings
+        report = SweepReport(sweep="probe")
+        return sweeps.sweepable_model_keys(ctx.registry, settings, report=report), report
+
+    def test_a_testing_only_model_is_held_back_by_default(self, ctx) -> None:
+        keys, _ = self._keys(ctx)
+        assert "luna" not in keys
+
+    def test_the_ordinary_models_are_still_swept(self, ctx) -> None:
+        """The filter must remove one entry, not disable sweeping."""
+        keys, _ = self._keys(ctx)
+        assert "mock" in keys
+
+    def test_holding_a_model_back_is_reported(self, ctx) -> None:
+        """A sweep that narrowed its own scope silently would report "nothing
+        left to measure" about a suite it chose not to measure."""
+        _, report = self._keys(ctx)
+        assert any("luna" in note for note in report.notes)
+
+    def test_the_note_names_the_tag_that_caused_it(self, ctx) -> None:
+        """An operator asking "why was luna skipped" should not have to read
+        this module to find out."""
+        _, report = self._keys(ctx)
+        assert any("testing-only" in note for note in report.notes)
+
+    def test_nothing_is_reported_when_nothing_is_held_back(self, ctx) -> None:
+        _, report = self._keys(ctx, sweep_exclude_tags="")
+        assert report.notes == []
+
+    def test_an_empty_setting_sweeps_every_enabled_model(self, ctx) -> None:
+        """The escape hatch: an operator who has done the arithmetic can turn the
+        filter off for a deliberate firing."""
+        keys, _ = self._keys(ctx, sweep_exclude_tags="")
+        assert set(keys) == set(ctx.registry.enabled_keys())
+
+    def test_matching_is_case_insensitive(self, ctx) -> None:
+        keys, _ = self._keys(ctx, sweep_exclude_tags="TESTING-ONLY")
+        assert "luna" not in keys
+
+    def test_a_disabled_model_never_appears_regardless_of_tags(self, ctx) -> None:
+        """`sparks-local` is disabled AND untagged by the exclude list. Enabled-ness
+        is still the first gate."""
+        keys, _ = self._keys(ctx, sweep_exclude_tags="")
+        assert "sparks-local" not in keys
+
+    def test_rebenchmark_does_not_enqueue_the_held_back_model(self, ctx) -> None:
+        """The end-to-end statement: no queue message names luna."""
+        run_rebenchmark(ctx)
+        assert "luna" not in {model for _task, model in _drain_pairs(ctx.queue)}
+
+    def test_model_sweep_does_not_treat_it_as_a_new_model(self, ctx) -> None:
+        """The sharpest edge. `model-sweep` looks for enabled models with no
+        measured run and enqueues the whole suite for them -- which is exactly
+        what luna is on the night it lands."""
+        report = run_model_sweep(ctx)
+        assert "luna" not in {model for _task, model in _drain_pairs(ctx.queue)}
+        assert report.exit_code == 0
