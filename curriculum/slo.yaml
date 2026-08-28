@@ -1,0 +1,261 @@
+# The BScBA Student Learning Outcomes, and which core course teaches each one.
+#
+# WHY THIS FILE EXISTS. Every task under `tasks/` that claims to measure a
+# curriculum outcome carries an `slo:<ID>` tag. A tag naming an outcome that
+# does not exist is a result row filed under a heading nobody can look up, and
+# it fails silently -- the run succeeds, the number is real, and it is
+# attributed to nothing. This file is the list those tags are checked against,
+# by `tools/validate_tasks.py` (which is the `task-schema` CI gate), so a typo
+# in a tag fails the pull request instead of the analysis.
+#
+# It is DATA, not documentation: `ida_core.curriculum.load_curriculum` parses
+# it, `curriculum.schema.json` constrains it, and the dashboard reads outcome
+# ids and statements from here rather than hardcoding nine strings that will
+# drift from the registrar's wording.
+#
+# PROVENANCE. Transcribed by hand from the university's published curriculum
+# map for the BScBA General Business (core) programme -- see `source` below.
+# The nine `statement` strings are the outcome wording as published; the
+# coverage grid is the published course x outcome matrix. Nothing here is
+# course material, student work, or an assessment instrument: it is the list of
+# outcomes and the map of which course covers which, both of which are public
+# programme description. See curriculum/README.md.
+version: 1
+
+program: BScBA General Business (core)
+
+source: https://folio.taskstream.com/Folio/CurMap/view.asp
+source_title: Curriculum Map - Courses and Activities Mapped to BScBA Student Learning Outcomes
+source_last_modified: "2025-09-18"   # quoted: YAML would otherwise parse a bare date into a date object, which JSON Schema has no type for
+retrieved: "2026-08-28"
+
+# --------------------------------------------------------------------------
+# The nine outcomes
+# --------------------------------------------------------------------------
+#
+# `text_benchmarkable` is the field that decides whether an outcome can appear
+# in this benchmark at all, and it is recorded rather than assumed because the
+# honest answer is "no" for two of the nine. A benchmark that quietly dropped
+# SLO5 and SLO8 would read as though the programme has seven outcomes.
+outcomes:
+  - id: SLO1
+    title: Problem Solving
+    statement: >-
+      Students assess a business problem, choose and apply the appropriate
+      business tools necessary for concise analysis, and propose suitable
+      strategic solutions.
+    text_benchmarkable: true
+    benchmark_note: >-
+      Judged, not checked. The outcome is about tool CHOICE and the fit between
+      a diagnosis and a recommendation, which has no single right answer; a
+      family that scored it against a gold answer would be measuring agreement
+      with one analyst rather than the reasoning the outcome names.
+
+  - id: SLO2
+    title: Quantitative Literacy
+    statement: >-
+      Students analyze, solve, and communicate effectively regarding
+      quantitative business problems using appropriate software, data sources,
+      and tools.
+    text_benchmarkable: true
+    benchmark_note: >-
+      The one outcome that is straightforwardly checkable: a break-even volume
+      or a contribution margin is a number, and a wrong method lands far enough
+      away to be told apart from a rounding difference.
+
+  - id: SLO3
+    title: Global Perspective
+    statement: >-
+      Students demonstrate knowledge of global factors, global systems, and
+      cross-cultural variations and their role in business decisions.
+    text_benchmarkable: true
+    benchmark_note: >-
+      Judged. The knowledge half could be quizzed, but the outcome's verb
+      phrase is "and their role in business decisions" -- the part worth
+      measuring is whether a global factor is carried into a decision, which is
+      a judgement about an argument.
+
+  - id: SLO4
+    title: Cultural and Societal Perspective
+    statement: >-
+      Students will evaluate how cultural and societal aspects influence
+      business decisions and practices in domestic and international contexts.
+    text_benchmarkable: true
+    benchmark_note: >-
+      Judged. "Evaluate" is the operative verb, and the failure mode worth
+      catching -- reaching for a national stereotype instead of an evaluation
+      -- is visible only to a rubric.
+
+  - id: SLO5
+    title: Teamwork
+    statement: >-
+      Students demonstrate ability to work effectively on teams including
+      contributing, communicating, and dealing with conflict.
+    text_benchmarkable: false
+    benchmark_note: >-
+      OUT OF SCOPE for a text benchmark, and deliberately not faked. The
+      outcome is about behaviour inside a real group over time; a single-turn
+      prompt can at best measure whether a model can WRITE about teamwork,
+      which is SLO7 wearing a different label. Measuring that and filing it
+      under SLO5 would be the most misleading thing in this repository.
+
+  - id: SLO6
+    title: Ethical Reasoning
+    statement: >-
+      Students demonstrate knowledge of ethical principles and concepts and
+      their implications for business decisions.
+    text_benchmarkable: true
+    benchmark_note: >-
+      Judged. Scoring an ethics case against a gold verdict would grade the
+      conclusion; the outcome names the reasoning, so the rubric grades whether
+      the principle invoked actually governs the facts.
+
+  - id: SLO7
+    title: Written Communication
+    statement: >-
+      Students construct written messages that are professionally and
+      strategically appropriate for a variety of business contexts.
+    text_benchmarkable: true
+    benchmark_note: >-
+      Judged, and the outcome where a judge is least controversial: the artefact
+      being graded is the text itself, which is exactly what the judge sees.
+
+  - id: SLO8
+    title: Oral Communication
+    statement: >-
+      Students make effective oral presentations that are informative as well
+      as persuasive, as appropriate.
+    text_benchmarkable: false
+    benchmark_note: >-
+      OUT OF SCOPE for a text benchmark. Delivery, timing and audience response
+      are the outcome; a transcript is not a presentation. A speaker-notes task
+      would measure SLO7.
+
+  - id: SLO9
+    title: General Business Knowledge
+    statement: >-
+      Students will demonstrate a comprehensive understanding of core business
+      principles.
+    text_benchmarkable: true
+    benchmark_note: >-
+      Checkable. "Comprehensive understanding of core principles" is the one
+      outcome where breadth matters more than depth, which is what a wide
+      forced-choice family measures well and an essay measures badly.
+
+# --------------------------------------------------------------------------
+# Use modes
+# --------------------------------------------------------------------------
+#
+# The second axis every SLO task is tagged on. An outcome is not one question:
+# "can the model do the coursework itself" and "can the model help a student do
+# it" have different right answers and very different consequences, and a
+# platform that averaged them would answer neither.
+#
+# Only `capability` is in use today. The other two are declared, and marked
+# `in_use: false`, so that the vocabulary is fixed BEFORE a second family is
+# authored against an invented spelling -- and so the validator can reject a
+# `use-mode:` tag naming a mode nobody has defined.
+use_modes:
+  - id: capability
+    title: Capability
+    statement: >-
+      Can the model itself produce work that would satisfy the outcome, given
+      the same prompt a student is given? The model is the candidate.
+    in_use: true
+
+  - id: assistive
+    title: Assistive
+    statement: >-
+      Does the model improve a student's own work against the outcome without
+      doing it for them -- feedback, critique, a next question? The model is a
+      tutor and the student is the candidate.
+    in_use: false
+
+  - id: instructional
+    title: Instructional
+    statement: >-
+      Can the model do the instructor's side of the outcome -- author an item,
+      apply a marking key, grade against a rubric? The model is staff.
+    in_use: false
+
+# --------------------------------------------------------------------------
+# The coverage grid
+# --------------------------------------------------------------------------
+#
+# Levels, as the published map's legend defines them:
+#   I    Introduced
+#   R    Reinforced
+#   M    Mastered
+#   A    Assessment Point
+#   M+A  Mastered + Assessment Point
+#
+# The level is not decoration. An outcome an assessment point measures (`A`,
+# `M+A`) is one the programme reports on, so a benchmark family aimed at that
+# (course, outcome) pair is aimed at something the department already grades --
+# which is what makes a comparison to it meaningful later.
+#
+# MIS 200 is the target course for the first live run: SLO1 (R), SLO2 (A),
+# SLO9 (I). Those three families are the ones authored to full depth.
+#
+# A course with a blank cell for an outcome simply omits the key. Absence means
+# "the published map does not mark this pair", not "level unknown".
+coverage:
+  - course: GBA 146
+    title: Professional Development I
+    outcomes: { SLO4: I, SLO6: I, SLO7: I, SLO8: I }
+
+  - course: EC 110
+    title: Principles of Microeconomics
+    outcomes: { SLO1: I, SLO2: I, SLO3: I, SLO9: I }
+
+  - course: EC 111
+    title: Principles of Macroeconomics
+    outcomes: { SLO1: I, SLO2: I, SLO3: I, SLO4: I, SLO9: I }
+
+  - course: LGS 200
+    title: Legal Environment of Business
+    outcomes: { SLO1: R, SLO6: R, SLO7: I, SLO8: I, SLO9: I }
+
+  - course: AC 210
+    title: Intro to Accounting
+    outcomes: { SLO1: R, SLO2: R, SLO3: R, SLO6: R, SLO9: I }
+
+  - course: GBA 246
+    title: Professional Development II
+    outcomes: { SLO1: R, SLO4: R, SLO5: I, SLO6: R, SLO7: R, SLO8: R }
+
+  - course: ST 260
+    title: Statistical Data Analysis
+    outcomes: { SLO1: R, SLO2: A, SLO6: R, SLO9: I }
+
+  - course: MIS 200
+    title: Fundamentals of MIS
+    outcomes: { SLO1: R, SLO2: A, SLO9: I }
+
+  - course: GBA 300
+    title: Business Communications
+    outcomes: { SLO1: R, SLO3: R, SLO4: A, SLO5: A, SLO7: R, SLO8: R }
+
+  - course: MGT 300
+    title: Organizational Theory and Management
+    outcomes: { SLO1: R, SLO3: R, SLO6: R, SLO9: I }
+
+  - course: MKT 300
+    title: Marketing
+    outcomes: { SLO1: R, SLO3: R, SLO4: R, SLO6: R, SLO7: R, SLO8: M+A, SLO9: I }
+
+  - course: OM 300
+    title: Introduction to Operations Management
+    outcomes: { SLO1: R, SLO2: A, SLO9: I }
+
+  - course: FI 302
+    title: Business Finance
+    outcomes: { SLO1: R, SLO2: M, SLO3: R, SLO9: I }
+
+  - course: GBA 346
+    title: Professional Development III
+    outcomes: { SLO4: M, SLO6: R }
+
+  - course: GBA 490
+    title: Strategic Management
+    outcomes: { SLO1: M+A, SLO3: M+A, SLO5: M+A, SLO6: M+A, SLO7: M+A, SLO9: A }

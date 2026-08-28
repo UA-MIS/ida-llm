@@ -1,13 +1,16 @@
-"""JSON Schema loading + validation for the two authored file formats.
+"""JSON Schema loading + validation for the three authored file formats.
 
 There are deliberately **two** layers of checking and they do different jobs:
 
 * **JSON Schema** (this module) -- structural, language-agnostic, and what CI
-  runs over ``tasks/**/*.yaml`` and ``models.yaml`` without importing our code
+  runs over ``tasks/**/*.yaml``, ``models.yaml`` and ``curriculum/slo.yaml``
+  without importing our code
   (the ``task-schema`` job in ``.github/workflows/ci.yml``).  It is the contract a non-Python
   contributor can read.
-* **Pydantic** (:mod:`ida_core.contracts`) -- semantic cross-field rules that a
-  schema expresses badly, e.g. "``scorer.rubric_id`` must equal ``rubric.id``".
+* **Pydantic** (:mod:`ida_core.contracts`, :mod:`ida_core.curriculum`) -- semantic
+  cross-field rules that a schema expresses badly, e.g. "``scorer.rubric_id``
+  must equal ``rubric.id``", or "this coverage cell names an outcome nobody
+  declared".
 
 A file that passes the schema but fails pydantic is a *bug in the schema*; keep
 them in step.  ``tests/test_validation.py`` asserts both agree on the demo tasks.
@@ -26,6 +29,7 @@ import yaml
 SCHEMA_DIR = Path(__file__).parent / "schemas"
 TASK_SCHEMA_PATH = SCHEMA_DIR / "task.schema.json"
 MODELS_SCHEMA_PATH = SCHEMA_DIR / "models.schema.json"
+CURRICULUM_SCHEMA_PATH = SCHEMA_DIR / "curriculum.schema.json"
 
 
 class ValidationError(ValueError):
@@ -42,7 +46,7 @@ class ValidationError(ValueError):
         super().__init__(f"{self.path} failed validation:\n  - {joined}")
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=8)
 def _load_schema(path: str) -> dict[str, Any]:
     return json.loads(Path(path).read_text())
 
@@ -55,6 +59,11 @@ def task_schema() -> dict[str, Any]:
 def models_schema() -> dict[str, Any]:
     """The models.yaml JSON Schema as a dict."""
     return _load_schema(str(MODELS_SCHEMA_PATH))
+
+
+def curriculum_schema() -> dict[str, Any]:
+    """The curriculum/slo.yaml JSON Schema as a dict."""
+    return _load_schema(str(CURRICULUM_SCHEMA_PATH))
 
 
 def _validate(document: Any, schema: dict[str, Any], source: Path | str) -> None:
@@ -76,6 +85,18 @@ def validate_task_document(document: Any, source: Path | str = "<memory>") -> No
 def validate_models_document(document: Any, source: Path | str = "<memory>") -> None:
     """Structurally validate a parsed ``models.yaml``.  Raises :class:`ValidationError`."""
     _validate(document, models_schema(), source)
+
+
+def validate_curriculum_document(document: Any, source: Path | str = "<memory>") -> None:
+    """Structurally validate a parsed ``curriculum/slo.yaml``.
+
+    The third authored format, and the newest.  It gets the same two-layer
+    treatment as the other two for the same reason: the schema is the contract
+    a non-Python reader can check, and the pydantic model in
+    :mod:`ida_core.curriculum` carries the cross-field rules a schema states
+    badly.
+    """
+    _validate(document, curriculum_schema(), source)
 
 
 def load_yaml(path: Path | str) -> Any:

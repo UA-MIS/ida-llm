@@ -1,0 +1,158 @@
+# slo9-business-knowledge, rung 5 of 6.
+#
+# WHAT THIS RUNG ADDS: a distractor that is the INTUITIVE answer. On rungs 1-4
+# the wrong options are wrong for a reader who knows the material. Here one
+# option in every item is the answer a confident, plausible-sounding business
+# instinct produces, and it is wrong. That is a different failure to test:
+# rungs 1-4 measure knowledge, this rung measures whether knowledge survives
+# contact with an attractive story.
+#
+# This borrows the design of tasks/quantitative-quiz/l7-distractor-key.yaml,
+# where naming the misconception is what makes the item scorable. Each comment
+# below names the misconception its intuitive option encodes.
+version: 1
+id: slo9-business-knowledge/l5-misconception-distractor-key
+title: SLO9 rung 5 -- resisting the plausible wrong answer
+description: >
+  Rung 5 of the SLO9 ladder. Every item contains one option that a confident
+  business instinct produces and that is wrong, drawn from across the core
+  subjects: inference from observational data, incremental costing, marketing
+  performance, financial-statement interpretation, portfolio risk and study
+  design.
+
+  The specific misconception each item is built on is recorded in that item's
+  YAML comment and NOT here. An earlier draft listed all six in this
+  description, in sample order -- and `description` is published
+  unauthenticated by GET /tasks/{id}, so it named the option to avoid on every
+  item and lifted a guesser from 0.25 to 0.33.
+
+  Four options, so the guessing floor is 0.25.
+
+  Provenance: every item and every scenario was written for this file. No
+  textbook, question-bank, past-paper or other institution's examination
+  content is reproduced, and no real firm or study is described.
+kind: verifiable
+domain: general-business
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate general
+  business examination. Exactly one option is correct. You may reason briefly
+  first, but you must then put the letter of the correct option alone on the
+  last line, with no punctuation and no other text on that line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", ladder-l5, business-knowledge, forced-choice]
+samples:
+  - id: staffing-and-sales-across-stores
+    input: >-
+      A retail chain finds that its stores with more staff on the floor also
+      record higher sales. Which conclusion does this finding best support?
+      A) Adding staff to a store causes its sales to rise
+      B) Higher sales cause a store to be given more staff
+      C) Neither variable has any effect on the other
+      D) The association is consistent with more than one explanation,
+      including that the chain deliberately staffs its busier stores more
+      heavily
+    # D. THE MISCONCEPTION: an observed association read as a causal lever,
+    # which is option A and is the answer a staffing proposal would assert.
+    # B is a single reversed causal claim and is no better supported than A;
+    # C over-corrects into denying any relationship. Only D matches what
+    # cross-sectional data can support.
+    target: "D"
+    metadata: { skill: association-versus-causation, function: analytics, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: extra-order-below-average-cost
+    input: >-
+      A factory's average total cost is $40 per unit at its current output. A
+      customer offers to buy 500 additional units at $32 each. The additional
+      units would add $28 each in variable cost and would require no additional
+      fixed cost, and the factory has spare capacity. Accepting the order will:
+      A) Reduce profit, because $32 is below the $40 average cost
+      B) Increase profit by $2,000
+      C) Leave profit unchanged
+      D) Increase profit by $16,000
+    # B. Incremental contribution is (32 - 28) * 500 = 2,000.
+    # THE MISCONCEPTION: option A -- "never sell below cost" -- which uses the
+    # average total cost where only incremental cost is relevant. It is the
+    # answer most people give and it is wrong here precisely because the fixed
+    # costs are unaffected, which the stem states.
+    # D is 32 * 500, i.e. treating revenue as profit.
+    # Spare capacity is stated explicitly: without it the displaced-sales
+    # argument would make A defensible and the item would have two keys.
+    target: "B"
+    metadata: { skill: incremental-analysis, function: managerial-accounting, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: share-up-profit-down
+    input: >-
+      A division has grown its market share in each of the last three years
+      while its operating profit has fallen in each of those years. The most
+      likely explanation is that the division:
+      A) Cannot be measuring both figures reliably
+      B) Has competitors who also lost profit over the period
+      C) Bought share through discounts or higher spending that cost more than
+      the extra volume returned
+      D) Is experiencing the normal result, since growing share always reduces
+      profit
+    # C. THE MISCONCEPTION: option D, share growth treated as automatically
+    # costly, is an overgeneralisation dressed as a rule; profitable share
+    # growth is ordinary. A dodges the question, B is irrelevant to this
+    # division's own profit.
+    target: "C"
+    metadata: { skill: share-versus-profitability, function: marketing, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: equal-revenue-growth-unequal-profit
+    input: >-
+      Two firms each report revenue growth of 20% for the year. Firm X's
+      operating profit grew 5%; firm Y's grew 45%. Which statement is best
+      supported by these figures alone?
+      A) Firm Y's costs grew more slowly relative to revenue than firm X's did
+      B) Firm Y sold more units than firm X
+      C) Firm X is the larger of the two firms
+      D) Firm Y has lower revenue than firm X
+    # A. Equal revenue growth with unequal profit growth is a statement about
+    # cost behaviour and nothing else.
+    # THE MISCONCEPTION: growth rates read as levels -- options B, C and D all
+    # infer SIZE from a percentage, which percentages cannot carry. B is the
+    # most tempting because "grew more" sounds like "sold more".
+    target: "A"
+    metadata: { skill: rates-versus-levels, function: finance, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: adding-a-counter-cyclical-line
+    input: >-
+      A firm with a single product line adds a second line whose demand tends
+      to rise in the periods when the first line's demand falls. The most
+      direct effect of this addition is:
+      A) Higher expected profit
+      B) Lower average cost per unit across the firm
+      C) A higher contribution margin on the original line
+      D) Less variability in the firm's total profit
+    # D. Negatively correlated demand smooths the total; that is what
+    # diversification does and it is all it does here.
+    # THE MISCONCEPTION: option A -- diversification read as a way to earn
+    # more rather than to vary less. B would need a shared cost driver the stem
+    # does not give; C is unaffected by what a second line does.
+    target: "D"
+    metadata: { skill: diversification-and-risk, function: finance, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: study-of-current-market-leaders
+    input: >-
+      A consultant studies only firms that are currently market leaders and
+      reports the management practices they have in common, recommending those
+      practices to others. The main weakness of this study is that:
+      A) The sample is too small to be representative
+      B) Firms that adopted the same practices and failed are excluded, so the
+      practices' apparent effect is overstated
+      C) The practices identified would be difficult for other firms to imitate
+      D) Market leadership is not something that can be measured
+    # B. Selecting on the outcome removes every counter-example, which is the
+    # defect regardless of sample size.
+    # THE MISCONCEPTION: option A -- any methodological complaint reduced to
+    # "small sample". Enlarging a sample of winners does not fix selecting on
+    # winning, and that is the distinction the item is built to test.
+    target: "B"
+    metadata: { skill: survivorship-bias, function: analytics, provenance: synthetic, slo: SLO9, use_mode: capability }

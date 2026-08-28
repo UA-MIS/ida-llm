@@ -1,0 +1,143 @@
+# slo9-business-knowledge, rung 3 of 6.
+#
+# WHAT THIS RUNG ADDS: APPLICATION. Rungs 1 and 2 could both be answered from a
+# glossary. Here the item states a short situation and the correct option is
+# the one that reads the situation correctly; the term itself is never the
+# answer. A model that has memorised definitions and cannot use them separates
+# from one that can, at exactly this rung.
+version: 1
+id: slo9-business-knowledge/l3-principle-applied-key
+title: SLO9 rung 3 -- applying a principle to a stated situation
+description: >
+  Rung 3 of the SLO9 ladder. Opportunity cost, sunk cost, scale, elasticity,
+  internal control and cost-volume-profit, each posed as a two-line scenario
+  rather than a definition. The distractors are the readings a student who
+  knows the term but not its use would produce.
+
+  Four options, so the guessing floor is 0.25.
+
+  Provenance: every item and every scenario was written for this file. No
+  textbook, question-bank, past-paper or other institution's examination
+  content is reproduced, and no real firm is described.
+kind: verifiable
+domain: general-business
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate general
+  business examination. Exactly one option is correct. You may reason briefly
+  first, but you must then put the letter of the correct option alone on the
+  last line, with no punctuation and no other text on that line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", ladder-l3, business-knowledge, forced-choice]
+samples:
+  - id: owned-premises-in-performance
+    input: >-
+      An owner uses a building she already owns to house her new shop, rather
+      than renting the building out for $3,000 a month as she previously did.
+      In judging the shop's economic performance, that $3,000 a month:
+      A) Is an opportunity cost and should be counted against the shop
+      B) Should be ignored, because no cash changes hands
+      C) Is a sunk cost and is irrelevant to any decision
+      D) Should be recorded as revenue of the shop
+    # A. B is the accounting-only reading the item is aimed at; C misapplies a
+    # term the student knows; D inverts the sign. Forgone rent is the textbook
+    # opportunity cost and the scenario supplies the forgone amount explicitly
+    # so the item does not turn on estimating it.
+    target: "A"
+    metadata: { skill: non-cash-costs-in-performance, function: economics, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: part-completed-product-decision
+    input: >-
+      A firm has already spent $400,000 developing a product. It now estimates
+      that finishing the product will cost a further $150,000, and that the
+      finished product will earn $200,000 in total. Assuming these estimates
+      are reliable and there is no better use of the money, what should the
+      firm do?
+      A) Abandon it, because total spending of $550,000 would exceed total
+      earnings of $200,000
+      B) Finish it, because the $400,000 already spent must be recovered
+      C) Abandon it, because the $400,000 is a sunk cost
+      D) Finish it, because the remaining $150,000 of cost is less than the
+      $200,000 still to be earned
+    # D. A is the sunk-cost fallacy in its backward-looking form and is the
+    # most attractive wrong option; B is the classic forward form; C reaches
+    # the wrong action from the right premise -- a sunk cost being sunk is a
+    # reason to IGNORE it, not a reason to abandon. Only D reasons from
+    # incremental cost against incremental revenue.
+    # "No better use of the money" is stated so the item cannot be answered
+    # "it depends on the alternative", which would be a defensible second key.
+    target: "D"
+    metadata: { skill: sunk-cost, function: managerial-accounting, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: average-cost-turning-upward
+    input: >-
+      A manufacturer's average cost per unit falls steadily as monthly output
+      rises from 10,000 to 40,000 units, and then begins to rise once output
+      passes 60,000. The rise beyond 60,000 units is best explained by:
+      A) A fall in the firm's fixed costs
+      B) Economies of scale being exhausted, which on its own would leave
+      average cost flat rather than rising
+      C) Diseconomies of scale, such as coordination and supervision costs
+      growing faster than output
+      D) An increase in the contribution margin per unit
+    # C. B is the near miss and the option is worded to state why it is not
+    # sufficient: exhausted economies flatten the curve, they do not turn it
+    # upward. A would lower average cost; D is about margin, not cost.
+    target: "C"
+    metadata: { skill: returns-to-scale, function: economics, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: revenue-response-to-a-price-rise
+    input: >-
+      A cinema raises its ticket prices by 10% and finds that its total ticket
+      revenue falls. Over this price range, demand for its tickets is best
+      described as:
+      A) Perfectly inelastic
+      B) Unit elastic
+      C) Elastic
+      D) Inelastic
+    # C. Revenue moving OPPOSITE to price is the definition of elastic demand
+    # over the range. A would leave quantity unchanged and revenue rising; B
+    # would leave revenue unchanged; D would raise revenue. Each distractor is
+    # a distinct, checkable prediction, which is what makes the item
+    # single-keyed.
+    target: "C"
+    metadata: { skill: price-elasticity, function: economics, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: one-employee-three-duties
+    input: >-
+      In a small firm, one employee approves supplier invoices for payment,
+      signs the cheques, and reconciles the bank statement. The primary
+      internal-control weakness here is:
+      A) Insufficient documentation of transactions
+      B) A failure to segregate incompatible duties
+      C) The absence of an external audit
+      D) Excessive delegation of authority
+    # B. The three duties named -- authorising, executing and recording -- are
+    # the standard incompatible trio, and the item lists exactly those three so
+    # the answer is determined by the facts rather than by judgement. A and C
+    # are separate weaknesses not described here; D names the wrong problem,
+    # since the issue is the COMBINATION of duties, not their level.
+    target: "B"
+    metadata: { skill: internal-control, function: accounting, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: break-even-response-to-fixed-costs
+    input: >-
+      A firm's fixed costs rise while its selling price per unit and its
+      variable cost per unit are both unchanged. Its break-even volume will:
+      A) Fall
+      B) Stay the same
+      C) Rise or fall depending on the contribution margin ratio
+      D) Rise
+    # D. Break-even volume is fixed costs divided by an unchanged contribution
+    # margin, so it moves with the numerator. C is the option that sounds
+    # sophisticated: the contribution margin ratio is held constant by the
+    # stem, so it cannot be the swing factor, but a model reasoning by pattern
+    # rather than from the formula is drawn to it.
+    target: "D"
+    metadata: { skill: cost-volume-profit, function: managerial-accounting, provenance: synthetic, slo: SLO9, use_mode: capability }

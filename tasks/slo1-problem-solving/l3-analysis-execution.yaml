@@ -1,0 +1,234 @@
+# slo1-problem-solving, rung 3 of 5.
+#
+# WHAT THIS RUNG ADDS: the third verb -- APPLY the tool to the figures. Rung 2
+# stopped at the choice; here the response must run the analysis on the numbers
+# supplied and say what it shows. Still no recommendation: that is rung 4.
+#
+# WHY THE ARITHMETIC IS DELIBERATELY EASY. Every calculation below is one or
+# two operations. This is a PROBLEM-SOLVING rung, not a numeracy rung -- the
+# quantitative ladder is tasks/slo2-quantitative-literacy/, and duplicating it
+# here would make a poor score ambiguous between "cannot analyse" and "cannot
+# arithmetic". What is hard here is knowing which figures belong in the
+# calculation, which is why every sample supplies at least one that does not.
+#
+# EVERY SAMPLE'S ARITHMETIC IS WORKED IN A COMMENT beside it, so a reviewer can
+# check the author's expectation without redoing it. Those comments are the
+# nearest a subjective task gets to a gold answer, and they are comments rather
+# than metadata because metadata is published unauthenticated.
+version: 1
+id: slo1-problem-solving/l3-analysis-execution
+title: SLO1 rung 3 -- running the analysis and saying what it shows
+description: >
+  Rung 3 of the SLO1 ladder. Each sample supplies figures and asks for the
+  analysis itself, plus an explicit statement of what the analysis does not
+  show. Every sample supplies something that must be kept out of the
+  calculation or handled rather than taken at face value -- an unavoidable
+  cost, a committed cost, an average concealing uneven flows, a point estimate
+  carrying a stated measurement band -- and one sample's honest result is that
+  the two options cannot be separated at all.
+
+  Provenance: every firm, figure and scenario is synthetic, authored for this
+  file. No course material, no textbook content, no real firm's data.
+kind: subjective
+domain: business-analysis
+system_prompt: >-
+  You are a business analyst advising a decision-maker who has ten minutes.
+  Work only from the information the item supplies; where something you would
+  need is missing, say so rather than assuming a value. Use exactly the
+  headings the item asks for, in the order it asks for them, and write nothing
+  that does not earn its place under one of them. Do not invent figures, firms
+  or events that the item did not give you.
+scorer:
+  kind: llm_judge
+  rubric_id: slo1-problem-solving-analysis-execution-v1
+rubric:
+  id: slo1-problem-solving-analysis-execution-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: excludes-the-figures-that-do-not-belong
+      description: |-
+        Every sample supplies at least one figure that must be kept out of the
+        calculation -- an unavoidable cost, an allocated overhead, an average
+        standing in for uneven flows, a revenue figure where contribution is
+        what governs. Does the analysis exclude it, and say that it did?
+
+        1.0 -- every figure that does not belong is excluded, and the response
+               states which one it excluded and why; OR, where what must be set
+               aside is a treatment rather than a figure -- a point estimate
+               used as though it were exact, an average standing in for the
+               values it averages -- the response says so and says what it does
+               instead.
+        0.5 -- the figures used are right but the exclusion is silent, so a
+               reader cannot tell it was a decision rather than an oversight.
+        0.0 -- a figure that does not belong is used in the calculation, or a
+               stated uncertainty is discarded without comment.
+      weight: 3.0
+    - name: the-working-is-shown-and-checkable
+      description: |-
+        Can the reader follow the calculation from the supplied figures to the
+        stated result without redoing it themselves?
+
+        1.0 -- each step names the figures it uses and produces a stated
+               intermediate, and the final number follows from them.
+        0.5 -- the result is correct but arrives with one or more steps
+               missing, so a reader must reconstruct them.
+        0.0 -- a result is asserted with no working, or the stated working does
+               not produce the stated result.
+      weight: 2.0
+    - name: conclusion-matches-what-the-numbers-support
+      description: |-
+        Does WHAT IT SHOWS claim exactly as much as the analysis establishes --
+        no more, and no less?
+
+        This is the criterion that catches manufactured decisiveness. Where the
+        two options fall within the uncertainty the item states, the analysis
+        does not identify a winner, and saying it does is wrong however
+        confident it sounds.
+
+        1.0 -- the conclusion is the one the numbers support, and where they do
+               not separate the options it says so and gives the margin.
+        0.5 -- the conclusion is directionally right but overstated, or right
+               and hedged into vagueness.
+        0.0 -- a winner is declared that the numbers do not support, or the
+               numbers support a clear conclusion and the response declines to
+               state one.
+      weight: 3.0
+    - name: names-a-limit-and-stops-there
+      description: |-
+        Does WHAT IT DOES NOT SHOW name something material this analysis cannot
+        settle, and does the response stop short of recommending? Rung 3's job
+        is the analysis; the outcome's word is CONCISE, and this criterion is
+        weighted equally with the working criterion so thoroughness cannot be
+        bought with length.
+
+        1.0 -- both headings present, a material limitation named, and no
+               recommendation offered.
+        0.5 -- a limitation is named but is immaterial here, or a
+               recommendation is offered in addition to the analysis.
+        0.0 -- the response is a recommendation, or WHAT IT DOES NOT SHOW is
+               absent or says only that more data would help.
+      weight: 2.0
+tags: [slo-benchmark, "slo:SLO1", "use-mode:capability", ladder-l3, problem-solving, subjective, not-yet-scorable]
+samples:
+  # CLEAN. Same firm and figures as l2/make-or-buy-a-subassembly, on purpose:
+  # rung 2 asked which tool, rung 3 runs it, so a reader can see the ladder
+  # move one step and a reviewer checks one set of figures twice.
+  - id: make-or-buy-execution
+    input: >-
+      A manufacturer makes 24,000 units a year of a subassembly in-house. Its
+      accounting system reports an in-house cost of $18.40 per unit, of which
+      $6.10 is an allocation of factory overhead that would continue unchanged
+      if production stopped. A supplier quotes $14.90 per unit, fixed for two
+      years. The line making the subassembly cannot be repurposed and would
+      stand idle.
+
+      Respond under exactly these headings: ANALYSIS, WHAT IT SHOWS, WHAT IT
+      DOES NOT SHOW.
+    # Author's note. Avoidable in-house cost = 18.40 - 6.10 = 12.30 per unit.
+    # Make: 24,000 * 12.30 = 295,200 a year.
+    # Buy:  24,000 * 14.90 = 357,600 a year.
+    # Making is cheaper by 62,400 a year.
+    # THE EXCLUDED FIGURE is the 6.10 allocation. Including it gives the
+    # headline comparison 18.40 against 14.90 -- "buying saves 3.50 a unit,
+    # 84,000 a year" -- which reverses the decision. That reversal is the whole
+    # point of the sample.
+    # A material limitation: this says nothing about single-source supply risk
+    # or about the price after the two-year quote expires.
+    metadata: { probe: allocated-overhead-inside-the-unit-cost, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  # BORDERLINE. The analysis is decisive; the ACTION is not, because a
+  # commitment the analysis does not price sits behind it. Grade whether the
+  # response keeps those two apart -- rung 3 is not allowed to resolve the
+  # second, and saying so is the strong answer.
+  - id: customer-profitability-ranking
+    input: >-
+      A distributor is reviewing two accounts.
+
+      Account A: revenue $480,000 a year at a 22% gross margin. It made 340
+      service calls last year, each costing the distributor $95, and takes 12
+      deliveries a month at $260 a delivery.
+
+      Account B: revenue $310,000 a year at a 31% gross margin. It made 60
+      service calls last year at the same $95, and takes 3 deliveries a month
+      at the same $260.
+
+      Separately: account A is on a contract with three years left to run, and
+      serving it requires a dedicated depot leased at $28,000 a year for those
+      three years, which cannot be sublet.
+
+      Respond under exactly these headings: ANALYSIS, WHAT IT SHOWS, WHAT IT
+      DOES NOT SHOW.
+    # Author's note.
+    # A: gross profit 480,000 * 0.22 = 105,600. Cost to serve = 340 * 95 =
+    #    32,300 plus 12 * 12 * 260 = 37,440, total 69,740. Net = 35,860.
+    # B: gross profit 310,000 * 0.31 =  96,100. Cost to serve = 60 * 95 =
+    #    5,700 plus 3 * 12 * 260 = 9,360, total 15,060. Net = 81,040.
+    # B is worth more than twice A on 35% less revenue: the revenue ranking and
+    # the profitability ranking are opposite, which is the finding.
+    # THE EXCLUDED FIGURE is revenue itself as a ranking measure -- and the
+    # 28,000 depot lease, which is committed for three years and is therefore
+    # not avoidable by dropping A within that window. A response that nets the
+    # lease off A's 35,860 to make it look marginal has priced a cost that
+    # cannot be escaped.
+    # The strong answer says the analysis ranks the accounts and does NOT
+    # support dropping A, because the lease continues either way.
+    metadata: { probe: revenue-and-cost-to-serve-both-supplied, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  # TRAP. An average is supplied that is true and useless: the flows are
+  # heavily back-loaded and the average hides it.
+  - id: payback-with-uneven-flows
+    input: >-
+      A project costs $270,000 up front. The sponsor's paper states that it
+      "returns an average net cash inflow of $90,000 a year over five years"
+      and concludes that it pays back in three years.
+
+      The year-by-year net cash inflows are: year 1 $20,000; year 2 $45,000;
+      year 3 $95,000; year 4 $140,000; year 5 $150,000.
+
+      Respond under exactly these headings: ANALYSIS, WHAT IT SHOWS, WHAT IT
+      DOES NOT SHOW.
+    # Author's note. The five flows total 450,000, so the sponsor's 90,000
+    # average is arithmetically correct -- which is what makes it a good trap.
+    # Cumulative: 20,000; 65,000; 160,000 after year 3; 300,000 after year 4.
+    # 270,000 is reached during year 4: 270,000 - 160,000 = 110,000 of that
+    # year's 140,000, so payback = 3 + 110,000/140,000 = 3.79 years.
+    # THE EXCLUDED FIGURE is the 90,000 average. Using it gives exactly the
+    # sponsor's 3.00 years and understates payback by 0.79 of a year.
+    # A material limitation: payback ignores everything after the payback point
+    # -- here the whole of year 5's 150,000 -- and ignores the time value of
+    # money entirely, so it ranks projects badly even when computed correctly.
+    metadata: { probe: average-and-year-by-year-flows-both-given, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  # TOO CLOSE TO CALL. Mandatory counterweight. Every other sample in this task
+  # has an answer; without one that does not, the rung teaches a model to
+  # produce a winner from any pair of numbers.
+  - id: two-suppliers-within-the-measurement-band
+    input: >-
+      A firm buys 120,000 units a year of a component and is choosing between
+      two suppliers.
+
+      Supplier X: $4.62 a unit, measured defect rate 1.8%, 18-day lead time.
+      Supplier Y: $4.55 a unit, measured defect rate 2.4%, 14-day lead time.
+
+      A defective unit costs the firm $3.10 to identify and replace. The
+      quality team states that its defect-rate measurements for both suppliers
+      carry an uncertainty of plus or minus 1.2 percentage points.
+
+      Respond under exactly these headings: ANALYSIS, WHAT IT SHOWS, WHAT IT
+      DOES NOT SHOW.
+    # Author's note.
+    # X: 120,000 * 4.62 = 554,400 purchase, plus 120,000 * 0.018 = 2,160
+    #    defects * 3.10 = 6,696. Total 561,096.
+    # Y: 120,000 * 4.55 = 546,000 purchase, plus 120,000 * 0.024 = 2,880
+    #    defects * 3.10 = 8,928. Total 554,928.
+    # Y appears cheaper by 6,168 a year, about 1.1% of either total.
+    # But +-1.2 percentage points on 120,000 units is +-1,440 defective units,
+    # worth +-4,464 EACH. Moving both figures within their stated band closes
+    # or reverses a 6,168 gap, so the cost analysis does not separate them.
+    # THE EXCLUDED FIGURE is the point defect rate treated as exact.
+    # The honest conclusion: the two are indistinguishable on cost, so the
+    # decision should be made on the four-day lead-time difference, which the
+    # item states and this analysis does not price. A response that declares Y
+    # the winner on 6,168 should score 0.0 on the third criterion.
+    metadata: { probe: defect-rates-with-a-stated-measurement-band, provenance: synthetic, slo: SLO1, use_mode: capability }
