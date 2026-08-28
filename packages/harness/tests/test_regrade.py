@@ -164,6 +164,183 @@ class TestTheRegradeFlips:
             regrade_run(run_id=RUN_ID, store=store, judge=judge)
 
 
+class TestTheAttemptCounter:
+    """``judge_attempts`` is the only thing that terminates a retry loop.
+
+    The *judge failed* class is retryable by design, so an unbounded retrier is a
+    money pump against a judge that stays down. Nothing else in the schema could
+    count: ``judge_transcript_uri`` and ``judge_prompt_tokens`` say only *that* an
+    attempt happened, and ``judge_cost_usd`` is overwritten with the LAST
+    attempt's spend on every retry.
+    """
+
+    def test_a_successful_regrade_counts_its_attempt(
+        self, archived_run, anchored_task, judge_entry
+    ) -> None:
+        store, log = archived_run
+        assert all(r.judge_attempts == 0 for r in log.results), "precondition: never judged"
+
+        with _judge(judge_entry, _judging()) as judge:
+            regrade_run(run_id=RUN_ID, store=store, judge=judge, task=anchored_task)
+
+        assert [r.judge_attempts for r in load_eval_log(store, RUN_ID).results] == [1, 1]
+
+    def test_a_failed_regrade_counts_its_attempt_too(
+        self, archived_run, anchored_task, judge_entry
+    ) -> None:
+        """Counting only successes would leave the retry loop unbounded.
+
+        A judge that is down produces no grade -- and that is exactly the state
+        the bound has to terminate, so it is exactly the state that must count.
+        """
+        store, _log = archived_run
+        garbage = lambda _r: httpx.Response(200, json=_body("not json"))  # noqa: E731
+
+        with _judge(judge_entry, garbage) as judge:
+            report = regrade_run(run_id=RUN_ID, store=store, judge=judge, task=anchored_task)
+
+        assert report.graded == []
+        assert len(report.failed) == 2
+        reloaded = load_eval_log(store, RUN_ID)
+        assert [r.judge_attempts for r in reloaded.results] == [1, 1]
+        assert all(is_judge_failure(r) for r in reloaded.results), "still retryable"
+
+    def test_attempts_accumulate_across_repeated_regrades(
+        self, archived_run, anchored_task, judge_entry
+    ) -> None:
+        """Three nightly firings against a broken judge read as three, not one."""
+        store, _log = archived_run
+        garbage = lambda _r: httpx.Response(200, json=_body("not json"))  # noqa: E731
+
+        for _ in range(3):
+            with _judge(judge_entry, garbage) as judge:
+                regrade_run(run_id=RUN_ID, store=store, judge=judge, task=anchored_task)
+
+        assert [r.judge_attempts for r in load_eval_log(store, RUN_ID).results] == [3, 3]
+
+    def test_a_dry_run_does_not_count_an_attempt(
+        self, archived_run, anchored_task, judge_entry
+    ) -> None:
+        """A dry run changes nothing about the records it hands back.
+
+        ⚠ It DOES call the judge and IS billed, so repeated dry runs spend money
+        without ever moving toward the bound. ``--dry-run`` answers "what would
+        this change", not "what would this cost".
+        """
+        store, _log = archived_run
+        calls: dict = {}
+
+        with _judge(judge_entry, _judging(calls=calls)) as judge:
+            report = regrade_run(
+                run_id=RUN_ID, store=store, judge=judge, task=anchored_task, dry_run=True
+            )
+
+        assert calls["n"] > 0, "the judge was called and billed"
+        assert report.judge_cost_usd > 0
+        assert [r.judge_attempts for r in load_eval_log(store, RUN_ID).results] == [0, 0]
+
+
+class TestOnlyResultIds:
+    """The per-RESULT bound has to survive being handed to a per-RUN grader.
+
+    ``regrade_run`` grades a whole run from one eval log, but a caller bounds
+    retries per sample: within one run some samples are freshly nominated and
+    others have exhausted their attempts. A bare per-run call would silently
+    re-grade the exhausted ones -- the per-run call widening the per-result bound
+    back open and re-billing exactly the samples the bound exists to protect.
+    """
+
+    def test_it_grades_only_the_nominated_results(
+        self, archived_run, anchored_task, judge_entry
+    ) -> None:
+        store, log = archived_run
+        wanted = log.results[0].id
+
+        with _judge(judge_entry, _judging()) as judge:
+            report = regrade_run(
+                run_id=RUN_ID,
+                store=store,
+                judge=judge,
+                task=anchored_task,
+                only_result_ids={wanted},
+            )
+
+        assert report.graded == ["s1"]
+        reloaded = {r.id: r for r in load_eval_log(store, RUN_ID).results}
+        assert reloaded[wanted].score is not None
+        other = next(r for rid, r in reloaded.items() if rid != wanted)
+        assert other.score is None, "a result nobody nominated must be untouched"
+        assert other.judge_attempts == 0, "and must not be charged an attempt"
+
+    def test_it_never_calls_the_judge_for_an_unnominated_result(
+        self, archived_run, anchored_task, judge_entry
+    ) -> None:
+        """The bound is about MONEY, so the assertion has to be about calls.
+
+        The rubric has two criteria and the judge makes one call per criterion,
+        so grading one of two samples is two calls, not four.
+        """
+        store, log = archived_run
+        calls: dict = {}
+
+        with _judge(judge_entry, _judging(calls=calls)) as judge:
+            regrade_run(
+                run_id=RUN_ID,
+                store=store,
+                judge=judge,
+                task=anchored_task,
+                only_result_ids={log.results[0].id},
+            )
+
+        assert calls["n"] == len(anchored_task.rubric.criteria)
+
+    def test_unnominated_results_are_still_accounted_for_as_skipped(
+        self, archived_run, anchored_task, judge_entry
+    ) -> None:
+        """Every sample in the run lands in a bucket, or the report cannot be reconciled."""
+        store, log = archived_run
+
+        with _judge(judge_entry, _judging()) as judge:
+            report = regrade_run(
+                run_id=RUN_ID,
+                store=store,
+                judge=judge,
+                task=anchored_task,
+                only_result_ids={log.results[0].id},
+            )
+
+        assert len(report.graded) + len(report.failed) + len(report.skipped) == len(log.results)
+        assert any("not nominated" in reason for _sid, reason in report.skipped)
+
+    def test_an_empty_nomination_set_grades_nothing(
+        self, archived_run, anchored_task, judge_entry
+    ) -> None:
+        """``set()`` means "none", not "all" -- the difference is a whole run's spend."""
+        store, _log = archived_run
+        calls: dict = {}
+
+        with _judge(judge_entry, _judging(calls=calls)) as judge:
+            report = regrade_run(
+                run_id=RUN_ID,
+                store=store,
+                judge=judge,
+                task=anchored_task,
+                only_result_ids=set(),
+            )
+
+        assert report.graded == []
+        assert calls == {}, "no judge call, therefore no spend"
+
+    def test_none_still_means_the_whole_run(self, archived_run, anchored_task, judge_entry) -> None:
+        """The CLI passes nothing and must keep grading everything."""
+        store, _log = archived_run
+
+        with _judge(judge_entry, _judging()) as judge:
+            report = regrade_run(run_id=RUN_ID, store=store, judge=judge, task=anchored_task)
+
+        assert report.graded == ["s1", "s2"]
+
+
 class TestWhatARegradeRefusesToDo:
     def test_an_already_scored_sample_is_left_alone(
         self, archived_run, anchored_task, judge_entry

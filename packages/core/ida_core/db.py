@@ -159,6 +159,20 @@ class ResultRow(Base):
     """Money spent on the GRADE, priced at the judge's rates.  Excluded from
     ``cost_usd``; a consumer wanting the all-in figure adds the two."""
 
+    judge_attempts: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    """How many times a judge has been ASKED to grade this sample (successful or
+    not).  The bound on retroactive retries: the judge-calibration sweep selects
+    ``judge_attempts < IDA_SWEEP_JUDGE_MAX_ATTEMPTS``, which is the only thing
+    stopping a permanently-down judge from being re-billed nightly forever.
+
+    ``server_default="0"`` and not merely ``default=0``: rows written before
+    migration 0005 are backfilled by the database rather than left NULL in a
+    NOT NULL column, and a row inserted by anything that bypasses the ORM still
+    gets a countable value instead of failing.  ``judge_cost_usd`` cannot serve
+    this purpose -- it is the LAST attempt's spend, not a running total."""
+
     judge_transcript_uri: Mapped[str | None] = mapped_column(String(1024))
     """``s3://bucket/key`` -- the judge's per-criterion transcript (D-3 applied
     to the grade).  NULL when no judge ran.  See ida_core.artifacts.judge_key."""

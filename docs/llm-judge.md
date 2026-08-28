@@ -26,13 +26,19 @@ next to the sample transcript.
 `scorable=false`, `score=null` and archive their transcripts — exactly as before
 — and can be graded later with `python -m ida_harness.regrade <run_id>`.
 
-> ⚠ **Setting `IDA_JUDGE_MODEL_KEY` does not, on its own, turn online grading
-> on.** The runner service does not yet pass a judge to `run_task`, and both API
-> call sites still call `unscorable_reason(spec)` without `judge_configured=`, so
-> the UI reports "no judge" regardless. Today the setting is consumed by
-> `python -m ida_harness.regrade` and by any caller constructing a judge
-> directly. Wiring the runner is a small, named follow-on — see
-> [Known limits](#known-limits).
+> ⚠ **`IDA_JUDGE_MODEL_KEY` turns on grading, but the API still says otherwise.**
+> The runner is wired: with the key set, `build_worker` builds a judge, `Worker`
+> hands it to every job, and subjective samples are graded as they run. What is
+> **not** wired is the read side — both API call sites still call
+> `unscorable_reason(spec)` without `judge_configured=`, and report
+> `scorable: spec.is_scorable`, which is the judge-free answer. So on a
+> judge-configured deployment the UI keeps calling a subjective task
+> "not yet scorable" while the results table fills with real scores.
+>
+> That is a deliberate stopping point, not an oversight: `scorable` is a public
+> API field, and making it depend on deployment configuration changes what it
+> means for every consumer, the frontend included. It needs its own decision.
+> See [Known limits](#known-limits).
 
 ---
 
@@ -284,10 +290,15 @@ not errored**, so a judge outage does not make the run look broken forever and a
 later regrade can retry it. `--dry-run` answers *"what would this change"*, **not**
 *"what would this cost"* — it still calls the judge, and still spends.
 
-> **NOTE — API backlog.** `regrade_run` returns updated `ResultRecord`s ready to
-> persist, but writing them to Postgres is left to the service that owns those
-> rows. Until that lands, a regrade updates object storage and the UI still shows
-> the original blank. A `POST /runs/{id}/regrade` endpoint is the natural home.
+> **Where a retroactive grade is written.** `regrade_run` archives to object
+> storage and returns updated `ResultRecord`s; it does not touch Postgres,
+> because the harness deliberately has no database. The service that owns those
+> rows does the write: `ida_core.repositories.persist_regraded_results`, called
+> by the `judge-calibration` sweep. So a scheduled regrade reaches the table and
+> the UI. The **CLI** (`python -m ida_harness.regrade`) still only updates object
+> storage — it is a harness entry point and has no session — so a hand-run
+> regrade shows up in the archived eval log and not yet in the UI. A
+> `POST /runs/{id}/regrade` endpoint is the natural home for that.
 
 ---
 
@@ -303,8 +314,8 @@ table:
 
 | class | SQL | meaning |
 |---|---|---|
-| **never judged** | `score_value IS NULL AND transcript_uri IS NOT NULL AND judge_transcript_uri IS NULL AND judge_prompt_tokens = 0` | nobody has tried. **The nomination class.** |
-| **judge failed** | `score_value IS NULL AND transcript_uri IS NOT NULL AND (judge_transcript_uri IS NOT NULL OR judge_prompt_tokens > 0)` | a judge was asked and could not answer. **Retryable — and a caller must bound its retries.** |
+| **never judged** | `score_value IS NULL AND transcript_uri IS NOT NULL AND judge_transcript_uri IS NULL AND judge_prompt_tokens = 0` | nobody has tried. **The nomination class**, together with the under-bound part of *judge failed*. |
+| **judge failed** | `score_value IS NULL AND transcript_uri IS NOT NULL AND (judge_transcript_uri IS NOT NULL OR judge_prompt_tokens > 0)` | a judge was asked and could not answer. **Retryable while `judge_attempts < N`** — see [Bounding retries](#bounding-retries). |
 | **ungradable** | `transcript_uri IS NULL` | the model call died; no completion exists. Never nominate: it can never succeed. |
 | **graded** | `score_value IS NOT NULL` | done. |
 
@@ -339,23 +350,47 @@ mean `none_as_null=True` and a backfill, and is not done here.)
 
 The **judge failed** class is retryable *by design* — that is the whole point of
 E3 — which means an unbounded retrier is a money pump against a judge that stays
-down. What the schema gives you today is **detection, not a counter**:
+down. Detection was never the problem; **counting** was:
 
-- `judge_prompt_tokens` / `judge_transcript_uri` say *that* an attempt happened;
-- `judge_cost_usd` is the **last attempt's** spend, not a running total, so it
-  cannot serve as an attempt count.
+- `judge_prompt_tokens` / `judge_transcript_uri` say *that* an attempt happened.
+  They are booleans wearing other clothes; they do not increment.
+- `judge_cost_usd` is the **last attempt's** spend, not a running total —
+  `regrade_run` overwrites it on every retry — so it cannot serve as an attempt
+  count, and the earlier values are gone.
 
-So a sweep must bound itself — a nomination ledger, a cap per `(run_id,
-sample_id)`, or a cooling-off window keyed on `results.created_at`. If a
-persisted attempt count would be better, `results.judge_attempts INTEGER NOT NULL
-DEFAULT 0` is a small additive migration; it is deliberately **not** added here,
-because how retries are bounded belongs to the sweep that does the retrying.
+So the count is persisted: **`results.judge_attempts`** (migration
+`0005_judge_attempts`, `INTEGER NOT NULL DEFAULT 0`).
 
-> **Not persisted yet.** `regrade_run` returns records and does not write to
-> Postgres (see the note under *Retroactive grading*), so the *retroactive*
-> failure state currently exists only in the archived eval log. The **online**
-> failure state is persisted today. Both are covered by the predicates above, so
-> a sweep written against them stays correct once the write-back lands.
+- **What increments it.** `run_task` when it grades online (+1), and
+  `regrade_run` on every retroactive attempt (+1) — successful or not, because
+  counting only failures leaves the loop unbounded. A `--dry-run` regrade does
+  **not** increment: it changes nothing about the records it hands back. Note the
+  asymmetry that creates — a dry run still calls the judge and is still billed,
+  so it is not a free probe.
+- **What reads it.** The nomination predicate, as a third clause:
+  `judge_attempts < IDA_SWEEP_JUDGE_MAX_ATTEMPTS` (default 3). Three nightly
+  firings outlast a transient outage; a permanently unparseable sample stops
+  costing money within the week.
+- **Successes are counted too.** A graded row is excluded by
+  `score_value IS NOT NULL` long before the bound is consulted, so counting them
+  costs nothing and lets the column mean one simple thing rather than "failures,
+  conditionally". It also answers *how many attempts did this grade take*, which
+  is the number a calibration study wants from a flaky judge.
+- **There is no reset.** Raising `IDA_SWEEP_JUDGE_MAX_ATTEMPTS` re-opens a
+  backlog after a judge is fixed; the count stays as the evidence of what was
+  already spent on that sample. `0` parks the sweep without editing the CronJob.
+
+`TestRetroactiveGradingEndToEnd::test_a_failing_judge_converges_instead_of_billing_forever`
+runs four firings against a permanently-broken judge and pins the sequence
+`considered = [2, 2, 2, 0]`.
+
+> **One nomination that is still unbounded — in noise, not in money.** A row
+> whose run has no archived eval log cannot be graded, and no judge is asked, so
+> `judge_attempts` never moves and the row is re-nominated every night forever.
+> Each firing costs nothing (the grader never reaches a provider) and the rows
+> are reported as `skipped_unavailable` on the summary line, but it does not
+> converge. The fix is to make eval-log archival failures visible on the run
+> itself; it is not done here.
 
 ---
 
@@ -386,11 +421,26 @@ A human-agreement study therefore needs a table of human ratings joined on
 
 ## Known limits
 
-- **The runner service is not wired.** `IDA_JUDGE_MODEL_KEY` → `Worker` →
-  `run_task(judge=…)` is a small change in `services/runner/` that has not been
-  made, so grading during a normal run does not happen yet and
-  `unscorable_reason`'s `judge_configured=True` branch is currently unreached.
-  Retroactive grading is the working path.
+- **The API's `scorable` field does not know about the judge.** Both call sites
+  report the judge-free answer, so a judge-configured deployment shows
+  "not yet scorable" in the UI for tasks the runner is grading. Fixing it is
+  four lines; deciding what the public field should *mean* when it depends on
+  deployment config is the part that is not. Named here rather than guessed at.
+- **Grading is off by default, and that is the only switch.** With
+  `IDA_JUDGE_MODEL_KEY` set, the runner grades subjective samples as they run
+  (`build_worker` → `Worker` → `run_task(judge=…)`) and `judge-calibration`
+  grades the backlog nightly. With it unset, both paths do nothing and say so:
+  subjective samples are archived unscored and the sweep exits 0. A key that is
+  set but unusable — unknown, disabled, missing its API key — is a **startup
+  crash**, not a degrade to unscored, because a runner that came up healthy and
+  quietly graded nothing would write blanks indistinguishable from "no judge
+  configured".
+- **`rebenchmark` and `model-sweep` still do not enqueue subjective tasks**, even
+  where a judge is configured — `scorable_tasks` asks
+  `unscorable_reason(spec)` with the judge-free default. Turning that on adds a
+  judge call per criterion per sample to the unattended nightly, so it is a
+  spending decision left to whoever makes it; the backlog is not stranded
+  meanwhile, because `judge-calibration` grades those samples retroactively.
 - **`parse_judgment` called without `graded_completion`** loses refusal rule 3,
   and a reply that is prose ending in a JSON object becomes indistinguishable
   from a benign preface. `LLMJudge` always supplies it; a direct caller should

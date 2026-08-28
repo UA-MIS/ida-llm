@@ -274,6 +274,30 @@ class Settings(BaseSettings):
     next night's firing picks up the remainder.  The sweep logs when it hits
     this bound so a truncated pass never reads as "that was all"."""
 
+    sweep_judge_max_attempts: int = 3
+    """How many times a judge may be asked to grade one sample before the
+    calibration sweep stops nominating it.
+
+    **The bound that makes a retryable failure affordable.**  A sample whose
+    grading failed is retryable by design -- otherwise a judge outage would make
+    it permanently ungradable -- but "retryable" with no cap is a standing charge
+    against a judge that stays down: nominated nightly, failed nightly, billed
+    nightly, with the invoice as the only symptom.  Counted against
+    ``results.judge_attempts``, which is why that column exists;
+    ``judge_cost_usd`` is the last attempt's spend, not a running total, and
+    could never have served.
+
+    Three, not one: a judge failure is usually transient (a timeout, a rate
+    limit, one unparseable reply), so a single attempt would strand samples that
+    the very next night would have graded.  Three nightly firings spread the
+    retries across three days, which is long enough to outlast an outage and
+    short enough that a genuinely unparseable sample stops costing money within
+    the week.  Set ``0`` to park the sweep without editing the CronJob.
+
+    Raising this **re-opens** samples already past the old bound, which is the
+    intended way to retry a backlog after fixing a judge -- there is no separate
+    reset, because the count is the evidence of what was already spent."""
+
     judge_model_key: str = ""
     """``models.yaml`` key of the model that grades ``subjective`` tasks.
 

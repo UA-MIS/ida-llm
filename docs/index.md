@@ -51,21 +51,20 @@ not scaffolding.
    `models.yaml` key, and `python -m ida_harness.regrade <run_id>` grades runs
    that already finished. The calibration record shape exists and is queryable
    per sample and criterion; the human-agreement study has not been run.
-3. **Wire the judge into the runner and into `judge-calibration`.**
-   `rebenchmark` and `model-sweep` are implemented in
-   `services/runner/ida_runner/sweeps.py`; `judge-calibration` ships as an
-   orchestration shell that finds ungraded subjective samples, says how many it
-   skipped and exits 0. The precondition it was waiting on -- *what a failed
-   grading writes* -- is now settled and written down as
+3. **Decide whether the nightly should *produce* subjective runs, and teach the
+   API about the judge.** Both grading paths are wired: the runner grades
+   subjective samples as they run (`IDA_JUDGE_MODEL_KEY` → `build_worker` →
+   `Worker` → `run_task(judge=…)`), and `judge-calibration` grades the backlog
+   nightly against
    [the row-level predicate contract](llm-judge.md#the-row-level-predicate-contract),
-   which is the spec for both the retroactive wiring (`_load_retroactive_grader`)
-   and the live one (`IDA_JUDGE_MODEL_KEY` → Worker → `run_task(judge=…)`), plus
-   a `POST /runs/{id}/regrade` endpoint so a retroactive grade reaches Postgres
-   and the UI. **Read that contract before writing the sweep's SELECT**: the
-   obvious predicate is wrong in both directions, and it names the retry bound a
-   nightly pass needs so it cannot re-nominate the same failed samples at judge
-   cost forever. Every sweep must stay idempotent and MUST exit non-zero on
-   failure.
+   bounded by `results.judge_attempts` so a down judge cannot be re-billed
+   forever. Two named follow-ons remain, both deliberately stopped at a decision
+   rather than guessed: `rebenchmark`/`model-sweep` still exclude subjective
+   tasks (turning that on adds a judge call per criterion per sample to the
+   unattended nightly), and the API still reports `scorable: false` for them
+   (that field is a public contract). A `POST /runs/{id}/regrade` endpoint would
+   give the *CLI* regrade path a way to reach Postgres, which the sweep already
+   has. Every sweep must stay idempotent and MUST exit non-zero on failure.
 4. **Write real tasks.** [`tasks/SCHEMA.md`](../tasks/SCHEMA.md) is the whole
    authoring guide and `tasks/quantitative-quiz/` and `tasks/conceptual-grading/`
    are the two families to copy from. (`tasks/demo/` is not an exemplar -- it is

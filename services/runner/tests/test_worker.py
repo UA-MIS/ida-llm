@@ -213,6 +213,228 @@ class TestSubjectiveTask:
         assert all(r.transcript_uri is not None for r in results)
 
 
+class TestTheQueuePathGrades:
+    """The gap this story closes: a judge reaching subjective samples via the QUEUE.
+
+    ``run_task`` has accepted ``judge=`` and graded correctly for as long as the
+    judge has existed -- pinned by ``test_runner_judge.py``. What did not exist
+    was any caller in the runner service passing one, so every subjective sample
+    that arrived through the queue was archived unscored no matter how the
+    deployment was configured. The harness path worked; the path production
+    actually uses did not.
+
+    These tests drive ``execute_job``/``Worker`` -- the real queue path -- and
+    assert on the DATABASE, because "the eval log says it was graded" and "the
+    results table says it was graded" are the two halves that were disconnected.
+    """
+
+    def test_a_judge_reaches_subjective_samples_through_execute_job(
+        self,
+        session_factory,
+        registry,
+        catalog,
+        artifact_store,
+        mock_transport_factory,
+        mock_judge_factory,
+    ) -> None:
+        run_id = _seed_run(session_factory, task_id=SUBJECTIVE_TASK)
+
+        with mock_judge_factory() as judge:
+            record = _execute(
+                _message(run_id, task_id=SUBJECTIVE_TASK),
+                session_factory=session_factory,
+                registry=registry,
+                catalog=catalog,
+                artifact_store=artifact_store,
+                client_factory=mock_transport_factory,
+                judge=judge,
+            )
+
+        assert record.status is RunStatus.SUCCEEDED
+        assert record.sample_count == 2
+        assert record.scored_count == 2, "the queue path must now grade, not archive blanks"
+        assert record.mean_score is not None
+
+        with session_scope(session_factory) as session:
+            results = [result_row_to_record(r) for r in list_results_for_run(session, run_id)]
+        assert all(r.score is not None for r in results)
+        assert all(r.scorable for r in results)
+        assert all(r.judge_serving_config is not None for r in results)
+
+    def test_the_same_run_without_a_judge_is_still_honestly_blank(
+        self,
+        session_factory,
+        registry,
+        catalog,
+        artifact_store,
+        mock_transport_factory,
+    ) -> None:
+        """The flip is opt-in, and this is the half that must not change.
+
+        A deployment that has not configured a judge must behave exactly as it
+        did before this wiring existed -- same statuses, same blanks, no spend.
+        """
+        run_id = _seed_run(session_factory, task_id=SUBJECTIVE_TASK)
+
+        record = _execute(
+            _message(run_id, task_id=SUBJECTIVE_TASK),
+            session_factory=session_factory,
+            registry=registry,
+            catalog=catalog,
+            artifact_store=artifact_store,
+            client_factory=mock_transport_factory,
+        )
+
+        assert record.status is RunStatus.SUCCEEDED
+        assert record.scored_count == 0
+        with session_scope(session_factory) as session:
+            results = [result_row_to_record(r) for r in list_results_for_run(session, run_id)]
+        assert all(r.score is None and r.scorable is False for r in results)
+        assert all(r.judge_attempts == 0 for r in results), "nothing was asked of a judge"
+
+    def test_a_verifiable_task_is_untouched_by_a_configured_judge(
+        self,
+        session_factory,
+        registry,
+        catalog,
+        artifact_store,
+        mock_transport_factory,
+        mock_judge_factory,
+    ) -> None:
+        """Passing a judge must not divert programmatic scoring through it.
+
+        A verifiable task has a gold answer; grading it with a rubric would swap
+        a checkable number for an opinion, and would bill for the privilege.
+        """
+        run_id = _seed_run(session_factory, task_id=VERIFIABLE_TASK)
+
+        with mock_judge_factory() as judge:
+            record = _execute(
+                _message(run_id, task_id=VERIFIABLE_TASK),
+                session_factory=session_factory,
+                registry=registry,
+                catalog=catalog,
+                artifact_store=artifact_store,
+                client_factory=mock_transport_factory,
+                judge=judge,
+            )
+
+        assert record.status is RunStatus.SUCCEEDED
+        with session_scope(session_factory) as session:
+            results = [result_row_to_record(r) for r in list_results_for_run(session, run_id)]
+        assert all(r.judge_attempts == 0 for r in results)
+        assert all(r.judge_serving_config is None for r in results)
+        assert all(r.judge_cost_usd == 0.0 for r in results)
+
+    def test_online_grading_records_exactly_one_attempt(
+        self,
+        session_factory,
+        registry,
+        catalog,
+        artifact_store,
+        mock_transport_factory,
+        mock_judge_factory,
+    ) -> None:
+        """The counter starts here, and it is what a nightly retry counts down from."""
+        run_id = _seed_run(session_factory, task_id=SUBJECTIVE_TASK)
+
+        with mock_judge_factory() as judge:
+            _execute(
+                _message(run_id, task_id=SUBJECTIVE_TASK),
+                session_factory=session_factory,
+                registry=registry,
+                catalog=catalog,
+                artifact_store=artifact_store,
+                client_factory=mock_transport_factory,
+                judge=judge,
+            )
+
+        with session_scope(session_factory) as session:
+            results = [result_row_to_record(r) for r in list_results_for_run(session, run_id)]
+        assert [r.judge_attempts for r in results] == [1, 1]
+
+    def test_a_failing_judge_counts_its_attempt_and_does_not_fabricate_a_grade(
+        self,
+        session_factory,
+        registry,
+        catalog,
+        artifact_store,
+        mock_transport_factory,
+        mock_judge_factory,
+    ) -> None:
+        """The state the whole attempt-bound exists for.
+
+        A judge that cannot be parsed leaves the sample scoreless with an error,
+        NOT scored-as-zero -- and the attempt is still counted, because the call
+        happened and was paid for. Counting only successes would leave the retry
+        loop unbounded, which is the money pump.
+        """
+        run_id = _seed_run(session_factory, task_id=SUBJECTIVE_TASK)
+
+        with mock_judge_factory("malformed") as judge:
+            record = _execute(
+                _message(run_id, task_id=SUBJECTIVE_TASK),
+                session_factory=session_factory,
+                registry=registry,
+                catalog=catalog,
+                artifact_store=artifact_store,
+                client_factory=mock_transport_factory,
+                judge=judge,
+            )
+
+        assert record.scored_count == 0
+        assert record.mean_score is None, "a failed grade is not a zero"
+        assert record.status is not RunStatus.SUCCEEDED, "a failed grading is not a clean run"
+
+        with session_scope(session_factory) as session:
+            results = [result_row_to_record(r) for r in list_results_for_run(session, run_id)]
+        assert all(r.score is None for r in results)
+        assert all(r.error for r in results)
+        assert [r.judge_attempts for r in results] == [1, 1]
+        assert all(r.transcript_uri for r in results), (
+            "the completion was bought and must stay gradable later"
+        )
+
+    def test_the_worker_loop_carries_its_judge_into_the_job(
+        self,
+        session_factory,
+        registry,
+        catalog,
+        artifact_store,
+        queue,
+        mock_transport_factory,
+        mock_judge_factory,
+    ) -> None:
+        """End to end through the real loop, not just ``execute_job``.
+
+        ``Worker`` holds the judge and hands it to every job; a judge accepted by
+        the constructor and dropped before ``run_task`` would pass every test
+        above and grade nothing in production.
+        """
+        run_id = _seed_run(session_factory, task_id=SUBJECTIVE_TASK)
+        queue.enqueue(_message(run_id, task_id=SUBJECTIVE_TASK))
+
+        with mock_judge_factory() as judge:
+            worker = Worker(
+                queue=queue,
+                session_factory=session_factory,
+                registry=registry,
+                catalog=catalog,
+                artifact_store=artifact_store,
+                client_factory=mock_transport_factory,
+                judge=judge,
+                poll_timeout_s=0,
+            )
+            _drain(worker, jobs=1)
+
+        with session_scope(session_factory) as session:
+            run = run_row_to_record(get_run(session, run_id))
+            results = [result_row_to_record(r) for r in list_results_for_run(session, run_id)]
+        assert run.status is RunStatus.SUCCEEDED
+        assert run.scored_count == 2
+        assert all(r.score is not None for r in results)
+
+
 class TestFailurePolicy:
     def test_unknown_task_fails_the_run_readably(
         self, session_factory, registry, catalog, artifact_store

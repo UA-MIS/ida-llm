@@ -1083,6 +1083,30 @@ class ResultRecord(BaseModel):
     wants the all-in figure adds them, and one that wants to know what grading
     costs can now ask."""
 
+    judge_attempts: Annotated[int, Field(ge=0)] = 0
+    """How many times a judge has been **asked** to grade this sample.
+
+    Counts attempts, not successes: an online grading that failed and three
+    retroactive retries that also failed read as ``4``.  Incremented by
+    :func:`ida_harness.runner.run_task` when it grades, and again by
+    :func:`ida_harness.regrade.regrade_run` on every retry.
+
+    **It exists because nothing else could bound a retry.**  The *judge failed*
+    class in ``docs/llm-judge.md`` is retryable by design, which makes an
+    unbounded retrier a money pump against a judge that stays down.  The columns
+    that were available before this said only *that* an attempt happened --
+    :attr:`judge_transcript_uri` and :attr:`judge_usage` -- and
+    :attr:`judge_cost_usd` is the **last** attempt's spend rather than a running
+    total, so none of them could be counted.  A nomination query bounds itself on
+    this field (``judge_attempts < IDA_SWEEP_JUDGE_MAX_ATTEMPTS``); without it
+    the nightly calibration sweep re-nominates the same failed samples forever.
+
+    Successful grades are counted too.  A graded row is excluded from nomination
+    by ``score_value IS NOT NULL`` long before the bound is consulted, so
+    counting them costs nothing and lets this field mean one simple thing rather
+    than "failures, conditionally".
+    """
+
     judge_transcript_uri: str | None = None
     """``s3://<bucket>/<key>`` pointing at the judge's own transcript.
 
