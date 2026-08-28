@@ -304,6 +304,10 @@ class TestTheRealConfigMapIsUsable:
             "MINIO_USE_SSL",
             "MINIO_BUCKET",
             "MOCK_MODEL_BASE_URL",
+            # Settings.judge_model_key, via env_prefix="IDA_". Selects which
+            # models.yaml entry grades subjective tasks; unset means they stay
+            # unscored, which is why it is set explicitly rather than defaulted.
+            "IDA_JUDGE_MODEL_KEY",
         }
         not_ours = {
             "API_URL",  # the frontend reads this, server-side (Node, not Python)
