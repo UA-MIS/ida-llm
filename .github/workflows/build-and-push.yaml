@@ -100,6 +100,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Cache pip packages
+        # Keyed on the FIVE distributions' pyproject.toml (their pinned runtime
+        # deps) plus requirements-dev.txt (the pinned dev/CI tooling) -- the
+        # same key composition ci.yml's Python-container jobs use.
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('packages/core/pyproject.toml', 'packages/harness/pyproject.toml', 'services/api/pyproject.toml', 'services/runner/pyproject.toml', 'services/mock-model/pyproject.toml', 'requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
       - name: Install
         run: |
           set -eu
@@ -163,6 +173,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Cache pip packages
+        # Same key composition as `checks-python` above -- see that step's
+        # comment.
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('packages/core/pyproject.toml', 'packages/harness/pyproject.toml', 'services/api/pyproject.toml', 'services/runner/pyproject.toml', 'services/mock-model/pyproject.toml', 'requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
       - name: Install
         run: |
           set -eu
