@@ -112,7 +112,7 @@ QUESTIONS: list[IntakeQuestion] = [
             IntakeOption(
                 value="researcher", label="Research", detail="Papers, data, grants, literature."
             ),
-            IntakeOption(value="teacher", value="researcher", label="Both", detail="We will ask about each in turn."),
+            IntakeOption(value="teacher"+"researcher", label="Both", detail="We will ask about each in turn."),
         ],
     ),
     IntakeQuestion(
