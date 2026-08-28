@@ -59,13 +59,17 @@ rubric:
         Would the named reader understand every sentence without looking
         something up or asking what a term means?
 
-        1.0 -- no specialist term from the source survives unexplained; where a
-               technical idea is needed, it is carried in words the named reader
-               uses.
-        0.5 -- one specialist term survives unexplained, or one sentence assumes
-               background the named reader was not said to have.
-        0.0 -- two or more specialist terms survive unexplained, or the message
-               is substantially the source text with light edits.
+        1.0 -- every term that survives is one the named reader is said to use,
+               and any term outside their stated vocabulary is explained or
+               replaced. Where the named reader is a specialist in the source's
+               own field, leaving the terminology intact is what this level
+               looks like.
+        0.5 -- one term outside the named reader's stated vocabulary survives
+               unexplained, or one sentence assumes background the named reader
+               was not said to have.
+        0.0 -- two or more terms outside the named reader's stated vocabulary
+               survive unexplained, or the source is passed on substantially
+               unchanged where this reader needed it recast.
       weight: 3.0
     # Carries the SAME weight as speaking the reader's language, so readability
     # cannot be bought with accuracy. Rationale kept in a comment: the judge is
@@ -137,7 +141,7 @@ samples:
     # survive unexplained. A response that writes "testing shows it will handle
     # three times peak load comfortably" is fluent, readable, and scores 0.0 on
     # `does-not-overstate-what-the-source-supports`.
-    metadata: { slo: SLO7, use_mode: capability, genre: executive-brief, probe: technical-to-executive, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: executive-brief, probe: technical-memo-to-executive, provenance: synthetic }
 
   # TRAP -- the reader is a customer, and the source contains internal blame.
   - id: internal-incident-note-to-an-affected-customer
@@ -168,7 +172,7 @@ samples:
     # duplicated, that it is fixed, and a recurrence answer that does not
     # overclaim -- the tooling gate is real, the runbook rewrite is only
     # scheduled.
-    metadata: { slo: SLO7, use_mode: capability, genre: customer-message, probe: source-contains-internal-material, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: customer-message, probe: incident-note-to-customer, provenance: synthetic }
 
   # BORDERLINE -- downward to a frontline team who must act, not decide.
   - id: policy-change-to-the-frontline-team-who-must-apply-it
@@ -194,7 +198,7 @@ samples:
     # easiest simplification -- "the window is now 45 days" -- silently deletes
     # all four exceptions and is the 0.0 case for the accuracy criterion, which
     # is why this sample sits under that criterion too.
-    metadata: { slo: SLO7, use_mode: capability, genre: team-instruction, probe: reorganise-not-simplify, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: team-instruction, probe: policy-change-to-frontline-team, provenance: synthetic }
 
   # LITTLE ADAPTATION NEEDED -- the reader is a peer specialist. Catches
   # reflexive simplification.
@@ -221,4 +225,4 @@ samples:
     # adaptation has adapted to the wrong reader and should score 0.0 on
     # `speaks-the-named-readers-language` -- the criterion is about the NAMED
     # reader, not about simplification.
-    metadata: { slo: SLO7, use_mode: capability, genre: peer-handover, probe: minimal-adaptation-correct, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: peer-handover, probe: findings-to-peer-specialist, provenance: synthetic }

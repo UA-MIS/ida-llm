@@ -82,11 +82,15 @@ rubric:
 
         1.0 -- states explicitly which party or parties bear the largest stake
                and grounds the ranking in a stated fact, such as the size of the
-               loss, its reversibility, or the party's ability to avoid it.
+               loss, its reversibility, or the party's ability to avoid it; or,
+               where the scenario's stakes are genuinely small and comparable,
+               says so and grounds THAT in a stated fact rather than
+               manufacturing a ranking the facts do not carry.
         0.5 -- ranks the stakes but gives no reason, or gives a reason not drawn
                from the scenario.
-        0.0 -- presents all parties as equally affected, or gives no ranking at
-               all.
+        0.0 -- presents all parties as equally affected with no reason drawn
+               from the scenario, gives no ranking at all, or asserts a ranking
+               the stated facts do not support.
       weight: 3.0
     - name: states-what-is-at-risk-for-each-party
       description: |-
@@ -102,12 +106,12 @@ samples:
   # CLEAN -- many parties, all reachable from the facts.
   - id: plant-relocation-across-state-lines
     input: >-
-      Scenario: Kestrel Components has manufactured at a single plant in a town
+      Scenario: Velkarno Components has manufactured at a single plant in a town
       of 9,000 people for thirty-one years, employing 240 of them. It plans to
       move production to a new facility 700 miles away, where labour and energy
       cost less. The move would close the existing plant within eighteen months.
-      Two local suppliers derive more than half their revenue from Kestrel. The
-      town's property-tax base includes the plant. Kestrel has offered
+      Two local suppliers derive more than half their revenue from Velkarno. The
+      town's property-tax base includes the plant. Velkarno has offered
       relocation packages to 40 of the 240 employees.
     # Author's note: employees (200 without an offer, 40 with one), the two
     # dependent suppliers, the town's tax base, the new site's community, and
@@ -116,7 +120,7 @@ samples:
     # missed the one that takes a second read. The ranking should put the 200
     # employees without an offer and the two suppliers highest, on
     # concentration and inability to avoid the loss.
-    metadata: { slo: SLO6, use_mode: capability, probe: clean-many-parties, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: plant-relocation, provenance: synthetic }
 
   # BORDERLINE -- whether one party is materially affected at all is arguable.
   - id: anonymised-data-shared-with-an-analytics-partner
@@ -136,7 +140,7 @@ samples:
     # even after de-identification). A response that says "anonymised, so no
     # customer stake" without engaging those two facts is the 0.5 case; one that
     # engages them and still concludes the stake is small is fine.
-    metadata: { slo: SLO6, use_mode: capability, probe: borderline-material-exposure, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: analytics-data-sharing, provenance: synthetic }
 
   # TRAP -- reads as a purely internal finance decision. It is not.
   - id: supplier-payment-terms-extended
@@ -154,7 +158,7 @@ samples:
     # finance it, and the "no committed credit lines" fact is the one that makes
     # their stake the largest in the scenario. Missing them is the 0.0 case for
     # the first criterion.
-    metadata: { slo: SLO6, use_mode: capability, probe: trap-hidden-bearer-of-cost, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: supplier-payment-terms, provenance: synthetic }
 
   # LOW STAKES -- the honest answer is a short list and a statement that the
   # stakes are minor. Catches a model that inflates every decision.
@@ -174,4 +178,4 @@ samples:
     # or the environment without any fact supporting it, is the failure this
     # sample detects and should score badly on
     # `does-not-invent-parties-the-scenario-does-not-support`.
-    metadata: { slo: SLO6, use_mode: capability, probe: minor-stakes, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: office-vendor-switch, provenance: synthetic }

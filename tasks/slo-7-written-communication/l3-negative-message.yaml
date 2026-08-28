@@ -98,7 +98,8 @@ rubric:
 
         1.0 -- every future possibility mentioned is one the scenario states is
                available, and possibilities that are genuinely uncertain are
-               described as uncertain.
+               described as uncertain; where the scenario supports no future
+               possibility at all, the message offers none.
         0.5 -- one vague encouragement is offered that the scenario does not
                support, such as an unbacked suggestion to try again later.
         0.0 -- a specific commitment is made that the scenario contradicts or
@@ -141,7 +142,7 @@ samples:
     # survivable; the three weeks and the in-person presentation are what the
     # relationship criterion wants acknowledged specifically rather than
     # generically.
-    metadata: { slo: SLO7, use_mode: capability, genre: internal-email, probe: clean-refusal-route-exists, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: internal-email, probe: internal-proposal-decline, provenance: synthetic }
 
   # TRAP -- the customer is right on the facts and still gets a no. The
   # temptation is to imply a goodwill exception nobody authorised.
@@ -167,7 +168,7 @@ samples:
     # 0.0 case for the promises criterion, because Callum's manager has already
     # ruled. The purchase-note fact is available but leading with it reads as
     # blaming the recipient.
-    metadata: { slo: SLO7, use_mode: capability, genre: customer-email, probe: trap-sympathetic-recipient-firm-no, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: customer-email, probe: refund-outside-window, provenance: synthetic }
 
   # HARD -- a reduction affecting many people, where the sender is a decision
   # maker and the passive voice is the tempting hiding place.
@@ -193,11 +194,11 @@ samples:
     # reported as exactly that. "We hope to restore it next year" is the 0.0
     # promises case. The manager-discretion and committed-balance facts are the
     # two most likely to be dropped and both change what a reader does next.
-    metadata: { slo: SLO7, use_mode: capability, genre: internal-announcement, probe: many-recipients-sender-decided, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: internal-announcement, probe: benefit-reduction-announcement, provenance: synthetic }
 
   # NO CONSOLATION AVAILABLE -- nothing can be offered. Catches a model that
   # cannot end a message without a silver lining.
-  - id: tell-a-strong-performer-there-is-no-promotion
+  - id: promotion-decision-for-a-strong-performer
     input: >-
       Write an email. You are writing on behalf of Lena Ostrowski to Sam Beaufort,
       who reports to her and asked to be promoted to principal analyst. Facts:
@@ -218,4 +219,4 @@ samples:
     # that is true and useful -- what the gap is -- and honest that she cannot
     # say when it can be closed. A model that cannot end a refusal without a
     # silver lining will fail here, which is exactly what this sample is for.
-    metadata: { slo: SLO7, use_mode: capability, genre: internal-email, probe: nothing-can-be-offered, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: internal-email, probe: promotion-round-outcome, provenance: synthetic }

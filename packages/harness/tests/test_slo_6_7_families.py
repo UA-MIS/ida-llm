@@ -538,3 +538,140 @@ class TestTheseRubricsReachTheJudge:
         assert len(verdict.score.criteria) == len(task.rubric.criteria)
         assert 0.0 <= verdict.score.value <= 1.0
         assert verdict.score.value == pytest.approx(aggregate(verdict.score.criteria))
+
+
+#: Verdict vocabulary that must never reach a PUBLISHED sample field.
+#:
+#: ``GET /tasks/{id}`` returns each sample's ``id`` and ``metadata`` verbatim and
+#: unauthenticated, and it returns the whole ``rubric`` too -- only ``target`` is
+#: redacted. So an id or a metadata value that STATES the expected answer
+#: ("no-issue-present", "brevity-is-the-answer", "trap-permitted-but-wrong") is a
+#: public contamination leak: a scraper gets the scenario and the verdict
+#: together, and a future training corpus gets the answer key this endpoint's
+#: redaction exists to protect.
+#:
+#: The design role each sample plays is genuinely useful to an author, so it
+#: still lives beside the sample -- in a YAML COMMENT, which is not parsed, is
+#: not part of ``content_sha`` and never leaves the repository. That is the
+#: placement SCHEMA.md prescribes for expected verdicts, and this list is what
+#: keeps it there.
+LEAKY_VERDICT_TOKENS = (
+    "trap",
+    "clean-",
+    "no-issue",
+    "nothing",
+    "correct",
+    "wrong",
+    "defensible",
+    "convergence",
+    "objectionable",
+    "aligned",
+    "brevity-is",
+    "minimal-adaptation",
+    "no-artefact",
+    "already-requires",
+    "thin-evidence",
+    "should-narrow",
+    "cannot-be-offered",
+    "both-wrong",
+)
+
+
+class TestPublishedSampleFieldsDoNotCarryTheVerdict:
+    """The answer must not be reachable from the fields the API publishes."""
+
+    def test_no_sample_id_states_the_expected_answer(self, slo_tasks: list) -> None:
+        for task in slo_tasks:
+            for sample in task.samples:
+                for token in LEAKY_VERDICT_TOKENS:
+                    assert token not in sample.id, (
+                        f"{task.id}/{sample.id}: sample id carries the verdict token "
+                        f"{token!r}; sample ids are published unauthenticated"
+                    )
+
+    def test_no_metadata_value_states_the_expected_answer(self, slo_tasks: list) -> None:
+        for task in slo_tasks:
+            for sample in task.samples:
+                for key, value in sample.metadata.items():
+                    for token in LEAKY_VERDICT_TOKENS:
+                        assert token not in str(value), (
+                            f"{task.id}/{sample.id}: metadata.{key} is {value!r}, which "
+                            f"carries the verdict token {token!r}; metadata is published "
+                            "verbatim and unauthenticated"
+                        )
+
+
+#: The sample in each task whose correct answer is the UNDRAMATIC one, and the
+#: criteria whose 1.0 anchor had to be widened to admit it.
+#:
+#: Every family here mandates a counterweight sample -- one where the honest
+#: answer is "there is no issue", "nothing transmits", "no message should be
+#: written". A rubric whose top criterion demands a positive existence ("names a
+#: principle", "the artefact could be sent as written") scores that CORRECT
+#: answer 0.0, which silently inverts the measurement: the models that get it
+#: right are marked down. Each anchor below now carries an explicit alternative
+#: branch, and this table is what stops one being dropped in a later edit.
+#:
+#: It lives in the test file rather than in sample metadata on purpose -- naming
+#: the counterweight in metadata would publish the very thing the leak guard
+#: above removes.
+COUNTERWEIGHT_BRANCHES = {
+    "slo-6-ethical-reasoning/l1-principle-identification": {
+        "does-not-shotgun-extra-principles": "where the facts raise no principle",
+        "quotes-or-cites-a-specific-fact": "where the facts raise no principle",
+    },
+    "slo-6-ethical-reasoning/l2-stakeholder-analysis": {
+        "ranks-the-stakes-against-each-other": "genuinely small and comparable",
+    },
+    "slo-6-ethical-reasoning/l5-law-and-ethics-distinction": {
+        "does-not-treat-legality-as-settling-the-ethics": "reach the same answer",
+    },
+    "slo-7-written-communication/l2-audience-adaptation": {
+        "speaks-the-named-readers-language": "specialist in the source's",
+    },
+    "slo-7-written-communication/l3-negative-message": {
+        "promises-nothing-the-sender-cannot-deliver": "no future possibility at all",
+    },
+    "slo-7-written-communication/l5-channel-and-restraint": {
+        "keeps-out-of-writing-what-should-not-be-written-down": "nothing should be written",
+        "the-artefact-itself-is-well-written": "no artefact should be written",
+    },
+}
+
+
+class TestTheUndramaticAnswerCanStillScoreFull:
+    """A correct "nothing to report" answer must be able to reach 1.0."""
+
+    def test_each_widened_anchor_still_carries_its_alternative_branch(
+        self, slo_tasks: list
+    ) -> None:
+        by_id = {task.id: task for task in slo_tasks}
+        for task_id, criteria in COUNTERWEIGHT_BRANCHES.items():
+            task = by_id[task_id]
+            named = {c.name: c for c in task.rubric.criteria}
+            for criterion_name, branch in criteria.items():
+                assert criterion_name in named, f"{task_id}: no criterion {criterion_name!r}"
+                flat = " ".join(named[criterion_name].description.split())
+                assert branch in flat, (
+                    f"{task_id}/{criterion_name}: the alternative branch that lets the "
+                    f"undramatic answer reach 1.0 is gone (looked for {branch!r})"
+                )
+
+    def test_the_widened_anchors_reach_the_judge_intact(self, slo_tasks: list) -> None:
+        """A branch that does not survive into the prompt is not a fix."""
+        by_id = {task.id: task for task in slo_tasks}
+        for task_id, criteria in COUNTERWEIGHT_BRANCHES.items():
+            task = by_id[task_id]
+            named = {c.name: c for c in task.rubric.criteria}
+            for criterion_name, branch in criteria.items():
+                prompt = build_criterion_messages(
+                    task=task,
+                    sample=task.samples[0],
+                    completion="A plausible response.",
+                    criterion=named[criterion_name],
+                    rubric=task.rubric,
+                )[-1].content
+                assert branch in " ".join(prompt.split()), (
+                    f"{task_id}/{criterion_name}: the alternative branch did not survive "
+                    "into the judge prompt"
+                )

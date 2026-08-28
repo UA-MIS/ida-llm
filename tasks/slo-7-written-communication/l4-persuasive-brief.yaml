@@ -29,9 +29,8 @@ description: >
   persuasion and selection: the brief must lead with its recommendation, marshal
   the supplied evidence behind it, and meet the strongest objection honestly
   rather than a convenient weaker one -- all inside a budget that makes the
-  writer choose what to leave out. One scenario supplies evidence that does not
-  in fact support the ask, so the rung measures judgement about when to advocate
-  as well as skill in advocating.
+  writer choose what to leave out. The rung measures judgement about when to
+  advocate as well as skill in advocating.
 
   Provenance: every scenario, company, person, figure and quoted objection in
   this file is SYNTHETIC, invented for this file. No real business data, vendor,
@@ -138,7 +137,7 @@ samples:
     # status quo. Note the $1.1m is orders TURNED AWAY, not margin -- a brief
     # that treats it as profit has overstated, which is the 0.5 case on the
     # first criterion.
-    metadata: { slo: SLO7, use_mode: capability, genre: decision-brief, probe: clean-strong-evidence, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: decision-brief, probe: capital-request, provenance: synthetic }
 
   # BORDERLINE -- the decision-maker has a stake in the status quo.
   - id: switch-the-payroll-vendor
@@ -162,7 +161,7 @@ samples:
     # that scores points off that choice loses him, while one that never
     # acknowledges he has a position is naive. The three-year commitment is the
     # fact that makes the price hold answerable.
-    metadata: { slo: SLO7, use_mode: capability, genre: decision-brief, probe: borderline-reader-has-a-stake, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: decision-brief, probe: payroll-vendor-switch, provenance: synthetic }
 
   # HARD -- a tight limit and an ask that must be narrowed to be defensible.
   - id: exception-to-a-hiring-freeze
@@ -189,11 +188,11 @@ samples:
     # permanent hires without engaging the cash objection has ignored the reason
     # for the freeze; one that proposes contractors for some and hires for the
     # contractual gap is doing the rung's actual work.
-    metadata: { slo: SLO7, use_mode: capability, genre: decision-brief, probe: tight-limit-ask-should-narrow, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: decision-brief, probe: hiring-freeze-exception, provenance: synthetic }
 
   # THE EVIDENCE DOES NOT SUPPORT THE ASK. The honest brief says so. Without
   # this sample the rung rewards advocacy regardless of the evidence.
-  - id: rebrand-proposal-on-thin-evidence
+  - id: rebrand-investment-request
     input: >-
       Write a brief of no more than 200 words to Marguerite Okafor, the chief
       executive, who is sceptical of marketing spend. You have been asked to make
@@ -218,4 +217,4 @@ samples:
     # for the full spend is the 0.0 case on the first criterion no matter how
     # well written it is -- and that is the discrimination this rung exists to
     # make.
-    metadata: { slo: SLO7, use_mode: capability, genre: decision-brief, probe: evidence-does-not-reach-the-ask, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: decision-brief, probe: rebrand-proposal, provenance: synthetic }

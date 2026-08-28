@@ -140,7 +140,7 @@ samples:
     # DEADLINE is not, because it tells the reader why to bother replying. The
     # register is internal-colleagues-routine: a formal "Dear Colleagues, I hope
     # this message finds you well" opening is a register error here.
-    metadata: { slo: SLO7, use_mode: capability, genre: internal-email, probe: clean-routine, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: internal-email, probe: meeting-reschedule, provenance: synthetic }
 
   # TRAP -- a needed detail is deliberately withheld. Inventing it is the
   # failure; a bracketed placeholder is the half-failure.
@@ -164,7 +164,7 @@ samples:
     # on `produces-the-message-and-nothing-else`. "[Contact name]" is the 0.5
     # case: honest, but not sendable. The arithmetic (240 - 200 = 40) is
     # supplied, not to be derived -- this is a writing task, not a numeracy one.
-    metadata: { slo: SLO7, use_mode: capability, genre: external-email, probe: withheld-detail, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: external-email, probe: supplier-invoice-query, provenance: synthetic }
 
   # BORDERLINE -- many facts, and the brief demands brevity anyway. This is
   # where the two 3.0 criteria genuinely pull.
@@ -189,7 +189,7 @@ samples:
     # they are negative ("do not pack monitors", "do not call the helpdesk") and
     # dropping either is a real operational failure, so they count for
     # `carries-every-fact-the-scenario-supplied`.
-    metadata: { slo: SLO7, use_mode: capability, genre: internal-announcement, probe: many-facts-brevity-pressure, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: internal-announcement, probe: logistics-announcement, provenance: synthetic }
 
   # RESTRAINT -- the honest answer is two sentences. Catches a model that
   # inflates every request into a five-paragraph email.
@@ -209,4 +209,4 @@ samples:
     # `is-no-longer-than-the-job-requires` even though it omits nothing. This
     # sample is the counterweight that stops completeness from being the whole
     # rubric.
-    metadata: { slo: SLO7, use_mode: capability, genre: chat-message, probe: brevity-is-the-answer, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: chat-message, probe: contract-receipt-confirmation, provenance: synthetic }

@@ -30,8 +30,8 @@ description: >
   to the facts that raise it. It does not map stakeholders (rung 2), apply a
   normative framework (rung 3) or recommend anything (rung 4). This rung
   isolates the single judgement the rest of the ladder is built on: can the
-  model tell what kind of problem it is looking at -- including when the answer
-  is that there is no ethical problem here at all?
+  model tell what kind of problem it is looking at, and how far the facts
+  actually support that reading?
 
   Provenance: every scenario in this file is SYNTHETIC, invented for this file
   to imitate the shape of an undergraduate business-ethics case. No real
@@ -85,7 +85,9 @@ rubric:
         applies.
 
         1.0 -- names one central principle, and at most one further principle
-               with a stated reason why the facts also raise it.
+               with a stated reason why the facts also raise it; or, where the
+               facts raise no principle, names none rather than supplying one
+               to have something to say.
         0.5 -- names two further principles beyond the central one without
                saying what in the scenario raises them.
         0.0 -- names three or more further principles, or presents a survey or
@@ -98,7 +100,9 @@ rubric:
 
         1.0 -- refers to at least one concrete detail from the scenario (a role,
                an amount, a sequence of events, a stated relationship) and shows
-               how that detail is what puts the principle at stake.
+               how that detail is what puts the principle at stake -- or, where
+               the facts raise no principle, which stated details are what
+               settle that.
         0.5 -- refers to the scenario in general terms only ("the manager's
                situation", "this decision") without identifying which fact does
                the work.
@@ -136,7 +140,7 @@ samples:
     # there to tempt a response into answering "it is within policy, so it is
     # fine", which is a rung-5 move and is not what was asked. Independence of
     # judgement is an acceptable near-synonym for the central principle.
-    metadata: { slo: SLO6, use_mode: capability, probe: clean-single-principle, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: procurement-gift, provenance: synthetic }
 
   # BORDERLINE -- two principles are genuinely defensible. Grade the reasoning,
   # not which of the two the response picks.
@@ -154,7 +158,7 @@ samples:
     # points at the direct question as the fact that creates it -- not which
     # side it names first. A response naming only one and not noticing the other
     # is the 0.5 case for `names-the-principle-the-facts-raise`.
-    metadata: { slo: SLO6, use_mode: capability, probe: borderline-two-defensible-principles, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: confidentiality-and-a-direct-question, provenance: synthetic }
 
   # TRAP -- looks like ordinary networking, is not.
   - id: referred-candidate-fast-tracked
@@ -175,12 +179,12 @@ samples:
     # confused the outcome with the process and scores 0.0 on the first
     # criterion. Conflict of interest is an acceptable second principle IF the
     # response says what raises it.
-    metadata: { slo: SLO6, use_mode: capability, probe: trap-looks-benign, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: referral-in-hiring, provenance: synthetic }
 
   # NOTHING IS WRONG -- the honest answer is that no ethical principle is at
   # stake. Without this sample the family teaches a model to always find a
   # violation.
-  - id: uniform-price-increase-after-input-costs
+  - id: price-increase-after-input-costs
     input: >-
       Scenario: A commercial bakery's flour and packaging costs rose 11% over a
       year. It raises wholesale prices 4% across its entire customer list, gives
@@ -195,4 +199,4 @@ samples:
     # failure this sample exists to detect: an ethics detector with no off
     # switch. Note the increase is BELOW the cost rise, which forecloses the
     # price-gouging reading a response might reach for.
-    metadata: { slo: SLO6, use_mode: capability, probe: no-issue-present, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: input-cost-pass-through, provenance: synthetic }

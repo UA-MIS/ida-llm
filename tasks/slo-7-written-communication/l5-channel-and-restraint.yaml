@@ -32,8 +32,8 @@ description: >
   at all -- then produce the artefact, or explain why the right move is a
   conversation rather than a message. The rung measures the judgement that
   precedes composition, which is why a well-written message sent to the wrong
-  audience scores badly here, and why one scenario's correct answer is to write
-  no message at all.
+  audience scores badly here, and why the right artefact is not always a
+  message.
 
   Provenance: every scenario, company, person, review and internal matter in
   this file is SYNTHETIC, invented for this file. No real customer feedback,
@@ -81,7 +81,9 @@ rubric:
         handling, and speculation about cause?
 
         1.0 -- every such item is kept out of the artefact, and the response says
-               which it withheld and why.
+               which it withheld and why; where the response's judgement is that
+               nothing should be written at all, it says what must be kept out
+               of a durable record and why.
         0.5 -- such material is included but marked confidential or hedged, or is
                withheld with no acknowledgement that a choice was made.
         0.0 -- unconfirmed allegations, a named individual's conduct, or
@@ -110,15 +112,18 @@ rubric:
 
         1.0 -- the artefact could be sent as written: right length for the
                channel, point first where the channel calls for it, no errors.
+               Where the response's judgement is that no artefact should be
+               written, this level is reached by a reasoned account of what is
+               said instead, to whom, and through what channel.
         0.5 -- usable but noticeably too long for its channel, or carrying one
                mechanical error.
-        0.0 -- the artefact is unusable as written, or the response describes
-               what it would say instead of writing it.
+        0.0 -- the artefact is unusable as written, or the response undertakes
+               to write one and then only describes what it would say.
       weight: 2.0
 tags: [slo-benchmark, "slo:SLO7", "use-mode:capability", slo-7-written-communication, ladder-l5, subjective, not-yet-scorable]
 samples:
   # PROVOCATION IN PUBLIC -- and one of the customer's claims is wrong.
-  - id: angry-public-review-with-one-false-claim
+  - id: angry-public-review
     input: >-
       Situation: A customer has posted a one-star public review of your
       software: "Support ignored me for a week, the export feature has been
@@ -142,10 +147,10 @@ samples:
     # since the refund was made without telling her and that is the fixable
     # relationship failure. Note the reply cannot be edited afterwards, which is
     # the fact that should drive the restraint.
-    metadata: { slo: SLO7, use_mode: capability, genre: public-reply, probe: provocation-with-a-false-claim, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: public-reply, probe: public-review-response, provenance: synthetic }
 
   # PRESSURE TO BROADCAST BEFORE THE FACTS ARE IN.
-  - id: outage-the-chief-executive-wants-communicated-widely
+  - id: outage-notice-scope
     input: >-
       Situation: A four-hour outage of your scheduling product ended ninety
       minutes ago. Confirmed: the outage window, that all customers were
@@ -167,7 +172,7 @@ samples:
     # cause is under investigation. The response should also be willing to tell
     # the CEO that the cause cannot go in this message, which is a judgement the
     # rung wants to see made.
-    metadata: { slo: SLO7, use_mode: capability, genre: customer-notice, probe: pressure-to-state-unconfirmed-cause, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: customer-notice, probe: outage-customer-notice, provenance: synthetic }
 
   # A RUMOUR IS CIRCULATING. Silence and broadcast are both wrong.
   - id: internal-rumour-about-a-restructure
@@ -194,11 +199,11 @@ samples:
     # person. A model that writes a reassuring note saying nothing is changing
     # has written something false; a model that says nothing at all has left the
     # rumour to run.
-    metadata: { slo: SLO7, use_mode: capability, genre: internal-note, probe: rumour-silence-and-broadcast-both-wrong, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: internal-note, probe: restructure-rumour, provenance: synthetic }
 
   # THE ANSWER IS NOT A WRITTEN MESSAGE. Catches a model that cannot decline to
   # produce an artefact.
-  - id: performance-conversation-nobody-should-put-in-an-email
+  - id: repeated-missed-deadlines
     input: >-
       Situation: Ravi, who reports to you, has missed three client deadlines in
       six weeks. Before this he had two years without a single slip. You have
@@ -221,4 +226,4 @@ samples:
     # external party. A model that produces the enumerated email, however well
     # written, has failed this sample; so has one that puts the father's illness
     # anywhere in a written artefact.
-    metadata: { slo: SLO7, use_mode: capability, genre: no-artefact-is-correct, probe: restraint-conversation-not-a-message, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: judgement-call, probe: performance-concern-with-context, provenance: synthetic }
