@@ -41,7 +41,7 @@ FAMILIES = {
 # it -- SLO 3 needs two families because SCHEMA.md requires one kind per family,
 # and only the tag reunites them. `use_mode:` marks what the task is measuring.
 SLO_TAG = re.compile(r"^slo:SLO\d+$")
-USE_MODE_TAG = "use_mode:capability"
+USE_MODE_TAG = "use-mode:capability"
 
 # `l3-weighing-competing-factors` -> rung 3. Enforced against the `ladder-l3`
 # tag so the id and the machine-readable rung cannot drift apart.
@@ -68,8 +68,15 @@ class TestTagConvention:
     """The tags a dashboard groups on. Nothing else in the repo enforces these.
 
     The task JSON Schema sets ``additionalProperties: false``, so `slo` and
-    `use_mode` cannot be top-level YAML keys; `tags` (a list of strings, exposed
+    `use-mode` cannot be top-level YAML keys; `tags` (a list of strings, exposed
     by the API) is where this convention has to live.
+
+    The exact spellings -- ``slo:SLO3``, ``use-mode:capability``, and the
+    family-wide ``slo-benchmark`` tag -- are set by the SLO skeleton, which owns
+    the convention. They are asserted here rather than described, because a
+    dashboard grouping on these strings fails silently on a mismatch: the tasks
+    still load, still run and still score, they just stop appearing under their
+    outcome.
     """
 
     def test_every_task_carries_exactly_one_slo_tag(self, slo_tasks) -> None:
@@ -86,6 +93,11 @@ class TestTagConvention:
     def test_every_task_declares_its_use_mode(self, slo_tasks) -> None:
         for task in slo_tasks:
             assert USE_MODE_TAG in task.tags, f"{task.id} is missing {USE_MODE_TAG}"
+
+    def test_every_task_carries_the_shared_slo_benchmark_tag(self, slo_tasks) -> None:
+        """The tag that gathers every SLO family, across all the branches building them."""
+        for task in slo_tasks:
+            assert "slo-benchmark" in task.tags, f"{task.id} is missing the slo-benchmark tag"
 
     def test_family_name_is_a_tag(self, slo_tasks) -> None:
         """SCHEMA.md: tag every task in a family with the family name."""

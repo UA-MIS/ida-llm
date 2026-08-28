@@ -121,7 +121,7 @@ rubric:
         0.0 -- a counter-case is invented for a decision the scenario does not
                make close, or a genuinely close call is presented as obvious.
       weight: 2.0
-tags: [slo:SLO3, use_mode:capability, slo3-global-analysis, ladder-l3, international-business, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-analysis, ladder-l3, international-business, subjective, not-yet-scorable]
 samples:
   # CLEAN CONFLICT. Cost points one way, currency and lead-time risk the other,
   # and the magnitudes are supplied so the comparison can actually be made.

@@ -128,7 +128,7 @@ rubric:
                ones.
         0.0 -- inferred rules or figures are presented as facts of the scenario.
       weight: 2.0
-tags: [slo:SLO3, use_mode:capability, slo3-global-analysis, ladder-l4, international-business, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-analysis, ladder-l4, international-business, subjective, not-yet-scorable]
 samples:
   # CLEAN. The rules-of-origin threshold is the textbook shape of this failure
   # and every number needed to see it is supplied. This is the sample that

@@ -102,7 +102,7 @@ rubric:
         0.0 -- the list is padded and undifferentiated, or the response asserts
                that a largely domestic decision is heavily globally exposed.
       weight: 2.0
-tags: [slo:SLO3, use_mode:capability, slo3-global-analysis, ladder-l1, international-business, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-analysis, ladder-l1, international-business, subjective, not-yet-scorable]
 samples:
   # CLEAN. The global factors are numerous, explicit and each attached to a
   # stated fact: currency, tariff, freight lead time, and a local-content rule.

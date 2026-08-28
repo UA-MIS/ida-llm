@@ -119,7 +119,7 @@ rubric:
         0.0 -- a generalisation about a national, ethnic or religious group is
                asserted as fact and carries part of the argument.
       weight: 2.0
-tags: [slo:SLO4, use_mode:capability, slo4-cultural-societal, ladder-l2, organisational-behaviour, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO4", "use-mode:capability", slo4-cultural-societal, ladder-l2, organisational-behaviour, subjective, not-yet-scorable]
 samples:
   # CLEAN, INTERNATIONAL. A societal structure with a stated legal mechanism, so
   # the chain to the practice is checkable end to end.

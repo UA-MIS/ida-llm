@@ -57,7 +57,7 @@ scorer:
     strip: true
     collapse_whitespace: true
     take_last_line: true
-tags: [slo:SLO3, use_mode:capability, slo3-global-knowledge, ladder-l1, international-business, verifiable]
+tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-knowledge, ladder-l1, international-business, verifiable]
 samples:
   - id: invoice-converted-at-spot
     input: >-

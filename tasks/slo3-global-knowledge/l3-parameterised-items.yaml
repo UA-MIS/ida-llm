@@ -48,7 +48,7 @@ scorer:
     strip: true
     collapse_whitespace: true
     take_last_line: true
-tags: [slo:SLO3, use_mode:capability, slo3-global-knowledge, ladder-l3, international-business, verifiable, item-generation]
+tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-knowledge, ladder-l3, international-business, verifiable, item-generation]
 samples:
   - id: template-landed-unit-cost
     input: >-

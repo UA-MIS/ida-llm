@@ -142,7 +142,7 @@ rubric:
                culture against its principles, or defers the decision to further
                consultation.
       weight: 2.0
-tags: [slo:SLO4, use_mode:capability, slo4-cultural-societal, ladder-l4, business-ethics, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO4", "use-mode:capability", slo4-cultural-societal, ladder-l4, business-ethics, subjective, not-yet-scorable]
 samples:
   # THE FLOOR MUST HOLD -- and the scenario is built so that the accommodating
   # answer is genuinely tempting: the request is framed in cultural terms by a

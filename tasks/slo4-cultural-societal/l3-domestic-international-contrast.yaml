@@ -124,7 +124,7 @@ rubric:
         0.0 -- a generalisation about a national, ethnic or religious group is
                asserted as fact and carries part of the comparison.
       weight: 2.0
-tags: [slo:SLO4, use_mode:capability, slo4-cultural-societal, ladder-l3, organisational-behaviour, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO4", "use-mode:capability", slo4-cultural-societal, ladder-l3, organisational-behaviour, subjective, not-yet-scorable]
 samples:
   # CLEAN. Genuine differences in both directions, each traceable to a stated
   # aspect, and a core that plainly should transfer.

@@ -140,7 +140,7 @@ rubric:
         0.0 -- the response states or implies that a single-country scenario has
                no cultural or societal dimension.
       weight: 2.0
-tags: [slo:SLO4, use_mode:capability, slo4-cultural-societal, ladder-l1, organisational-behaviour, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO4", "use-mode:capability", slo4-cultural-societal, ladder-l1, organisational-behaviour, subjective, not-yet-scorable]
 samples:
   # CLEAN, INTERNATIONAL. Both categories are present and explicitly stated:
   # two cultural norms and two societal structures. An adequate response finds

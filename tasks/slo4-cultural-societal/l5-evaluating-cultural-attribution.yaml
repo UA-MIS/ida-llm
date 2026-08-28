@@ -143,7 +143,7 @@ rubric:
                supports part of the verdict -- including where it is used to
                SUPPORT the cultural explanation.
       weight: 2.0
-tags: [slo:SLO4, use_mode:capability, slo4-cultural-societal, ladder-l5, organisational-behaviour, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO4", "use-mode:capability", slo4-cultural-societal, ladder-l5, organisational-behaviour, subjective, not-yet-scorable]
 samples:
   # STRUCTURAL EXPLANATION DOMINATES. The cultural claim is offered by a senior
   # person, sounds reasonable, and is undercut by two facts sitting in the same

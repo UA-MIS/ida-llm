@@ -73,7 +73,7 @@ scorer:
     strip: true
     collapse_whitespace: true
     take_last_line: true
-tags: [slo:SLO3, use_mode:capability, slo3-global-knowledge, ladder-l6, international-business, verifiable, chained]
+tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-knowledge, ladder-l6, international-business, verifiable, chained]
 samples:
   # STAGE 1 of the chain. Everything downstream depends on this number.
   - id: marenna-customs-value

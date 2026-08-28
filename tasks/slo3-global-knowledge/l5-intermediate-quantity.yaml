@@ -57,7 +57,7 @@ scorer:
     strip: true
     collapse_whitespace: true
     take_last_line: true
-tags: [slo:SLO3, use_mode:capability, slo3-global-knowledge, ladder-l5, international-business, verifiable, multi-step]
+tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-knowledge, ladder-l5, international-business, verifiable, multi-step]
 samples:
   - id: hedged-receivable-at-forward-rate
     input: >-

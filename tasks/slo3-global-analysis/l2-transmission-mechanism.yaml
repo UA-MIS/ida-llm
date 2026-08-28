@@ -114,7 +114,7 @@ rubric:
         0.0 -- an invented figure carries the argument, or two or more unflagged
                figures are introduced.
       weight: 2.0
-tags: [slo:SLO3, use_mode:capability, slo3-global-analysis, ladder-l2, international-business, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-analysis, ladder-l2, international-business, subjective, not-yet-scorable]
 samples:
   # CLEAN. A long but unambiguous chain, and every direction is the intuitive
   # one. This is the sample that should separate "has a mechanism" from "has
