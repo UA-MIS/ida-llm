@@ -1,0 +1,226 @@
+# slo1-problem-solving, rung 1 of 5 -- the floor.
+#
+# WHAT THIS RUNG ADDS: nothing beyond the first verb of the outcome. SLO1 reads
+# "assess a business problem, choose and apply the appropriate business tools
+# ... and propose suitable strategic solutions" -- three verbs, and this family
+# gives each its own rung so a model that can recommend but cannot diagnose is
+# visible as such rather than averaged into a single number.
+#
+# Rung 1 is ASSESS alone. No tool, no analysis, no recommendation: name the
+# problem and separate it from the symptoms that made someone notice it. The
+# item says so explicitly, and a response that recommends anything is scored
+# down for it -- not because recommending is bad, but because a rung that lets
+# you skip to the answer stops measuring the step it was built for.
+#
+# NOT YET SCORABLE, ON PURPOSE: kind: subjective + scorer.kind: llm_judge means
+# these run, store transcripts and report scorable: false until a judge model
+# is configured. See tasks/SCHEMA.md.
+#
+# ANCHOR: SLO1 Problem Solving. MIS 200 carries SLO1 at level R (Reinforced)
+# in curriculum/slo.yaml.
+version: 1
+id: slo1-problem-solving/l1-problem-definition
+title: SLO1 rung 1 -- naming the problem, not the symptom
+description: >
+  Rung 1 of the SLO1 ladder. Each sample gives a situation in which something
+  measurable has gone wrong and an obvious culprit is in view. The response
+  must state the problem to be solved, list the observations that are
+  consequences rather than causes, and say briefly why. One sample contains no
+  problem at all.
+
+  Provenance: every firm, figure and scenario is synthetic, authored for this
+  file. No course material, no textbook content, no real firm's data, no real
+  people.
+kind: subjective
+domain: business-analysis
+system_prompt: >-
+  You are a business analyst advising a decision-maker who has ten minutes.
+  Work only from the information the item supplies; where something you would
+  need is missing, say so rather than assuming a value. Use exactly the
+  headings the item asks for, in the order it asks for them, and write nothing
+  that does not earn its place under one of them. Do not invent figures, firms
+  or events that the item did not give you.
+scorer:
+  kind: llm_judge
+  rubric_id: slo1-problem-solving-problem-definition-v1
+rubric:
+  id: slo1-problem-solving-problem-definition-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: names-a-cause-not-a-restated-symptom
+      description: |-
+        Does the PROBLEM line state something that could be acted on, rather
+        than restating the measurement that fell?
+
+        A restated symptom is a problem statement that, if fixed, would only
+        mean the number moved -- "on-time delivery is too low", "churn is too
+        high", "margin has fallen".
+
+        1.0 -- the PROBLEM line names a condition of the business that
+               produced the numbers, and it is one the supplied facts point to;
+               OR, where the supplied facts show there is no problem, it says
+               so and names the fact that establishes it.
+        0.5 -- the PROBLEM line names a condition, but it is the one the
+               situation's obvious culprit suggests rather than the one the
+               supplied facts support.
+        0.0 -- the PROBLEM line restates the measurement that fell, names the
+               culprit the situation blames without engaging the facts that
+               contradict it, or asserts a problem the supplied facts do not
+               support.
+
+        The null branch is load-bearing, not a courtesy: one sample in this
+        task contains no problem, and without it the CORRECT answer to that
+        sample would score 0.0 on the highest-weighted criterion in the rubric.
+      weight: 3.0
+    - name: sorts-consequences-out-of-causes
+      description: |-
+        Does the SYMPTOMS section correctly place the observations that are
+        downstream of the problem rather than evidence of a different one?
+
+        1.0 -- every observation listed as a symptom is a consequence of the
+               stated problem, and no observation that discriminates between
+               competing explanations is buried there.
+        0.5 -- one observation is misplaced in either direction.
+        0.0 -- two or more are misplaced, or the section simply repeats the
+               situation in the order it was given.
+      weight: 2.0
+    - name: reasoning-cites-the-supplied-facts
+      description: |-
+        Does WHY THIS IS THE PROBLEM turn on specific facts from the item?
+
+        This is the criterion that catches a diagnosis which is plausible in
+        general and unconnected to this situation. A response that would read
+        identically if two of the item's figures were changed has not used
+        them.
+
+        1.0 -- at least two specific supplied facts (a figure, a date, a
+               stated comparison) are named and each is used to support or rule
+               out an explanation.
+        0.5 -- one supplied fact is named and used; the rest is general
+               reasoning.
+        0.0 -- no supplied fact is named, or facts are named but only
+               restated rather than used to discriminate.
+      weight: 3.0
+    - name: stops-where-the-item-stops
+      description: |-
+        Does the response do only the job rung 1 asks for, in the length asked
+        for? The outcome names CONCISE analysis, so volume is not evidence of
+        rigour here.
+
+        1.0 -- three headings, no recommendation, no proposed tool, and
+               WHY THIS IS THE PROBLEM is three sentences or fewer.
+        0.5 -- the content is right but it adds a recommendation or an action
+               plan, or WHY runs to more than three sentences.
+        0.0 -- the response is structured as a recommendation, or omits one of
+               the three required headings.
+      weight: 2.0
+tags: [slo-benchmark, "slo:SLO1", "use-mode:capability", ladder-l1, problem-solving, subjective, not-yet-scorable]
+samples:
+  # CLEAN. One explanation fits every fact and the blamed party is exonerated
+  # by the figures. A competent response should find this one.
+  - id: courier-on-time-delivery
+    input: >-
+      A regional parcel courier's on-time delivery rate fell from 94% to 78%
+      over four months. The operations director's note says: "Driver
+      performance has slipped; we need to tighten the route discipline."
+
+      The figures for the same four months: driver headcount unchanged at 46;
+      parcels handled up 41%; the single sorting hub's throughput capacity
+      unchanged; average parcels loaded per van up from 88 to 124; the hub's
+      last loading slot has moved 70 minutes later. Late deliveries are
+      concentrated in the two postcode areas served by the vans loaded last.
+      Driver turnover and the rate of customer complaints naming a driver are
+      both unchanged.
+
+      Respond under exactly these headings: PROBLEM, SYMPTOMS, WHY THIS IS THE
+      PROBLEM (three sentences at most).
+    # Author's note (a COMMENT, not metadata): the problem is that sorting-hub
+    # capacity has not scaled with a 41% volume rise, so vans load later and
+    # the last-loaded routes run out of day. Everything in the operations
+    # director's note is contradicted: headcount, turnover and driver-named
+    # complaints are all flat. A strong response names hub capacity, places the
+    # 78% and the postcode concentration as symptoms, and cites the 70-minute
+    # slot slip.
+    metadata: { probe: operations-note-blames-drivers, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  # BORDERLINE. Two explanations are both genuinely supported and the data
+  # cannot separate them. Grade the reasoning, not which one is picked: a
+  # response that names both and says what would separate them is stronger than
+  # one that confidently picks either.
+  - id: retail-gross-margin-slide
+    input: >-
+      A homewares retailer's gross margin fell from 38% to 33% over twelve
+      months while revenue grew 9%. No supplier contract was renegotiated in
+      the period and no list price was changed.
+
+      Over the same twelve months: the retailer's supplier price index rose
+      6%; the share of revenue coming from its lowest-margin category, small
+      electricals, rose from 20% to 34%; the share from its highest-margin
+      category, textiles, fell from 31% to 22%. Promotional discounting as a
+      share of revenue was 4.1% at the start and 4.3% at the end.
+
+      Respond under exactly these headings: PROBLEM, SYMPTOMS, WHY THIS IS THE
+      PROBLEM (three sentences at most).
+    # Author's note: both input-cost inflation (6%) and mix shift (electricals
+    # 20% -> 34%, textiles 31% -> 22%) are real and both are large enough to
+    # matter; the item deliberately supplies no category-level margin figures,
+    # so their relative contribution cannot be decomposed. Discounting is flat
+    # and is the one explanation the facts DO rule out. A strong response names
+    # both live candidates, rules out discounting, and says that category-level
+    # margins would separate them. A response that asserts one is the cause
+    # without acknowledging the other should lose the first criterion.
+    metadata: { probe: cost-index-and-mix-shift-both-move, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  # TRAP. The prominent, quantified explanation is the wrong one, and the
+  # facts that overturn it are stated plainly but late.
+  - id: churn-blamed-on-a-cheaper-rival
+    input: >-
+      A workflow-software firm's monthly customer churn rose from 1.6% to 3.4%
+      over two quarters. A competitor launched at a list price 20% below the
+      firm's, and the sales team's account notes attribute most losses to
+      price.
+
+      The firm's own usage data for the same period: of the accounts that
+      churned, 81% had never activated the second of the two core features, and
+      68% churned within 70 days of signing. Among accounts that had completed
+      onboarding, churn was 1.5% at the start of the period and 1.6% at the
+      end. Median time from signature to first successful use rose from 9 days
+      to 31 days after the firm moved onboarding from a dedicated team to
+      general support in the same quarter.
+
+      Respond under exactly these headings: PROBLEM, SYMPTOMS, WHY THIS IS THE
+      PROBLEM (three sentences at most).
+    # Author's note: churn among ONBOARDED customers is flat at ~1.5-1.6%, so
+    # price is not driving the loss of customers who have actually used the
+    # product; the entire rise sits in accounts that never got working, and the
+    # onboarding hand-off tripled time-to-first-use. The problem is the
+    # onboarding change. The 20% price gap and the sales notes are the bait --
+    # they are prominent, quantified and attributed to a source, which is
+    # exactly what a plausible wrong answer looks like.
+    metadata: { probe: competitor-price-gap-plus-usage-data, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  # NOTHING IS WRONG. Mandatory. A family whose every situation contains a
+  # problem teaches a model to manufacture one, and a manufactured problem is
+  # the most expensive output an analyst can produce.
+  - id: garden-centre-quarterly-fall
+    input: >-
+      A garden centre's revenue fell 45% from the third quarter to the fourth.
+      The owner has asked what has gone wrong.
+
+      The same third-to-fourth-quarter fall in each of the previous four years
+      was 46%, 43%, 47% and 44%. Full-year revenue is up 7% on last year. Gross
+      margin is 41%, against 41% and 42% in the two prior years. Customer
+      complaints, supplier lead times and staff turnover are all within their
+      usual ranges. No competitor has opened within thirty miles and no product
+      line has been discontinued.
+
+      Respond under exactly these headings: PROBLEM, SYMPTOMS, WHY THIS IS THE
+      PROBLEM (three sentences at most).
+    # Author's note: there is no problem. A 45% fall sits inside a four-year
+    # range of 43-47%, the full year is up 7%, and every other indicator is
+    # steady. The correct PROBLEM line says so -- the honest answer is that the
+    # observation is seasonality and the question rests on comparing two
+    # quarters that are not comparable. A response that finds a problem here
+    # should score 0.0 on the first criterion however fluent it is.
+    metadata: { probe: four-prior-years-of-the-same-quarters, provenance: synthetic, slo: SLO1, use_mode: capability }

@@ -1,0 +1,229 @@
+# slo-7-written-communication, rung 5 of 5 -- the top rung, and it should be
+# hard.
+#
+# WHAT THIS RUNG ADDS over rung 4: the QUESTION OF WHETHER TO WRITE AT ALL, and
+# to whom. Every earlier rung handed the model a channel and an audience and
+# asked it to write well. Here the situation is messy, the channel is not given,
+# and some of what the model knows must stay out of the artefact entirely. This
+# is the strategic half of SLO 7 at full strength -- "strategically appropriate
+# for a variety of business contexts" is finally the whole question rather than
+# a constraint on execution.
+#
+# WHY IT IS THE CEILING. Three failures converge here and a fluent model makes
+# all three smoothly: broadcasting to everyone because a mass email is the
+# default, putting into a durable written record something that should have been
+# said in a room, and answering a provocation defensively. Each is separately
+# scored, and `keeps-out-of-writing-what-should-not-be-written-down` and
+# `does-not-become-defensive-or-blame-shifting` sit at 3.0 alongside the channel
+# judgement because a beautifully written message to the wrong audience is worse
+# than a clumsy one to the right audience.
+#
+# THE FOURTH SAMPLE'S CORRECT ANSWER IS NOT TO SEND A WRITTEN MESSAGE. The
+# system prompt licenses that explicitly, and the rubric anchors accept it,
+# because a rung that always rewards producing an artefact cannot measure
+# restraint.
+version: 1
+id: slo-7-written-communication/l5-channel-and-restraint
+title: Written communication -- choose the channel and the audience, then write only what belongs in writing
+description: >
+  Rung 5 of the SLO 7 ladder, and its ceiling. Each scenario is a messy
+  situation rather than a writing brief: the model must decide who should hear
+  about it, through what channel, and what belongs in a durable written record
+  at all -- then produce the artefact, or explain why the right move is a
+  conversation rather than a message. The rung measures the judgement that
+  precedes composition, which is why a well-written message sent to the wrong
+  audience scores badly here, and why the right artefact is not always a
+  message.
+
+  Provenance: every scenario, company, person, review and internal matter in
+  this file is SYNTHETIC, invented for this file. No real customer feedback,
+  personnel matter, incident or organisation is described, and no textbook or
+  question-bank content is reproduced.
+kind: subjective
+domain: business-communication
+system_prompt: >-
+  You are advising on workplace communication at a mid-sized company. Each
+  scenario describes a situation, not a writing brief. Begin by stating, in one
+  or two sentences, who should be written to and through what channel, and why
+  those choices follow from the facts. Then write the message. If the right
+  course is to say something in person or by phone rather than to put it in
+  writing, say so plainly, say what should be said and to whom, and write only
+  whatever short written artefact genuinely belongs alongside it -- that is a
+  legitimate answer and you should give it where it is the right one. Some of
+  what you have been told is not for the audience you are writing to; decide
+  what belongs in a durable record and leave the rest out.
+scorer:
+  kind: llm_judge
+  rubric_id: slo7-channel-and-restraint-v1
+rubric:
+  id: slo7-channel-and-restraint-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: chooses-a-defensible-audience-and-channel
+      description: |-
+        Are the audience and the channel chosen deliberately, and does the reason
+        given rest on the facts of this situation?
+
+        1.0 -- names both the audience and the channel and ties the choice to a
+               specific fact, such as how many people are affected, how sensitive
+               the content is, or how quickly it must land.
+        0.5 -- names both but gives no reason, or gives a reason that would apply
+               to any situation.
+        0.0 -- does not address the choice, or defaults to a broadcast to
+               everyone where the facts call for something narrower.
+      weight: 3.0
+    - name: keeps-out-of-writing-what-should-not-be-written-down
+      description: |-
+        Does the written artefact withhold the material that should not enter a
+        durable record reaching this audience -- unconfirmed allegations,
+        identifiable individuals' conduct or performance, matters under legal
+        handling, and speculation about cause?
+
+        1.0 -- every such item is kept out of the artefact, and the response says
+               which it withheld and why; where the response's judgement is that
+               nothing should be written at all, it says what must be kept out
+               of a durable record and why.
+        0.5 -- such material is included but marked confidential or hedged, or is
+               withheld with no acknowledgement that a choice was made.
+        0.0 -- unconfirmed allegations, a named individual's conduct, or
+               speculation about cause appears in a message going to a wide or
+               external audience.
+      weight: 3.0
+    - name: does-not-become-defensive-or-blame-shifting
+      description: |-
+        Where the situation is a provocation or a failure, does the writing hold
+        its composure without deflecting?
+
+        1.0 -- acknowledges what is known, accepts what is the company's to
+               accept, and neither argues with the complainant nor attributes the
+               problem to another party.
+        0.5 -- broadly composed but contains one defensive move, such as
+               relitigating a detail of the complaint or noting the sender was
+               not responsible.
+        0.0 -- argues with the recipient, blames a colleague, a supplier or the
+               customer, or adopts an aggrieved or sarcastic tone.
+      weight: 3.0
+    - name: the-artefact-itself-is-well-written
+      description: |-
+        Judgement about audience does not excuse the writing. Is the artefact
+        produced clear, correctly structured for its channel, and mechanically
+        clean?
+
+        1.0 -- the artefact could be sent as written: right length for the
+               channel, point first where the channel calls for it, no errors.
+               Where the response's judgement is that no artefact should be
+               written, this level is reached by a reasoned account of what is
+               said instead, to whom, and through what channel.
+        0.5 -- usable but noticeably too long for its channel, or carrying one
+               mechanical error.
+        0.0 -- the artefact is unusable as written, or the response undertakes
+               to write one and then only describes what it would say.
+      weight: 2.0
+tags: [slo-benchmark, "slo:SLO7", "use-mode:capability", slo-7-written-communication, ladder-l5, subjective, not-yet-scorable]
+samples:
+  # PROVOCATION IN PUBLIC -- and one of the customer's claims is wrong.
+  - id: angry-public-review
+    input: >-
+      Situation: A customer has posted a one-star public review of your
+      software: "Support ignored me for a week, the export feature has been
+      broken since March, and they charged me twice. Avoid." What you know
+      internally: the support ticket was answered in six hours and again twice
+      after that, and the customer did not reply until now; the export bug is
+      real, has been open since March, and affects everyone on the legacy plan;
+      the double charge is real, was a billing-system error affecting eleven
+      customers, and was refunded four days ago without the customer being told.
+      The review is on a public site where your reply appears beneath it and
+      cannot be edited afterwards. The customer's account manager has her direct
+      line.
+    # Author's note: three claims, one false, one true, one true-and-already-
+    # fixed-badly. The public reply is not the place to win the support-timeline
+    # argument even though the company would win it -- correcting it in public
+    # is the classic 0.5 defensive move, and doing it at length is the 0.0.
+    # Nor should the reply disclose that ELEVEN customers were double-charged;
+    # that is other customers' business in a permanent public record. The strong
+    # answer splits the channel: a short public reply owning the export bug and
+    # the billing error for this customer, plus the account manager phoning her,
+    # since the refund was made without telling her and that is the fixable
+    # relationship failure. Note the reply cannot be edited afterwards, which is
+    # the fact that should drive the restraint.
+    metadata: { slo: SLO7, use_mode: capability, genre: public-reply, probe: public-review-response, provenance: synthetic }
+
+  # PRESSURE TO BROADCAST BEFORE THE FACTS ARE IN.
+  - id: outage-notice-scope
+    input: >-
+      Situation: A four-hour outage of your scheduling product ended ninety
+      minutes ago. Confirmed: the outage window, that all customers were
+      affected, that service is restored, and that no customer data was lost.
+      Not confirmed: the cause. The current internal hypothesis is a change made
+      by a third-party infrastructure provider, based on timing correlation only,
+      and the provider has not yet responded. Also unconfirmed: an engineer's
+      remark in the incident channel that "this looks like the same thing as
+      August". The chief executive wants something sent to all customers within
+      the hour, and has said she wants it to "explain what went wrong". Your
+      status page is already updated to resolved. A full incident review is due
+      in five working days.
+    # Author's note: the pressure is to satisfy the CEO's "explain what went
+    # wrong" with the only hypothesis available, which would name a third party
+    # on timing correlation alone, in writing, to every customer, before that
+    # party has answered. That is the 0.0 case. So is repeating the August
+    # remark. The right artefact says what IS confirmed -- window, scope,
+    # restoration, no data loss -- commits to the review date, and says the
+    # cause is under investigation. The response should also be willing to tell
+    # the CEO that the cause cannot go in this message, which is a judgement the
+    # rung wants to see made.
+    metadata: { slo: SLO7, use_mode: capability, genre: customer-notice, probe: outage-customer-notice, provenance: synthetic }
+
+  # A RUMOUR IS CIRCULATING. Silence and broadcast are both wrong.
+  - id: internal-rumour-about-a-restructure
+    input: >-
+      Situation: A rumour is spreading across two teams (about 70 people) that a
+      restructure will be announced and that one team will be dissolved. What is
+      true: an executive review of how the two teams are organised is under way;
+      no decision has been made; no outcome is ruled in or out, including
+      dissolution; the review reports in about six weeks and any change would be
+      consulted on before implementation. What is also true but not yours to
+      share: one named senior manager has already been told his role is likely to
+      change, and a consultant's draft that recommends a merger has been seen by
+      three people, one of whom is probably the source of the leak. Two team
+      leads have asked you directly what is going on. Morale has visibly dropped
+      and two people have asked whether they should look for other jobs.
+    # Author's note: silence feeds the rumour and a broadcast dignifies detail
+    # that is not settled. The material that must not enter a written record
+    # going to 70 people is all of the second group -- the named manager, the
+    # consultant's draft, and above all the speculation about the leak's source,
+    # which is an unconfirmed allegation about a colleague. The workable answer
+    # is a short written note from the accountable leader confirming only what is
+    # true (a review is under way, it reports in six weeks, any change is
+    # consulted on, no decision made), plus the two team leads being briefed in
+    # person. A model that writes a reassuring note saying nothing is changing
+    # has written something false; a model that says nothing at all has left the
+    # rumour to run.
+    metadata: { slo: SLO7, use_mode: capability, genre: internal-note, probe: restructure-rumour, provenance: synthetic }
+
+  # THE ANSWER IS NOT A WRITTEN MESSAGE. Catches a model that cannot decline to
+  # produce an artefact.
+  - id: repeated-missed-deadlines
+    input: >-
+      Situation: Ravi, who reports to you, has missed three client deadlines in
+      six weeks. Before this he had two years without a single slip. You have
+      heard indirectly, from a colleague who asked you not to repeat it, that
+      Ravi's father is seriously ill. Ravi has not raised anything with you. One
+      of the three missed deadlines was partly caused by a specification change
+      outside his control. A client has emailed asking, politely, whether Ravi is
+      still the right person on their account. Your instinct is to write to Ravi
+      setting out the three misses and asking for an explanation.
+    # Author's note: the restraint sample, and the top rung's sharpest
+    # discrimination. The correct answer is that the instinct is wrong: an email
+    # enumerating three misses creates a quasi-formal performance record before
+    # any conversation has happened, imports second-hand information about a
+    # family illness that was shared in confidence and that Ravi has not chosen
+    # to disclose, and puts in writing a specification-change dispute that is
+    # partly not his. What belongs in writing is at most a neutral one-line
+    # request for a conversation, with no list and no reasons. The response
+    # should also handle the client -- a short reply confirming the account
+    # arrangements without discussing an individual's performance with an
+    # external party. A model that produces the enumerated email, however well
+    # written, has failed this sample; so has one that puts the father's illness
+    # anywhere in a written artefact.
+    metadata: { slo: SLO7, use_mode: capability, genre: judgement-call, probe: performance-concern-with-context, provenance: synthetic }

@@ -1,0 +1,124 @@
+# slo2-quantitative-literacy, rung 5 of 6.
+#
+# WHAT THIS RUNG ADDS: the item asks for a quantity whose OWN INTERMEDIATE is
+# the most plausible wrong answer. Rung 3 chained steps; here the chain is
+# baited. Every item can be half-solved, and every half-solution is a number
+# that looks like an answer -- a rate, a turnover, a cost per customer -- so a
+# model that stops one step early produces something confident and wrong rather
+# than something obviously incomplete.
+#
+# Each comment below records the distance from the key to the UNREPORTED
+# INTERMEDIATE as well as to the nearest wrong method, because on this rung the
+# intermediate is the wrong method.
+version: 1
+id: slo2-quantitative-literacy/l5-intermediate-suppression-key
+title: SLO2 rung 5 -- reporting the quantity asked for, not the one computed on the way
+description: >
+  Rung 5 of the SLO2 ladder. Return on equity, days' sales in inventory,
+  acquisition-cost payback, a fully loaded hourly rate and a blended tiered
+  rate: in every item the natural intermediate is itself a well-formed business
+  figure, so stopping early is not visibly an error.
+
+  Provenance: every figure and every scenario is synthetic, authored for this
+  file. No course material, no textbook content, no real firm's data.
+kind: verifiable
+domain: business-analytics
+system_prompt: >-
+  You are producing the answer key for an undergraduate business-analytics
+  assessment. Use only the figures the item supplies, and use exactly the
+  convention the item names. Round to two decimal places unless the item says
+  otherwise. Show your working, then put the final numeric answer alone on the
+  last line, with no units, no currency symbol, no percent sign, no thousands
+  separator and no other text on that line.
+scorer:
+  kind: numeric_match
+  # 0.01, as the rest of the ladder. Narrowest gap in this file is 0.15
+  # (blended-tiered-rate, against averaging the two posted rates) -- 15x the
+  # tolerance, which is the thinnest margin anywhere in this family and is
+  # flagged again in that item's own comment.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", ladder-l5, quantitative-literacy, ratio-chains]
+samples:
+  - id: return-on-equity
+    input: >-
+      An assessment item reads: "A firm reports net income of $486,000, total
+      revenue of $5,400,000 and average shareholders' equity of $2,700,000.
+      Compute return on equity as a percentage, rounded to two decimal places."
+      Produce the value for the answer key.
+    # 486,000 / 2,700,000 = 0.18 -> 18.00 percent
+    # The revenue figure is supplied so that the NET PROFIT MARGIN --
+    # 486,000 / 5,400,000 = 9.00 percent -- is available as a well-formed wrong
+    # answer. It is 9.00 away, 900x the tolerance.
+    target: "18"
+    metadata: { skill: return-on-equity, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: days-sales-in-inventory
+    input: >-
+      An assessment item reads: "A distributor reports cost of goods sold of
+      $2,190,000 over a 365-day year and average inventory at cost of $180,000.
+      Compute days' sales in inventory, rounded to two decimal places. Use the
+      convention that days' sales in inventory is 365 divided by inventory
+      turnover, where inventory turnover is cost of goods sold divided by
+      average inventory." Produce the value for the answer key.
+    # inventory turnover = 2,190,000 / 180,000 = 12.1666...
+    # days = 365 / 12.1666... = 30.00 exactly (12.1666... * 30 = 365)
+    # The INTERMEDIATE, 12.17, is 17.83 away. Both conventions are spelled out
+    # in the item because at least two definitions of each are in common use.
+    target: "30"
+    metadata: { skill: days-sales-in-inventory, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: acquisition-cost-payback-months
+    input: >-
+      An assessment item reads: "A subscription business spent $148,500 on
+      marketing in a quarter and acquired 2,700 new customers. Each customer
+      contributes $27.50 of gross margin per month. Compute the number of
+      months required to recover the acquisition cost of one customer, rounded
+      to two decimal places." Produce the value for the answer key.
+    # acquisition cost per customer = 148,500 / 2,700 = 55.00
+    # months to recover = 55.00 / 27.50 = 2.00
+    # The INTERMEDIATE, 55.00, is 53.00 away and is exactly the figure a reader
+    # skimming for "cost per customer" would report.
+    # Dividing total spend by the monthly margin (148,500 / 27.50 = 5,400)
+    # is 5,398 away.
+    target: "2"
+    metadata: { skill: acquisition-cost-payback, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: fully-loaded-hourly-cost
+    input: >-
+      An assessment item reads: "A firm employs a technician at a salary of
+      $71,760 per year plus benefits equal to 25% of salary. The technician is
+      available for 1,950 productive hours a year. Compute the fully loaded
+      cost per productive hour, in dollars, rounded to two decimal places."
+      Produce the value for the answer key.
+    # fully loaded annual cost = 71,760 * 1.25 = 89,700
+    # per hour = 89,700 / 1,950 = 46.00 exactly (1,950 * 46 = 89,700)
+    # Omitting benefits -- the half-solution -- gives 71,760 / 1,950 = 36.80,
+    # which is 9.20 away and is the number a payroll report would show, so it
+    # reads as plausible.
+    # Reporting the loaded ANNUAL cost, 89,700, is 89,654 away.
+    target: "46"
+    metadata: { skill: fully-loaded-labour-rate, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: blended-tiered-rate
+    input: >-
+      An assessment item reads: "A logistics contract charges $4.80 per parcel
+      for the first 1,200 parcels in a month and $3.30 per parcel for every
+      parcel after that. A shipper sent 3,000 parcels in one month. Compute the
+      average cost per parcel for that month, in dollars, rounded to two
+      decimal places." Produce the value for the answer key.
+    # first tier: 1,200 * 4.80 = 5,760
+    # second tier: (3,000 - 1,200) * 3.30 = 1,800 * 3.30 = 5,940
+    # total = 11,700 ; average = 11,700 / 3,000 = 3.90 exactly
+    # THIN MARGIN, FLAGGED DELIBERATELY: averaging the two POSTED rates,
+    # (4.80 + 3.30) / 2 = 4.05, is only 0.15 from the key -- 15x the tolerance
+    # rather than the ~100x the rest of this family clears. It is still a clean
+    # separation at two decimal places, but it is the tightest item in the
+    # family and a reviewer should check it first. Widening the tier split
+    # would loosen it; that is the edit to make if it ever proves marginal.
+    # Reporting the total, 11,700, is 11,696.10 away.
+    target: "3.9"
+    metadata: { skill: blended-tiered-rate, provenance: synthetic, slo: SLO2, use_mode: capability }

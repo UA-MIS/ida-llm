@@ -1,0 +1,133 @@
+# research-analysis, rung 3 of 6.
+#
+# What this rung ADDS over rung 2: a PROCEDURE applied across a family of tests,
+# rather than a formula applied to one comparison. Rung 2 asks "which
+# denominator"; this rung asks the model to run a small algorithm to completion
+# and report a count.
+#
+# Every item asks for a COUNT, on purpose. A count is an integer, so the nearest
+# wrong procedure is at least 1.0 away -- a hundred times the tolerance -- and
+# the file never has to argue about rounding. It also matches what a reviewer
+# actually asks a manuscript: "how many of these survive correction?"
+#
+# The items are chosen so that the uncorrected count, the Bonferroni count and
+# the Benjamini-Hochberg count are three DIFFERENT numbers wherever possible.
+# An item where two procedures agree measures nothing about which one was used.
+version: 1
+id: research-analysis/l3-multiplicity-correction
+title: Manuscript check -- how many results survive multiplicity correction
+description: >
+  Rung 3 of the research-analysis ladder. Given a family of p-values from a
+  synthetic study and a named correction procedure, report how many tests remain
+  significant. The rung adds one demand over rung 2: running a procedure over a
+  set rather than evaluating a formula once. Benjamini-Hochberg in particular is
+  a step-up procedure, so a model that checks each p-value against its own
+  threshold independently gets a different -- and wrong -- count.
+
+  Provenance: every p-value family is synthetic, authored for this file, and
+  chosen so that the uncorrected, Bonferroni and Benjamini-Hochberg counts
+  differ. No real study data, no unpublished results, no textbook content.
+kind: verifiable
+domain: research-methods
+system_prompt: >-
+  You are a research assistant checking the multiple-comparison handling in a
+  colleague's manuscript. Apply exactly the procedure the item names, at exactly
+  the level it names. Report a count of tests, as a whole number. Put the final
+  numeric answer alone on the last line, with no label and no other text on that
+  line.
+scorer:
+  kind: numeric_match
+  # Every key is a whole number and every wrong procedure in this file yields a
+  # count that differs by at least 1 -- a hundred times this tolerance. The
+  # tolerance exists only so that a model writing "2.0" is not marked wrong.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [research-analysis, ladder-l3, persona-researcher, use-mode-assist, multiple-comparisons]
+samples:
+  - id: bonferroni-count
+    input: >-
+      A synthetic study ran six planned tests and obtained these p-values:
+      0.001, 0.008, 0.013, 0.021, 0.040, 0.220. The manuscript applies a
+      Bonferroni correction at a family-wise alpha of 0.05. How many of the six
+      tests remain significant?
+    # Bonferroni threshold = 0.05 / 6 = 0.008333...
+    # p <= 0.008333: 0.001 yes, 0.008 yes, 0.013 no, and the rest larger. -> 2
+    # Uncorrected (p < 0.05) would give 5 -- three counts away. A model that
+    # compares 0.008 against 0.008333 the wrong way round would give 1.
+    target: "2"
+    metadata: { skill: bonferroni-threshold, provenance: synthetic }
+
+  - id: benjamini-hochberg-count
+    input: >-
+      A synthetic study ran six exploratory tests and obtained these p-values:
+      0.002, 0.011, 0.030, 0.041, 0.046, 0.310. The manuscript controls the
+      false discovery rate with the Benjamini-Hochberg procedure at q = 0.05.
+      How many of the six tests are declared significant?
+    # Sorted p(k) against (k/6)*0.05 = 0.00833, 0.01667, 0.025, 0.03333,
+    # 0.041667, 0.05:
+    #   k=1 0.002 <= 0.00833  yes
+    #   k=2 0.011 <= 0.01667  yes
+    #   k=3 0.030 <= 0.025    no
+    #   k=4 0.041 <= 0.03333  no
+    #   k=5 0.046 <= 0.041667 no
+    #   k=6 0.310 <= 0.05     no
+    # Largest k that passes = 2 -> 2 significant.
+    # Three distinct counts here: BH 2, Bonferroni 1 (only 0.002 <= 0.008333),
+    # uncorrected 5. The item cannot be passed by using the wrong procedure.
+    target: "2"
+    metadata: { skill: false-discovery-rate, provenance: synthetic }
+
+  - id: benjamini-hochberg-step-up
+    input: >-
+      A synthetic study ran seven tests and obtained these p-values: 0.010,
+      0.013, 0.014, 0.019, 0.040, 0.049, 0.400. The manuscript controls the
+      false discovery rate with the Benjamini-Hochberg procedure at q = 0.05.
+      How many of the seven tests are declared significant?
+    # This is the item that separates a correct step-up implementation from a
+    # per-test comparison. Thresholds (k/7)*0.05 = 0.007143, 0.014286, 0.021429,
+    # 0.028571, 0.035714, 0.042857, 0.05:
+    #   k=1 0.010 <= 0.007143 NO
+    #   k=2 0.013 <= 0.014286 yes
+    #   k=3 0.014 <= 0.021429 yes
+    #   k=4 0.019 <= 0.028571 yes
+    #   k=5 0.040 <= 0.035714 no
+    #   k=6 0.049 <= 0.042857 no
+    #   k=7 0.400 <= 0.05     no
+    # BH takes the LARGEST k that passes (k=4) and rejects every hypothesis with
+    # rank <= k -- including p = 0.010, which failed its own threshold. -> 4.
+    # Four candidate answers, all distinct: BH 4; counting only p-values that
+    # pass their own threshold 3; stopping at the first failure (a step-DOWN
+    # misreading) 0; Bonferroni 0; uncorrected 6.
+    target: "4"
+    metadata: { skill: step-up-procedure, provenance: synthetic }
+
+  - id: bonferroni-large-family
+    input: >-
+      A synthetic exploratory analysis ran twenty tests. The manuscript reports
+      only the five smallest p-values, which were 0.0001, 0.0004, 0.0006,
+      0.0030 and 0.0090; the other fifteen were all larger than 0.0090. The
+      manuscript applies a Bonferroni correction at a family-wise alpha of 0.01.
+      How many of the twenty tests remain significant?
+    # Threshold = 0.01 / 20 = 0.0005. Of the reported five, 0.0001 and 0.0004
+    # pass; 0.0006 does not. The unreported fifteen all exceed 0.0090 and so
+    # cannot pass -- the item requires noticing that the family size is 20 (the
+    # divisor) even though only five p-values are listed. -> 2.
+    # Dividing by 5 instead of 20 gives a threshold of 0.002 and a count of 3.
+    target: "2"
+    metadata: { skill: family-size-not-reported-size, provenance: synthetic }
+
+  - id: no-survivors
+    input: >-
+      A synthetic study ran twelve tests. The smallest p-value obtained was
+      0.006. The manuscript applies a Bonferroni correction at a family-wise
+      alpha of 0.05. How many of the twelve tests remain significant?
+    # Threshold = 0.05 / 12 = 0.0041667. The smallest p-value, 0.006, already
+    # exceeds it, so nothing survives. -> 0.
+    # Every family needs an item whose honest answer is "none": a model that has
+    # learned to report a plausible small positive count rather than run the
+    # procedure fails here and nowhere else in the file.
+    target: "0"
+    metadata: { skill: honest-null-result, provenance: synthetic }

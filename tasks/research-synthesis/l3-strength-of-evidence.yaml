@@ -1,0 +1,194 @@
+# research-synthesis, rung 3 of 4.
+#
+# What this rung ADDS over rung 2: a JUDGEMENT about the evidence rather than a
+# report of it. Rungs 1 and 2 ask what the sources say; this rung asks what a
+# design can and cannot support.
+#
+# The degenerate strategy is obvious and common: attach "this is correlational,
+# causation cannot be inferred, further research is needed" to everything. It
+# is right often enough to look competent and it is worthless, because it does
+# not depend on the study. Two criteria are weighted equally at 3.0 to make it
+# unprofitable -- naming the limit THIS design has, and not reciting a limit
+# this design does not have. The rct-narrow-sample item exists so that the
+# reflexive causal caveat is the WRONG answer at least once in the file.
+#
+# The second degenerate strategy is only listing weaknesses. An appraisal that
+# says nothing about what the study does establish is not an appraisal, so
+# credits-what-it-supports carries real weight too.
+version: 1
+id: research-synthesis/l3-strength-of-evidence
+title: Literature review -- what this design can and cannot support
+description: >
+  Rung 3 of the research-synthesis ladder. Given a fictional study description,
+  state in a short paragraph what its design supports and what it does not. The
+  rung adds appraisal to the reporting demands of rungs 1 and 2, and the rubric
+  is built to make generic scepticism unprofitable: a response is graded on
+  whether the limitation it names is the one this design actually has, and
+  penalised for reciting limitations the design does not have.
+
+  Provenance: every study description is SYNTHETIC, written for this file and
+  labelled as fictional in the prompt itself. No real publication or unpublished
+  manuscript is described here.
+kind: subjective
+domain: scholarly-communication
+system_prompt: >-
+  You are helping a researcher appraise a study for a literature review. You
+  will be given a fictional study description. In at most five sentences, state
+  what its design does support and what it does not, referring to the specific
+  features of this design. Do not restate the findings at length, do not
+  recommend further research in general terms, and do not raise a limitation
+  that this design does not have.
+scorer:
+  kind: llm_judge
+  rubric_id: research-synthesis-appraisal-v1
+rubric:
+  id: research-synthesis-appraisal-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: names-this-designs-limit
+      description: |-
+        Is the principal limitation named the one that this particular design
+        actually has, identified by the feature that produces it?
+
+        1.0 -- names the limitation and ties it to a stated feature of the
+               design (the sampling frame, the absence of randomisation, the
+               measurement window, the outcome that was not measured).
+        0.5 -- names a real limitation of this design but not its principal one,
+               or names it without tying it to any feature of the design.
+        0.0 -- names no limitation, or names one that does not apply to this
+               design.
+      weight: 3.0
+    - name: no-misapplied-caveat
+      description: |-
+        Does the response avoid raising a limitation this design does not have?
+        Weighted equally with names-this-designs-limit: reciting the causal
+        caveat at a randomised trial, or the generalisability caveat at a
+        population census, is how an appraisal looks rigorous while being wrong.
+
+        1.0 -- every limitation raised applies to the design as described.
+        0.5 -- one raised limitation is only marginally applicable, or is
+               phrased as a general caution rather than asserted of this study.
+        0.0 -- asserts a limitation the design rules out, or applies a template
+               caveat (correlation is not causation, small sample, further
+               research needed) that the description contradicts.
+      weight: 3.0
+    - name: credits-what-it-supports
+      description: |-
+        Does the response say what the study does establish, and not only what
+        it fails to?
+
+        1.0 -- states a specific conclusion the design supports, at the strength
+               the design supports it.
+        0.5 -- concedes in general terms that the study is informative without
+               saying about what.
+        0.0 -- lists only weaknesses, or dismisses the study without stating
+               anything it supports.
+      weight: 2.0
+    - name: no-invented-design-features
+      description: |-
+        Does the appraisal describe the study that was given?
+
+        1.0 -- every design feature the response refers to appears in the
+               description.
+        0.5 -- attributes one plausible but unstated feature to the study while
+               the substance of the appraisal survives without it.
+        0.0 -- criticises or credits a feature the description does not contain,
+               such as a blinding procedure, an attrition rate or a control
+               group that was never mentioned.
+      weight: 2.0
+    - name: proportionate-and-brief
+      description: |-
+        Is the appraisal one a reviewer could paste into a review matrix?
+
+        1.0 -- five sentences or fewer, and the strength of language matches the
+               seriousness of what is named.
+        0.5 -- over-length, or hedged so heavily that the reader cannot tell how
+               serious the limitation is.
+        0.0 -- restates the findings instead of appraising them, or condemns or
+               endorses the study in terms the description cannot support.
+      weight: 1.0
+tags: [research-synthesis, ladder-l3, persona-researcher, use-mode-assist, critical-appraisal, subjective, not-yet-scorable]
+samples:
+  - id: cross-sectional-with-causal-language
+    input: >-
+      The following study description is FICTIONAL and was written for this
+      benchmark. State what its design does and does not support.
+
+      "A cross-sectional survey of 1,842 households in four municipalities found
+      that households within 200 m of a composting collection point participated
+      at 58%, against 22% for households beyond 1 km. The authors conclude that
+      reducing the distance to collection points would raise participation and
+      recommend that municipalities site points more densely."
+    # CLEAN case, and the one where the standard caveat is the right one: the
+    # design cannot separate proximity causing participation from participating
+    # households having located near points, and the policy recommendation
+    # therefore outruns the evidence. What the design DOES support -- that the
+    # association is large and consistent across four municipalities, and that
+    # proximity is worth testing experimentally -- must also appear, or
+    # credits-what-it-supports is lost.
+    metadata: { probe: causal-claim-from-cross-section, provenance: synthetic }
+
+  - id: rct-narrow-sample
+    input: >-
+      The following study description is FICTIONAL and was written for this
+      benchmark. State what its design does and does not support.
+
+      "Nine hundred households in a single municipality were randomised to
+      receive a monthly written reminder or no reminder. Allocation was
+      concealed and outcome data came from municipal collection records rather
+      than self-report. Composting participation over twelve months was 46% in
+      the reminder arm and 38% in the control arm (difference 8 points, 95% CI
+      3 to 13). Loss to follow-up was under 2% and did not differ by arm."
+    # TRAP, and the sample this rung exists for. The reflexive answer --
+    # "correlational, cannot infer causation, needs a control group" -- is
+    # WRONG here and should score 0.0 on no-misapplied-caveat: this is a
+    # randomised trial with concealed allocation, administrative outcomes and
+    # negligible attrition, so internal validity is its strength. The real limit
+    # is external: one municipality, one reminder format, one twelve-month
+    # window, and no evidence about whether the effect persists after reminders
+    # stop. A response that names generalisability rather than causality is the
+    # one that scores 1.0.
+    metadata: { probe: strong-internal-validity, provenance: synthetic }
+
+  - id: preregistered-null
+    input: >-
+      The following study description is FICTIONAL and was written for this
+      benchmark. State what its design does and does not support.
+
+      "A pre-registered stepped-wedge trial across six wards tested whether a
+      structured pre-shift briefing reduces handover errors. The analysis plan,
+      primary outcome and sample size were registered before data collection.
+      The briefing was associated with -0.4 errors per 100 handovers (95% CI
+      -1.6 to 0.8) against a registered target of a 3-error reduction. Protocol
+      adherence was 71%."
+    # TRAP of a second kind: a null result that a careless appraisal dismisses
+    # as uninformative. The pre-registration and the interval together support a
+    # real conclusion -- the briefing as delivered does not produce the effect
+    # the trial was designed to detect. The genuine limit is 71% adherence,
+    # which makes this a test of the briefing AS IMPLEMENTED rather than of the
+    # briefing as designed. A response that says only "the study found nothing,
+    # so no conclusion can be drawn" loses both credits-what-it-supports and
+    # names-this-designs-limit.
+    metadata: { probe: informative-null-appraisal, provenance: synthetic }
+
+  - id: measurement-study-that-claims-little
+    input: >-
+      The following study description is FICTIONAL and was written for this
+      benchmark. State what its design does and does not support.
+
+      "Sixty-four temperature loggers were installed beneath and outside the
+      tree canopy at 32 paired sites in one city and recorded hourly readings
+      from June to September. Mean daytime air temperature beneath the canopy
+      was 2.3 C lower than at the paired open site (95% CI 2.0 to 2.6). The
+      authors state that they report measurements only and make no claim about
+      health outcomes or about other cities."
+    # NOTHING-MUCH-IS-WRONG case. The study already scopes itself to exactly
+    # what it measured, so the honest appraisal is short: the paired design
+    # supports the cooling estimate for these sites in this season, and the
+    # authors have already disclaimed the extensions. A model that must find a
+    # fault will invent one -- an unstated confounder, an attrition rate, a
+    # missing control -- and lose no-invented-design-features. Naming the
+    # genuine residual scope limits (one city, one summer, no night-time
+    # coverage) is correct and is not an invented defect.
+    metadata: { probe: appropriately-scoped-study, provenance: synthetic }

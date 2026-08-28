@@ -1,0 +1,127 @@
+# slo2-quantitative-literacy, rung 2 of 6.
+#
+# WHAT THIS RUNG ADDS: a METHOD CHOICE. Every item here has a well-known wrong
+# sibling that is one plausible substitution away -- margin against markup,
+# percentage points against percent, weighted mean against simple mean, gross
+# against net. Rung 1 could be passed by careful arithmetic. This rung cannot:
+# the arithmetic is still one or two steps, and the whole difficulty is picking
+# which one.
+#
+# The first two samples are deliberately THE SAME TWO NUMBERS asked two ways.
+# That is the pair the rung is built around: a model that has memorised one
+# formula and not the distinction will answer them identically, and the file
+# will show it.
+version: 1
+id: slo2-quantitative-literacy/l2-margin-versus-markup-key
+title: SLO2 rung 2 -- picking the right base, ratio and weighting
+description: >
+  Rung 2 of the SLO2 ladder. Each item is arithmetically easy and has a
+  commonly-confused sibling that a single wrong choice of base or weighting
+  produces. This is where "quantitative literacy" starts to mean something
+  other than calculation.
+
+  Provenance: every figure and every scenario is synthetic, authored for this
+  file. No course material, no textbook content, no real firm's data.
+kind: verifiable
+domain: business-analytics
+system_prompt: >-
+  You are producing the answer key for an undergraduate business-analytics
+  assessment. Use only the figures the item supplies, and use exactly the
+  convention the item names. Round to two decimal places unless the item says
+  otherwise. Show your working, then put the final numeric answer alone on the
+  last line, with no units, no currency symbol, no percent sign, no thousands
+  separator and no other text on that line.
+scorer:
+  kind: numeric_match
+  # Two decimal places -> 0.01, as rung 1. Wrong-method gaps in this file, per
+  # item: 20.25, 20.25, 17.50, 686.00, 1,860.00 and 3.38. The narrowest is
+  # 3.38 (inventory-turnover-ratio, cost of goods sold against net sales),
+  # which is 338x the tolerance.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", ladder-l2, quantitative-literacy, ratios]
+samples:
+  # PAIR, part 1 of 2. Same two figures as markup-percentage-on-cost below.
+  - id: gross-margin-percentage
+    input: >-
+      An assessment item reads: "A product sells for $250.00 and costs $160.00
+      to make. Compute the gross MARGIN as a percentage OF THE SELLING PRICE,
+      rounded to two decimal places." Produce the value for the answer key.
+    # gross profit = 250.00 - 160.00 = 90.00
+    # margin = 90.00 / 250.00 = 0.36 -> 36.00 percent
+    # Dividing by cost instead (i.e. answering the markup question) gives
+    # 90.00 / 160.00 = 56.25 -- 20.25 away.
+    target: "36"
+    metadata: { skill: gross-margin-percentage, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  # PAIR, part 2 of 2. Deliberately the same 250.00 and 160.00, asked the other
+  # way round. A model that returns the same number for both has told us
+  # exactly what we wanted to know.
+  - id: markup-percentage-on-cost
+    input: >-
+      An assessment item reads: "A product costs $160.00 to make and sells for
+      $250.00. Compute the MARKUP as a percentage OF COST, rounded to two
+      decimal places." Produce the value for the answer key.
+    # gross profit = 250.00 - 160.00 = 90.00
+    # markup = 90.00 / 160.00 = 0.5625 -> 56.25 percent
+    # Dividing by price instead (the margin) gives 36.00 -- 20.25 away.
+    target: "56.25"
+    metadata: { skill: markup-percentage-on-cost, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: percentage-point-increase
+    input: >-
+      An assessment item reads: "A firm's operating margin was 12.50% last year
+      and 15.00% this year. Compute the increase in PERCENTAGE POINTS." Produce
+      the value for the answer key.
+    # 15.00 - 12.50 = 2.50 percentage points
+    # The relative change -- 2.50 / 12.50 = 20.00 percent -- is the classic
+    # substitution and is 17.50 away. Both are correct answers to DIFFERENT
+    # questions, which is why the item names the one it wants in capitals.
+    target: "2.5"
+    metadata: { skill: percentage-points-versus-percent, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: weighted-average-deal-value
+    input: >-
+      An assessment item reads: "Three regional teams closed deals at these
+      average values and volumes: North $4,200 across 18 deals, South $6,800
+      across 7 deals, West $3,100 across 25 deals. Compute the overall average
+      deal value across all deals closed, in dollars, rounded to two decimal
+      places." Produce the value for the answer key.
+    # 4,200 * 18 = 75,600 ; 6,800 * 7 = 47,600 ; 3,100 * 25 = 77,500
+    # total value = 200,700 ; total deals = 18 + 7 + 25 = 50
+    # 200,700 / 50 = 4,014.00
+    # The simple mean of the three regional averages, (4,200 + 6,800 + 3,100)/3
+    # = 4,700.00, is 686.00 away. West has half the deals and the lowest value,
+    # so the weighting genuinely moves the answer -- an item where weighted and
+    # simple means nearly agree does not test the distinction.
+    target: "4014"
+    metadata: { skill: weighted-mean, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: net-sales-from-gross
+    input: >-
+      An assessment item reads: "A merchant recorded gross sales of $84,500,
+      customer returns of $6,240 and sales discounts of $1,860. Compute NET
+      sales, in dollars." Produce the value for the answer key.
+    # 84,500 - 6,240 - 1,860 = 76,400
+    # Deducting returns but forgetting discounts gives 78,260 -- 1,860 away.
+    # Reporting gross gives 84,500 -- 8,100 away.
+    target: "76400"
+    metadata: { skill: net-versus-gross-sales, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: inventory-turnover-ratio
+    input: >-
+      An assessment item reads: "A retailer reports cost of goods sold of
+      $1,248,000, net sales of $1,950,000 and average inventory at cost of
+      $208,000. Compute the inventory turnover ratio, rounded to two decimal
+      places. Use the convention that inventory turnover is cost of goods sold
+      divided by average inventory." Produce the value for the answer key.
+    # 1,248,000 / 208,000 = 6.00
+    # The net sales figure is a DISTRACTOR and the item supplies it on purpose:
+    # using it gives 1,950,000 / 208,000 = 9.38 -- 3.38 away. The convention is
+    # named in the item because both ratios are in use and an item that left it
+    # implicit would have two defensible keys.
+    target: "6"
+    metadata: { skill: inventory-turnover, provenance: synthetic, slo: SLO2, use_mode: capability }

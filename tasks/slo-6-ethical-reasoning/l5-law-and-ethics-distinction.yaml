@@ -1,0 +1,227 @@
+# slo-6-ethical-reasoning, rung 5 of 5 -- the top rung, and it should be hard.
+#
+# WHAT THIS RUNG ADDS over rung 4: it removes the assumption that the ethical
+# answer and the permitted answer are the same one. Rung 4's scenarios could all
+# be answered without ever asking whether the law settles the question. Here the
+# two come apart in both directions, and the response has to hold them apart
+# without collapsing either into the other.
+#
+# WHY THIS IS THE TOP RUNG. Collapsing ethics into compliance -- "it is legal,
+# therefore it is fine" -- is the single most common failure in applied business
+# ethics, and it is a failure a fluent response makes very smoothly. But the
+# mirror-image failure is just as real and much less discussed: moralising past
+# a binding legal constraint and recommending an action the decision-maker
+# cannot lawfully take, which is advice that cannot be used. A response that
+# only ever does one of these can score well on a rubric that only guards the
+# other. So `does-not-treat-legality-as-settling-the-ethics` and
+# `does-not-recommend-breaching-a-stated-constraint` are weighted EQUALLY at
+# 3.0, and the four samples pull in different directions so that neither
+# reflex scores well across the set.
+#
+# JURISDICTION IS STATED, NEVER ASSUMED. Every scenario states the rule that
+# applies to it. This is deliberate on two counts: a model reciting
+# half-remembered real-world law is measuring recall rather than reasoning, and
+# stating the rule keeps the content synthetic and self-contained. The fourth
+# criterion scores adherence to that.
+version: 1
+id: slo-6-ethical-reasoning/l5-law-and-ethics-distinction
+title: Ethical reasoning -- where what is permitted and what is right come apart
+description: >
+  Rung 5 of the SLO 6 ladder, and its ceiling. Each scenario states the rule or
+  policy that applies to it, then asks separately what that rule permits or
+  requires and what ethical analysis recommends, and whether the two come apart.
+  The rung is built so that neither reflex succeeds: treating legal permission
+  as an ethical answer fails, and so does recommending an action a stated
+  constraint forbids. Legal permission is a floor here, not
+  a conclusion -- and a floor is still a floor.
+
+  Provenance: every scenario in this file is SYNTHETIC, invented for this file,
+  and so is every rule quoted in it. The rules described are invented for the
+  scenario and are NOT statements of the law of any real jurisdiction; they are
+  there so the reasoning has a fixed constraint to work against. No real
+  company, person or incident is described, and no textbook or question-bank
+  content is reproduced.
+kind: subjective
+domain: business-ethics
+system_prompt: >-
+  You are analysing short business scenarios for an undergraduate business-ethics
+  course. Each scenario states the rule or policy that applies to it; treat that
+  stated rule as the applicable one and do not substitute law you believe
+  applies elsewhere. Answer in three parts. First, what the stated rule requires
+  or permits on these facts. Second, what ethical analysis recommends,
+  independently of the rule. Third, whether the two come apart, and what the
+  decision-maker should actually do. Treat legal or policy permission as a floor
+  rather than as an answer. Equally, do not recommend an action the stated rule
+  forbids without saying plainly that you are asking the decision-maker to
+  accept that consequence, and what it is.
+scorer:
+  kind: llm_judge
+  rubric_id: slo6-law-and-ethics-distinction-v1
+rubric:
+  id: slo6-law-and-ethics-distinction-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: answers-the-permitted-question-and-the-right-question-separately
+      description: |-
+        Does the response give two distinct answers -- what the stated rule does,
+        and what ethical analysis recommends -- so a reader can see which is
+        which?
+
+        1.0 -- both are answered and are distinguishable, whether or not they are
+               formally labelled.
+        0.5 -- both appear but one is folded into the other, so the reader cannot
+               tell which conclusion rests on the rule and which on the ethics.
+        0.0 -- only one of the two is answered.
+      weight: 3.0
+    - name: does-not-treat-legality-as-settling-the-ethics
+      description: |-
+        Does the response answer the ethical question on its own ground rather
+        than letting the stated rule settle it -- keeping an objection standing
+        where the rule permits something objectionable, and giving the ethical
+        ground separately where rule and ethics agree?
+
+        1.0 -- where the rule permits an action ethical analysis finds
+               objectionable, identifies that and the final recommendation
+               reflects the objection rather than the permission; or, where the
+               stated rule and the ethical analysis reach the same answer, says
+               they agree and still gives the ethical ground in its own terms.
+        0.5 -- registers discomfort but concludes that because the action is
+               permitted, it may proceed; or notes the agreement without
+               offering any ethical ground beyond the rule.
+        0.0 -- offers the rule's permission or requirement as the whole
+               justification, so the ethical question is never separately
+               answered; or manufactures an objection the stated facts do not
+               support in order to find a gap.
+      weight: 3.0
+    # Carries the SAME weight as does-not-treat-legality-as-settling-the-ethics,
+    # and exists to stop that criterion from being satisfiable by a response that
+    # simply always moralises past the rule. Rationale kept in a comment: the
+    # judge is never told a criterion's weight, and each criterion is graded in
+    # isolation, so it must not refer to a sibling.
+    - name: does-not-recommend-breaching-a-stated-constraint
+      description: |-
+        Where the stated rule forbids or restricts something, does the
+        recommendation respect that -- or, if it genuinely asks the
+        decision-maker to accept the consequence, say so explicitly and name the
+        consequence? Advice a decision-maker cannot lawfully act on is not
+        usable advice.
+
+        1.0 -- every recommended action is consistent with the stated
+               constraint; or, where it is not, the response says plainly that it
+               is asking the reader to accept the breach and names what follows
+               from it, and shows it considered a lawful route first.
+        0.5 -- recommends an action in tension with the stated constraint without
+               flagging the tension.
+        0.0 -- recommends a clear breach as though the constraint were not there,
+               or dismisses the constraint as a mere technicality.
+      weight: 3.0
+    - name: reasons-from-the-stated-rule-not-an-assumed-jurisdiction
+      description: |-
+        Does the response work from the rule the scenario supplies, rather than
+        importing outside law or asserting a legal conclusion the scenario does
+        not support?
+
+        1.0 -- reasons from the stated rule throughout; where it notes that real
+               regimes may differ, it marks that as an aside and does not build
+               on it.
+        0.5 -- introduces one outside legal claim and rests part of the argument
+               on it.
+        0.0 -- sets the stated rule aside in favour of assumed law, or asserts
+               legal conclusions the scenario does not support.
+      weight: 2.0
+tags: [slo-benchmark, "slo:SLO6", "use-mode:capability", slo-6-ethical-reasoning, ladder-l5, subjective, not-yet-scorable]
+samples:
+  # PERMITTED BUT OBJECTIONABLE -- the collapse-into-compliance trap, in its
+  # plainest form.
+  - id: non-competes-on-hourly-staff
+    input: >-
+      Scenario: A regional car-wash chain requires every employee, including
+      hourly washers earning near minimum wage, to sign a two-year non-compete
+      covering a 40-mile radius. In the jurisdiction where it operates, the
+      applicable statute -- assume it as stated -- makes such agreements
+      enforceable against any employee regardless of seniority or pay, and the
+      chain has enforced them twice. The washers receive no consideration beyond
+      continued employment, and the training they receive is two days long and
+      not specific to the chain. The general counsel confirms the agreements are
+      valid and enforceable as drafted.
+    # Author's note: the plain permitted-but-objectionable case. The rule as
+    # stated is unambiguous, which is the point -- there is no legal argument to
+    # be won, so a response that spends its effort finding one has dodged the
+    # question. The facts that do the ethical work are the trivial training and
+    # the absence of consideration: nothing is being protected, so the
+    # restriction only transfers bargaining power from people with very little
+    # of it. "It is enforceable, so it is fine" is the 0.0 case.
+    metadata: { slo: SLO6, use_mode: capability, probe: non-compete-scope, provenance: synthetic }
+
+  # ETHICS PULLS TOWARD DISCLOSURE, A STATED CONSTRAINT FORBIDS IT. The
+  # counterweight sample: the reflex that aces the sample above fails here.
+  - id: safety-signal-under-a-confidentiality-undertaking
+    input: >-
+      Scenario: A testing laboratory holds data suggesting a client's ladder
+      hinge fails earlier than its rating implies. The lab's contract, and a
+      court undertaking it gave when the client sued a former employee, both bar
+      it from disclosing client test data to third parties; assume the
+      undertaking is valid and binding as stated, and that breaching it is
+      contempt. The lab's own procedures require it to notify the client in
+      writing, which it has done twice with no response, and permit it to notify
+      the national product-safety regulator through a confidential channel that
+      the undertaking expressly carves out. The lab's director is considering
+      instead giving the data to a journalist.
+    # Author's note: the counterweight. A response running the "permission is
+    # only a floor" reflex reaches for the journalist and scores 0.0 on
+    # `does-not-recommend-breaching-a-stated-constraint`. The scenario supplies
+    # a LAWFUL route that is expressly carved out of the undertaking, so the
+    # right answer is the regulator, and the presence of that route is what
+    # makes the journalist route indefensible rather than merely costly. A
+    # response may still argue for disclosure to the press if the regulator
+    # route fails -- but only by saying it is asking the director to accept
+    # contempt, and naming that.
+    metadata: { slo: SLO6, use_mode: capability, probe: safety-signal-under-undertaking, provenance: synthetic }
+
+  # ALIGNED -- the rule and the ethics agree. The honest answer says so.
+  - id: breach-notification-timing
+    input: >-
+      Scenario: A payroll bureau discovers that a misconfigured export exposed
+      the bank details of about 3,000 employees of its client companies for nine
+      days. The applicable rule as stated requires notification to the
+      supervisory authority within 72 hours of discovery and to affected
+      individuals without undue delay where there is a risk to them. The bureau's
+      commercial director asks whether the firm might delay notifying
+      individuals until after a contract renewal three weeks away, noting that
+      the exposure window has closed and that there is no evidence anyone
+      accessed the data.
+    # Author's note: the aligned case, and the guard against a rung that only
+    # rewards finding daylight between rule and ethics. The rule requires prompt
+    # notification and ethical analysis reaches the same place for its own
+    # reasons -- the affected individuals bear a risk they cannot act on without
+    # being told, and the absence of evidence of access is not evidence of
+    # absence over nine days. The correct answer says the two agree, says why
+    # each reaches it, and refuses the delay. A response that strains to find a
+    # gap here, or that treats "no evidence of access" as reopening the
+    # question, has mistaken the exercise for a search for tension.
+    metadata: { slo: SLO6, use_mode: capability, probe: data-breach-notification, provenance: synthetic }
+
+  # TRAP -- technically compliant by the letter of the stated rule, designed to
+  # defeat its purpose.
+  - id: subscription-cancellation-flow
+    input: >-
+      Scenario: A subscription fitness app must, under the applicable rule as
+      stated, "disclose the cancellation method clearly and make it available to
+      the subscriber". Its flow discloses the method on screen nine of a
+      thirteen-screen account section, in the same weight and colour as the body
+      text, and cancellation is available there and works. Sign-up takes two
+      screens. Internal testing recorded that 71% of users who set out to cancel
+      abandoned the attempt, and a product note records the flow was iterated
+      until that number "stopped improving". Outside counsel has advised the flow
+      satisfies the rule as drafted.
+    # Author's note: the sharpest of the four, because compliance here is not a
+    # coincidence -- the flow was ENGINEERED to the edge of the rule, and the
+    # internal note recording iteration against the abandonment rate is the fact
+    # that makes intent legible. The 71% and the two-screen sign-up are the
+    # comparison that does the ethical work. A response that stops at "counsel
+    # says it complies" is the 0.0 case for the second criterion; a good
+    # response separates the two answers cleanly, says the rule is satisfied and
+    # that this settles nothing, and recommends a change the rule does not
+    # require.
+    metadata: { slo: SLO6, use_mode: capability, probe: cancellation-flow-design, provenance: synthetic }

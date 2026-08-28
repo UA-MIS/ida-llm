@@ -1,0 +1,181 @@
+# slo-6-ethical-reasoning, rung 2 of 5.
+#
+# WHAT THIS RUNG ADDS over rung 1: WEIGHING. Rung 1 asked only what kind of
+# problem this is. Rung 2 asks who it lands on, what each party stands to lose,
+# and -- the part that is actually hard -- which of those stakes is largest and
+# why. Still no framework and still no recommendation.
+#
+# THE LAZIEST 1.0. Completeness is trivially gamed: list every conceivable
+# party, including ones the scenario never mentions, and you cannot be accused
+# of missing anyone. Two criteria are set against that at equal weight --
+# `identifies-the-parties-the-facts-affect` rewards finding the non-obvious
+# party, `does-not-invent-parties-the-scenario-does-not-support` punishes
+# padding the list -- and `ranks-the-stakes-against-each-other` makes an
+# unranked list score badly no matter how complete it is.
+version: 1
+id: slo-6-ethical-reasoning/l2-stakeholder-analysis
+title: Ethical reasoning -- who bears the consequences of this decision, and whose stake is largest?
+description: >
+  Rung 2 of the SLO 6 ladder. The model is given a business decision and must
+  identify the parties it materially affects, state what each stands to gain or
+  lose, and say which stakes are the largest and why. The demand this rung adds
+  over rung 1 is comparative: an undifferentiated list of everyone who could
+  conceivably care is not a stakeholder analysis, because it supports no
+  decision. No recommendation is asked for.
+
+  Provenance: every scenario in this file is SYNTHETIC, invented for this file.
+  No real company, person or incident is described, no real business data is
+  used, and no textbook or question-bank content is reproduced.
+kind: subjective
+domain: business-ethics
+system_prompt: >-
+  You are analysing short business scenarios for an undergraduate business-ethics
+  course. For each scenario, identify the parties the decision materially
+  affects, state for each what it stands to gain or lose, and then say which
+  stakes are the largest and why. Work only from the facts you are given; where
+  a party's exposure depends on something the scenario does not tell you, say
+  what you would need to know rather than assuming it. If the decision's effects
+  are minor, say so -- not every decision carries large stakes. Do not apply a
+  named ethical framework and do not recommend a course of action.
+scorer:
+  kind: llm_judge
+  rubric_id: slo6-stakeholder-analysis-v1
+rubric:
+  id: slo6-stakeholder-analysis-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: identifies-the-parties-the-facts-affect
+      description: |-
+        Does the response find the parties the decision materially affects,
+        including any whose exposure is not obvious from a first reading?
+
+        1.0 -- every party the scenario shows to be materially affected appears,
+               including at least one whose exposure requires reading past the
+               surface of the scenario.
+        0.5 -- one materially affected party is missing, or only the obvious
+               parties appear.
+        0.0 -- two or more materially affected parties are missing, or the
+               analysis reaches no further than the company and its customers.
+      weight: 3.0
+    # Carries the SAME weight as identifying the parties, so padding the list
+    # cannot buy completeness. Rationale kept in a comment: the judge is never
+    # told a criterion's weight.
+    - name: does-not-invent-parties-the-scenario-does-not-support
+      description: |-
+        Does every party named have a basis in the facts given? Listing
+        everyone conceivable is the cheapest way for a response to appear
+        complete.
+
+        1.0 -- every party named can be tied to something the scenario states.
+        0.5 -- one party is named whose involvement the scenario does not
+               support, or a party's exposure is asserted with invented detail.
+        0.0 -- two or more parties are invented, or the response lists a generic
+               roster (shareholders, employees, customers, suppliers, community,
+               regulators, the environment) without tying them to these facts.
+      weight: 3.0
+    - name: ranks-the-stakes-against-each-other
+      description: |-
+        Does the response say which stakes are largest, and give a reason drawn
+        from the facts? This is the demand that separates a stakeholder analysis
+        from a list.
+
+        1.0 -- states explicitly which party or parties bear the largest stake
+               and grounds the ranking in a stated fact, such as the size of the
+               loss, its reversibility, or the party's ability to avoid it; or,
+               where the scenario's stakes are genuinely small and comparable,
+               says so and grounds THAT in a stated fact rather than
+               manufacturing a ranking the facts do not carry.
+        0.5 -- ranks the stakes but gives no reason, or gives a reason not drawn
+               from the scenario.
+        0.0 -- presents all parties as equally affected with no reason drawn
+               from the scenario, gives no ranking at all, or asserts a ranking
+               the stated facts do not support.
+      weight: 3.0
+    - name: states-what-is-at-risk-for-each-party
+      description: |-
+        For each party named, is it clear what that party actually stands to
+        gain or lose?
+
+        1.0 -- every party named carries a specific gain or loss.
+        0.5 -- one or two parties are named with no stated exposure.
+        0.0 -- parties are listed as labels with no gains or losses attached.
+      weight: 2.0
+tags: [slo-benchmark, "slo:SLO6", "use-mode:capability", slo-6-ethical-reasoning, ladder-l2, subjective, not-yet-scorable]
+samples:
+  # CLEAN -- many parties, all reachable from the facts.
+  - id: plant-relocation-across-state-lines
+    input: >-
+      Scenario: Velkarno Components has manufactured at a single plant in a town
+      of 9,000 people for thirty-one years, employing 240 of them. It plans to
+      move production to a new facility 700 miles away, where labour and energy
+      cost less. The move would close the existing plant within eighteen months.
+      Two local suppliers derive more than half their revenue from Velkarno. The
+      town's property-tax base includes the plant. Velkarno has offered
+      relocation packages to 40 of the 240 employees.
+    # Author's note: employees (200 without an offer, 40 with one), the two
+    # dependent suppliers, the town's tax base, the new site's community, and
+    # shareholders are all reachable. The non-obvious party is the pair of
+    # SUPPLIERS -- a response that stops at employees/company/community has
+    # missed the one that takes a second read. The ranking should put the 200
+    # employees without an offer and the two suppliers highest, on
+    # concentration and inability to avoid the loss.
+    metadata: { slo: SLO6, use_mode: capability, probe: plant-relocation, provenance: synthetic }
+
+  # BORDERLINE -- whether one party is materially affected at all is arguable.
+  - id: anonymised-data-shared-with-an-analytics-partner
+    input: >-
+      Scenario: A regional pharmacy chain signs an agreement to share purchase
+      histories with an analytics partner. Names, addresses and payment details
+      are stripped before transfer; what remains is a per-customer identifier,
+      basket contents, store location and timestamp. The partner will use the
+      data to build demand forecasts it sells to consumer-goods manufacturers.
+      Customers were not told individually; the practice is described in a
+      privacy notice on the chain's website. Roughly 60% of baskets contain at
+      least one over-the-counter medication.
+    # Author's note: whether CUSTOMERS are materially affected is genuinely
+    # arguable, which is the point. The facts that make it arguable are the
+    # per-customer identifier plus store plus timestamp (re-identifiable in a
+    # small town) and the medication share (the residual data is health-adjacent
+    # even after de-identification). A response that says "anonymised, so no
+    # customer stake" without engaging those two facts is the 0.5 case; one that
+    # engages them and still concludes the stake is small is fine.
+    metadata: { slo: SLO6, use_mode: capability, probe: analytics-data-sharing, provenance: synthetic }
+
+  # TRAP -- reads as a purely internal finance decision. It is not.
+  - id: supplier-payment-terms-extended
+    input: >-
+      Scenario: A national restaurant group changes its standard supplier
+      payment terms from 30 days to 90 days, applied to all suppliers at renewal.
+      Finance projects the change frees about $14m in working capital. The group
+      has 1,100 suppliers; 60 of them are single-site produce farms for which the
+      group is the largest customer, and the group's own accounts show those 60
+      have no committed credit lines on file.
+    # Author's note: the surface is a treasury decision with no obvious victim,
+    # and the $14m figure invites a response that analyses only the company and
+    # its shareholders. The non-obvious party is the 60 SMALL SUPPLIERS: the
+    # decision moves a working-capital burden onto the parties least able to
+    # finance it, and the "no committed credit lines" fact is the one that makes
+    # their stake the largest in the scenario. Missing them is the 0.0 case for
+    # the first criterion.
+    metadata: { slo: SLO6, use_mode: capability, probe: supplier-payment-terms, provenance: synthetic }
+
+  # LOW STAKES -- the honest answer is a short list and a statement that the
+  # stakes are minor. Catches a model that inflates every decision.
+  - id: office-coffee-vendor-switch
+    input: >-
+      Scenario: A 45-person consultancy switches the vendor that services its
+      office coffee machine. The outgoing vendor is a national chain for which
+      the account is one of several thousand; the contract is month-to-month with
+      no notice period, and the vendor was told a month ahead as a courtesy. The
+      new vendor is $30 a month cheaper. Staff were surveyed and were indifferent
+      between the two.
+    # Author's note: the correct response is short -- the firm, the two vendors,
+    # the staff -- and says the stakes are minor for all of them, with reasons
+    # available in the facts (month-to-month, no notice period, one of several
+    # thousand accounts, staff indifferent). A response that constructs a
+    # weighty analysis here, or that reaches for the outgoing vendor's employees
+    # or the environment without any fact supporting it, is the failure this
+    # sample detects and should score badly on
+    # `does-not-invent-parties-the-scenario-does-not-support`.
+    metadata: { slo: SLO6, use_mode: capability, probe: office-vendor-switch, provenance: synthetic }

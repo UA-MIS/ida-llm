@@ -1,0 +1,199 @@
+# slo-6-ethical-reasoning, rung 4 of 5.
+#
+# WHAT THIS RUNG ADDS over rung 3: a DECISION. Rungs 1-3 build the "knowledge of
+# ethical principles and concepts" half of SLO 6; this rung is the first that
+# tests the second half -- "and their implications for business decisions". An
+# analysis that never lands is not an implication for a decision.
+#
+# THE TENSION, PUT IN THE RUBRIC. Committing to one course of action and being
+# honest about what that action costs pull against each other: the easiest way
+# to sound decisive is to present the recommendation as free of downside, and
+# the easiest way to sound scrupulous is to qualify it until no decision is
+# left. `commits-to-one-course-of-action` and `names-the-cost-and-who-bears-it`
+# are therefore weighted EQUALLY at 3.0 so a response cannot buy one with the
+# other. This is the technique the SCHEMA.md exemplar
+# (conceptual-grading/l4-actionable-feedback) demonstrates.
+#
+# THE LAZIEST 1.0 is "escalate to Legal and Compliance", which is decisive,
+# costless-sounding, and available in every scenario.
+# `does-not-substitute-a-referral-for-the-judgement` catches it, and the fourth
+# sample is one where a narrow proportionate step genuinely IS right, so the
+# criterion cannot be satisfied by never referring anything either.
+version: 1
+id: slo-6-ethical-reasoning/l4-reasoned-recommendation
+title: Ethical reasoning -- recommend one course of action and say what it costs
+description: >
+  Rung 4 of the SLO 6 ladder, and the first rung on the "implications for
+  business decisions" half of the outcome. The model advises a named
+  decision-maker: one course of action, the principle it rests on, and a plain
+  statement of what the recommendation costs and who bears that cost. The rung
+  is built around a tension that is real in the work itself -- decisiveness and
+  candour about downside are easy to trade against each other -- so the rubric
+  weights them equally and refuses the trade.
+
+  Provenance: every scenario in this file is SYNTHETIC, invented for this file.
+  No real company, person or incident is described, no real business data is
+  used, and no textbook or question-bank content is reproduced.
+kind: subjective
+domain: business-ethics
+system_prompt: >-
+  You are advising a named decision-maker in a short business scenario. Recommend
+  ONE course of action, in a short paragraph a busy reader can act on. State the
+  ethical principle the recommendation rests on. Then state plainly what the
+  recommendation costs, and who bears that cost -- every real recommendation
+  costs something, and if you cannot name the cost you have not finished the
+  analysis. Recommend one action; do not present a menu of options and do not
+  leave the choice to the reader. Where the right action is a narrow or
+  procedural one, recommend that narrow action rather than inflating it.
+scorer:
+  kind: llm_judge
+  rubric_id: slo6-reasoned-recommendation-v1
+rubric:
+  id: slo6-reasoned-recommendation-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: commits-to-one-course-of-action
+      description: |-
+        Could the reader put down this response and do something specific,
+        without having to make the decision themselves?
+
+        1.0 -- exactly one course of action is recommended, stated clearly
+               enough that the reader knows what to do on Monday morning.
+        0.5 -- one action is recommended but is hedged or conditioned so heavily
+               that the reader cannot tell what is actually being advised.
+        0.0 -- two or more options are laid out without one being chosen, or the
+               response concludes that it depends on factors it then does not
+               resolve.
+      weight: 3.0
+    # Carries the SAME weight as committing to a course of action, so
+    # decisiveness cannot be bought by hiding the downside and candour cannot be
+    # bought by refusing to decide. Rationale kept in a comment: the judge is
+    # never told a criterion's weight.
+    - name: names-the-cost-and-who-bears-it
+      description: |-
+        Does the response say what the recommended action costs, and identify who
+        pays that cost? A recommendation presented as costless is the cheapest
+        way to sound decisive.
+
+        1.0 -- names a specific cost, harm, risk or forgone benefit AND names
+               the party that bears it.
+        0.5 -- names a cost only in general terms, or names a cost without
+               saying who bears it.
+        0.0 -- presents the recommendation as having no downside, or claims the
+               recommended action is best for every party at once.
+      weight: 3.0
+    - name: rests-the-recommendation-on-a-stated-principle
+      description: |-
+        Is the recommendation tied to an ethical principle, rather than resting
+        on business expediency alone?
+
+        1.0 -- names the principle the recommendation rests on and shows how it
+               applies to these facts.
+        0.5 -- names a principle but does not connect it to the recommendation,
+               or justifies the action solely by its business benefit while
+               mentioning a principle in passing.
+        0.0 -- gives no principle, and argues purely from reputational, legal or
+               commercial advantage.
+      weight: 2.0
+    - name: does-not-substitute-a-referral-for-the-judgement
+      description: |-
+        Where the scenario asks for a judgement, does the response make one,
+        rather than handing the decision to Legal, Compliance, HR or a committee
+        and stopping there? Referral can be a legitimate and proportionate step;
+        what fails is referral used to avoid the recommendation.
+
+        1.0 -- states what the decision-maker should do; where a referral is part
+               of the answer, it is accompanied by the substantive judgement and
+               by what the decision-maker does in the meantime.
+        0.5 -- recommends a referral and gestures at the substantive answer
+               without stating it.
+        0.0 -- the entire recommendation is to refer the matter elsewhere, so no
+               ethical judgement is offered.
+      weight: 2.0
+tags: [slo-benchmark, "slo:SLO6", "use-mode:capability", slo-6-ethical-reasoning, ladder-l4, subjective, not-yet-scorable]
+samples:
+  # CLEAN -- the right action is not in serious doubt; the cost is.
+  - id: expense-padding-by-a-top-performer
+    input: >-
+      Scenario: You advise Rana, a sales director. Her highest-billing
+      salesperson, who closed a third of the region's revenue last year, has been
+      submitting client-dinner receipts that finance has now matched to dates the
+      clients were demonstrably elsewhere. The total across nine months is about
+      $4,800. The company's policy makes falsified expenses a dismissal offence
+      and has been applied that way to two junior staff in the last three years.
+      The salesperson's contract renews in six weeks.
+    # Author's note: what to do is not seriously in doubt -- consistency of
+    # enforcement is the principle, and the two prior dismissals are the fact
+    # that makes it binding. The work is in the COST: the region loses a third
+    # of its revenue producer at renewal, and Rana bears the shortfall. A
+    # response that recommends dismissal and calls it straightforwardly correct
+    # without naming that cost scores 0.0 on the second criterion; one that
+    # recommends a quiet repayment to avoid the cost has to defend it against
+    # the two juniors, and can, but must name who bears THAT cost.
+    metadata: { slo: SLO6, use_mode: capability, probe: expense-irregularity, provenance: synthetic }
+
+  # BORDERLINE -- two defensible recommendations. Grade the reasoning.
+  - id: hiring-a-competitors-pricing-analyst
+    input: >-
+      Scenario: You advise Tomas, who runs a commercial team. A pricing analyst
+      from the firm's closest competitor has applied for an open role. She is
+      well qualified on the merits. She spent two years building the competitor's
+      discount model and would inevitably carry knowledge of its structure in her
+      head. She has no non-compete. She has not offered any document, and has
+      said she would not discuss her former employer's specifics. Tomas's team
+      would report to her within six months.
+    # Author's note: both hiring with a ring-fence and declining are defensible,
+    # and the sample is here to be graded on reasoning rather than on which is
+    # chosen. The facts that do the work: no non-compete (so no duty is
+    # breached by hiring), knowledge carried in the head cannot be un-known, and
+    # she would end up SUPERVISING the team that sets prices, which is what makes
+    # a ring-fence hard to operate. A 1.0 response picks one, names the principle
+    # and names the cost -- forgoing a strong candidate, or accepting a risk to
+    # the competitor's legitimate interest and to the firm's own exposure.
+    metadata: { slo: SLO6, use_mode: capability, probe: competitor-hire, provenance: synthetic }
+
+  # TRAP -- the tempting frame is that it is not the firm's problem.
+  - id: customer-overpayment-nobody-noticed
+    input: >-
+      Scenario: You advise Grace, a controller. A long-standing customer paid an
+      invoice twice, eleven months ago, for $61,000. The duplicate sits in a
+      suspense account. The customer has not raised it and its own controls
+      evidently did not catch it. The contract is silent on overpayments. Under
+      the firm's stated policy, unclaimed balances move to income after twelve
+      months, which would happen in four weeks. The customer is currently
+      renegotiating its rate card downward, and Grace's year-end result is $50,000
+      short of plan.
+    # Author's note: the trap is the "our policy allows it and they had eleven
+    # months" frame, which is a rung-5 legal-permission move showing up early --
+    # and the $50,000 gap against a $61,000 balance is placed to make it
+    # tempting. The right action is to tell the customer and refund it; the cost
+    # is real and should be named (Grace misses plan, and does so during a
+    # renegotiation in which the customer now knows it is owed money). A
+    # response that recommends letting the policy run and calls that costless is
+    # the failure this sample detects.
+    metadata: { slo: SLO6, use_mode: capability, probe: customer-overpayment, provenance: synthetic }
+
+  # RESTRAINT -- the proportionate action is narrow. Catches a model that always
+  # escalates dramatically, and stops `does-not-substitute-a-referral` from
+  # being satisfiable by never referring anything.
+  - id: anonymous-allegation
+    input: >-
+      Scenario: You advise Desmond, a department head. An anonymous note left in
+      an internal suggestion box alleges that a named senior colleague
+      "has an arrangement" with a supplier. There is no other detail: no dates,
+      no amounts, no documents, no corroborating account. The named colleague has
+      eleven years of unblemished service. The company has a written
+      whistleblowing procedure with a designated recipient, which Desmond is not.
+      Two other managers have seen the note.
+    # Author's note: the honest recommendation is narrow and procedural -- route
+    # the note to the designated recipient under the written procedure, do not
+    # investigate personally, do not confront the colleague, do not widen who
+    # knows. The costs are still real and should be named: the colleague may
+    # come under suspicion he cannot answer because there is nothing to answer,
+    # and the two managers who have seen it may talk. This sample is the
+    # counterweight that keeps the fourth criterion honest -- here a referral IS
+    # the substantive judgement, provided the response also says what Desmond
+    # does in the meantime. A response that recommends a full investigation, or
+    # that recommends confronting the colleague, has mistaken drama for rigour.
+    metadata: { slo: SLO6, use_mode: capability, probe: anonymous-allegation, provenance: synthetic }
