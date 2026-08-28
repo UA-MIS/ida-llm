@@ -37,19 +37,28 @@ requires the `author` role, and the anonymous principal deliberately does *not*
 hold it — so the answer key is already fail-shut, not fail-open. Publishing every
 answer key would be both an integrity risk and a training-contamination risk.
 
-**3. Run execution is *not* protected — and it spends money.**
+**3. Run execution is gated — by a flag that is OFF by default.**
 
-`POST /runs` (`enqueue_runs`) enqueues benchmark runs against real providers.
-`services/api/ida_api/auth.py` is an explicit placeholder (D-5, `auth_mode="disabled"`),
-and its anonymous principal holds **`reader` and `runner`** — `runner` being, in
-its own words, *"enqueue runs (spends money)"*.
+`POST /runs` (`enqueue_runs`) enqueues benchmark runs against real providers, and
+it is now the one route behind a role check that anonymous cannot satisfy —
+**when `auth_mode=token`**. `services/api/ida_api/auth.py` implements the mode:
 
-Today that is contained by accident of routing rather than by design: the API has
-**no public Ingress** (only `ida-llm-frontend` and `ida-llm-agile` are routed),
-and the frontend proxies just three read-only routes. So nothing on the internet
-can currently trigger a run. **That containment disappears the moment the API is
-routed publicly or a "run this" button is added** — which is exactly what the
-results work is heading toward.
+| `auth_mode` | anonymous holds | `POST /runs` anonymously |
+|---|---|---|
+| `disabled` *(default)* | `reader`, `runner` | 202 — enqueues |
+| `token` | `reader` only | **403**; a bad token is **401** |
+| anything else | — | 501 |
+
+Reads answer anonymously in every mode, including `token` — see §1.
+
+⚠️ **The default is still open, and that is deliberate.** Local dev, CI and PR
+previews all run `disabled` and all point at the mock model, so no credential
+there would buy any safety. It follows that the containment argument below has
+not changed for a deployment that has not set the flag: the API has **no public
+Ingress** (only `ida-llm-frontend` and `ida-llm-agile` are routed) and the
+frontend proxies three read-only routes, so nothing on the internet can trigger a
+run today. What *has* changed is that closing that gap is now a Vault write plus
+two env vars, not a code change — see "Known gaps".
 
 **4. Everything a model sees is archived and published.**
 
@@ -142,15 +151,44 @@ handle material we choose not to clean, or cannot clean well enough.
 
 **Require auth to trigger a run on prod.** Not to view results — to spend money.
 
-This is our application's work, not the platform's: `auth.py` already defines the
-`runner` role for exactly this, and every protected route already depends on
-`current_principal`, so it is an edit to that file plus a config flag rather than
-a sweep through the handlers. The specific change is to stop granting `runner` to
-the anonymous principal and to validate a real token.
+**Built.** It was our application's work, not the platform's, and it landed
+exactly where §6 predicted: an edit to `services/api/ida_api/auth.py` plus a
+config flag, with no sweep through the route handlers. Under `auth_mode=token`
+the anonymous principal no longer holds `runner`, and a bearer token from
+`IDA_AUTH_TOKENS` does.
 
-It pairs with the cost interlocks already in place: nightly sweeps suspended in
-all environments (D-43), and `test_only_the_mock_is_enabled` keeping hosted
-models off by deliberate act.
+Three properties are worth stating because they were choices, not defaults:
+
+- **A token grants `reader` + `runner`, never `author`.** A shared static token
+  in an env var is a *weaker* credential than the per-person SSO identity A10 was
+  written against, so the answer key stays fail-shut rather than becoming
+  unlockable by whoever holds the CI secret.
+- **No credential is not an error.** Anonymous resolves to a reader principal
+  rather than a 401, because the public results view must keep working
+  uncredentialed. A *wrong* credential is a 401 — a bad token must never be
+  silently treated as "no token".
+- **`auth_mode=token` with no tokens refuses to start.** A pod that cannot
+  enforce the mode it was configured with fails its readiness probe instead of
+  reporting Ready without the control it was deployed for.
+
+It pairs with the cost interlocks already in place, and weakens neither: nightly
+sweeps suspended in all environments (D-43), and `test_only_the_mock_is_enabled`
+keeping hosted models off by deliberate act. Authenticating buys no exemption
+from the budget caps — `TestTheOtherCostInterlocksAreUntouched` pins that.
+
+**To turn it on in a cluster** (an ops step, not a code change):
+
+1. `vault kv put secret/tenants/ida-llm/<env>/app IDA_AUTH_TOKENS='subject:token,...'`
+   — generate each with `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+2. Uncomment the `IDA_AUTH_TOKENS` entry in that env's
+   `app-secret.externalsecret.yaml` and the matching `secretKeyRef` on the `api`
+   container in `.devops/chart/base/deployments.yaml`. Both are present, commented,
+   with this procedure next to them.
+3. Set `IDA_AUTH_MODE: "token"` in the ConfigMap for that environment.
+
+Ordering matters: the `secretKeyRef` is deliberately not `optional: true`, so
+referencing a key Vault does not hold yet keeps the pods in
+`CreateContainerConfigError`. Seed first, then reference.
 
 ---
 
@@ -158,7 +196,7 @@ models off by deliberate act.
 
 | gap | consequence | owner |
 |---|---|---|
-| **Run execution is unauthenticated** — anonymous principal holds `runner` | anyone who can reach the API can spend real tokens; contained today only because the API has no public route | this repo (tracked as its own story) |
+| ~~**Run execution is unauthenticated**~~ — **closed in code**: `auth_mode=token` drops `runner` from anonymous | the *deployed* default is still `disabled`, so the containment is still "no public route" until an operator seeds the Vault key and flips the flag (§6 has the three steps) | this repo (code done); ops (enable) |
 | Intake cleaning **module** built; no automated **ingest endpoint** or table to persist cleaned material | intake runs only when a human runs `tools/deid_material.py`; nothing ingests on its own, and cleaned material has no row to live in | this repo |
 | De-identification is pattern-based: it cannot detect **re-identification by content** | a short answer can identify its author through what it says; cleaned ≠ anonymous, so a human must read cleaned material before it is published | standing limit, restated in every `DeidReport` |
 | Personal names in free text need a **roster** to be caught reliably | material cleaned without one keeps mid-sentence names; re-ingesting with a roster finds them | whoever runs intake |
@@ -180,4 +218,7 @@ The safe default until they decide: **use synthetic stand-ins for exam items**
 (§4), which costs about ten minutes per task and keeps the family redistributable.
 
 **Note also:** gating run execution does **not** gate viewing. Results stay public
-by design (§ "What the system actually does", 1).
+by design (§ "What the system actually does", 1) — and that is now enforced by
+test rather than merely intended: `TestReadsStayPublic` in
+`services/api/tests/test_auth.py` fails if anyone "secures the API" with a
+blanket dependency.

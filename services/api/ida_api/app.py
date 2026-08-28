@@ -9,7 +9,7 @@ Route map
 ``GET  /models``            the model registry (secrets stripped)
 ``GET  /tasks``             the task catalog, with scorability
 ``GET  /tasks/{task_id}``   one full task spec
-``POST /runs``              enqueue task x model runs
+``POST /runs``              enqueue task x model runs -- THE ONLY GATED ROUTE
 ``GET  /runs``              newest-first list of runs
 ``GET  /runs/{run_id}``     one run plus its results (score + artifact pointer)
 ``GET  /runs/{run_id}/results/{sample_id}/transcript``
@@ -17,6 +17,12 @@ Route map
 
 The API is a thin, honest layer over :mod:`ida_core.repositories`.  Any logic
 that is about *evaluating* belongs in the harness, not here.
+
+Auth, in one line: **reads are anonymous, enqueueing is not** (when
+``auth_mode=token``).  Every read above answers without a credential on
+purpose -- the benchmark is meant to be public and ``docs/sensitive-material.md``
+§ 1 forbids gating the results view.  ``POST /runs`` spends real provider money,
+so it is the one route behind :meth:`~ida_api.auth.Principal.require_role`.
 """
 
 from __future__ import annotations
@@ -31,7 +37,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_
 from sqlalchemy import text
 
 from ida_api import __version__
-from ida_api.auth import Principal, current_principal
+from ida_api.auth import Principal, current_principal, validate_auth_config
 from ida_api.deps import AppContext, build_context, get_context
 from ida_api.schemas import (
     EnqueueResponse,
@@ -135,6 +141,18 @@ def create_app(context: AppContext | None = None) -> FastAPI:
 
     app.state.context = context or build_context()
     app.state.settings = app.state.context.settings
+
+    # ⚠ BEFORE A SINGLE ROUTE EXISTS. A process configured with an auth mode it
+    # cannot enforce (`auth_mode=token`, no credentials) must never reach the
+    # point of answering a request: it would report Ready while the control it
+    # was deployed for -- the one that stops anonymous callers spending real
+    # provider credits -- is simply absent. Raising here fails the readiness
+    # probe, halts the rollout and leaves the previous replicas serving.
+    #
+    # An UNKNOWN mode is deliberately NOT a boot failure; it is a request-time
+    # 501 (see ida_api.auth). Booting is what lets that 501 be seen: the reads
+    # stay up and the one route that spends money says loudly that it cannot.
+    validate_auth_config(app.state.settings)
 
     @app.middleware("http")
     async def _record_request_metrics(request: Request, call_next):

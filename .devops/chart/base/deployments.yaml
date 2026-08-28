@@ -185,6 +185,26 @@ spec:
                 secretKeyRef:
                   name: ida-llm-secret
                   key: MINIO_SECRET_KEY
+            # ── RUN-EXECUTION AUTH (D-49 section 6) ─────────────────────────
+            # `POST /runs` spends real provider money. Under IDA_AUTH_MODE=token
+            # the anonymous principal loses the `runner` role and a bearer token
+            # from IDA_AUTH_TOKENS is required; reads stay anonymous in every
+            # mode, because the public results view IS the product and must not
+            # be gated (docs/sensitive-material.md section 1).
+            #
+            # COMMENTED because the ref below is not `optional: true` either: if
+            # Vault does not hold the property yet, uncommenting this parks every
+            # api pod in CreateContainerConfigError. The order is: seed Vault,
+            # uncomment the ExternalSecret entry in the overlay, uncomment this,
+            # then set IDA_AUTH_MODE in the ConfigMap. That last step is what
+            # actually arms the gate — and the api refuses to start if it is set
+            # to `token` with no tokens present, so a half-done rollout fails its
+            # readiness probe rather than reporting Ready without the control.
+            # - name: IDA_AUTH_TOKENS
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: ida-llm-secret
+            #       key: IDA_AUTH_TOKENS
           readinessProbe:
             # /readyz DOES check the database — a pod that cannot reach Postgres
             # is pulled from the Service and left running, which is correct.

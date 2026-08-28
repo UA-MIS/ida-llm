@@ -91,8 +91,17 @@ class TestSettings:
         settings = Settings()
         assert settings.s3_access_key == ""
         assert settings.s3_secret_key == ""
+        assert settings.auth_tokens == "", "a credential that gates spend is a secret too"
 
     def test_auth_is_disabled_by_default(self) -> None:
+        """Open by default, and that is a decision, not an oversight.
+
+        Every context that runs on the default -- local dev, CI, PR previews, the
+        tracer bullet -- is pointed at the mock model, so a credential there
+        would buy no safety and cost every contributor a setup step. The gate is
+        armed per deployment (IDA_AUTH_MODE=token); see docs/sensitive-material.md
+        section 6.
+        """
         assert Settings().auth_mode == "disabled"
 
     def test_paths_fall_back_to_repo_root(self) -> None:
