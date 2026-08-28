@@ -161,6 +161,26 @@ QUESTIONS: list[IntakeQuestion] = [
         ],
     ),
     IntakeQuestion(
+        id="student_task",
+        prompt="What do you want help with?",
+        why_it_matters="This is what we look up in the benchmark. Everything after it is about which of the measured models fits your situation.",
+        depends_on=IntakeCondition(question_id="beneficiary", values=["for_students", "both"]),
+        options=[
+            IntakeOption(
+                value="notetaking",
+                label="Note taking",
+            ),
+            IntakeOption(
+                value="assignment_assistance",
+                label="Help on assignments",
+            ),
+            IntakeOption(
+                value="research_assistance",
+                label="Research assistance",
+            ),
+        ],
+    ),
+    IntakeQuestion(
         id="research_task",
         prompt="What part of your research do you want help with?",
         why_it_matters="Research tasks are benchmarked separately from teaching tasks; a model that grades well is not automatically a good literature reviewer.",
@@ -502,6 +522,56 @@ Give me the code with comments, then list the ways it could silently give a
 wrong answer on data shaped slightly differently from what I described.
 """
 
+NOTETAKING_TEMPLATE = """Help a {level} student take notes on {subject}.
+
+Source material:
+<<<
+[paste the lecture notes, slides, or reading]
+>>>
+
+Produce notes that:
+- Capture the claims and definitions, not a transcript
+- Flag anything the source left ambiguous
+- End with three check-yourself questions, without answers
+
+Do not invent content that is not in the source.
+"""
+
+ASSIGNMENT_HELP_TEMPLATE = """Act as a study aid for a {level} student working on a {subject} assignment.
+
+The assignment:
+<<<
+[paste the prompt — no student name]
+>>>
+
+What the student has tried:
+<<<
+[paste their attempt, or 'not started']
+>>>
+
+Rules:
+- Never produce the submission they would turn in.
+- Ask what they have tried first; then give one hint at a time.
+- Name the concept they need, and where in the course it was taught if you can tell.
+- If they ask you to just do it, decline.
+"""
+
+STUDENT_RESEARCH_TEMPLATE = """Help a {level} student research a {subject} question.
+
+Question: [state it]
+Sources they already have:
+<<<
+[paste abstracts, citations, or notes]
+>>>
+
+Give them:
+- a tighter version of the question
+- what to look up next, and why
+- what their current sources do and do not support
+
+Do not invent citations. If a claim is not in the sources they pasted, say so.
+"""
+
 GRANT_TEMPLATE = """Help me with a section of a grant proposal.
 
 Programme / solicitation: [name it, and paste the review criteria if you have them]
@@ -564,6 +634,46 @@ TASK_AREAS: dict[str, TaskArea] = {
             "hand over answers, and that refusal is the whole point.",
             "Tell students plainly that it can be confidently wrong, and that checking it "
             "against the course material is part of the exercise.",
+            "Do not have students paste anything identifying themselves or a classmate.",
+        ),
+    ),
+    "notetaking": TaskArea(
+        value="notetaking",
+        label="Note taking",
+        match_tags=frozenset({"notetaking", "notes"}),
+        match_use_modes=frozenset({USE_MODE_INSTRUCTIONAL}),
+        prompt_template=NOTETAKING_TEMPLATE,
+        student_facing_guardrails=(
+            "Notes should capture the source, not replace attending or reading it.",
+            "Tell students plainly that it can be confidently wrong, and that checking it "
+            "against the course material is part of the exercise.",
+            "Do not have students paste anything identifying themselves or a classmate.",
+        ),
+    ),
+    "assignment_assistance": TaskArea(
+        value="assignment_assistance",
+        label="Help on assignments",
+        match_tags=frozenset({"tutoring", "learning-aid", "scaffolding", "assignment-help"}),
+        match_use_modes=frozenset({USE_MODE_INSTRUCTIONAL}),
+        prompt_template=ASSIGNMENT_HELP_TEMPLATE,
+        student_facing_guardrails=(
+            "Set it up as a study aid, not an answer engine — the template below refuses "
+            "to produce the work they would submit.",
+            "Tell students plainly that it can be confidently wrong, and that checking it "
+            "against the course material is part of the exercise.",
+            "Do not have students paste anything identifying themselves or a classmate.",
+        ),
+    ),
+    "research_assistance": TaskArea(
+        value="research_assistance",
+        label="Research assistance",
+        match_tags=frozenset({"research-assistance", "student-research"}),
+        match_use_modes=frozenset({USE_MODE_INSTRUCTIONAL}),
+        prompt_template=STUDENT_RESEARCH_TEMPLATE,
+        student_facing_guardrails=(
+            "It should help them find and weigh sources, not write the paper.",
+            "Tell students plainly that it can be confidently wrong, and that invented "
+            "citations are a known failure mode — they must open every source they cite.",
             "Do not have students paste anything identifying themselves or a classmate.",
         ),
     ),
@@ -952,13 +1062,60 @@ def _context_summary(answers: dict[str, str], areas: list[TaskArea]) -> list[Con
     return items
 
 
+TEACHING_SIDE_TASK_IDS = frozenset({"teaching_task", "student_task"})
+"""The two teaching-side task questions. Answering either is enough when the
+professor is teaching (role ``teacher`` or ``both``); ``research_task`` is a
+separate requirement."""
+
+
+def _has_teaching_side_task(answers: dict[str, str]) -> bool:
+    return bool(answers.get("teaching_task") or answers.get("student_task"))
+
+
 def _selected_areas(answers: dict[str, str]) -> list[TaskArea]:
     areas: list[TaskArea] = []
-    for key in ("teaching_task", "research_task"):
+    for key in ("teaching_task", "student_task", "research_task"):
         value = answers.get(key)
         if value and value in TASK_AREAS:
             areas.append(TASK_AREAS[value])
     return areas
+
+
+def _context_gaps(answers: dict[str, str]) -> list[Gap]:
+    """Required applicable questions that still have no answer.
+
+    ``teaching_task`` and ``student_task`` are an either/or pair when the
+    professor is teaching: one named task is enough to look up.  A researcher
+    (or the research half of ``both``) still has to answer ``research_task``.
+    """
+    missing = [
+        question
+        for question in applicable_questions(answers)
+        if question.required and not answers.get(question.id)
+    ]
+    if answers.get("role") in ("teacher", "both") and _has_teaching_side_task(answers):
+        missing = [question for question in missing if question.id not in TEACHING_SIDE_TASK_IDS]
+    return [
+        Gap(
+            question_id=question.id,
+            prompt=question.prompt,
+            why_it_matters=question.why_it_matters,
+        )
+        for question in missing
+    ]
+
+
+def _unmapped_task_question_id(answers: dict[str, str]) -> str:
+    """Which task question to name when no mapped area could be resolved."""
+    if answers.get("role") == "researcher":
+        return "research_task"
+    if answers.get("teaching_task"):
+        return "teaching_task"
+    if answers.get("student_task") or any(
+        question.id == "student_task" for question in applicable_questions(answers)
+    ):
+        return "student_task"
+    return "teaching_task"
 
 
 def validate_answers(answers: dict[str, str]) -> list[str]:
@@ -996,11 +1153,7 @@ def evaluate(
     summary = _context_summary(answers, areas)
 
     # ── 1. do we know enough to even look? ──────────────────────────────────
-    gaps = [
-        Gap(question_id=q.id, prompt=q.prompt, why_it_matters=q.why_it_matters)
-        for q in applicable_questions(answers)
-        if q.required and not answers.get(q.id)
-    ]
+    gaps = _context_gaps(answers)
     if gaps:
         return RecommendationResponse(
             status="need_more_context",
@@ -1133,15 +1286,16 @@ def evaluate(
 
     # ── 4. is there benchmark evidence for what they asked about? ───────────
     if not areas:
+        task_question = QUESTIONS_BY_ID[_unmapped_task_question_id(answers)]
         return RecommendationResponse(
             status="need_more_context",
             message="I need to know what you want help with before I can look anything up.",
             context_summary=summary,
             gaps=[
                 Gap(
-                    question_id="teaching_task",
-                    prompt=QUESTIONS_BY_ID["teaching_task"].prompt,
-                    why_it_matters=QUESTIONS_BY_ID["teaching_task"].why_it_matters,
+                    question_id=task_question.id,
+                    prompt=task_question.prompt,
+                    why_it_matters=task_question.why_it_matters,
                 )
             ],
         )
