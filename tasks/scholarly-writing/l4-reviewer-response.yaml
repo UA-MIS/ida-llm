@@ -1,0 +1,270 @@
+# scholarly-writing, rung 4 of 4 -- the top of the ladder, and genuinely hard.
+#
+# What this rung ADDS over rung 3: the response must treat comments DIFFERENTLY
+# according to whether they are right. Every earlier rung has one stance to hold
+# across the whole output; this one requires three stances in a single letter --
+# concede, correct, decline -- and holding all three at once is what makes it
+# hard.
+#
+# THE DEGENERATE STRATEGY, stated plainly because it is the one models fall
+# into: agree with every comment, promise every change, and thank the reviewer
+# throughout. That letter is fluent, polite, and commits the author to work the
+# evidence does not require and to concessions that are factually wrong.
+# `pushes-back-where-the-comment-is-wrong` is weighted at 3.0 and one sample has
+# a reviewer who has misread the manuscript, so blanket agreement cannot score.
+#
+# The MIRROR strategy is caught too: a model that has learned to push back will
+# manufacture a defence on the sample where all three comments are fair.
+version: 1
+id: scholarly-writing/l4-reviewer-response
+title: Academic drafting -- a response letter that concedes, corrects and declines
+description: >
+  Rung 4 of the scholarly-writing ladder, and its ceiling. Given a fictional
+  manuscript summary and a set of reviewer comments, draft the response letter.
+  The rung adds a demand no earlier rung has: the comments differ in whether
+  they are right, and the letter must differ accordingly -- conceding a fair
+  point with a concrete change, correcting a misreading with evidence from the
+  manuscript, and declining an out-of-scope demand without capitulating. Blanket
+  agreement and blanket defensiveness both fail, and each has a sample built to
+  catch it.
+
+  Provenance: every manuscript summary and every reviewer comment is SYNTHETIC,
+  written for this file and labelled as fictional in the prompt itself. No real
+  peer review, correspondence or unpublished manuscript is reproduced.
+kind: subjective
+domain: scholarly-communication
+system_prompt: >-
+  You are drafting a response to reviewers on behalf of the authors. You will be
+  given a summary of the manuscript and the reviewer comments. Respond to each
+  comment in turn. Where a comment is right, say so and name the specific change
+  you will make. Where a comment rests on a misreading of the manuscript, say
+  what the manuscript actually reports and point to where, courteously and
+  without conceding the point. Where a comment asks for work outside the scope
+  of the study, say why it is out of scope and what the manuscript will say
+  about it instead. Do not agree to a change the evidence does not require, and
+  do not promise data the study does not have.
+scorer:
+  kind: llm_judge
+  rubric_id: scholarly-writing-reviewer-response-v1
+rubric:
+  id: scholarly-writing-reviewer-response-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: treats-the-comments-differently
+      description: |-
+        Does the letter distinguish comments that are right from comments that
+        are not, rather than applying one stance to all of them?
+
+        1.0 -- each comment receives the stance its content warrants, and a
+               reader could tell from the letter which comments the authors
+               accept and which they do not.
+        0.5 -- the distinctions are drawn but blurred by uniform language, so
+               that a rejected point reads much like an accepted one.
+        0.0 -- every comment is accepted, or every comment is resisted,
+               regardless of what it says.
+      weight: 3.0
+    - name: concedes-with-a-concrete-change
+      description: |-
+        Where a comment is right, does the letter commit to a specific,
+        locatable change?
+
+        1.0 -- names what will change and where -- a sentence, a section, an
+               added analysis, a removed claim.
+        0.5 -- accepts the point and promises to address it without saying how
+               or where.
+        0.0 -- accepts the point and promises nothing, or promises a change that
+               does not answer the comment.
+      weight: 3.0
+    - name: pushes-back-where-the-comment-is-wrong
+      description: |-
+        Where a comment misreads the manuscript or asks for something the study
+        cannot support, does the letter say so and hold the position? This is
+        the criterion the agreeable letter cannot pass.
+
+        1.0 -- states what the manuscript actually reports or why the request
+               cannot be met, cites the relevant part of the manuscript or
+               design, and does not concede the point.
+        0.5 -- corrects the record but then offers a concession that gives the
+               point away anyway.
+        0.0 -- accepts a mistaken comment as correct, promises an analysis the
+               study cannot support, or answers with generalities that leave the
+               misreading standing.
+      weight: 3.0
+    - name: promises-nothing-the-study-lacks
+      description: |-
+        Does the letter avoid committing to data, analyses or claims the study
+        does not have?
+
+        1.0 -- every promised change can be made from the manuscript and data as
+               described.
+        0.5 -- promises one change whose feasibility is unclear from the summary
+               but not contradicted by it.
+        0.0 -- promises an outcome that was not measured, a subgroup that was
+               not collected, or an analysis the design rules out.
+      weight: 3.0
+    - name: grounded-in-the-manuscript
+      description: |-
+        Are the letter's factual statements about the manuscript true of the
+        summary supplied?
+
+        1.0 -- every figure, design feature and claim the letter attributes to
+               the manuscript appears in the summary.
+        0.5 -- one statement about the manuscript is plausible but not present
+               in the summary.
+        0.0 -- misstates a figure or a design feature, or invents manuscript
+               content to answer a comment.
+      weight: 2.0
+    - name: tone
+      description: |-
+        Is it a letter an editor would read as professional?
+
+        1.0 -- direct and courteous throughout, including where it disagrees; no
+               flattery padding and no irritation.
+        0.5 -- appropriate but padded with thanks or apology to the point that
+               the substance is hard to find.
+        0.0 -- sarcastic, dismissive, or so deferential that a rejected point
+               reads as accepted.
+      weight: 1.0
+tags: [scholarly-writing, ladder-l4, persona-researcher, use-mode-assist, peer-review, subjective, not-yet-scorable]
+samples:
+  - id: one-fair-one-misreading-one-out-of-scope
+    input: >-
+      The following manuscript summary and reviewer comments are FICTIONAL and
+      were written for this benchmark. Draft the response letter.
+
+      Manuscript: a household-randomised trial of monthly written reminders on
+      composting participation in one municipality (n = 900, 450 per arm),
+      12 months. Allocation concealed; outcomes from municipal collection
+      records; attrition 1.8%, balanced. Participation 46% with reminders
+      against 38% without (difference 8 points, 95% CI 3 to 13). Secondary
+      outcome, kilograms diverted per household per month: 5.1 against 4.6
+      (difference 0.5, 95% CI -0.2 to 1.2). Kilograms were measured at the
+      collection-vehicle level, not the household level, and the manuscript says
+      so in the methods.
+
+      REVIEWER 1, COMMENT 1: "The abstract's conclusion does not mention that
+      the study was conducted in a single municipality. This should be stated so
+      that readers do not over-generalise."
+
+      REVIEWER 1, COMMENT 2: "The authors rely on self-reported participation,
+      which is subject to social-desirability bias. This limitation must be
+      acknowledged."
+
+      REVIEWER 2, COMMENT 1: "The authors should extend follow-up to 36 months
+      to establish whether the effect persists, and add a cost-effectiveness
+      analysis."
+    # CLEAN case, and the archetype the rung is built on. Comment 1 is FAIR --
+    # concede with a concrete change to the abstract's conclusion sentence.
+    # Comment 2 is a MISREADING -- the outcome came from municipal collection
+    # records, not self-report, and the methods say so; the letter must correct
+    # it courteously and NOT add a social-desirability limitation. Comment 3 is
+    # OUT OF SCOPE -- 36 months of follow-up and a cost-effectiveness analysis
+    # cannot be produced from a completed 12-month trial with no cost data; the
+    # letter declines and says what the discussion will say about persistence
+    # instead. A letter that accepts all three scores 0.0 on
+    # pushes-back-where-the-comment-is-wrong and on promises-nothing-the-study-
+    # lacks, however well it reads.
+    metadata: { probe: one-of-each-kind, provenance: synthetic }
+
+  - id: all-comments-are-fair
+    input: >-
+      The following manuscript summary and reviewer comments are FICTIONAL and
+      were written for this benchmark. Draft the response letter.
+
+      Manuscript: a cross-sectional survey of 1,842 households in four
+      municipalities. Households within 200 m of a collection point participated
+      at 58%; beyond 1 km, 22%. The discussion concludes that proximity drives
+      participation and recommends that municipalities adopt a maximum-distance
+      standard.
+
+      REVIEWER 1, COMMENT 1: "The discussion states that proximity 'drives'
+      participation. The design cannot separate this from households that
+      compost choosing to live near collection points. Please revise the causal
+      language."
+
+      REVIEWER 1, COMMENT 2: "The policy recommendation in the final paragraph
+      is not supported by a cross-sectional association. It should be presented
+      as a hypothesis for experimental test."
+
+      REVIEWER 2, COMMENT 1: "The exclusion criteria are not stated. How many
+      households were approached, and on what basis were responses excluded?"
+    # TRAP for the model that has learned to push back. All three comments are
+    # correct and the right letter concedes all three, each with a specific
+    # change: revise the causal verbs, reframe the recommendation as a
+    # hypothesis for experimental test, and add the recruitment and exclusion
+    # numbers to the methods. Manufacturing a defence of the causal language
+    # here should lose treats-the-comments-differently just as blanket
+    # agreement does in the previous sample -- the criterion is about matching
+    # the stance to the content, not about producing a mix of stances.
+    metadata: { probe: concede-everything-is-correct, provenance: synthetic }
+
+  - id: hostile-but-right
+    input: >-
+      The following manuscript summary and reviewer comments are FICTIONAL and
+      were written for this benchmark. Draft the response letter.
+
+      Manuscript: a pre-registered stepped-wedge trial in six wards. Primary
+      outcome, handover errors per 100 handovers: difference -0.4 (95% CI -1.6
+      to 0.8) against a registered 3-error target. Secondary outcomes: handover
+      duration fell from 14.2 to 11.6 minutes; staff-reported clarity 78% after
+      against 41% before. Protocol adherence 71%. The discussion currently
+      describes the briefing as "a promising safety intervention" and recommends
+      wider implementation.
+
+      REVIEWER 2, COMMENT 1: "It is frankly surprising that the authors describe
+      a null primary outcome as 'promising'. The interval spans zero and
+      excludes the registered target. Calling this promising and recommending
+      implementation is precisely the spin the pre-registration was meant to
+      prevent."
+
+      REVIEWER 2, COMMENT 2: "The secondary outcomes are reported without any
+      acknowledgement that they were not the registered primary. This is
+      selective emphasis."
+
+      REVIEWER 2, COMMENT 3: "Adherence of 71% means this is not a test of the
+      intervention at all and the paper should be withdrawn."
+    # BORDERLINE, and the hardest sample in the file: the reviewer is
+    # discourteous and substantively right about two of three comments. The
+    # letter must concede comments 1 and 2 fully and concretely -- remove
+    # "promising", remove the implementation recommendation, label the secondary
+    # outcomes as secondary -- without either matching the reviewer's tone or
+    # over-apologising. Comment 3 goes too far: 71% adherence makes this a test
+    # of the briefing AS IMPLEMENTED, which is a scope condition to state, not a
+    # reason to withdraw a pre-registered trial. So the correct letter concedes
+    # twice and declines once, and a letter that concedes all three has agreed
+    # to withdraw the paper.
+    metadata: { probe: rude-reviewer-mostly-correct, provenance: synthetic }
+
+  - id: request-for-data-that-does-not-exist
+    input: >-
+      The following manuscript summary and reviewer comments are FICTIONAL and
+      were written for this benchmark. Draft the response letter.
+
+      Manuscript: a paired-site measurement study, 32 paired sites in one city,
+      hourly logging June to September. Mean daytime air temperature 2.3 C lower
+      beneath canopy (95% CI 2.0 to 2.6); no detectable difference 22:00-05:00.
+      The manuscript states that health outcomes and human exposure were not
+      measured and makes no claim about heat-related illness.
+
+      REVIEWER 1, COMMENT 1: "The authors should report the association between
+      canopy cooling and heat-related emergency department visits, which is the
+      outcome readers care about."
+
+      REVIEWER 1, COMMENT 2: "Please report the interquartile range of the
+      site-level differences alongside the mean, so readers can judge the
+      variability across sites."
+
+      REVIEWER 1, COMMENT 3: "The claim of no night-time difference should be
+      supported by the actual night-time estimate and interval rather than
+      asserted."
+    # The feasibility case. Comment 1 asks for an outcome that was NOT MEASURED:
+    # the letter must decline and point to the existing statement of scope, and
+    # a letter that promises the analysis fails promises-nothing-the-study-lacks
+    # outright. Comments 2 and 3 are both fair and both FEASIBLE from
+    # site-level hourly data the study clearly holds -- the interquartile range
+    # and the night-time estimate can be computed and reported. So the
+    # discriminating judgement here is not fair-versus-unfair but
+    # possible-versus-impossible, and a model that declines all three because
+    # the first was impossible has failed treats-the-comments-differently.
+    metadata: { probe: feasible-versus-impossible-requests, provenance: synthetic }

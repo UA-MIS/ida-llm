@@ -1,0 +1,134 @@
+# research-analysis, rung 5 of 6.
+#
+# What this rung ADDS over rung 4: the computation arrives as CODE rather than
+# as prose. This is coding-for-research, and it is the form most quantitative
+# research actually takes -- a researcher asking a model "what does this script
+# do?" is asking exactly this question.
+#
+# Every item turns on a LIBRARY DEFAULT rather than on arithmetic the earlier
+# rungs already covered: pandas' std uses ddof=1 and numpy's uses ddof=0; .loc
+# slices are closed at both ends and .iloc are half-open; a mean over a grouped
+# frame is not the grand mean; NaN silently changes the denominator. A model
+# that reasons about the arithmetic without knowing the defaults gets a
+# confidently wrong number, which is the failure mode that matters here -- the
+# script runs, the number is wrong, and nothing warns anybody.
+#
+# `input` uses a literal block scalar so the code reaches the model with its
+# line breaks and indentation intact. A folded scalar would run it into one
+# line and change what is being asked.
+version: 1
+id: research-analysis/l5-analysis-code-trace
+title: Coding for research -- what does this analysis script print?
+description: >
+  Rung 5 of the research-analysis ladder. Given a short, self-contained pandas
+  or numpy snippet over a small inline data set, report the number it prints.
+  The rung adds one demand over rung 4: the calculation is expressed as code, so
+  the model must know the library's defaults rather than the textbook formula.
+  Each item is built so that the value produced by the wrong default is far
+  outside the tolerance.
+
+  Provenance: every data set and every snippet is synthetic, authored for this
+  file. No real study data, no unpublished results, no code copied from any
+  project or textbook.
+kind: verifiable
+domain: research-methods
+system_prompt: >-
+  You are a research assistant reviewing a colleague's analysis script. Trace
+  the code exactly as written, using the real behaviour of the libraries it
+  imports rather than what the code appears to intend. Report the number the
+  program prints. Put that number alone on the last line, with no label and no
+  other text on that line.
+scorer:
+  kind: numeric_match
+  # Every snippet rounds its own output to four decimal places, so the answer
+  # format is fixed by the code rather than by a convention the model has to
+  # remember. 0.0001 admits that rounding (worst case 0.00005 of error); the
+  # nearest wrong-default value in this file is 0.2030 away, two thousand times
+  # the tolerance.
+  tolerance: 0.0001
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [research-analysis, ladder-l5, persona-researcher, use-mode-assist, coding-for-research]
+samples:
+  - id: pandas-std-default-ddof
+    input: |-
+      What does this script print?
+
+      import pandas as pd
+      df = pd.DataFrame({"x": [4, 8, 6, 5, 3]})
+      print(round(df["x"].std(), 4))
+    # pandas Series.std defaults to ddof=1 (the SAMPLE standard deviation).
+    # mean = 5.2; squared deviations 1.44 + 7.84 + 0.64 + 0.04 + 4.84 = 14.8;
+    # sample variance = 14.8 / 4 = 3.7; sd = sqrt(3.7) = 1.923538 -> 1.9235.
+    # The population divisor (numpy's default) gives sqrt(14.8/5) = 1.7205 --
+    # 0.2030 away, 2030x the tolerance. Paired deliberately with the next item.
+    target: "1.9235"
+    metadata: { skill: pandas-ddof-default, provenance: synthetic }
+
+  - id: numpy-std-default-ddof
+    input: |-
+      What does this script print?
+
+      import numpy as np
+      values = np.array([4, 8, 6, 5, 3])
+      print(round(float(np.std(values)), 4))
+    # numpy.std defaults to ddof=0 (the POPULATION standard deviation) over the
+    # same five numbers as the previous item: sqrt(14.8/5) = 1.720465 -> 1.7205.
+    # Same data, opposite default. The pair is the whole point: a model that has
+    # memorised "standard deviation" rather than the library defaults gets one
+    # of these two items right and the other wrong, and which one tells you
+    # which formula it reached for.
+    target: "1.7205"
+    metadata: { skill: numpy-ddof-default, provenance: synthetic }
+
+  - id: loc-slice-is-inclusive
+    input: |-
+      What does this script print?
+
+      import pandas as pd
+      df = pd.DataFrame({"y": [10, 20, 30, 40, 50, 60]})
+      print(df.loc[1:3, "y"].sum())
+    # .loc slices on LABELS and is closed at both ends, so rows 1, 2 and 3 are
+    # selected: 20 + 30 + 40 = 90.
+    # .iloc[1:3] would be half-open and give 20 + 30 = 50 -- 40 away. This is
+    # the single most consequential difference between the two accessors and it
+    # silently drops an observation from an analysis.
+    target: "90"
+    metadata: { skill: loc-versus-iloc, provenance: synthetic }
+
+  - id: mean-of-group-means
+    input: |-
+      What does this script print?
+
+      import pandas as pd
+      df = pd.DataFrame({
+          "group": ["a", "a", "a", "b"],
+          "v": [2, 4, 6, 20],
+      })
+      print(round(df.groupby("group")["v"].mean().mean(), 4))
+    # groupby(...).mean() gives one row per group: a -> (2+4+6)/3 = 4.0,
+    # b -> 20.0. The second .mean() averages those two group means, NOT the four
+    # observations: (4.0 + 20.0) / 2 = 12.0.
+    # The grand mean over the raw rows is 32/4 = 8.0 -- 4.0 away. The groups are
+    # deliberately unbalanced (3 rows against 1) because with equal group sizes
+    # the two answers coincide and the item would measure nothing.
+    target: "12"
+    metadata: { skill: unweighted-group-average, provenance: synthetic }
+
+  - id: nan-changes-the-denominator
+    input: |-
+      What does this script print?
+
+      import pandas as pd
+      df = pd.DataFrame({"v": [3, None, 7, 9]})
+      print(round(df["v"].mean(), 4))
+    # pandas coerces None to NaN and mean() skips NaN by default, so the
+    # denominator is 3, not 4: (3 + 7 + 9) / 3 = 6.333333 -> 6.3333.
+    # Treating the missing value as zero gives 19/4 = 4.75 -- 1.5833 away. The
+    # skipna default is the reason a missing value never announces itself in a
+    # results table: the mean is computed over a sample the analyst did not
+    # choose.
+    target: "6.3333"
+    metadata: { skill: skipna-default, provenance: synthetic }

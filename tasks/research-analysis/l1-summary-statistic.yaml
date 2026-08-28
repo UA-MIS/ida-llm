@@ -1,0 +1,109 @@
+# research-analysis, rung 1 of 6 -- the floor of the ladder.
+#
+# RESEARCHER TRACK. This family is the verifiable half of the researcher-facing
+# benchmark (see docs/researcher-track.md). Its framing is deliberately NOT the
+# teaching framing: the model is checking a number in a manuscript, not writing
+# an answer key for undergraduates. Same DNA, different audience.
+#
+# What this rung measures: can the model read one line out of a synthetic
+# results table and do the single arithmetic step that turns it into the
+# reported figure? Nothing here needs a method choice or a convention. If a
+# model fails this rung, no later rung tells you anything new -- a bad score at
+# l4 would be about the ladder, not about the model.
+#
+# Gold-answer derivations are in YAML COMMENTS beside each target, never in
+# `metadata`: GET /tasks/{id} publishes sample metadata unauthenticated while it
+# redacts targets, so a derivation in metadata would hand out the answer key.
+version: 1
+id: research-analysis/l1-summary-statistic
+title: Manuscript check -- one-step summary statistic
+description: >
+  Rung 1 of the research-analysis ladder. Given one row of a synthetic results
+  table, produce the summary figure the manuscript would report. One arithmetic
+  step, no estimator to choose, no convention to pin. This rung establishes that
+  a model can be trusted with the arithmetic of a results section before the
+  later rungs ask it to choose an estimator, apply a correction procedure, or
+  trace an analysis script.
+
+  Provenance: every table, count and data set is synthetic, authored for this
+  file. No real study data, no unpublished results, no textbook content.
+kind: verifiable
+domain: research-methods
+system_prompt: >-
+  You are a research assistant checking the arithmetic in a colleague's
+  manuscript. Work the figure out from the values given, then put the final
+  numeric answer alone on the last line, with no units, no percent sign, no
+  label and no other text on that line.
+scorer:
+  kind: numeric_match
+  # 0.01 admits an answer rounded to two decimal places (worst case 0.005 of
+  # error) and nothing else. Every item below is exact to at least one decimal
+  # place, so no item sits on a rounding boundary and no plausible wrong
+  # arithmetic lands within 0.01 of the key.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [research-analysis, ladder-l1, persona-researcher, use-mode-assist, descriptive-statistics]
+samples:
+  - id: mean-from-condition-total
+    input: >-
+      Table 2 of a manuscript reports per-condition totals for a reaction-time
+      study. The row for Condition A reads: n = 8 participants, summed reaction
+      time = 1240 ms. The manuscript needs to report the Condition A mean
+      reaction time in milliseconds. What is it?
+    # 1240 / 8 = 155. The last number in the prompt is 1240, not the key, so the
+    # item is not passable by echoing the final figure.
+    target: "155"
+    metadata: { skill: mean-from-total, provenance: synthetic }
+
+  - id: agree-percentage
+    input: >-
+      A synthetic faculty survey had 250 respondents, of whom 92 selected
+      "agree" on the item about assessment redesign. The manuscript reports this
+      as a percentage of all respondents, to two decimal places. What percentage
+      is it?
+    # 92 / 250 = 0.368 -> 36.8%. Reporting the raw count (92) or the complement
+    # (63.2) is far outside 0.01.
+    target: "36.8"
+    metadata: { skill: percentage-of-sample, provenance: synthetic }
+
+  - id: mean-difference-between-arms
+    input: >-
+      Table 3 of a synthetic two-arm study reports a control-group mean of 42.6
+      and a treatment-group mean of 47.1 on the same outcome scale. The
+      manuscript reports the raw mean difference as treatment minus control.
+      What is it?
+    # 47.1 - 42.6 = 4.5. Reversing the direction gives -4.5, which is 9.0 away.
+    target: "4.5"
+    metadata: { skill: raw-mean-difference, provenance: synthetic }
+
+  - id: replication-proportion
+    input: >-
+      A synthetic replication project attempted 40 studies and obtained a
+      successful replication in 18 of them. The manuscript reports the
+      replication rate as a proportion, to two decimal places. What is it?
+    # 18 / 40 = 0.45 exactly -- deliberately not a value like 17/40 = 0.425,
+    # which sits on a rounding boundary and would have two defensible keys.
+    target: "0.45"
+    metadata: { skill: proportion-from-counts, provenance: synthetic }
+
+  - id: usable-response-rate
+    input: >-
+      A synthetic survey instrument was sent to 480 faculty members and 132
+      usable responses were returned. The manuscript reports the usable response
+      rate as a percentage, to two decimal places. What is it?
+    # 132 / 480 = 0.275 -> 27.5%. The last number in the prompt is 132.
+    target: "27.5"
+    metadata: { skill: response-rate, provenance: synthetic }
+
+  - id: sd-from-reported-variance
+    input: >-
+      Table 1 of a synthetic manuscript reports the variance of the primary
+      outcome as 12.25 but omits the standard deviation, which a reviewer has
+      asked for. What is the standard deviation?
+    # sqrt(12.25) = 3.5 exactly. The variance itself (12.25) is the last number
+    # in the prompt and is 8.75 away from the key, so echoing it fails.
+    target: "3.5"
+    metadata: { skill: sd-from-variance, provenance: synthetic }

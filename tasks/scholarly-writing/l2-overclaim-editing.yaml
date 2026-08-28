@@ -1,0 +1,218 @@
+# scholarly-writing, rung 2 of 4.
+#
+# What this rung ADDS over rung 1: the model is editing someone else's prose
+# rather than producing its own, and restraint is now part of the task. Rung 1
+# rewards saying the right things; this rung rewards changing only what must
+# change.
+#
+# THE TENSION, and the reason this rung exists. Removing an overclaim is easy if
+# you are allowed to remove the claim -- hedge everything, and nothing is
+# overclaimed. That is not an edit, it is an evacuation, and it is what makes
+# AI-edited discussion sections unusable to their authors. `removes-the-
+# overclaim` and `keeps-the-substantive-claim` are weighted equally at 3.0 so
+# that neither can be bought with the other.
+#
+# The laziest response that scores 1.0 on both would be one that rewrites the
+# paragraph wholesale in its own voice. `minimal-and-in-the-authors-voice`
+# catches it. And a model that must always edit fails the already-calibrated
+# sample, which is why that sample is here.
+version: 1
+id: scholarly-writing/l2-overclaim-editing
+title: Academic editing -- bring a discussion paragraph back to its evidence
+description: >
+  Rung 2 of the scholarly-writing ladder. Given a fictional discussion paragraph
+  and the design it rests on, edit it so that it claims what the evidence
+  supports -- while keeping the claim it was making. The rung adds restraint to
+  the drafting demands of rung 1: an edit that removes the overclaim by removing
+  the argument has failed, and so has one that rewrites a paragraph the author
+  would no longer recognise. One sample is already appropriately hedged, so that
+  a model which edits reflexively is penalised somewhere in the file.
+
+  Provenance: every paragraph and every design description is SYNTHETIC, written
+  for this file and labelled as fictional in the prompt itself. No real
+  manuscript text is reproduced or paraphrased.
+kind: subjective
+domain: scholarly-communication
+system_prompt: >-
+  You are copy-editing a colleague's discussion section for accuracy of claim.
+  You will be given the study design and one paragraph. Return the edited
+  paragraph, then one or two sentences saying what you changed and why. Change
+  only what the evidence requires you to change: keep the author's argument,
+  keep their voice and sentence order where you can, and if the paragraph
+  already claims no more than the design supports, return it unchanged and say
+  so.
+scorer:
+  kind: llm_judge
+  rubric_id: scholarly-writing-overclaim-v1
+rubric:
+  id: scholarly-writing-overclaim-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: removes-the-overclaim
+      description: |-
+        Is the specific claim that outran the design brought back within it?
+
+        1.0 -- every statement the design cannot support is corrected, and the
+               corrected version is accurate about what the design shows.
+        0.5 -- the principal overclaim is softened but a second one is left
+               standing, or the softening is a general hedge ("may") attached to
+               a claim that is still stated too broadly.
+        0.0 -- the overclaim survives, or is restated in different words with
+               the same force.
+      weight: 3.0
+    - name: keeps-the-substantive-claim
+      description: |-
+        Does the paragraph still make an argument after the edit? Weighted
+        equally with removes-the-overclaim on purpose: hedging everything
+        removes every overclaim and ruins the paragraph.
+
+        1.0 -- the author's point is still asserted, at the strength the
+               evidence supports, and a reader can still tell what the authors
+               think their result means.
+        0.5 -- the point survives but is so qualified that its force is hard to
+               locate.
+        0.0 -- the claim is deleted, or reduced to a statement that the finding
+               exists and requires further research.
+      weight: 3.0
+    - name: minimal-and-in-the-authors-voice
+      description: |-
+        Is this an edit of the author's paragraph rather than a replacement for
+        it?
+
+        1.0 -- sentence order and phrasing are largely preserved; the changes
+               are localised to the claims that needed them.
+        0.5 -- the paragraph is substantially reorganised or restated, though
+               the content is equivalent.
+        0.0 -- returns a new paragraph in a different voice, or changes the
+               paragraph's topic or emphasis.
+      weight: 2.0
+    - name: introduces-no-new-claims
+      description: |-
+        Does the edit avoid adding content the study does not contain?
+
+        1.0 -- no finding, number, mechanism, citation or limitation is added
+               that the supplied design and paragraph do not contain.
+        0.5 -- adds one general methodological caution that is true of the
+               design but was not stated in the supplied material.
+        0.0 -- adds a figure, a mechanism, a comparison to other work, or a
+               limitation the design does not have.
+      weight: 2.0
+    - name: says-what-changed
+      description: |-
+        Does the accompanying note identify the change and the reason for it, so
+        the author can accept or reject it?
+
+        1.0 -- names the specific claim that was changed and the feature of the
+               design that required the change.
+        0.5 -- describes the change in general terms ("softened the causal
+               language") without tying it to the design.
+        0.0 -- no note, a note that misdescribes what was changed, or a note
+               that claims a change that was not made.
+      weight: 2.0
+tags: [scholarly-writing, ladder-l2, persona-researcher, use-mode-assist, academic-editing, subjective, not-yet-scorable]
+samples:
+  - id: causal-language-from-cross-section
+    input: >-
+      The following study and paragraph are FICTIONAL and were written for this
+      benchmark. Edit the paragraph.
+
+      Design: cross-sectional survey of 1,842 households in four municipalities.
+      Households within 200 m of a composting collection point participated at
+      58%; households beyond 1 km at 22%.
+
+      Paragraph: "These results demonstrate that proximity to a collection point
+      drives household participation in composting. Because siting is under
+      municipal control, this is an unusually actionable lever: municipalities
+      that increase collection-point density will raise participation, and the
+      36-point gap we observe indicates how much is available to be captured.
+      We therefore recommend that municipalities adopt a maximum-distance
+      standard for new schemes."
+    # CLEAN case. Three claims outrun a cross-sectional design: "drives", "will
+    # raise", and the policy recommendation. The paragraph's substantive point
+    # -- that the association is large, that siting is under municipal control,
+    # and that this makes proximity worth acting on or testing -- survives an
+    # honest edit intact. An edit that reduces the paragraph to "proximity was
+    # associated with participation; further research is needed" has removed
+    # every overclaim and also the argument, and should lose
+    # keeps-the-substantive-claim while scoring well on removes-the-overclaim.
+    metadata: { probe: causal-verbs-and-policy-claim, provenance: synthetic }
+
+  - id: generalisation-beyond-the-sample
+    input: >-
+      The following study and paragraph are FICTIONAL and were written for this
+      benchmark. Edit the paragraph.
+
+      Design: household-randomised trial of monthly written reminders in ONE
+      municipality (n = 900), 12 months. Participation 46% with reminders
+      against 38% without (95% CI of the difference 3 to 13 points). Allocation
+      concealed; outcomes from municipal collection records; attrition 1.8%.
+
+      Paragraph: "Written reminders raise composting participation by roughly
+      eight percentage points. Given the trial's concealed allocation and
+      administrative outcome data, we regard this as a robust causal estimate,
+      and it should generalise readily to household recycling and to other
+      kerbside services. Municipalities everywhere should adopt monthly
+      reminders as standard practice."
+    # The mirror of the previous sample, and the harder one. Here the CAUSAL
+    # claim is well founded -- randomised, concealed, administrative outcomes,
+    # negligible attrition -- so an edit that softens "causal estimate" has
+    # misdiagnosed the problem and should lose removes-the-overclaim as well as
+    # keeps-the-substantive-claim. What outruns the design is external: one
+    # municipality, one reminder format, and an unevidenced leap to recycling
+    # and other services. The good edit keeps the causal claim and its stated
+    # magnitude and cuts the transfer and the universal recommendation.
+    metadata: { probe: causal-claim-is-fine-scope-is-not, provenance: synthetic }
+
+  - id: practical-significance-overclaim
+    input: >-
+      The following study and paragraph are FICTIONAL and were written for this
+      benchmark. Edit the paragraph.
+
+      Design: pre-registered stepped-wedge trial, six wards, 11 months. Primary
+      outcome, handover errors per 100 handovers: difference -0.4 (95% CI -1.6
+      to 0.8). Registered target was a 3-error reduction. Protocol adherence
+      71%.
+
+      Paragraph: "The briefing reduced handover errors by 0.4 per 100 handovers.
+      Although the confidence interval includes zero, the direction of effect is
+      encouraging and, extrapolated across a large hospital system, would
+      prevent a substantial number of errors annually. We conclude that
+      structured briefings are a promising safety intervention and recommend
+      wider implementation while further evidence accumulates."
+    # TRAP. Every individual sentence is nearly defensible and the paragraph as
+    # a whole converts a null into a recommendation -- the most common way a
+    # discussion section misleads. "Reduced" states an effect the interval does
+    # not support; extrapolating a point estimate whose interval spans zero
+    # multiplies noise; "promising" and "recommend wider implementation" then
+    # rest on that extrapolation. The honest edit reports the null against the
+    # registered target and may note the 71% adherence as a scope condition --
+    # a real feature of the design, not an added limitation. An edit that keeps
+    # the recommendation and merely adds "however, the result was not
+    # statistically significant" has left the overclaim standing.
+    metadata: { probe: null-dressed-as-promising, provenance: synthetic }
+
+  - id: already-appropriately-hedged
+    input: >-
+      The following study and paragraph are FICTIONAL and were written for this
+      benchmark. Edit the paragraph.
+
+      Design: paired-site measurement study, 32 paired sites in one city, hourly
+      logging June to September. Mean daytime air temperature 2.3 C lower
+      beneath canopy (95% CI 2.0 to 2.6); no detectable difference at night.
+      Health outcomes not measured.
+
+      Paragraph: "Across 32 paired sites we measured a mean daytime cooling of
+      2.3 C beneath the canopy (95% CI 2.0 to 2.6), concentrated in the early
+      afternoon and absent overnight. These are measurements at one city over a
+      single summer, and we did not measure exposure or health outcomes, so we
+      make no claim about heat-related illness. What the paired design supports
+      is an estimate of the temperature difference itself at these sites."
+    # NOTHING-IS-WRONG case, and the one that makes the file honest. The
+    # paragraph already states the scope, the interval and what it does not
+    # claim. The instruction says to return it unchanged and say so. A model
+    # that produces an edit anyway -- adding a caution, tightening prose,
+    # inserting "further research is needed" -- fails
+    # minimal-and-in-the-authors-voice and probably introduces-no-new-claims,
+    # and it is the only place in this file where that reflex is caught.
+    metadata: { probe: no-edit-required, provenance: synthetic }
