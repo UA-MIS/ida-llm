@@ -13,8 +13,9 @@ from dataclasses import dataclass
 from fastapi import Request
 from sqlalchemy.orm import Session, sessionmaker
 
+from ida_api.slo import CurriculumView, load_curriculum_view
 from ida_core.artifacts import ArtifactStore, LocalArtifactStore, S3ArtifactStore
-from ida_core.config import Settings, get_settings
+from ida_core.config import Settings, get_settings, repo_root
 from ida_core.contracts import ModelRegistry
 from ida_core.db import make_engine, make_session_factory
 from ida_core.gitmeta import current_git_sha
@@ -35,6 +36,17 @@ class AppContext:
     catalog: TaskCatalog
     git_sha: str | None
     """D-1: recorded on every run this process enqueues."""
+
+    curriculum: CurriculumView
+    """``curriculum/slo.yaml``, read ONCE at startup.
+
+    Per request would re-read and re-validate a file that cannot change while
+    the process lives, on the path that serves the front page. Unlike the task
+    catalog a missing or malformed map is NOT a boot failure -- the results view
+    works without outcome statements, and `make lint-tasks` is the gate that
+    fails a pull request over a bad map. Taking the site down over it would
+    replace a visible data error with an invisible outage.
+    """
 
 
 def build_artifact_store(settings: Settings) -> ArtifactStore:
@@ -69,6 +81,7 @@ def build_context(settings: Settings | None = None) -> AppContext:
         registry=load_registry(settings.resolved_models_file()),
         catalog=TaskCatalog.from_directory(settings.resolved_tasks_dir()),
         git_sha=current_git_sha(settings.resolved_tasks_dir()),
+        curriculum=load_curriculum_view(repo_root()),
     )
 
 

@@ -627,3 +627,78 @@ def count_results_for_run(session: Session, run_id: str) -> int:
     """
     stmt = select(func.count()).select_from(ResultRow).where(ResultRow.run_id == run_id)
     return int(session.scalar(stmt) or 0)
+
+
+TERMINAL_RUN_STATUSES: tuple[RunStatus, ...] = (
+    RunStatus.SUCCEEDED,
+    RunStatus.PARTIAL,
+    RunStatus.FAILED,
+)
+"""Statuses a run can never leave.  What the leaderboard is allowed to read.
+
+``queued`` and ``running`` are excluded on purpose: a run that has not finished
+has no ``mean_score``, and showing it beside finished ones would put a blank
+next to a real number for a reason ("still going") that the reader would
+naturally misread as the reason the platform uses blanks everywhere else
+("nothing was measured").
+"""
+
+
+def latest_terminal_run_per_pair(
+    session: Session,
+    *,
+    task_ids: Sequence[str] | None = None,
+    statuses: Sequence[RunStatus] = TERMINAL_RUN_STATUSES,
+) -> list[RunRow]:
+    """The newest finished run for each ``(task_id, model_key)`` pair.
+
+    **Why the newest rather than an average over all runs.** Runs of the same
+    pair are not interchangeable samples of one quantity: the task text changes
+    (``task_content_sha``), the serving config changes, a re-run happens
+    *because* something was fixed.  Averaging across those mixes measurements of
+    different things into one number that describes none of them.  The newest
+    finished run is a claim we can actually defend -- "this is what we measured
+    most recently, here is the exact run" -- and it keeps every score on the
+    leaderboard one click from a single, citable run id (D-3).
+
+    A caller that wants across-run aggregation should ask for it explicitly, on
+    a fixed ``task_content_sha``; that is a different (and later) feature.
+
+    ``FAILED`` runs are included so that "this pair was tried and every call
+    failed" is visible as a distinct state from "this pair was never tried".
+    Collapsing the two would let a broken endpoint read as an untested model.
+
+    One statement, one window function -- portable to both SQLite (3.25+) and
+    Postgres.  Fetching every terminal run and reducing in Python would work
+    today and stop working at the first sweep with real volume.
+    """
+    if not statuses:
+        return []
+    if task_ids is not None and not task_ids:
+        # An explicit empty filter means "none of them", not "all of them".
+        return []
+    ranked = (
+        select(
+            RunRow.id.label("id"),
+            func.row_number()
+            .over(
+                partition_by=(RunRow.task_id, RunRow.model_key),
+                # `id` breaks the tie: run ids are minted in creation order, so
+                # two runs enqueued inside the same clock tick still order
+                # deterministically instead of flipping between requests.
+                order_by=(RunRow.created_at.desc(), RunRow.id.desc()),
+            )
+            .label("rank"),
+        )
+        .where(RunRow.status.in_([s.value for s in statuses]))
+        .subquery()
+    )
+    stmt = (
+        select(RunRow)
+        .join(ranked, RunRow.id == ranked.c.id)
+        .where(ranked.c.rank == 1)
+        .order_by(RunRow.task_id, RunRow.model_key)
+    )
+    if task_ids is not None:
+        stmt = stmt.where(RunRow.task_id.in_(list(task_ids)))
+    return list(session.scalars(stmt))

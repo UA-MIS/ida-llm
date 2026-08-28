@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient
 
 from ida_api.app import create_app
 from ida_api.deps import AppContext
+from ida_api.slo import load_curriculum_view
 from ida_core.artifacts import LocalArtifactStore
 from ida_core.config import Settings, repo_root
 from ida_core.db import create_all, make_engine, make_session_factory
@@ -55,6 +56,12 @@ def context(settings: Settings, tmp_path) -> AppContext:
         registry=load_registry(repo_root() / "models.yaml"),
         catalog=TaskCatalog.from_directory(repo_root() / "tasks"),
         git_sha="d" * 40,
+        # The REAL loader against the REAL repo. When curriculum/slo.yaml is
+        # absent (or ida_core.curriculum is not yet installed) this returns an
+        # honest `available: false`, which is a state the API must serve --
+        # so the tests exercise whichever of the two is true of this checkout,
+        # rather than a fixture that is true of neither.
+        curriculum=load_curriculum_view(repo_root()),
     )
 
 

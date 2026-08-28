@@ -39,6 +39,12 @@ Then open <http://localhost:3000> and fire a run:
 make tracer-manual
 ```
 
+The dashboard has three pages: **`/`** is the results view (pick a task, see
+which model does it best, and open the evidence behind any number),
+**`/recommend`** is the intake that asks about your situation before it will
+recommend anything, and **`/runs`** is the raw run log. Before any run has
+finished, `/` says so in words rather than showing a placeholder number.
+
 `make test` needs **Python 3.12 and Node 22+**. `make dev` and `make tracer`
 additionally need **Docker**. No API key is required, ever — local dev runs
 against a deterministic mock model.
@@ -198,7 +204,10 @@ flowchart TB
 
 ```
 frontend/            Next.js 15 (standalone)         -> image: ida-llm-frontend
-  src/app/             the UI (run list → detail → transcript)
+  src/app/page.tsx     THE FRONT DOOR: task-first results, with the trust tell
+  src/app/recommend/   the intake that refuses to hand-wave, and its output
+  src/app/runs/        the raw run log → detail → transcript (the drill-down)
+  src/components/      the trust badges and the result card
   src/lib/             the single place the frontend talks to the API
 services/api/        FastAPI                          \
 services/runner/     queue worker + the three sweeps   >- image: ida-llm-python-app
@@ -599,15 +608,34 @@ it matters.
    `judge_serving_config` and `Score.criteria` exist with `None`/`[]` defaults
    so the judge story is additive; nothing writes them yet.
 
-8. **No browser tests.** Frontend coverage is typecheck + lint + build. The
-    classification logic the UI depends on is asserted through its *inputs* in
-    the tracer bullet. A headless browser in CI is a maintenance cost this
-    project has not earned.
+8. **No browser tests.** Frontend coverage is typecheck + lint + build, plus
+    `vitest` over the pure modules (`src/lib/intake.ts`, `src/lib/trust.ts`) —
+    the branch logic and the display rules are deliberately kept *out* of the
+    components so they can be tested without a DOM. The classification logic
+    the UI depends on is asserted through its *inputs* in the tracer bullet. A
+    headless browser in CI is a maintenance cost this project has not earned.
+
+9. **The recommendation engine is rule-based, and says so.** `POST /recommend`
+    reasons over the benchmark data with readable rules; no model is called to
+    produce a recommendation. That is not a placeholder for an LLM version — an
+    engine that asks an LLM which LLM to use has the exact credibility problem
+    this project exists to fix, and a professor cannot audit it. →
+    `services/api/ida_api/recommend.py`
+
+10. **The dashboard reads the curriculum; it never holds a copy.** Results
+    group by a task's `tags` (`slo:<ID>`, `use-mode:<id>`, `slo-benchmark`),
+    parsed by `ida_core.curriculum`; outcome ids, titles and statements come
+    from `curriculum/slo.yaml`; per-sample drill-down reads each sample's
+    un-prefixed `metadata`. There is no list of outcomes in any component, and
+    no use-mode caption written from memory. When the curriculum map is absent
+    the API answers `available: false` and the UI groups by outcome id rather
+    than inventing statements. → `services/api/ida_api/slo.py`
 
 ---
 
 ## Where to start reading
 
+0. `frontend/src/app/page.tsx` — the product, as a professor sees it
 1. `packages/core/ida_core/contracts.py` — the contracts, written to be read
 2. `tasks/SCHEMA.md` — how to author a task, end to end
 3. `e2e/test_tracer_inprocess.py` — the whole system in one file

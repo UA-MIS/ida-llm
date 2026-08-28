@@ -19,7 +19,15 @@
  * `API_BASE_URL` is accepted as a fallback for older local .env files.
  */
 
-import type { RunDetail, RunListResponse, SampleTranscript } from "./types";
+import type {
+  IntakeQuestion,
+  LeaderboardResponse,
+  RecommendationResponse,
+  RunDetail,
+  RunListResponse,
+  SampleTranscript,
+  TaskDetail,
+} from "./types";
 
 const SERVER_BASE =
   process.env.API_URL ?? process.env.API_BASE_URL ?? "http://localhost:8000";
@@ -81,4 +89,85 @@ export function getTranscript(
   return getJson<SampleTranscript>(
     `/runs/${encodeURIComponent(runId)}/results/${encodeURIComponent(sampleId)}/transcript`,
   );
+}
+
+/**
+ * The results front door.
+ *
+ * `taskId` narrows to one task; without it every task in the catalog comes
+ * back, measured or not. An unbenchmarked task deliberately still appears --
+ * dropping it would make "we have not measured this yet" indistinguishable
+ * from "this does not exist", and saying the former is half the product.
+ */
+export function getLeaderboard(params?: {
+  taskId?: string;
+  family?: string;
+  domain?: string;
+  /** A Student Learning Outcome id, e.g. `SLO2`. */
+  slo?: string;
+  /** `capability` today; `assistive`/`instructional` are declared, not in use. */
+  useMode?: string;
+  /** Only tasks carrying `slo-benchmark` — one filter, the whole benchmark. */
+  benchmark?: boolean;
+}): Promise<LeaderboardResponse> {
+  const query = new URLSearchParams();
+  if (params?.taskId) query.set("task_id", params.taskId);
+  if (params?.family) query.set("family", params.family);
+  if (params?.domain) query.set("domain", params.domain);
+  if (params?.slo) query.set("slo", params.slo);
+  if (params?.useMode) query.set("use_mode", params.useMode);
+  if (params?.benchmark) query.set("benchmark", "true");
+  const suffix = query.toString() ? `?${query}` : "";
+  return getJson<LeaderboardResponse>(`/leaderboard${suffix}`);
+}
+
+/** One full task spec, including each sample's authored `metadata`. */
+export function getTask(taskId: string): Promise<TaskDetail> {
+  return getJson<TaskDetail>(`/tasks/${taskId}`, 60);
+}
+
+/**
+ * The intake question tree.
+ *
+ * Fetched rather than hardcoded here so the questions the form asks and the
+ * questions the engine gates on cannot drift apart. Cached briefly: the tree is
+ * code-shaped data that changes on deploy, not per request.
+ */
+export function getIntakeQuestions(): Promise<IntakeQuestion[]> {
+  return getJson<IntakeQuestion[]>("/recommend/questions", 60);
+}
+
+/**
+ * Ask for a recommendation.
+ *
+ * A refusal ("I still need three things", "no model meets your constraint") is
+ * a 200 with a status, not an error -- so this only throws when the API itself
+ * failed. Server-side only; the browser reaches it through the same-origin
+ * proxy at /api/recommend, for the reasons in this file's header.
+ */
+export async function postRecommendation(
+  answers: Record<string, string>,
+): Promise<RecommendationResponse> {
+  const url = `${apiBase()}/recommend`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ answers }),
+      cache: "no-store",
+    });
+  } catch (cause) {
+    throw new ApiError(
+      `Could not reach the API at ${url}: ${cause instanceof Error ? cause.message : String(cause)}`,
+      0,
+    );
+  }
+  if (!response.ok) {
+    throw new ApiError(
+      `POST /recommend failed: ${response.status} ${response.statusText}`,
+      response.status,
+    );
+  }
+  return (await response.json()) as RecommendationResponse;
 }

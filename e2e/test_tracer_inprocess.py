@@ -28,6 +28,7 @@ from fastapi.testclient import TestClient
 
 from ida_api.app import create_app
 from ida_api.deps import AppContext
+from ida_api.slo import load_curriculum_view
 from ida_core.artifacts import LocalArtifactStore, eval_log_key, parse_uri
 from ida_core.config import Settings, repo_root
 from ida_core.db import create_all, make_engine, make_session_factory
@@ -67,6 +68,9 @@ def stack(tmp_path):
         registry=registry,
         catalog=catalog,
         git_sha="f" * 40,
+        # The real loader against the real repo: `available: false` when this
+        # checkout has no curriculum/slo.yaml, which is a state the API serves.
+        curriculum=load_curriculum_view(repo_root()),
     )
 
     transport = make_transport()
@@ -238,6 +242,9 @@ def broken_stack(tmp_path):
         registry=registry,
         catalog=catalog,
         git_sha="f" * 40,
+        # The real loader against the real repo: `available: false` when this
+        # checkout has no curriculum/slo.yaml, which is a state the API serves.
+        curriculum=load_curriculum_view(repo_root()),
     )
 
     def dead_client_factory() -> OpenAICompatibleClient:
@@ -373,6 +380,9 @@ def flaky_stack(tmp_path):
         registry=registry,
         catalog=catalog,
         git_sha="f" * 40,
+        # The real loader against the real repo: `available: false` when this
+        # checkout has no curriculum/slo.yaml, which is a state the API serves.
+        curriculum=load_curriculum_view(repo_root()),
     )
 
     # The mock model's OWN answering logic, called directly rather than over
