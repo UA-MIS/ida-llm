@@ -1,0 +1,198 @@
+# slo-6-ethical-reasoning, rung 1 of 5 -- the floor of the ladder.
+#
+# SLO 6 (BScBA core): "students demonstrate knowledge of ethical principles and
+# concepts and their implications for business decisions." The ladder splits
+# that outcome in half: rungs 1-3 build the KNOWLEDGE half (name the principle,
+# weigh the stakes, apply a framework) and rungs 4-5 build the IMPLICATIONS FOR
+# BUSINESS DECISIONS half (commit to a recommendation, and hold the line
+# between what is legal and what is right).
+#
+# WHAT THIS RUNG ADDS: nothing -- it is the floor. Its job is to tell you that a
+# low score higher up is about difficulty and not about the model being broken
+# or the prompt format being unreadable. Identification only: no stakeholder
+# map, no framework, no recommendation.
+#
+# THE LAZIEST 1.0. A model can look knowledgeable by reciting every principle it
+# knows and letting one of them be right. `does-not-shotgun-extra-principles`
+# exists to catch exactly that, and it is weighted equally with naming the
+# principle so the two cannot be traded off.
+#
+# THE FOURTH SAMPLE HAS NO ETHICAL ISSUE IN IT, on purpose. A family whose
+# scenarios all contain a violation teaches a model to always find one, and a
+# model that always finds one is useless to an instructor. The system prompt
+# licenses "no issue here" as an answer and the rubric anchors accept it.
+version: 1
+id: slo-6-ethical-reasoning/l1-principle-identification
+title: Ethical reasoning -- which ethical principle is at stake in this business scenario?
+description: >
+  Rung 1 of the SLO 6 ladder. The model is given a short business scenario and
+  must name the ethical principle or concept the facts actually raise, and point
+  to the facts that raise it. It does not map stakeholders (rung 2), apply a
+  normative framework (rung 3) or recommend anything (rung 4). This rung
+  isolates the single judgement the rest of the ladder is built on: can the
+  model tell what kind of problem it is looking at -- including when the answer
+  is that there is no ethical problem here at all?
+
+  Provenance: every scenario in this file is SYNTHETIC, invented for this file
+  to imitate the shape of an undergraduate business-ethics case. No real
+  company, person, incident or student work is described, and no textbook or
+  question-bank content is reproduced. Any resemblance to a real organisation is
+  unintended.
+kind: subjective
+domain: business-ethics
+system_prompt: >-
+  You are analysing short business scenarios for an undergraduate business-ethics
+  course. For each scenario, name the ethical principle or concept that is at
+  stake and explain in two or three sentences what in the scenario puts it at
+  stake, referring to specific facts you were given. Name only the principles
+  the scenario actually raises. If a scenario raises no ethical issue, say so
+  plainly and say why -- that is a legitimate answer. Do not map out the
+  stakeholders, do not apply a named ethical framework, and do not recommend a
+  course of action; none of that is being asked for here.
+scorer:
+  kind: llm_judge
+  rubric_id: slo6-principle-identification-v1
+rubric:
+  id: slo6-principle-identification-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: names-the-principle-the-facts-raise
+      description: |-
+        Does the response name an ethical principle or concept that the facts of
+        this scenario actually raise -- or, where the scenario raises none,
+        correctly report that?
+
+        1.0 -- names a recognised ethical principle or concept that the facts
+               genuinely raise (for example conflict of interest, confidentiality,
+               procedural fairness, honesty in disclosure); or, for a scenario
+               with no ethical issue, states that none is at stake.
+        0.5 -- names a principle that is adjacent to the one the facts raise but
+               not the one at the centre of them; or hedges between two without
+               settling on either.
+        0.0 -- names no principle at all, names one the facts do not raise, or
+               reports an ethical issue in a scenario that contains none.
+      weight: 3.0
+    # Carries the SAME weight as naming the principle, so a shotgun list cannot
+    # buy coverage. That rationale is a COMMENT and not part of the description:
+    # each criterion is graded in its own call, and a judge told what a
+    # criterion is worth grades it more harshly (tasks/SCHEMA.md, "Weights").
+    - name: does-not-shotgun-extra-principles
+      description: |-
+        Does the response name only what the facts raise, rather than listing
+        principles so that one of them is bound to be right? A list that
+        happens to contain the right answer does not show which principle
+        applies.
+
+        1.0 -- names one central principle, and at most one further principle
+               with a stated reason why the facts also raise it.
+        0.5 -- names two further principles beyond the central one without
+               saying what in the scenario raises them.
+        0.0 -- names three or more further principles, or presents a survey or
+               list of principles instead of a judgement about this scenario.
+      weight: 3.0
+    - name: quotes-or-cites-a-specific-fact
+      description: |-
+        Is the identification anchored to something specific in the scenario,
+        rather than being a definition that would fit any scenario?
+
+        1.0 -- refers to at least one concrete detail from the scenario (a role,
+               an amount, a sequence of events, a stated relationship) and shows
+               how that detail is what puts the principle at stake.
+        0.5 -- refers to the scenario in general terms only ("the manager's
+               situation", "this decision") without identifying which fact does
+               the work.
+        0.0 -- gives a textbook definition of the principle with no reference to
+               the scenario, such that the same paragraph would serve unchanged
+               for a different scenario.
+      weight: 2.0
+    - name: withholds-the-recommendation-it-was-not-asked-for
+      description: |-
+        Does the response do only the job this rung asks for? Identification is
+        the whole task here; recommending, mapping stakeholders and applying
+        frameworks are later rungs.
+
+        1.0 -- identifies the principle and stops.
+        0.5 -- identifies the principle correctly but adds an unrequested
+               recommendation, stakeholder list or framework analysis.
+        0.0 -- recommends a course of action instead of identifying a principle,
+               so that the identification must be inferred by the reader.
+      weight: 1.0
+tags: ["slo:SLO6", "use_mode:capability", slo-6-ethical-reasoning, ladder-l1, subjective, not-yet-scorable]
+samples:
+  # CLEAN -- the principle is unambiguous. Rung 1's floor should be nearly free.
+  - id: supplier-gift-during-open-tender
+    input: >-
+      Scenario: Dalia manages purchasing for a mid-sized packaging company. The
+      company has an open tender out for a three-year logistics contract, and
+      four vendors have submitted bids that Dalia will score next month. One of
+      the bidding vendors sends Dalia two tickets to a sold-out concert, with a
+      note saying they were "extras" and that the vendor hopes she enjoys them.
+      The company's gift policy is silent on entertainment under $500; the
+      tickets resell for about $400.
+    # Author's note (a COMMENT, not metadata -- metadata is published): conflict
+    # of interest is the centre. The facts that do the work are the OPEN tender
+    # and Dalia's role as scorer; the policy gap and the $500 threshold are
+    # there to tempt a response into answering "it is within policy, so it is
+    # fine", which is a rung-5 move and is not what was asked. Independence of
+    # judgement is an acceptable near-synonym for the central principle.
+    metadata: { probe: clean-single-principle, provenance: synthetic }
+
+  # BORDERLINE -- two principles are genuinely defensible. Grade the reasoning,
+  # not which of the two the response picks.
+  - id: confidential-layoffs-and-a-direct-question
+    input: >-
+      Scenario: Marcus is a finance director. He has been told in confidence
+      that a restructuring will eliminate about forty roles in his division, with
+      the announcement six weeks away, and he has been instructed not to discuss
+      it. Over lunch, an analyst on his team mentions she is about to sign a
+      mortgage on a house and asks Marcus, directly, whether he thinks her job is
+      secure. Her role is one of the forty.
+    # Author's note: duty of confidentiality and duty of candour genuinely
+    # collide here, and either can be argued as the centre. What separates a
+    # good response from a bad one is whether it identifies the COLLISION and
+    # points at the direct question as the fact that creates it -- not which
+    # side it names first. A response naming only one and not noticing the other
+    # is the 0.5 case for `names-the-principle-the-facts-raise`.
+    metadata: { probe: borderline-two-defensible-principles, provenance: synthetic }
+
+  # TRAP -- looks like ordinary networking, is not.
+  - id: referred-candidate-fast-tracked
+    input: >-
+      Scenario: A regional insurer posts an analyst opening and receives
+      sixty-one applications, which HR screens against a published rubric. The
+      hiring manager, Priya, receives a note from a former colleague recommending
+      his neighbour's daughter, who has applied. Priya pulls that application out
+      of the queue, skips the screening call the other candidates receive, and
+      books the candidate straight into a final-round interview. Priya describes
+      this to HR as "just being efficient with a known quantity". The candidate
+      is, on paper, well qualified.
+    # Author's note: the surface reads as benign networking, and the candidate
+    # being genuinely qualified is there to make it read more benign still. The
+    # principle at stake is procedural fairness to the other sixty applicants --
+    # the published rubric and the skipped screening call are the facts that do
+    # the work. A response that says "no issue, the candidate is qualified" has
+    # confused the outcome with the process and scores 0.0 on the first
+    # criterion. Conflict of interest is an acceptable second principle IF the
+    # response says what raises it.
+    metadata: { probe: trap-looks-benign, provenance: synthetic }
+
+  # NOTHING IS WRONG -- the honest answer is that no ethical principle is at
+  # stake. Without this sample the family teaches a model to always find a
+  # violation.
+  - id: uniform-price-increase-after-input-costs
+    input: >-
+      Scenario: A commercial bakery's flour and packaging costs rose 11% over a
+      year. It raises wholesale prices 4% across its entire customer list, gives
+      every customer the 60 days' written notice its standard contract requires,
+      publishes the same explanation to all of them, and applies the increase on
+      the same date for everyone regardless of account size. No customer is
+      singled out and no contract term is varied.
+    # Author's note: there is no ethical issue here. It is a lawful, uniform,
+    # contractually notified commercial decision, and the correct response says
+    # so. A model that manufactures an issue -- "the burden falls hardest on
+    # small customers", "they could have absorbed the cost" -- is exhibiting the
+    # failure this sample exists to detect: an ethics detector with no off
+    # switch. Note the increase is BELOW the cost rise, which forecloses the
+    # price-gouging reading a response might reach for.
+    metadata: { probe: no-issue-present, provenance: synthetic }

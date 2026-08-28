@@ -1,0 +1,221 @@
+# slo-7-written-communication, rung 3 of 5.
+#
+# WHAT THIS RUNG ADDS over rung 2: BAD NEWS. Rungs 1 and 2 moved information to
+# a reader who wanted it. Here the reader does not want it, the sender needs the
+# relationship afterwards, and the rhetorical structure changes -- reasons
+# before the refusal rather than the point first, which directly inverts rung
+# 1's directness demand. That inversion is the point: knowing WHICH structure a
+# context calls for is the strategic half of SLO 7.
+#
+# A THREE-WAY PULL, and the reason this rung is where scores start to separate.
+# The bad news must be unmistakable; the relationship must survive; and neither
+# may be bought with a promise the sender cannot keep. Those three are weighted
+# 3.0 / 3.0 / 3.0 precisely because the cheap route satisfies any two by
+# sacrificing the third: a warm, generous "we'll definitely revisit this next
+# quarter" preserves the relationship and lands softly, and is a lie. A blunt
+# two-line refusal is unmistakable and honest, and burns the relationship.
+#
+# THE LAZIEST 1.0 is the thick buffer -- so much appreciation and context that
+# the reader finishes the message unsure whether they were turned down.
+# `the-refusal-cannot-be-misread` is written to be checkable by a single
+# question: after one read, does the reader know the answer is no?
+version: 1
+id: slo-7-written-communication/l3-negative-message
+title: Written communication -- deliver bad news without losing the reader
+description: >
+  Rung 3 of the SLO 7 ladder. The model writes a message whose content the
+  reader does not want: a refusal, a withdrawal, a reduction. The demand this
+  rung adds is that two things must be true at once which the easy drafts trade
+  against each other -- the reader must finish the message in no doubt about the
+  answer, and must still be willing to work with the sender afterwards. A third
+  criterion closes the escape route, since the cheapest way to be both clear and
+  kind is to attach a commitment the sender is in no position to make. The
+  rubric weights all three equally and the samples are chosen so that no single
+  reflex succeeds across them.
+
+  Provenance: every scenario, company, person and business detail in this file
+  is SYNTHETIC, invented for this file. No real correspondence is reproduced or
+  paraphrased, no real personnel or customer matter is described, and no
+  textbook or question-bank content is reproduced.
+kind: subjective
+domain: business-communication
+system_prompt: >-
+  You are drafting workplace correspondence on behalf of a colleague at a
+  mid-sized company. Each scenario asks you to deliver news the recipient does
+  not want. Write that message: a subject line where the channel has one, then
+  the body. The recipient must finish the message in no doubt about the outcome.
+  Give the reasons that led to it before you state it, so the outcome arrives as
+  a conclusion rather than a verdict. Say only what is true and only what the
+  sender is in a position to commit to -- do not offer a future reconsideration,
+  a next opportunity or an exception unless the scenario tells you one is
+  actually available. Write only the message.
+scorer:
+  kind: llm_judge
+  rubric_id: slo7-negative-message-v1
+rubric:
+  id: slo7-negative-message-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: the-refusal-cannot-be-misread
+      description: |-
+        After one read, does the recipient know what the answer is?
+
+        1.0 -- the outcome is stated in plain terms in a sentence of its own, and
+               a reader skimming the message could not come away with the
+               opposite impression.
+        0.5 -- the outcome is present but must be inferred, or is buried inside a
+               sentence about something else, so a second read is needed.
+        0.0 -- the outcome is never stated plainly, or the buffer and the
+               softening leave it genuinely ambiguous whether the answer is no.
+      weight: 3.0
+    # Carries the SAME weight as the refusal being unmistakable, so neither
+    # bluntness nor warmth can be traded for the other. Rationale kept in a
+    # comment: the judge is never told a criterion's weight.
+    - name: leaves-the-working-relationship-intact
+      description: |-
+        Would the recipient still want to deal with this sender afterwards?
+        Bluntness is the cheapest route to an unmistakable message.
+
+        1.0 -- the reasoning is shared rather than merely asserted, the
+               recipient's position or effort is acknowledged in terms specific
+               to this case, and the tone is one colleague to another.
+        0.5 -- correct and neutral but impersonal, reading as a form letter that
+               could have been sent to anyone.
+        0.0 -- blames the recipient, is curt to the point of dismissiveness, uses
+               sarcasm or false cheer, or hides behind the passive voice so that
+               no one appears to have decided anything.
+      weight: 3.0
+    # Carries the SAME weight as the other two, closing the escape route
+    # between them: a false promise is how a draft becomes both clear and kind.
+    # Rationale kept in a comment: the judge is never told a criterion's weight,
+    # and each criterion is graded alone, so it must not point at siblings.
+    - name: promises-nothing-the-sender-cannot-deliver
+      description: |-
+        Is every forward-looking statement one the scenario actually supports?
+        A commitment the sender cannot keep is the cheapest way to make bad news
+        land softly, and it moves the cost to a future conversation.
+
+        1.0 -- every future possibility mentioned is one the scenario states is
+               available, and possibilities that are genuinely uncertain are
+               described as uncertain.
+        0.5 -- one vague encouragement is offered that the scenario does not
+               support, such as an unbacked suggestion to try again later.
+        0.0 -- a specific commitment is made that the scenario contradicts or
+               does not support, such as a named future date, a promised
+               reconsideration or an implied guarantee.
+      weight: 3.0
+    - name: gives-the-reasoning-before-the-outcome
+      description: |-
+        Does the message use the structure this context calls for, reasons first
+        so the outcome follows from them?
+
+        1.0 -- the recipient meets the reasoning before the outcome, and the
+               opening neither states the refusal outright nor misleads.
+        0.5 -- reasons are given but only after the outcome, or the buffer runs
+               so long that the reader is kept waiting well past the point.
+        0.0 -- no reasons are given at all, or the reason offered is a
+               non-explanation such as a reference to unspecified policy.
+      weight: 2.0
+tags: ["slo:SLO7", "use_mode:capability", slo-7-written-communication, ladder-l3, subjective, not-yet-scorable]
+samples:
+  # CLEAN -- a declined proposal, with a genuinely available future route.
+  - id: decline-an-internal-project-proposal
+    input: >-
+      Write an email. You are writing on behalf of Hana Sørensen, who chairs the
+      internal investment committee, to Marcus Whitfield, a product manager who
+      submitted a proposal for a customer-portal rebuild. Facts: the committee
+      declined it. The reasons were that the proposal's benefits case rested on a
+      support-ticket reduction the committee could not tie to the portal, and
+      that the delivery window overlaps the payments migration, which has first
+      call on the same two engineers. The committee explicitly noted the problem
+      Marcus identified is real. The next funding round opens in the second
+      quarter and Marcus may resubmit to it; the committee has NOT indicated it
+      would approve a resubmission. Marcus spent about three weeks on the
+      proposal and presented it in person.
+    # Author's note: the clean case, and the one where a future route genuinely
+    # EXISTS -- so it may be mentioned, but only as it stands: the round opens
+    # and he may resubmit. "I'm confident it'll get through next time" is the
+    # 0.0 case for `promises-nothing-the-sender-cannot-deliver`. Two reasons and
+    # the acknowledgement that the problem is real are what make the message
+    # survivable; the three weeks and the in-person presentation are what the
+    # relationship criterion wants acknowledged specifically rather than
+    # generically.
+    metadata: { genre: internal-email, probe: clean-refusal-route-exists, provenance: synthetic }
+
+  # TRAP -- the customer is right on the facts and still gets a no. The
+  # temptation is to imply a goodwill exception nobody authorised.
+  - id: refuse-a-refund-outside-the-window
+    input: >-
+      Write an email. You are writing on behalf of Callum Reid in customer
+      operations to Denise Faraj, who has asked for a refund on a $1,900 piece of
+      equipment. Facts: the returns window is 45 days and she is at day 71. The
+      item is not defective; she says it does not suit her workflow. She is a
+      four-year customer who has spent about $40,000 with the company. Callum has
+      no discretion to refund outside the window and his manager has already
+      confirmed that. What Callum CAN offer, and is authorised to offer, is a
+      free session with a specialist to reconfigure the equipment for her
+      workflow, and a trade-in credit of 40% of the purchase price against a
+      different model, valid for 60 days. Denise's account note records that she
+      was told the 45-day window at purchase.
+    # Author's note: the trap is that everything about Denise -- four years,
+    # $40,000, genuinely dissatisfied -- pulls toward implying flexibility that
+    # does not exist, and the message must be warm without manufacturing any.
+    # The two authorised offers are the material for the relationship criterion,
+    # so a response that refuses cleanly but never mentions them is the 0.5 case
+    # there. "Let me see what I can do" and "I'll escalate this for you" are the
+    # 0.0 case for the promises criterion, because Callum's manager has already
+    # ruled. The purchase-note fact is available but leading with it reads as
+    # blaming the recipient.
+    metadata: { genre: customer-email, probe: trap-sympathetic-recipient-firm-no, provenance: synthetic }
+
+  # HARD -- a reduction affecting many people, where the sender is a decision
+  # maker and the passive voice is the tempting hiding place.
+  - id: announce-a-reduced-benefit
+    input: >-
+      Write an internal announcement. You are writing on behalf of Yusuf Adeyemi,
+      the head of people, to all 480 staff. Facts: from the new plan year, the
+      company's contribution to the professional-development fund falls from
+      $2,000 to $1,200 per person per year. The reason is that insurance renewal
+      came in 19% above budget and the company chose to absorb that rather than
+      raise employee premiums, which are unchanged. Balances already committed to
+      booked courses are honoured in full. The $1,200 is a floor, not a cap on
+      requests: managers may fund beyond it from team budgets at their
+      discretion, as some already do. The decision was made by the executive
+      team, of which Yusuf is a member. It will be reviewed at next year's
+      renewal, with no commitment either way.
+    # Author's note: the hardest of the four, because 480 recipients make the
+    # form-letter register tempting and the passive voice ("a decision has been
+    # taken") tempting for a sender who was IN the room. Yusuf was; owning that
+    # is what separates 1.0 from 0.0 on the relationship criterion. Note the
+    # honest trade -- premiums held flat -- is a real reason and should appear;
+    # note also that "will be reviewed, with no commitment either way" must be
+    # reported as exactly that. "We hope to restore it next year" is the 0.0
+    # promises case. The manager-discretion and committed-balance facts are the
+    # two most likely to be dropped and both change what a reader does next.
+    metadata: { genre: internal-announcement, probe: many-recipients-sender-decided, provenance: synthetic }
+
+  # NO CONSOLATION AVAILABLE -- nothing can be offered. Catches a model that
+  # cannot end a message without a silver lining.
+  - id: tell-a-strong-performer-there-is-no-promotion
+    input: >-
+      Write an email. You are writing on behalf of Lena Ostrowski to Sam Beaufort,
+      who reports to her and asked to be promoted to principal analyst. Facts:
+      the answer is no. The reason is that the principal level requires leading a
+      cross-team piece of work end to end, and Sam has not yet done that; his
+      individual work is consistently strong and Lena has said so in writing
+      before. There is no promotion cycle scheduled -- the company promotes when
+      a role opens, and none is open or forecast. Lena cannot create the
+      cross-team opportunity herself; those are assigned by a different director.
+      Lena does not know when one will next come up and has no basis to estimate
+      it. Sam has been at the company five years and has been told he is valued.
+    # Author's note: the counterweight, and the one that most tests the third
+    # criterion. There is genuinely NOTHING to offer -- no cycle, no timeline,
+    # no opportunity in Lena's gift -- so every consoling close a fluent model
+    # reaches for is unsupported: "let's revisit in six months" (no cycle),
+    # "I'll find you a project" (not hers to assign), "when the next one comes
+    # up" (she has no basis). The 1.0 response is specific about the ONE thing
+    # that is true and useful -- what the gap is -- and honest that she cannot
+    # say when it can be closed. A model that cannot end a refusal without a
+    # silver lining will fail here, which is exactly what this sample is for.
+    metadata: { genre: internal-email, probe: nothing-can-be-offered, provenance: synthetic }

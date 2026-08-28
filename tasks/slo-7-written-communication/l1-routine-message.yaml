@@ -1,0 +1,212 @@
+# slo-7-written-communication, rung 1 of 5 -- the floor of the ladder.
+#
+# SLO 7 (BScBA core): "students construct written messages that are
+# professionally and strategically appropriate for a variety of business
+# contexts." The two adverbs are separate demands and the ladder separates them.
+# PROFESSIONALLY appropriate -- clear, correct, the right register -- is what
+# rung 1 establishes. STRATEGICALLY appropriate -- fitted to this reader, this
+# purpose, this channel -- is what rungs 2 to 5 add, one demand at a time.
+# "A variety of business contexts" is why the four samples in every rung are
+# four different genres rather than four versions of one.
+#
+# THESE TASKS ARE GENERATIVE. Unlike the SLO 6 family, which asks the model to
+# reason ABOUT something, these ask it to WRITE the artefact, and the rubric
+# grades the artefact. That is why every criterion is phrased as a question
+# about the produced text.
+#
+# WHAT THIS RUNG ADDS: nothing -- it is the floor, and it should be nearly free.
+# One routine message, direct structure, all facts supplied.
+#
+# THE LAZIEST 1.0 is padding: a five-paragraph email cannot be accused of
+# omitting anything. `includes-every-fact-the-prompt-supplies` and
+# `is-no-longer-than-the-job-requires` are therefore weighted EQUALLY at 3.0, so
+# completeness cannot be bought with length. The fourth sample is one whose
+# honest answer is two sentences.
+version: 1
+id: slo-7-written-communication/l1-routine-message
+title: Written communication -- draft a routine business message
+description: >
+  Rung 1 of the SLO 7 ladder. The model writes a short routine message -- the
+  everyday correspondence that carries most business information -- from a set
+  of supplied facts. Nothing about the reader is adversarial, no bad news is
+  being delivered and no persuasion is required, so what is being measured is
+  the professional half of the outcome on its own: is every required fact
+  present, is the message no longer than it needs to be, does it open with the
+  point, and is it mechanically clean? A model that cannot do this rung reliably
+  will produce uninterpretable results higher up the ladder.
+
+  Provenance: every scenario, company, person and business detail in this file
+  is SYNTHETIC, invented for this file. No real organisation's correspondence is
+  reproduced or paraphrased, no real business data is used, and no textbook or
+  question-bank content is reproduced.
+kind: subjective
+domain: business-communication
+system_prompt: >-
+  You are drafting workplace correspondence on behalf of a colleague at a
+  mid-sized company. Write the message the scenario asks for, and only that
+  message: a subject line where the channel has one, then the body. Use the
+  facts you are given and do not invent details that were not supplied -- if the
+  scenario withholds something the message would need, write around it or ask
+  for it, rather than inventing it or leaving a bracketed placeholder. Do not
+  explain your choices, do not offer the reader alternative drafts, and do not
+  add commentary before or after the message.
+scorer:
+  kind: llm_judge
+  rubric_id: slo7-routine-message-v1
+rubric:
+  id: slo7-routine-message-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: carries-every-fact-the-scenario-supplied
+      description: |-
+        Does the message contain every piece of information the reader would need
+        to act, out of what the scenario supplied?
+
+        1.0 -- every supplied fact that bears on what the reader must do or know
+               is present in the message.
+        0.5 -- one such fact is missing.
+        0.0 -- two or more such facts are missing, or the message would leave the
+               reader unable to act without replying to ask.
+      weight: 3.0
+    # Carries the SAME weight as carrying every supplied fact, so length cannot
+    # buy completeness. Rationale kept in a comment: the judge is never told a
+    # criterion's weight.
+    - name: is-no-longer-than-the-job-requires
+      description: |-
+        Is the message as short as its content allows? Padding is the cheapest
+        insurance against omitting something.
+
+        1.0 -- no sentence could be deleted without losing required information
+               or necessary courtesy.
+        0.5 -- one or two sentences carry nothing, such as a throat-clearing
+               opening or a restatement of what was just said.
+        0.0 -- the message is padded throughout with filler, pleasantries or
+               restatement, or it repeats its own content in a closing summary.
+      weight: 3.0
+    - name: opens-with-the-point-rather-than-the-run-up
+      description: |-
+        For a routine or good-news message, does the reader learn the main point
+        in the first sentence or two, before the background?
+
+        1.0 -- the main point appears in the opening sentence or the one after it.
+        0.5 -- the main point arrives after a paragraph of context.
+        0.0 -- the reader must reach the end of the message to find out what it is
+               about, or the subject line and the opening point at different
+               things.
+      weight: 2.0
+    - name: is-mechanically-clean
+      description: |-
+        Is the writing free of errors that would make a reader think less of the
+        sender or read a sentence twice?
+
+        1.0 -- no spelling, grammar or agreement errors; tense and person are
+               consistent throughout.
+        0.5 -- one such error, or one sentence that must be read twice to parse.
+        0.0 -- two or more errors, or a sentence whose meaning cannot be
+               recovered on a careful read.
+      weight: 2.0
+    - name: produces-the-message-and-nothing-else
+      description: |-
+        Did the response deliver a usable artefact, rather than a draft wrapped
+        in commentary or left with gaps for someone to fill?
+
+        1.0 -- the message could be sent as written, with no bracketed
+               placeholders, no notes to the requester and no alternative
+               versions.
+        0.5 -- the message is usable but carries a line of commentary, or one
+               bracketed placeholder for a detail the scenario did in fact supply.
+        0.0 -- the response is mostly commentary, offers several drafts to choose
+               between, or invents a specific detail the scenario withheld.
+      weight: 1.0
+tags: ["slo:SLO7", "use_mode:capability", slo-7-written-communication, ladder-l1, subjective, not-yet-scorable]
+samples:
+  # CLEAN -- a routine reschedule. Everything needed is supplied.
+  - id: reschedule-a-standing-review-email
+    input: >-
+      Write an email. You are writing on behalf of Nadia Okonjo, who chairs the
+      monthly supplier-quality review. This month's meeting must move because the
+      main conference room is being re-carpeted. Facts: the meeting was
+      Wednesday 14th at 10:00 in Room 3B; it will now be Thursday 15th at 09:30
+      in Room 1A; the agenda is unchanged; the pre-read is already circulated and
+      does not need re-sending; attendees who cannot make the new time should
+      tell Nadia by end of Monday so she can decide whether to split the agenda.
+      Recipients are the eleven regular attendees, all internal colleagues Nadia
+      works with routinely.
+    # Author's note (a COMMENT -- metadata is published): six facts must survive
+    # (new day/date, new time, new room, agenda unchanged, pre-read not
+    # re-sent, the Monday deadline and what it is for). The reason for the move
+    # is trivia and a good message may compress or drop it; the reason for the
+    # DEADLINE is not, because it tells the reader why to bother replying. The
+    # register is internal-colleagues-routine: a formal "Dear Colleagues, I hope
+    # this message finds you well" opening is a register error here.
+    metadata: { genre: internal-email, probe: clean-routine, provenance: synthetic }
+
+  # TRAP -- a needed detail is deliberately withheld. Inventing it is the
+  # failure; a bracketed placeholder is the half-failure.
+  - id: query-a-supplier-invoice-email
+    input: >-
+      Write an email. You are writing on behalf of Owen Bramley in accounts
+      payable to a supplier, Tellworth Fixings. Facts: their invoice number
+      TF-40219, dated the 3rd, bills for 240 units of bracket part 8817-C at
+      $14.60 each; the purchase order authorised 200 units at that price; the
+      delivery note in Owen's file records 200 units received. Owen needs
+      Tellworth either to issue a credit for the 40-unit difference or to send
+      the paperwork showing the extra 40 were ordered and delivered. Payment of
+      the undisputed portion will go out on the normal cycle. Owen does not know,
+      and the scenario does not tell you, the name of anyone at Tellworth or when
+      the normal payment cycle falls.
+    # Author's note: the withheld details are the CONTACT NAME and the PAYMENT
+    # DATE, and the correct move is to write around both -- a neutral salutation
+    # and "on the normal cycle" rather than an invented date. A response that
+    # writes "Dear Sarah" or "payment will be issued on the 28th" has invented
+    # business facts into a document that would be sent, which is the 0.0 case
+    # on `produces-the-message-and-nothing-else`. "[Contact name]" is the 0.5
+    # case: honest, but not sendable. The arithmetic (240 - 200 = 40) is
+    # supplied, not to be derived -- this is a writing task, not a numeracy one.
+    metadata: { genre: external-email, probe: withheld-detail, provenance: synthetic }
+
+  # BORDERLINE -- many facts, and the brief demands brevity anyway. This is
+  # where the two 3.0 criteria genuinely pull.
+  - id: all-hands-logistics-announcement
+    input: >-
+      Write an internal announcement. You are writing on behalf of the facilities
+      team at a 300-person company. Facts: the office moves floors over the
+      weekend of the 22nd; staff must clear desks by 16:00 on Friday the 21st;
+      crates are available from the print room from Monday the 17th and must be
+      labelled with name and new desk number; new desk numbers are in a
+      spreadsheet already shared and are not changing; monitors and docking
+      stations stay in place and must not be packed; personal items left
+      unpacked will not be moved; the building will be inaccessible all Saturday;
+      IT will re-patch network points on Sunday and anyone who cannot connect on
+      Monday should raise a ticket rather than calling the helpdesk. The audience
+      is everyone in the building.
+    # Author's note: nine instructions for an audience of 300, several of which
+    # are prohibitions. This is the sample where completeness and brevity are
+    # genuinely in conflict, and the way through is structure -- a short lead
+    # plus a scannable list is both complete and short, whereas nine flowing
+    # sentences is one or the other. Note two facts are easy to drop because
+    # they are negative ("do not pack monitors", "do not call the helpdesk") and
+    # dropping either is a real operational failure, so they count for
+    # `carries-every-fact-the-scenario-supplied`.
+    metadata: { genre: internal-announcement, probe: many-facts-brevity-pressure, provenance: synthetic }
+
+  # RESTRAINT -- the honest answer is two sentences. Catches a model that
+  # inflates every request into a five-paragraph email.
+  - id: confirm-receipt-of-a-signed-contract
+    input: >-
+      Write a message on the shared client channel. You are writing on behalf of
+      Ruth Alvarez to a client contact she speaks to several times a week. Facts:
+      the countersigned contract arrived this morning; Ruth has filed it; nothing
+      further is needed from the client; the kickoff call is already booked for
+      the 9th and is unchanged.
+    # Author's note: the correct artefact is two sentences on a chat channel to
+    # a frequent contact -- confirm receipt, confirm nothing is needed, and
+    # stop. Everything the scenario supplies is already known to the recipient
+    # except the confirmation itself. A response that produces a formal email
+    # with a subject line, a salutation, three paragraphs and a sign-off has got
+    # the register AND the length wrong, and should score 0.0 on
+    # `is-no-longer-than-the-job-requires` even though it omits nothing. This
+    # sample is the counterweight that stops completeness from being the whole
+    # rubric.
+    metadata: { genre: chat-message, probe: brevity-is-the-answer, provenance: synthetic }
