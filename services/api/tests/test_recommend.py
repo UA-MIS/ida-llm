@@ -138,9 +138,7 @@ class TestRefusalOnThinContext:
         )
         assert body["status"] != "need_more_context"
 
-    def test_either_teaching_side_task_suffices_when_both_apply(
-        self, client: TestClient
-    ) -> None:
+    def test_either_teaching_side_task_suffices_when_both_apply(self, client: TestClient) -> None:
         """Beneficiary 'both' opens both task questions; answering one is enough."""
         base = {
             "role": "teacher",
