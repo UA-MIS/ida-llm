@@ -1,0 +1,284 @@
+# slo1-problem-solving, rung 5 of 5 -- the top rung.
+#
+# WHAT THIS RUNG ADDS: the data does not settle the question, and the response
+# still has to act. Rungs 1-4 all had an answer the figures supported. Here the
+# demand is to separate what the evidence establishes from what it does not,
+# name the one thing that would settle it, and commit to a decision for today
+# anyway -- because "we need more data" is not a decision and a business that
+# waits has chosen to wait.
+#
+# WHY THIS IS THE CEILING. It is the hardest thing on the ladder for a language
+# model specifically: producing a fluent, confident answer is what the format
+# rewards everywhere else, and here confidence is the failure. The rung is
+# built to make over-reach visible rather than to make it unlikely.
+#
+# THE COUNTERWEIGHT SAMPLE IS LOAD-BEARING. One of the four samples IS settled
+# by its data, and a response that hedges on it scores 0.0 on the first
+# criterion. Without it this rung would teach a model that the winning move is
+# always to declare uncertainty, which is the same failure wearing modesty --
+# and it would be the easiest 1.0 in the family.
+version: 1
+id: slo1-problem-solving/l5-decision-under-underdetermination
+title: SLO1 rung 5 -- saying what the evidence cannot settle, and deciding anyway
+description: >
+  Rung 5 of the SLO1 ladder and its ceiling. Each sample supplies evidence that
+  is real but insufficient, or that appears insufficient and is not. The
+  response must state what the evidence supports, what it cannot settle, the
+  single piece of information that would settle it and how to obtain it, and
+  the decision to take now. One of the four samples is genuinely settled by the
+  evidence supplied, and hedging on it is the error.
+
+  Provenance: every firm, figure and scenario is synthetic, authored for this
+  file. No course material, no textbook content, no real firm's data.
+kind: subjective
+domain: business-analysis
+system_prompt: >-
+  You are a business analyst advising a decision-maker who has ten minutes.
+  Work only from the information the item supplies; where something you would
+  need is missing, say so rather than assuming a value. Use exactly the
+  headings the item asks for, in the order it asks for them, and write nothing
+  that does not earn its place under one of them. Do not invent figures, firms
+  or events that the item did not give you.
+scorer:
+  kind: llm_judge
+  rubric_id: slo1-problem-solving-underdetermination-v1
+rubric:
+  id: slo1-problem-solving-underdetermination-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: draws-the-line-in-the-right-place
+      description: |-
+        Does the split between WHAT THE EVIDENCE SUPPORTS and WHAT IT CANNOT
+        SETTLE match what this evidence actually does?
+
+        This criterion runs in both directions and they are equally wrong.
+        Claiming the evidence settles a question it does not is over-reach.
+        Claiming it cannot settle a question it does is false modesty, and it
+        is the failure mode of a response that has learned uncertainty is the
+        safe answer.
+
+        1.0 -- every claim placed under SUPPORTS is established by the supplied
+               evidence, and every claim placed under CANNOT SETTLE genuinely
+               is not -- including, where the evidence is decisive, a CANNOT
+               SETTLE section that says nothing material is unresolved.
+        0.5 -- the split is right in substance but one claim is on the wrong
+               side of it.
+        0.0 -- a conclusion the evidence does not support is placed under
+               SUPPORTS, or a question the evidence does settle is placed under
+               CANNOT SETTLE.
+      weight: 3.0
+    - name: the-missing-thing-is-specific-and-obtainable
+      description: |-
+        Is THE ONE THING THAT WOULD SETTLE IT a specific, obtainable piece of
+        information, with a stated route to getting it -- rather than a wish?
+
+        "More data", "further research" and "a better understanding of the
+        market" are wishes. A named measurement, a named record, a named
+        counterparty to ask, with a rough cost or elapsed time, is an
+        instruction.
+
+        1.0 -- names one specific item, says how it would be obtained, and says
+               what it would change about the decision; OR, where the evidence
+               already settles the question or no obtainable information could
+               change what to do now, says so plainly and names what makes that
+               true.
+        0.5 -- names something specific but not how to get it, or names
+               several things without saying which is the binding one.
+        0.0 -- asks for "more data" or lists research topics, names something
+               that could not in fact be obtained, or manufactures a missing
+               item where the supplied evidence is already sufficient.
+
+        Both halves of the null branch are exercised by samples in this task,
+        and they are different cases: in one the decision is settled by a
+        CONTRACT TERM that makes the listed unknowns irrelevant, in another it
+        is settled by the MEASUREMENTS themselves. Without the branch, the
+        correct answer to either would score 0.0 here -- which would make
+        performing uncertainty the winning strategy on the one rung built to
+        catch exactly that.
+      weight: 2.0
+    - name: decides-now-without-pretending-to-know
+      description: |-
+        Does DECISION NOW commit to a specific action for the present, and is
+        that action the right one GIVEN the acknowledged uncertainty rather
+        than one that assumes it away?
+
+        1.0 -- a specific action is stated for now, and it is defensible under
+               both readings of the unresolved question -- or, if it is not,
+               the response says which reading it is betting on and why.
+        0.5 -- an action is stated but it silently assumes the unresolved
+               question has resolved one way.
+        0.0 -- the decision is to wait for the missing information with no
+               action in the meantime, or no decision is stated.
+      weight: 3.0
+    - name: no-invented-evidence
+      description: |-
+        Does the response confine itself to what the item supplied?
+
+        The characteristic failure at this rung is filling a gap with a
+        plausible number, a benchmark, a rule of thumb or an industry norm that
+        the item did not give -- which converts an honest gap into a false
+        finding, and is worse than the gap.
+
+        1.0 -- every figure, comparison and fact used appears in the item.
+        0.5 -- one figure or benchmark not in the item is introduced, and is
+               flagged as an assumption where it is used.
+        0.0 -- a figure, benchmark or industry norm not in the item is
+               introduced and used as though supplied, or two or more
+               unflagged assumptions appear.
+      weight: 2.0
+tags: [slo-benchmark, "slo:SLO1", "use-mode:capability", ladder-l5, problem-solving, subjective, not-yet-scorable]
+samples:
+  # UNDERDETERMINED, cleanly: the difference is inside sampling noise.
+  - id: ab-test-below-resolution
+    input: >-
+      A retailer ran a two-week test of a new checkout page. Variant A, the
+      current page, was shown to 4,120 visitors and produced 103 orders.
+      Variant B, the new page, was shown to 4,080 visitors and produced 122
+      orders. The product manager reports "a 20% uplift" and wants to roll
+      variant B out to all traffic on Monday.
+
+      Traffic runs at roughly 8,200 visitors a fortnight and is stable.
+      Engineering says the test harness can stay in place at no cost and that
+      switching all traffic to B is a one-day change, reversible in a day.
+      Average order value is the same on both variants.
+
+      Respond under exactly these headings: WHAT THE EVIDENCE SUPPORTS, WHAT IT
+      CANNOT SETTLE, THE ONE THING THAT WOULD SETTLE IT, DECISION NOW.
+    # Author's note. A converts at 103/4,120 = 2.50%; B at 122/4,080 = 2.99%.
+    # The difference of 0.49 percentage points is a 20% RELATIVE uplift, so the
+    # product manager's number is not wrong -- it is just not distinguishable
+    # from noise. The standard error of the difference is about 0.36 percentage
+    # points, so the observed gap is roughly 1.4 standard errors: the sort of
+    # gap this sample size produces by chance often enough to be worthless as
+    # evidence.
+    # The response is NOT expected to compute a standard error, and the rubric
+    # does not require one. What is graded is recognising that ~100 orders per
+    # arm cannot resolve a half-point difference, and that a relative percentage
+    # on a small base is the form the over-claim takes.
+    # The specific missing thing: more of the same test. Detecting a lift this
+    # size reliably needs on the order of 15,000 visitors per arm, roughly four
+    # times what has been collected, which at 8,200 visitors a fortnight is
+    # about two months of running a test that costs nothing to leave in place.
+    # DECISION NOW is the interesting part and there is more than one good
+    # answer: keep the test running and do not roll out, OR roll B out anyway
+    # because the change is reversible in a day, the downside is bounded and B
+    # is not worse on any measure. Both are defensible; what is graded is
+    # whether the reversibility and the zero test cost -- both stated -- are
+    # used to justify whichever is chosen.
+    metadata: { probe: two-week-test-with-per-arm-counts, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  # UNDERDETERMINED by confounding: the measurement is precise and the
+  # attribution is impossible. A different failure to the one above, on purpose.
+  - id: price-cut-and-a-rival-outage
+    input: >-
+      A wholesaler cut the list price of one product by 8% on 3 March. Unit
+      sales of that product in March were 27% above February and 31% above the
+      previous March. The category manager wants to extend the cut across the
+      range.
+
+      On 5 March the wholesaler's largest competitor suffered a warehouse fire
+      and stopped shipping that product category entirely; it resumed on 2
+      April. That competitor holds roughly 40% of the category. April unit
+      sales for the product, with the 8% cut still in place, were 4% above
+      February. The wholesaler's own gross margin on the product fell from 24%
+      to 17% with the cut in place.
+
+      Respond under exactly these headings: WHAT THE EVIDENCE SUPPORTS, WHAT IT
+      CANNOT SETTLE, THE ONE THING THAT WOULD SETTLE IT, DECISION NOW.
+    # Author's note. The price cut and a 40%-share competitor's total absence
+    # begin two days apart and overlap for the whole of March, so March's 27%
+    # cannot be attributed to either. April is the informative month: with the
+    # competitor back and the cut still running, the lift collapses from 27% to
+    # 4% -- which points strongly to the outage having done most of the work,
+    # while 4% on a 7-point margin sacrifice is a bad trade.
+    # A strong response notices that April is nearly the clean experiment
+    # already and says so; that is the difference between this sample and the
+    # previous one, where no clean read exists in the data at all.
+    # The specific missing thing: April is one month and the return to normal
+    # trading may itself be lagged. Another month or two of post-resumption
+    # sales at the cut price, which costs only the margin already being given
+    # up, would settle it.
+    # DECISION NOW: do not extend the cut across the range -- the one product's
+    # evidence does not support it and the margin cost is measured. Restoring
+    # the cut product's price is also defensible on the April figure. What
+    # scores 0.0 is extending the cut on the strength of March.
+    metadata: { probe: price-cut-and-a-competitor-outage-overlap, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  # LOOKS UNDERDETERMINED, ISN'T: a great deal is unknown and none of it
+  # matters, because one supplied term settles the decision.
+  - id: renewal-with-a-termination-right
+    input: >-
+      A firm must decide by Friday whether to renew a three-year facilities
+      contract at $265,000 a year. The facilities manager lists what is not
+      known: whether the firm will still occupy the building in year three
+      (a site review reports in nine months); whether the incumbent's service
+      quality, currently rated 3.4 out of 5 by staff, would improve; what two
+      alternative suppliers would charge, since neither has been approached;
+      and whether the firm's headcount will grow.
+
+      The renewal terms include a right to terminate for convenience at any
+      time after the first twelve months, on ninety days' notice, with no
+      break fee. The current contract expires on Friday and there is no
+      extension option. Running the building uncovered is not possible.
+
+      Respond under exactly these headings: WHAT THE EVIDENCE SUPPORTS, WHAT IT
+      CANNOT SETTLE, THE ONE THING THAT WOULD SETTLE IT, DECISION NOW.
+    # Author's note. Every unknown the facilities manager lists resolves after
+    # month twelve or is irrelevant, and the contract can be exited from month
+    # twelve on ninety days' notice at no cost. The nine-month site review lands
+    # inside that window. So the "three-year" commitment is functionally a
+    # fifteen-month one, and none of the listed unknowns can change what to do
+    # by Friday -- the alternative is running uncovered, which is stated to be
+    # impossible.
+    # This sample exists to catch the response that has learned to perform
+    # uncertainty. Listing four unknowns and recommending delay is the fluent
+    # wrong answer here; there is nothing to delay for and no option to delay
+    # into. THE ONE THING THAT WOULD SETTLE IT is honestly "nothing that can be
+    # obtained by Friday, and nothing that needs to be" -- and a response
+    # saying that, and explaining that the termination right is what makes it
+    # true, is the strongest answer available.
+    # The genuine forward action -- approach the two alternative suppliers now
+    # so a comparison exists before the twelve-month point -- belongs under
+    # DECISION NOW alongside signing, and a response that includes it is
+    # stronger than one that only signs.
+    metadata: { probe: listed-unknowns-beside-a-break-clause, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  # SETTLED. Mandatory counterweight, and the sharpest one: the evidence is
+  # decisive and hedging is the error. Compare with the sample above -- there,
+  # a contract term makes the unknowns irrelevant; here the measurements
+  # themselves answer the question.
+  - id: warehouse-picking-errors
+    input: >-
+      A distributor's mis-picked order rate rose from 0.4% to 1.9% over six
+      weeks and has stayed there for a further eight weeks. Management is
+      divided between blaming a new agency-staffed night shift and blaming the
+      new warehouse layout introduced in the same period.
+
+      The distributor's scanner logs, which cover every pick, show: the day
+      shift, which uses the same new layout with unchanged permanent staff, has
+      a mis-pick rate of 0.4%, unchanged; the night shift's rate is 3.6%; among
+      night-shift pickers with more than eight weeks on site the rate is 0.6%,
+      and among those with less than eight weeks it is 5.1%; agency turnover on
+      the night shift is 60% a quarter. The layout was introduced on both
+      shifts on the same day.
+
+      Respond under exactly these headings: WHAT THE EVIDENCE SUPPORTS, WHAT IT
+      CANNOT SETTLE, THE ONE THING THAT WOULD SETTLE IT, DECISION NOW.
+    # Author's note. The day shift is a clean control: same layout, unchanged
+    # staff, unchanged 0.4% error rate. That single comparison eliminates the
+    # layout, and it was available all along. Within the night shift, experience
+    # splits the rate 0.6% against 5.1%, which locates the cause precisely: it
+    # is tenure on site, sustained by 60% quarterly agency turnover.
+    # The evidence settles it. WHAT IT CANNOT SETTLE should be short and should
+    # concern something else -- whether retention or longer induction is the
+    # cheaper remedy, for instance, which the logs cannot answer.
+    # THE ONE THING THAT WOULD SETTLE IT is the honest "nothing further is
+    # needed to identify the cause". A response that puts the layout under
+    # CANNOT SETTLE, or asks for more data before acting, scores 0.0 on the
+    # first criterion -- this is the false-modesty failure and it is exactly as
+    # wrong as over-reach.
+    # DECISION NOW: act on night-shift induction and retention. Reversing the
+    # layout is the specific wrong action and the one the divided management
+    # framing invites.
+    metadata: { probe: day-shift-and-night-shift-logs-supplied, provenance: synthetic, slo: SLO1, use_mode: capability }

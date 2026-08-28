@@ -1,0 +1,120 @@
+# slo9-business-knowledge, rung 2 of 6.
+#
+# WHAT THIS RUNG ADDS: a DISTINCTION. Every item names two concepts a student
+# routinely fuses -- profit and cash, gross and operating margin, efficiency
+# and effectiveness, debt and equity, marketing and selling, expense and asset
+# -- and the correct option is the one that gets the boundary right. Rung 1
+# could be passed by recognising a term. This rung cannot: the term is not the
+# answer, the boundary is.
+version: 1
+id: slo9-business-knowledge/l2-conflated-pairs-key
+title: SLO9 rung 2 -- distinguishing commonly fused pairs
+description: >
+  Rung 2 of the SLO9 ladder. Six pairs of concepts that undergraduate answers
+  routinely treat as one, each posed so that the fused reading picks a specific
+  wrong option. Distractors are the fused reading rather than an unrelated
+  term, which is what makes this rung harder than rung 1 without making the
+  stems longer.
+
+  Four options, so the guessing floor is 0.25.
+
+  Provenance: every item was written for this file. No textbook, question-bank,
+  past-paper or other institution's examination content is reproduced.
+kind: verifiable
+domain: general-business
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate general
+  business examination. Exactly one option is correct. You may reason briefly
+  first, but you must then put the letter of the correct option alone on the
+  last line, with no punctuation and no other text on that line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", ladder-l2, business-knowledge, forced-choice]
+samples:
+  - id: profit-versus-cash-flow
+    input: >-
+      A firm reports a healthy profit yet cannot pay its suppliers on time.
+      Which statement best explains how both can be true at once?
+      A) Profit is calculated after tax, and tax must be paid in cash.
+      B) Profit includes financing costs whereas cash flow excludes them.
+      C) Revenue is recorded when it is earned rather than when cash is
+      collected, so profit can be reported before the cash arrives.
+      D) Profit is measured monthly while cash flow is measured annually.
+    # C -- accrual recognition is the whole answer. A is true of tax but does
+    # not explain the gap; B has it backwards; D is invented. The fused
+    # reading, "profit is cash", picks none of these confidently, which is why
+    # the stem asks for the explanation rather than a yes/no.
+    target: "C"
+    metadata: { skill: accrual-versus-cash, function: accounting, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: gross-versus-operating-margin
+    input: >-
+      Operating margin differs from gross margin in that operating margin also
+      subtracts:
+      A) Selling, general and administrative expenses
+      B) Cost of goods sold
+      C) Interest and taxes
+      D) Dividends paid to shareholders
+    # A. B is already subtracted in arriving at gross margin, which is exactly
+    # the fusion this item tests. C comes after operating profit, not before.
+    # D is a distribution of profit and never an expense.
+    target: "A"
+    metadata: { skill: margin-hierarchy, function: accounting, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: efficiency-versus-effectiveness
+    input: >-
+      A plant produces at the lowest cost per unit in its industry, but the
+      product it makes is one that customers no longer want. In management
+      terms the plant is:
+      A) Neither efficient nor effective
+      B) Effective but not efficient
+      C) Both efficient and effective
+      D) Efficient but not effective
+    # D. Efficiency is doing the thing well; effectiveness is doing the right
+    # thing. B is the exact inversion and is the option a fused reading picks.
+    target: "D"
+    metadata: { skill: efficiency-versus-effectiveness, function: management, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: debt-versus-equity-financing
+    input: >-
+      Compared with issuing new equity, financing an expansion with debt:
+      A) Reduces the firm's obligation to make fixed payments
+      B) Avoids diluting existing owners' percentage ownership
+      C) Always lowers the firm's total risk
+      D) Gives lenders a vote on the firm's management decisions
+    # B. A is the reverse -- debt CREATES a fixed obligation. C is false; debt
+    # raises financial risk. D confuses creditors with shareholders. B is the
+    # single genuine advantage among the four.
+    target: "B"
+    metadata: { skill: capital-structure, function: finance, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: marketing-versus-selling
+    input: >-
+      Which of these is a marketing activity rather than a selling activity?
+      A) Researching which unmet customer need a new product should address
+      B) Negotiating terms with a prospect who has requested a quote
+      C) Closing an order at the end of a sales call
+      D) Following up with a buyer to collect an overdue payment
+    # A. B and C are selling; D is collections, which is neither. The fused
+    # reading -- "marketing is what the sales team does" -- picks B or C.
+    target: "A"
+    metadata: { skill: marketing-versus-selling, function: marketing, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: van-purchase-treatment
+    input: >-
+      A firm buys a delivery van it expects to use for six years. In the year
+      of purchase, the cost of the van is:
+      A) Recorded entirely as an expense of that year
+      B) Not recorded at all until the van is eventually sold
+      C) Recorded as an asset and charged against profit over its useful life
+      D) Recorded as revenue offset by a matching liability
+    # C. A is the fused reading -- "we paid cash, so it is an expense". B and D
+    # are not accounting treatments of anything.
+    target: "C"
+    metadata: { skill: asset-purchase-treatment, function: accounting, provenance: synthetic, slo: SLO9, use_mode: capability }
