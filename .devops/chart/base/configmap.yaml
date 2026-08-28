@@ -44,6 +44,29 @@ data:
   # control. Full procedure: docs/sensitive-material.md section 6.
   # IDA_AUTH_MODE: "token"
 
+  # ── THE JUDGE: SUBJECTIVE SCORING IS NOW ON ─────────────────────────────────
+  # Names an entry in models.yaml; the runner builds one judge per process from
+  # it (ida_runner.judging.build_judge_from_settings) and run_task grades every
+  # subjective sample against its rubric.
+  #
+  # UNSET MEANT UNSCORED. models.yaml's header is explicit that there is no
+  # default "because unset means subjective tasks stay unscored with their
+  # transcripts archived, rather than every run quietly starting to spend money".
+  # Setting it is therefore the deliberate act that header describes, and it is
+  # taken here knowingly: 150 of the 328 catalogue samples are subjective, and
+  # without a judge the benchmark's subjective half is permanently blank.
+  #
+  # ⚠ THIS SPENDS MONEY PER CRITERION, NOT PER SAMPLE. ida_harness.judge issues
+  # ONE model call per rubric criterion, deliberately, so that no call sees two
+  # criteria and rubric order cannot move a score. At a mean of 4.6 criteria the
+  # 150 subjective samples cost ~690 judge calls, and each call re-sends the
+  # prompt and the answer. The judge, not the model pass, is the larger bill.
+  #
+  # What still stops an unattended charge: the three sweep CronJobs remain
+  # `suspend: true` (D-43), so nothing fires on a timer. This key makes a run
+  # that a human starts grade its subjective half; it does not start any run.
+  IDA_JUDGE_MODEL_KEY: "luna"
+
   # ── THE CREDIT/HARDWARE SAFETY SWITCH ───────────────────────────────────────
   # MOCK_MODEL_BASE_URL points the harness at the in-namespace deterministic stub
   # instead of a paid provider. Base carries the PROD value, which is EMPTY — prod
