@@ -32,7 +32,7 @@ export default async function RecommendPage() {
         <p className="muted" style={{ marginBottom: 0 }}>
           Nothing you answer here is stored. Every recommendation links back to
           the benchmark runs behind it, which you can read at{" "}
-          <Link href="/">the results view</Link>.
+          <Link href="/leaderboard">the leaderboard</Link>.
         </p>
       </div>
 

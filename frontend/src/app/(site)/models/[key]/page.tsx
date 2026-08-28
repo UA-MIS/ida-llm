@@ -259,7 +259,7 @@ function TaskBreakdown({
               className={entry.result.mean_score === null ? "row-muted" : undefined}
             >
               <td>
-                <Link href={`/?task=${encodeURIComponent(entry.task_id)}`}>
+                <Link href={`/leaderboard?task=${encodeURIComponent(entry.task_id)}`}>
                   {entry.task_title}
                 </Link>
                 <div className="mono muted task-id">{entry.task_id}</div>
@@ -319,7 +319,7 @@ export default async function ModelReportPage({
 
   return (
     <>
-      <Link href="/" className="back">
+      <Link href="/leaderboard" className="back">
         ← All models
       </Link>
 
