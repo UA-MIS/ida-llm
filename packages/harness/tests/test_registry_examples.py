@@ -138,13 +138,92 @@ class TestAnthropicExamplesRespectTheMessagesApi:
         assert sampling.top_p == 1.0
 
 
+ALLOWED_ENABLED_KEYS = {"mock", "luna"}
+"""The only entries that may be `enabled: true` in the live ``models.yaml``.
+
+``mock`` is free and deterministic.  ``luna`` is deliberately enabled (issue
+#48) against an OpenAI key that is **scoped to that model and carries a $25 hard
+cap, for TESTING ONLY** -- it exists so the real provider path can be exercised
+end to end, and it is not the finished product's budget.
+
+Everything else stays off.  Widening this set is a decision with a credit-card
+consequence, so it is written here, once, rather than implied by the absence of
+a check.
+"""
+
+
 class TestLiveFileIsUnchangedInSpirit:
-    def test_only_the_mock_is_enabled(self) -> None:
+    def test_only_the_mock_and_luna_are_enabled(self) -> None:
         """No example is accidentally live. Enabling a hosted model is a
-        deliberate act with a credit-card consequence."""
+        deliberate act with a credit-card consequence.
+
+        Widened from mock-only to {mock, luna} for #48. The guard is not
+        weakened by that: it still fails the moment a SECOND hosted model is
+        enabled, which is the accident it was written to catch. Uncommenting
+        the gpt-5 example -- 6x Luna's input price and 8x its output price, on
+        an unscoped key -- still fails this test.
+        """
         from ida_core.registry import load_registry
 
-        assert load_registry(MODELS_YAML).enabled_keys() == ["mock"]
+        assert set(load_registry(MODELS_YAML).enabled_keys()) == ALLOWED_ENABLED_KEYS
+
+    def test_no_other_hosted_model_is_enabled(self) -> None:
+        """The same guarantee stated the other way round, so that renaming a key
+        cannot quietly satisfy the set-equality check above while turning on
+        something expensive."""
+        from ida_core.registry import load_registry
+
+        registry = load_registry(MODELS_YAML)
+        hosted_and_on = {
+            entry.key
+            for entry in registry.models
+            if entry.enabled and entry.base_url.startswith("https://")
+        }
+        assert hosted_and_on == {"luna"}
+
+    def test_the_budget_capped_entry_is_tagged_as_such(self) -> None:
+        """The $25 cap is an OpenAI-side setting nothing in this repo can read.
+        The tag is how an operator scanning the registry learns that selecting
+        this entry spends real money from a test allowance."""
+        from ida_core.registry import load_registry
+
+        entry = load_registry(MODELS_YAML).get("luna")
+        assert "testing-only" in entry.tags
+        assert "budget-capped" in entry.tags
+
+    def test_luna_declares_a_key_and_a_nonzero_price(self) -> None:
+        """A hosted entry with `api_key_env: null` would send unauthenticated
+        requests; one left at the 0.0 default would report every paid run as
+        free. Both are checked for the examples already -- luna is live, so it
+        matters more here, not less."""
+        from ida_core.registry import load_registry
+
+        entry = load_registry(MODELS_YAML).get("luna")
+        assert entry.api_key_env == "OPENAI_API_KEY"
+        assert entry.cost.input_usd_per_mtok > 0
+        assert entry.cost.output_usd_per_mtok > 0
+
+    def test_luna_takes_the_reasoning_client_not_the_plain_one(self) -> None:
+        """gpt-5.6 rejects the legacy `max_tokens` that OpenAICompatibleClient
+        sends. If this entry ever drifts back to `serving_stack: openai_api` it
+        would 400 on every call -- in staging, with a key, having looked fine in
+        CI where nothing calls it."""
+        from ida_core.registry import load_registry
+
+        entry = load_registry(MODELS_YAML).get("luna")
+        assert entry.serving.serving_stack is ServingStack.OPENAI_REASONING
+        assert client_class_for(entry).__name__ == "OpenAIReasoningClient"
+
+    def test_luna_samples_at_the_api_default_temperature(self) -> None:
+        """A reasoning model rejects a non-default temperature with a 400, so the
+        benchmark default of 0.0 cannot be used here. Pinned as a test because
+        the value looks wrong to anyone who knows the benchmark convention and
+        is exactly the kind of thing a well-meaning edit 'fixes'."""
+        from ida_core.registry import load_registry
+
+        sampling = load_registry(MODELS_YAML).get("luna").serving.sampling
+        assert sampling.temperature == 1.0
+        assert sampling.top_p == 1.0
 
     def test_the_mock_still_takes_the_openai_compatible_client(self) -> None:
         from ida_core.registry import load_registry

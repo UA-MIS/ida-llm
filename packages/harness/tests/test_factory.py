@@ -21,7 +21,7 @@ from ida_core.contracts import (
 )
 from ida_core.registry import MissingApiKeyError
 from ida_harness.anthropic_client import AnthropicMessagesClient
-from ida_harness.client import ModelClient, OpenAICompatibleClient
+from ida_harness.client import ModelClient, OpenAICompatibleClient, OpenAIReasoningClient
 from ida_harness.factory import build_client, client_class_for
 
 MESSAGES = [ChatMessage(role="user", content="hi")]
@@ -41,6 +41,20 @@ def _entry(stack: ServingStack, **kwargs) -> ModelEntry:
 class TestSelection:
     def test_anthropic_stack_selects_the_messages_client(self) -> None:
         assert client_class_for(_entry(ServingStack.ANTHROPIC_COMPAT)) is AnthropicMessagesClient
+
+    def test_openai_reasoning_stack_selects_the_reasoning_client(self) -> None:
+        """`luna` is a GPT-5.6 model: it rejects the legacy `max_tokens` the
+        plain client sends, so selecting the wrong one here is a 400 on every
+        call, not a subtle difference."""
+        assert client_class_for(_entry(ServingStack.OPENAI_REASONING)) is OpenAIReasoningClient
+
+    def test_the_reasoning_stack_is_not_the_default(self) -> None:
+        """Guards the row's existence. Delete it from the table and selection
+        silently falls through to OpenAICompatibleClient -- which is exactly the
+        failure this stack was added to prevent, and it would look fine."""
+        assert client_class_for(_entry(ServingStack.OPENAI_REASONING)) is not (
+            OpenAICompatibleClient
+        )
 
     @pytest.mark.parametrize(
         "stack",
@@ -62,7 +76,11 @@ class TestSelection:
             assert client_class_for(_entry(stack)) is not None
 
     def test_built_clients_satisfy_the_protocol(self) -> None:
-        for stack in (ServingStack.MOCK, ServingStack.ANTHROPIC_COMPAT):
+        for stack in (
+            ServingStack.MOCK,
+            ServingStack.ANTHROPIC_COMPAT,
+            ServingStack.OPENAI_REASONING,
+        ):
             client = build_client(_entry(stack), api_key="k")
             with client:
                 assert isinstance(client, ModelClient)

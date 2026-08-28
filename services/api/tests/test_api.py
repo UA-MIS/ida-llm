@@ -224,7 +224,19 @@ class TestHealth:
 class TestModelsEndpoint:
     def test_lists_enabled_models(self, client: TestClient) -> None:
         models = client.get("/models").json()
-        assert [m["key"] for m in models] == ["mock"]
+        assert [m["key"] for m in models] == ["mock", "luna"]
+
+    def test_a_disabled_model_is_not_offered(self, client: TestClient) -> None:
+        """`sparks-local` is unreachable from this cluster. Listing it would let
+        the UI enqueue a run that can only fail."""
+        assert "sparks-local" not in {m["key"] for m in client.get("/models").json()}
+
+    def test_no_key_material_is_exposed(self, client: TestClient) -> None:
+        """`luna` is the first listed model with a real key behind it. The
+        endpoint is unauthenticated, so the field whitelist below is now load
+        bearing rather than theoretical."""
+        body = client.get("/models").text
+        assert "sk-" not in body
 
     def test_exposes_only_the_whitelisted_fields(self, client: TestClient) -> None:
         """Pinned literally: adding a field to ModelEntry must not leak it by default."""

@@ -127,3 +127,68 @@ class TestRegistrySweep:
             ],
         )
         assert {p.entry_key for p in check_registry(registry)} == {"a", "b"}
+
+
+class TestOpenAiReasoningSampling:
+    """The same trap as the Anthropic one, one provider over.
+
+    ``SamplingParams`` defaults ``temperature`` to the BENCHMARK default of 0.0,
+    and OpenAI's reasoning families accept only the API default of 1.0.  An
+    author who writes ``serving_stack: openai_reasoning`` and omits the
+    ``sampling:`` block therefore ships an entry that 400s on every call, and the
+    mistake is again a line nobody wrote.
+    """
+
+    def test_a_non_default_temperature_warns(self) -> None:
+        problems = check_entry(
+            _entry(ServingStack.OPENAI_REASONING, SamplingParams(temperature=0.0))
+        )
+        assert _fields(problems) == {"serving.sampling.temperature"}
+        assert [p.severity for p in problems] == ["warning"]
+
+    def test_a_non_default_top_p_warns(self) -> None:
+        # temperature pinned to the API default so this isolates top_p; leaving
+        # it at the SamplingParams default would (correctly) warn about both.
+        problems = check_entry(
+            _entry(ServingStack.OPENAI_REASONING, SamplingParams(temperature=1.0, top_p=0.5))
+        )
+        assert _fields(problems) == {"serving.sampling.top_p"}
+
+    def test_an_entry_with_no_sampling_block_is_caught(self) -> None:
+        """The whole point: the inherited 0.0 is the failure, and nothing in the
+        YAML shows it."""
+        assert check_entry(_entry(ServingStack.OPENAI_REASONING))
+
+    def test_api_default_sampling_is_clean_at_both_severities(self) -> None:
+        entry = _entry(
+            ServingStack.OPENAI_REASONING,
+            SamplingParams(temperature=1.0, top_p=1.0, max_tokens=2048),
+        )
+        assert check_entry(entry) == []
+
+    def test_a_seed_warns_rather_than_erroring(self) -> None:
+        """chat-completions HAS a seed field, so this is not a protocol error the
+        way it is for the Messages API -- but hosted reasoning models honour it
+        best-effort at most, and a stored `seed` implies a reproducibility this
+        entry cannot deliver."""
+        problems = check_entry(
+            _entry(
+                ServingStack.OPENAI_REASONING,
+                SamplingParams(temperature=1.0, top_p=1.0, seed=7),
+            )
+        )
+        assert _fields(problems) == {"serving.sampling.seed"}
+        assert errors(problems) == [], "a real, accepted parameter is not an error"
+
+    def test_the_message_names_the_replacement_parameter(self) -> None:
+        """An author reading this warning should not have to go and find out what
+        the fix is."""
+        problems = check_entry(
+            _entry(ServingStack.OPENAI_REASONING, SamplingParams(temperature=0.0))
+        )
+        assert "1.0" in problems[0].message
+
+    def test_the_plain_openai_stack_is_left_alone(self) -> None:
+        """gpt-4o and a campus vLLM box accept 0.0 happily; warning about it
+        would train authors to ignore the checker."""
+        assert check_entry(_entry(ServingStack.OPENAI_API, SamplingParams(temperature=0.0))) == []

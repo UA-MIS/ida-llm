@@ -219,9 +219,10 @@ class Settings(BaseSettings):
 
     Bounds queue pressure and blast radius: a dedupe regression that made every
     pair look un-measured would otherwise re-enqueue the whole cross product
-    every night.  Sized well above a realistic registry x catalog (today: 1
-    enabled model x 8 scorable tasks = 8), so tripping it means something is
-    wrong, not that the suite grew."""
+    every night.  Sized well above a realistic registry x catalog (today: 2
+    enabled models, of which 1 is swept -- ``luna`` is held back by
+    :attr:`sweep_exclude_tags` -- x 8 scorable tasks = 8), so tripping it means
+    something is wrong, not that the suite grew."""
 
     sweep_max_samples: int = 2000
     """Most *samples* one sweep may enqueue.  Beyond this the sweep REFUSES.
@@ -232,6 +233,30 @@ class Settings(BaseSettings):
     cost the same and look nothing alike to :attr:`sweep_max_runs`.  Known
     exactly (not estimated) at planning time, because ``len(spec.samples)`` is
     read from the task file the sweep is planning against."""
+
+    sweep_exclude_tags: str = "testing-only"
+    """Comma-separated ``models.yaml`` tags whose models scheduled sweeps SKIP.
+
+    **The gap this closes.** Both nightly sweeps plan over
+    ``registry.enabled_keys()``, so ``enabled: true`` means two different things
+    at once: *an operator may select this model* and *a CronJob will select it
+    every night, unattended*. Those are not the same permission, and conflating
+    them is how a model enabled for one careful hand-run becomes a standing
+    nightly bill.
+
+    The live case is ``luna``, whose key is scoped to it with a **$25 hard cap
+    for testing**. It must be selectable on purpose and must NOT be swept at
+    02:00 -- ``model-sweep`` in particular exists to give a *newly enabled*
+    model a first full set of numbers, which is precisely the unattended spend
+    that budget cannot absorb.
+
+    Tag-driven rather than a key list, so the decision travels with the entry in
+    ``models.yaml`` instead of drifting in a second place -- the same reason
+    ``serving_stack`` lives there. A sweep that holds a model back **says so**
+    in its report and its log; a silently narrowed sweep would read as "the
+    suite is fully measured" when it is not.
+
+    Set to ``""`` to sweep every enabled model."""
 
     sweep_force: bool = False
     """Re-enqueue pairs that are already measured, ignoring dedupe.
@@ -270,6 +295,21 @@ class Settings(BaseSettings):
     API consumes it through one dependency-injected placeholder
     (``ida_api.auth.current_principal``).  This flag is the seam.
     """
+
+    @property
+    def sweep_exclude_tag_set(self) -> frozenset[str]:
+        """:attr:`sweep_exclude_tags` parsed, normalised and de-duplicated.
+
+        Comma-separated rather than a JSON list because the only place this is
+        ever set is a container environment variable, and
+        ``IDA_SWEEP_EXCLUDE_TAGS=testing-only,deferred`` is what an operator
+        would expect to write. Blank segments are dropped, so a trailing comma is
+        harmless; matching is case-insensitive because ``models.yaml`` tags are
+        lower-case by convention but nothing enforces it.
+        """
+        return frozenset(
+            part.strip().lower() for part in self.sweep_exclude_tags.split(",") if part.strip()
+        )
 
     @field_validator("log_level", mode="after")
     @classmethod

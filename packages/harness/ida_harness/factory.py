@@ -36,18 +36,34 @@ import httpx
 from ida_core.contracts import ModelEntry, ServingStack
 from ida_core.registry import resolve_api_key
 from ida_harness.anthropic_client import AnthropicMessagesClient
-from ida_harness.client import BaseChatClient, ModelClient, OpenAICompatibleClient
+from ida_harness.client import (
+    BaseChatClient,
+    ModelClient,
+    OpenAICompatibleClient,
+    OpenAIReasoningClient,
+)
 
 CLIENT_BY_SERVING_STACK: dict[ServingStack, type[BaseChatClient]] = {
     ServingStack.ANTHROPIC_COMPAT: AnthropicMessagesClient,
+    ServingStack.OPENAI_REASONING: OpenAIReasoningClient,
 }
-"""Serving stacks that need something other than the chat-completions shape.
+"""Serving stacks that need something other than the plain chat-completions shape.
 
 Everything absent from this table -- ``openai_api``, ``vllm``, ``ollama``,
 ``llama_cpp``, ``mock`` -- is OpenAI-compatible and uses
 :class:`~ida_harness.client.OpenAICompatibleClient`.  That default is the point:
 a new vLLM deployment or a laptop llama.cpp server is a YAML edit and touches no
 code at all.
+
+``openai_reasoning`` is the same *endpoint* as ``openai_api`` but a different
+*request dialect*: the o-series and the GPT-5/5.4/5.5/5.6 families reject the
+legacy ``max_tokens`` and any non-default sampling.  It earns a row here for the
+same reason Anthropic does -- a wire format the shared client cannot express --
+and it is selected the same way, by a value an author writes in ``models.yaml``.
+Note the direction of the default: a stack we have never heard of gets the
+LEGACY dialect, which is the right failure. A vLLM box that does not know
+``max_completion_tokens`` would break under the new name, whereas a hosted model
+that rejects ``max_tokens`` says so in one loud, self-describing 400.
 """
 
 DEFAULT_CLIENT: type[BaseChatClient] = OpenAICompatibleClient
