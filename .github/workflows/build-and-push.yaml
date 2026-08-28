@@ -262,9 +262,12 @@ jobs:
           # nothing. NOT a substitute for GIT_SHA above: a release string is
           # human-assigned and shared by every branch between two releases.
           #
-          # Harmless on the frontend and agile legs, which declare no such ARG —
-          # Kaniko warns about an unused build-arg and carries on, exactly as it
-          # already does for GIT_SHA on those two Dockerfiles.
+          # ALSO CONSUMED BY THE FRONTEND. frontend/Dockerfile declares the same
+          # ARG and inlines it as NEXT_PUBLIC_APP_VERSION at build time, which is
+          # what the header's version badge prints — it used to be a hardcoded
+          # `v0.1.4` that no release step ever wrote to. Still harmless on the
+          # agile leg, which declares no such ARG: Kaniko warns about an unused
+          # build-arg and carries on, exactly as it already does for GIT_SHA.
           IDA_VERSION: ${{ needs.resolve.outputs.TAG }}
           CONTEXT: ${{ matrix.context }}
           DOCKERFILE: ${{ matrix.dockerfile }}

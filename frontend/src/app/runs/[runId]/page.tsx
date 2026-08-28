@@ -12,6 +12,7 @@ import {
   shortSha,
 } from "@/lib/format";
 import { classifyRun, classifySample } from "@/lib/outcome";
+import { FACET_CAPTION, groupSamples, type SampleGroup } from "@/lib/samples";
 import type { ResultRecord, RunRecord, ServingConfig } from "@/lib/types";
 import { SAMPLE_FACET_LABEL, sampleFacets } from "@/lib/trust";
 import { Transcript } from "./transcript";
@@ -269,6 +270,75 @@ function ResultRow({
   );
 }
 
+/**
+ * One group of samples, collapsible, with its own mean.
+ *
+ * ⚠ WHY `<details>` AND NOT A CLIENT COMPONENT. The whole run view is server-
+ * rendered and the transcripts inside it already carry the only client JS on the
+ * page. A native disclosure keeps the collapse working before hydration, keeps
+ * it keyboard-accessible for free, and keeps Ctrl-F over a closed group working
+ * in the browsers that support it — none of which a `useState` toggle would.
+ */
+function SampleGroupSection({
+  group,
+  metadata,
+  defaultOpen,
+}: {
+  group: SampleGroup;
+  metadata: Record<string, Record<string, unknown>>;
+  defaultOpen: boolean;
+}) {
+  return (
+    <details className="sample-group" open={defaultOpen}>
+      <summary className="sample-group-head">
+        <span className="sample-group-name">{group.label}</span>
+        <span className="sample-group-stats muted">
+          {group.mean_score === null ? (
+            /* Null is not zero: a group nothing scored has no mean, and a 0.00
+               here would read as "every answer was wrong". */
+            <span>no score</span>
+          ) : (
+            <span className="sample-group-mean">
+              mean {formatScore(group.mean_score)}
+            </span>
+          )}
+          <span>
+            {group.scored_count}/{group.sample_count} scored
+          </span>
+          {group.error_count > 0 ? (
+            <span style={{ color: "var(--fail)" }}>
+              {group.error_count} errored
+            </span>
+          ) : null}
+        </span>
+      </summary>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Sample</th>
+              <th>Outcome</th>
+              <th className="num">Score</th>
+              <th>Explanation</th>
+              <th className="num">Tokens</th>
+              <th className="num">Latency</th>
+            </tr>
+          </thead>
+          <tbody>
+            {group.results.map((result) => (
+              <ResultRow
+                key={result.id}
+                result={result}
+                metadata={metadata[result.sample_id]}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
+
 export default async function RunDetailPage({
   params,
 }: {
@@ -302,6 +372,11 @@ export default async function RunDetailPage({
   // Classified from the taxonomy and the failure signal, never from score
   // nullity -- see lib/outcome.ts for what that mistake produced.
   const outcome = classifyRun(run, results);
+
+  // A run is one task x one model, so grouping by learning outcome would yield
+  // exactly one group. groupSamples picks the finest facet that actually splits
+  // THIS run -- normally the sample's own `skill` -- and says which it used.
+  const grouped = groupSamples(results, sampleMetadata);
 
   return (
     <>
@@ -356,32 +431,31 @@ export default async function RunDetailPage({
         </div>
       )}
 
-      <h2>Samples</h2>
-      {results.length === 0 ? (
-        <p className="muted">No results yet.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Sample</th>
-              <th>Outcome</th>
-              <th className="num">Score</th>
-              <th>Explanation</th>
-              <th className="num">Tokens</th>
-              <th className="num">Latency</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((result) => (
-              <ResultRow
-                key={result.id}
-                result={result}
-                metadata={sampleMetadata[result.sample_id]}
+      <section className="panel">
+        <div className="panel-head">
+          <h2>Samples</h2>
+          <p className="muted panel-note">
+            {results.length === 0
+              ? "No results yet."
+              : grouped.facet
+                ? `${results.length} samples, grouped by ${FACET_CAPTION[grouped.facet]} — the axis that actually varies inside one run. Each group shows the mean over the samples that produced a score; errored samples are counted beside it, never folded in as zeros.`
+                : `${results.length} sample${results.length === 1 ? "" : "s"}. Nothing in this task's metadata splits them into groups, so they are listed as one set.`}
+          </p>
+        </div>
+        {results.length > 0
+          ? grouped.groups.map((group, index) => (
+              <SampleGroupSection
+                key={group.key}
+                group={group}
+                metadata={sampleMetadata}
+                /* Open the first group so the page is never a wall of closed
+                   rows, and open any group with a failure in it — a hidden
+                   error is an error nobody fixes. */
+                defaultOpen={index === 0 || group.error_count > 0 || grouped.groups.length === 1}
               />
-            ))}
-          </tbody>
-        </table>
-      )}
+            ))
+          : null}
+      </section>
     </>
   );
 }

@@ -24,7 +24,33 @@ RUN npm ci --no-audit --no-fund
 # ---- build ----------------------------------------------------------------
 FROM ${NODE_IMAGE} AS build
 WORKDIR /app
-ENV NEXT_TELEMETRY_DISABLED=1
+
+# RELEASE IDENTITY -- the OTHER half of the header's version badge, and it is a
+# BOTH-HALVES wiring exactly like Dockerfile.python's IDA_VERSION.
+#
+# ⚠ NEXT_PUBLIC_* IS INLINED AT BUILD TIME, WHICH IS WHY IT HAS TO BE HERE AND
+# NOT IN THE RUNTIME STAGE. Setting it below `npm run build` would set an
+# environment variable nothing ever reads: the substitution has already happened.
+# One image is built and promoted byte-identically through dev, staging and prod,
+# so a per-environment value is structurally impossible here anyway -- and it is
+# not wanted: the badge names the BUILD, and the build is the thing that is the
+# same in all three.
+#
+# The value is the resolved image TAG, passed by build-and-push.yaml as
+# `--build-arg=IDA_VERSION` to every matrix leg. The overlays pin `newTag: <TAG>`,
+# so "what does the header say" and "what does the overlay say" name the same
+# string.
+#
+# ⚠ DEFAULTS TO EMPTY, ON PURPOSE, and src/lib/version.ts is where that is made
+# safe. A release-shaped literal here would be the `0.1.0` regression the
+# platform's build-provenance suite pins by value: an image confidently naming a
+# release it is not. Empty reaches version.ts, which renders the package version
+# with a `-dev` suffix and says in the tooltip that the build-arg was missing --
+# non-empty, obviously not a release, and visibly broken rather than silently so.
+ARG IDA_VERSION=""
+
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_PUBLIC_APP_VERSION=${IDA_VERSION}
 COPY --from=deps /app/node_modules ./node_modules
 COPY frontend/ ./
 RUN npm run build
