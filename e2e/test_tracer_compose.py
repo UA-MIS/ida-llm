@@ -78,9 +78,7 @@ class TestStackHealth:
         assert {"database", "queue", "artifacts"} <= set(body["checks"])
         assert all(body["checks"].values()), body["checks"]
 
-    def test_the_probe_contract_holds_against_the_real_container(
-        self, api: httpx.Client
-    ) -> None:
+    def test_the_probe_contract_holds_against_the_real_container(self, api: httpx.Client) -> None:
         """/healthz and /readyz are what the CHART probes.
 
         The unit suite proves the split in-process; this proves the paths
@@ -98,9 +96,7 @@ class TestStackHealth:
         assert readiness.status_code == 200
         assert readiness.json()["checks"], "readiness must actually check something"
 
-    def test_metrics_is_scrapeable_from_outside_the_container(
-        self, api: httpx.Client
-    ) -> None:
+    def test_metrics_is_scrapeable_from_outside_the_container(self, api: httpx.Client) -> None:
         """ServiceMonitor `ida-llm-api` scrapes this path on the `http` port."""
         response = api.get("/metrics")
         assert response.status_code == 200
