@@ -622,11 +622,14 @@ it matters.
     this project exists to fix, and a professor cannot audit it. →
     `services/api/ida_api/recommend.py`
 
-10. **SLO and use-mode faceting reads tags no task carries yet.** The results
-    view groups by `slo:` / `use-mode:` / `audience:` prefixed tags the moment a
-    task file has them, per `project-direction-2026-08-26.md`. Nothing is
-    hardcoded and no facet is invented; until tasks are tagged, those filters
-    match nothing. → `services/api/ida_api/leaderboard.py`
+10. **The dashboard reads the curriculum; it never holds a copy.** Results
+    group by a task's `tags` (`slo:<ID>`, `use-mode:<id>`, `slo-benchmark`),
+    parsed by `ida_core.curriculum`; outcome ids, titles and statements come
+    from `curriculum/slo.yaml`; per-sample drill-down reads each sample's
+    un-prefixed `metadata`. There is no list of outcomes in any component, and
+    no use-mode caption written from memory. When the curriculum map is absent
+    the API answers `available: false` and the UI groups by outcome id rather
+    than inventing statements. → `services/api/ida_api/slo.py`
 
 ---
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ApiError, getRun } from "@/lib/api";
+import { ApiError, getRun, getTask } from "@/lib/api";
 import {
   formatCost,
   formatDuration,
@@ -13,6 +13,7 @@ import {
 } from "@/lib/format";
 import { classifyRun, classifySample } from "@/lib/outcome";
 import type { ResultRecord, RunRecord, ServingConfig } from "@/lib/types";
+import { SAMPLE_FACET_LABEL, sampleFacets } from "@/lib/trust";
 import { Transcript } from "./transcript";
 
 export const dynamic = "force-dynamic";
@@ -196,7 +197,37 @@ function OutcomeLabel({ result }: { result: ResultRecord }) {
   }
 }
 
-function ResultRow({ result }: { result: ResultRecord }) {
+/**
+ * The per-sample drill-down, from the sample's own authored `metadata`.
+ *
+ * Results group by the TASK's `tags`; a single sample is drilled into through
+ * its un-prefixed `metadata` (`slo`, `use_mode`, `skill`, `provenance`). The
+ * task validator requires the two spellings to agree, so a reader moving from
+ * the outcome heading on the results page down to one sample here never meets a
+ * contradiction — and `skill` is the part that only exists at this level, which
+ * is what makes the drill-down worth taking.
+ */
+function SampleFacets({ metadata }: { metadata: Record<string, unknown> | undefined }) {
+  const facets = sampleFacets(metadata);
+  if (facets.length === 0) return null;
+  return (
+    <div className="sample-facets">
+      {facets.map(([key, value]) => (
+        <span key={key} className="badge badge-tag" title={SAMPLE_FACET_LABEL[key] ?? key}>
+          {SAMPLE_FACET_LABEL[key] ?? key}: <span className="mono">{value}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ResultRow({
+  result,
+  metadata,
+}: {
+  result: ResultRecord;
+  metadata: Record<string, unknown> | undefined;
+}) {
   return (
     <>
       <tr>
@@ -208,6 +239,7 @@ function ResultRow({ result }: { result: ResultRecord }) {
               (cached)
             </span>
           ) : null}
+          <SampleFacets metadata={metadata} />
         </td>
         <td>
           <OutcomeLabel result={result} />
@@ -253,6 +285,20 @@ export default async function RunDetailPage({
   }
 
   const { run, results } = detail;
+
+  // The task spec, for each sample's authored metadata. Best-effort: a run can
+  // outlive the task file that produced it (an id is never reused for different
+  // content, but a family can be removed), and losing the drill-down labels must
+  // never take down the page that shows the actual results.
+  let sampleMetadata: Record<string, Record<string, unknown>> = {};
+  try {
+    const task = await getTask(run.task_id);
+    sampleMetadata = Object.fromEntries(
+      task.samples.map((sample) => [sample.id, sample.metadata]),
+    );
+  } catch {
+    sampleMetadata = {};
+  }
   // Classified from the taxonomy and the failure signal, never from score
   // nullity -- see lib/outcome.ts for what that mistake produced.
   const outcome = classifyRun(run, results);
@@ -327,7 +373,11 @@ export default async function RunDetailPage({
           </thead>
           <tbody>
             {results.map((result) => (
-              <ResultRow key={result.id} result={result} />
+              <ResultRow
+                key={result.id}
+                result={result}
+                metadata={sampleMetadata[result.sample_id]}
+              />
             ))}
           </tbody>
         </table>

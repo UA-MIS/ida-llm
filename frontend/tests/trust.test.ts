@@ -11,14 +11,23 @@ import { describe, expect, it } from "vitest";
 import {
   confidenceColorVar,
   confidencePips,
-  facetValueLabel,
+  groupByOutcome,
   isDeEmphasised,
+  outcomeHeading,
+  outcomeOf,
   plainTags,
   residencyGlyph,
+  sampleFacets,
   summariseResult,
   trustGlyph,
+  titleForUseMode,
 } from "@/lib/trust";
-import type { ModelResult, TrustTell } from "@/lib/types";
+import type {
+  CurriculumView,
+  ModelResult,
+  TaskLeaderboard,
+  TrustTell,
+} from "@/lib/types";
 
 const VERIFIABLE_TRUST: TrustTell = {
   kind: "verifiable",
@@ -118,19 +127,181 @@ describe("isDeEmphasised", () => {
   });
 });
 
-describe("tags and facets", () => {
-  it("separates prefixed facet tags from plain descriptive ones", () => {
+/** A stand-in for `curriculum/slo.yaml` — the shape, not a copy of the content. */
+const CURRICULUM: CurriculumView = {
+  available: true,
+  unavailable_reason: null,
+  program: "BScBA General Business (core)",
+  source: "https://example.invalid/curriculum-map",
+  outcomes: [
+    {
+      id: "SLO2",
+      title: "Quantitative Literacy",
+      statement: "Students analyze, solve, and communicate…",
+      text_benchmarkable: true,
+      benchmark_note: "…",
+    },
+    {
+      id: "SLO5",
+      title: "Teamwork",
+      statement: "Students work effectively in teams…",
+      text_benchmarkable: false,
+      benchmark_note: "not measurable by a single-turn text benchmark",
+    },
+    {
+      id: "SLO9",
+      title: "General Business Knowledge",
+      statement: "Students demonstrate knowledge…",
+      text_benchmarkable: true,
+      benchmark_note: "…",
+    },
+  ],
+  use_modes: [
+    { id: "capability", title: "Capability", statement: "Can it do this?", in_use: true },
+    { id: "assistive", title: "Assistive", statement: "Can it help?", in_use: false },
+  ],
+};
+
+const NO_CURRICULUM: CurriculumView = {
+  available: false,
+  unavailable_reason: "No curriculum/slo.yaml in this deployment.",
+  program: null,
+  source: null,
+  outcomes: [],
+  use_modes: [],
+};
+
+function task(overrides: Partial<TaskLeaderboard> = {}): TaskLeaderboard {
+  return {
+    task_id: "t",
+    title: "T",
+    description: "d",
+    kind: "verifiable",
+    domain: "business-analytics",
+    scorer: "numeric_match",
+    family: "f",
+    tags: [],
+    slo: null,
+    use_mode: null,
+    in_benchmark: false,
+    sample_count: 5,
+    scorable: true,
+    unscorable_reason: null,
+    results: [],
+    has_results: false,
+    best_model_key: null,
+    ...overrides,
+  };
+}
+
+describe("tags", () => {
+  it("hides the prefixed axis tags, which are rendered from the parsed fields", () => {
+    // `slo:SLO2` next to the outcome's real title would print the same fact
+    // twice, once in the programme's words and once in raw tag form.
     expect(
-      plainTags(["quantitative-quiz", "slo:mis200-3", "use-mode:professor-assist"]),
-    ).toEqual(["quantitative-quiz"]);
+      plainTags([
+        "slo-benchmark",
+        "slo:SLO2",
+        "use-mode:capability",
+        "ladder-l1",
+        "unit-economics",
+      ]),
+    ).toEqual(["ladder-l1", "unit-economics"]);
+  });
+});
+
+describe("use mode titles", () => {
+  it("takes the wording from the curriculum, never from a table in the UI", () => {
+    expect(titleForUseMode(CURRICULUM, "capability")).toBe("Capability");
+    expect(titleForUseMode(CURRICULUM, "assistive")).toBe("Assistive");
   });
 
-  it("gives use-modes the wording from the project direction", () => {
-    expect(facetValueLabel("use_mode", "student-learning-aid")).toBe(
-      "Can it help a student learn?",
-    );
-    // An unknown value passes through rather than rendering as blank.
-    expect(facetValueLabel("use_mode", "brand-new-mode")).toBe("brand-new-mode");
-    expect(facetValueLabel("slo", "mis200-3")).toBe("mis200-3");
+  it("falls back to the raw id rather than inventing a caption", () => {
+    // An id is honest; a guessed caption is the bug this replaced — the old
+    // hardcoded map called `assistive` "professor-assist", which is not a word
+    // the curriculum uses.
+    expect(titleForUseMode(NO_CURRICULUM, "assistive")).toBe("assistive");
+    expect(titleForUseMode(CURRICULUM, "instructional")).toBe("instructional");
+  });
+});
+
+describe("outcome headings", () => {
+  it("pairs the id with the programme's own title", () => {
+    expect(outcomeHeading(CURRICULUM, "SLO2")).toBe("SLO2 · Quantitative Literacy");
+  });
+
+  it("shows a bare id rather than guessing when the curriculum is unavailable", () => {
+    expect(outcomeHeading(NO_CURRICULUM, "SLO2")).toBe("SLO2");
+    expect(outcomeOf(NO_CURRICULUM, "SLO2")).toBeUndefined();
+  });
+
+  it("surfaces an outcome the curriculum does not know, rather than blanking it", () => {
+    // `SL02` with a zero is the classic typo. It is a tagging error the CI gate
+    // reports; the UI showing it is how the person who must fix it sees it.
+    expect(outcomeHeading(CURRICULUM, "SL02")).toBe("SL02");
+  });
+
+  it("keeps outcomes that cannot be text-benchmarked visible", () => {
+    expect(outcomeOf(CURRICULUM, "SLO5")?.text_benchmarkable).toBe(false);
+  });
+});
+
+describe("groupByOutcome", () => {
+  it("groups in the order the API supplied, not alphabetically", () => {
+    // SLO10 would sort before SLO2 as a string; the API sends curriculum order
+    // and this function must not re-sort it.
+    const tasks = [
+      task({ task_id: "b", slo: "SLO9" }),
+      task({ task_id: "a", slo: "SLO2" }),
+    ];
+    expect(groupByOutcome(tasks, ["SLO2", "SLO9"]).map((g) => g.slo)).toEqual([
+      "SLO2",
+      "SLO9",
+    ]);
+  });
+
+  it("puts untagged families last under a null key, not in an error state", () => {
+    // The exemplar and demo families predate the benchmark. They are real
+    // measurements that are simply not filed under an outcome.
+    const tasks = [task({ task_id: "legacy" }), task({ task_id: "a", slo: "SLO2" })];
+    const groups = groupByOutcome(tasks, ["SLO2"]);
+    expect(groups.map((g) => g.slo)).toEqual(["SLO2", null]);
+    expect(groups[1]?.tasks.map((t) => t.task_id)).toEqual(["legacy"]);
+  });
+
+  it("omits an outcome with no tasks rather than rendering an empty heading", () => {
+    expect(groupByOutcome([task({ slo: "SLO2" })], ["SLO2", "SLO9"])).toHaveLength(1);
+  });
+});
+
+describe("sampleFacets", () => {
+  it("reads the un-prefixed per-sample keys in a fixed order", () => {
+    expect(
+      sampleFacets({
+        provenance: "synthetic",
+        skill: "contribution-margin-per-unit",
+        use_mode: "capability",
+        slo: "SLO2",
+      }),
+    ).toEqual([
+      ["slo", "SLO2"],
+      ["use_mode", "capability"],
+      ["skill", "contribution-margin-per-unit"],
+      ["provenance", "synthetic"],
+    ]);
+  });
+
+  it("leaves an author's other metadata keys alone", () => {
+    // Deciding which of an author's keys are interesting is how a dashboard
+    // eventually hides the one that mattered — so only the four are read, and
+    // nothing else is dropped from the underlying data.
+    expect(sampleFacets({ slo: "SLO2", something_else: "kept in the data" })).toEqual([
+      ["slo", "SLO2"],
+    ]);
+  });
+
+  it("survives a task with no metadata at all", () => {
+    expect(sampleFacets(undefined)).toEqual([]);
+    expect(sampleFacets({})).toEqual([]);
   });
 });

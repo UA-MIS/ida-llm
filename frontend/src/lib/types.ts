@@ -282,8 +282,19 @@ export interface TaskLeaderboard {
   scorer: string;
   family: string;
   tags: string[];
-  /** `slo:` / `use-mode:` / `audience:` tag values, once tasks carry them. */
-  facets: Record<string, string[]>;
+  /**
+   * The Student Learning Outcome this task measures, e.g. `SLO2`.
+   *
+   * The grouping key. Its MEANING — title, statement, whether a text benchmark
+   * can measure it at all — comes from `LeaderboardResponse.curriculum`, which
+   * is read from `curriculum/slo.yaml`. Nothing in this frontend holds a copy
+   * of the nine outcomes.
+   */
+  slo: string | null;
+  /** `capability` today; `assistive` and `instructional` are declared but not in use. */
+  use_mode: string | null;
+  /** Carries the `slo-benchmark` tag — one filter selects the whole benchmark. */
+  in_benchmark: boolean;
   sample_count: number;
   scorable: boolean;
   unscorable_reason: string | null;
@@ -301,9 +312,53 @@ export interface LeaderboardResponse {
   runs_considered: number;
   /** False on a fresh install: render an honest empty state, not an empty table. */
   has_any_results: boolean;
-  facet_values: Record<string, string[]>;
+  /** `curriculum/slo.yaml`, read not retyped. See `CurriculumView`. */
+  curriculum: CurriculumView;
+  benchmark_task_count: number;
+  /** Outcome ids present, in CURRICULUM order (SLO10 must not sort before SLO2). */
+  slos: string[];
+  use_modes: string[];
   families: string[];
   domains: string[];
+}
+
+/** One Student Learning Outcome, as the programme publishes it. */
+export interface OutcomeView {
+  id: string;
+  title: string;
+  statement: string;
+  /**
+   * False for the outcomes a single-turn text benchmark cannot measure (SLO5
+   * Teamwork, SLO8 Oral Communication). Surfaced rather than filtered out: a
+   * benchmark that silently covered seven of nine would read as though the
+   * programme has seven.
+   */
+  text_benchmarkable: boolean;
+  benchmark_note: string;
+}
+
+export interface UseModeView {
+  id: string;
+  title: string;
+  statement: string;
+  /** False declares the spelling without permitting a task to tag it yet. */
+  in_use: boolean;
+}
+
+/**
+ * `curriculum/slo.yaml`, served so no consumer holds its own copy.
+ *
+ * `available: false` is a legitimate state — a deployment without the map still
+ * groups results by outcome id, it just cannot render the statements, and says
+ * so rather than guessing at nine strings that are the registrar's to write.
+ */
+export interface CurriculumView {
+  available: boolean;
+  unavailable_reason: string | null;
+  program: string | null;
+  source: string | null;
+  outcomes: OutcomeView[];
+  use_modes: UseModeView[];
 }
 
 // ---------------------------------------------------------------------------
@@ -418,4 +473,38 @@ export interface RecommendationResponse {
   matched_task_ids: string[];
   missing_benchmarks: string[];
   what_would_change_this: string[];
+}
+
+/**
+ * One sample as `GET /tasks/{id}` exposes it.
+ *
+ * `metadata` is the task author's own dict. For SLO-benchmark tasks it repeats
+ * the task's two axes un-prefixed (`slo`, `use_mode`) alongside the sample's own
+ * `skill` and `provenance` — that is the per-sample drill-down, and the task
+ * validator requires it to agree with the tags so the two never disagree.
+ */
+export interface SampleView {
+  id: string;
+  input: string;
+  metadata: Record<string, unknown>;
+  /** Null when redacted OR genuinely absent — consult `has_target`. */
+  target: string | null;
+  has_target: boolean;
+}
+
+export interface TaskDetail {
+  id: string;
+  title: string;
+  description: string;
+  kind: TaskKind;
+  domain: string;
+  system_prompt: string | null;
+  tags: string[];
+  content_sha: string;
+  samples: SampleView[];
+  sample_count: number;
+  scorable: boolean;
+  unscorable_reason: string | null;
+  /** True when gold answers were withheld — the default for an anonymous read. */
+  targets_redacted: boolean;
 }

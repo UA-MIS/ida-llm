@@ -27,8 +27,18 @@ import Link from "next/link";
 import { ModelResultCard } from "@/components/model-result-card";
 import { TrustLegend } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
-import { FACET_LABEL, facetValueLabel, plainTags } from "@/lib/trust";
-import type { LeaderboardResponse, TaskLeaderboard } from "@/lib/types";
+import {
+  groupByOutcome,
+  outcomeHeading,
+  outcomeOf,
+  plainTags,
+  titleForUseMode,
+} from "@/lib/trust";
+import type {
+  CurriculumView,
+  LeaderboardResponse,
+  TaskLeaderboard,
+} from "@/lib/types";
 
 /** Results change as runs land, so never statically render this page. */
 export const dynamic = "force-dynamic";
@@ -103,26 +113,36 @@ function TaskChooser({
   );
 }
 
-/** The SLO / use-mode facets, shown only once tasks actually carry those tags. */
-function FacetRow({ task }: { task: TaskLeaderboard }) {
-  const entries = Object.entries(task.facets);
-  const tags = plainTags(task.tags);
+/**
+ * A task's axes and descriptive tags.
+ *
+ * The use mode is captioned from the curriculum, never from a table in this
+ * file — `assistive` is the programme's word, and an invented caption is a
+ * caption that disagrees with it.
+ */
+function FacetRow({
+  task,
+  curriculum,
+}: {
+  task: TaskLeaderboard;
+  curriculum: CurriculumView;
+}) {
   return (
     <div className="facet-row">
       <span className="badge">{task.kind}</span>
       <span className="badge">{task.domain}</span>
-      {entries.map(([facet, values]) =>
-        values.map((value) => (
-          <span
-            key={`${facet}:${value}`}
-            className="badge badge-facet"
-            title={FACET_LABEL[facet] ?? facet}
-          >
-            {FACET_LABEL[facet] ?? facet}: {facetValueLabel(facet, value)}
-          </span>
-        )),
-      )}
-      {tags.map((tag) => (
+      {task.use_mode ? (
+        <span
+          className="badge badge-facet"
+          title={
+            curriculum.use_modes.find((mode) => mode.id === task.use_mode)
+              ?.statement ?? "What is being asked of the model."
+          }
+        >
+          {titleForUseMode(curriculum, task.use_mode)}
+        </span>
+      ) : null}
+      {plainTags(task.tags).map((tag) => (
         <span key={tag} className="badge badge-tag mono">
           {tag}
         </span>
@@ -131,12 +151,71 @@ function FacetRow({ task }: { task: TaskLeaderboard }) {
   );
 }
 
-function TaskSection({ task }: { task: TaskLeaderboard }) {
+/**
+ * The heading for one Student Learning Outcome, with the programme's own words.
+ *
+ * This is the credibility claim of the whole SLO framing rendered: we are not
+ * measuring against *our* opinion of what matters, we are measuring against the
+ * outcome the programme published — so the outcome is quoted, not paraphrased,
+ * and it comes off the wire rather than out of this component.
+ */
+function OutcomeHeading({
+  slo,
+  curriculum,
+}: {
+  slo: string | null;
+  curriculum: CurriculumView;
+}) {
+  if (slo === null) {
+    return (
+      <div className="outcome-heading">
+        <h2>Not part of the SLO benchmark</h2>
+        <p className="muted">
+          These families predate the curriculum-anchored benchmark. They are real
+          measurements; they are just not filed under an outcome.
+        </p>
+      </div>
+    );
+  }
+  const outcome = outcomeOf(curriculum, slo);
+  return (
+    <div className="outcome-heading">
+      <h2>{outcomeHeading(curriculum, slo)}</h2>
+      {outcome ? (
+        <>
+          <blockquote className="outcome-statement">{outcome.statement}</blockquote>
+          <p className="muted outcome-note">
+            The programme&rsquo;s own published outcome
+            {curriculum.program ? ` for ${curriculum.program}` : ""}. Everything
+            below asks: how well can a model do what this outcome says a student
+            should be able to do?
+          </p>
+        </>
+      ) : (
+        /* Never invent a statement. An id we cannot look up is a tagging error
+           the task-schema CI gate reports — surfacing it is how it gets fixed. */
+        <p className="muted">
+          {curriculum.available
+            ? `No outcome ${slo} in the curriculum map — this is a tagging error, and \`make lint-tasks\` will name it.`
+            : "Outcome statements are unavailable in this deployment, so this group is shown by id."}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function TaskSection({
+  task,
+  curriculum,
+}: {
+  task: TaskLeaderboard;
+  curriculum: CurriculumView;
+}) {
   return (
     <section className="task-section">
-      <h2 className="task-title">{task.title}</h2>
+      <h3 className="task-title">{task.title}</h3>
       <p className="muted task-description">{task.description}</p>
-      <FacetRow task={task} />
+      <FacetRow task={task} curriculum={curriculum} />
 
       {task.has_results ? (
         <ol className="result-list">
@@ -192,6 +271,62 @@ function NothingMeasuredYet({ taskCount }: { taskCount: number }) {
   );
 }
 
+/**
+ * The outcome filter — one link per SLO, plus the whole-benchmark filter.
+ *
+ * Rendered from the ids the API found in the catalog and captioned from the
+ * curriculum. Nine outcomes are never listed here: a task tagged to an outcome
+ * nobody has benchmarked would produce a filter chip leading to an empty page.
+ */
+function OutcomeFilter({
+  board,
+  selectedSlo,
+  benchmarkOnly,
+}: {
+  board: LeaderboardResponse;
+  selectedSlo?: string;
+  benchmarkOnly: boolean;
+}) {
+  if (board.slos.length === 0) return null;
+  return (
+    <div className="chooser">
+      <div className="chooser-label">Or by learning outcome</div>
+      <div className="chips">
+        <Link
+          href="/"
+          className={`chip${!selectedSlo && !benchmarkOnly ? " chip-active" : ""}`}
+        >
+          Any
+        </Link>
+        {board.benchmark_task_count > 0 ? (
+          <Link
+            href="/?benchmark=1"
+            className={`chip${benchmarkOnly && !selectedSlo ? " chip-active" : ""}`}
+            title="Every task in the curriculum-anchored benchmark — one tag, one filter."
+          >
+            The whole SLO benchmark ({board.benchmark_task_count})
+          </Link>
+        ) : null}
+        {board.slos.map((slo) => (
+          <Link
+            key={slo}
+            href={`/?slo=${encodeURIComponent(slo)}`}
+            className={`chip${selectedSlo === slo ? " chip-active" : ""}`}
+            title={outcomeOf(board.curriculum, slo)?.statement ?? slo}
+          >
+            {outcomeHeading(board.curriculum, slo)}
+          </Link>
+        ))}
+      </div>
+      {!board.curriculum.available ? (
+        <p className="muted" style={{ fontSize: "0.8rem", marginTop: "0.5rem" }}>
+          {board.curriculum.unavailable_reason}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function ResultsPage({
   searchParams,
 }: {
@@ -199,17 +334,32 @@ export default async function ResultsPage({
 }) {
   const params = await searchParams;
   const selected = one(params.task);
-  const board = await getLeaderboard();
+  const selectedSlo = one(params.slo);
+  const selectedUseMode = one(params.use_mode);
+  const benchmarkOnly = one(params.benchmark) === "1";
+
+  // Filtering happens in the API, on the same parsed axes the CI gate
+  // validates — never by re-deriving tags in the browser.
+  const board = await getLeaderboard({
+    slo: selectedSlo,
+    useMode: selectedUseMode,
+    benchmark: benchmarkOnly,
+  });
 
   const shown = selected
     ? board.tasks.filter((task) => task.task_id === selected)
-    : board.tasks.filter((task) => task.has_results);
+    : selectedSlo || selectedUseMode || benchmarkOnly
+      ? board.tasks
+      : board.tasks.filter((task) => task.has_results);
+  const groups = groupByOutcome(shown, board.slos);
+  const filtered = Boolean(selectedSlo || selectedUseMode || benchmarkOnly || selected);
 
   return (
     <>
       <p className="subtitle">
-        Which model does what you need — measured against real academic tasks,
-        with the evidence behind every number one click away.
+        Which model does what you need — measured against your programme&rsquo;s
+        own learning outcomes, with the evidence behind every number one click
+        away.
       </p>
 
       <div className="cta-row">
@@ -219,28 +369,45 @@ export default async function ResultsPage({
       </div>
 
       <TaskChooser board={board} selected={selected} />
+      <OutcomeFilter
+        board={board}
+        selectedSlo={selectedSlo}
+        benchmarkOnly={benchmarkOnly}
+      />
       <TrustLegend />
 
-      {!board.has_any_results ? (
+      {!board.has_any_results && !filtered ? (
         <NothingMeasuredYet taskCount={board.task_count} />
       ) : shown.length === 0 ? (
         <div className="notice">
-          <strong>No such task.</strong> Nothing in the catalog matches{" "}
-          <code className="mono">{selected}</code>.{" "}
+          <strong>Nothing matches that.</strong> No task in the catalog matches
+          this filter.{" "}
           <Link href="/">Show everything measured</Link>.
         </div>
       ) : (
         <>
           <p className="muted results-meta">
             Showing {shown.length} task{shown.length === 1 ? "" : "s"} ·{" "}
-            {board.measured_task_count} of {board.task_count} tasks in the catalog
-            have been measured · {board.runs_considered} run
+            {board.measured_task_count} of {board.task_count} measured ·{" "}
+            {board.runs_considered} run
             {board.runs_considered === 1 ? "" : "s"} read (the newest finished run
-            per task and model) ·{" "}
-            <Link href="/runs">see every run</Link>
+            per task and model) · <Link href="/runs">see every run</Link>
           </p>
-          {shown.map((task) => (
-            <TaskSection key={task.task_id} task={task} />
+          {groups.map((group) => (
+            <section key={group.slo ?? "untagged"} className="outcome-group">
+              {/* Only worth a heading when there is more than one group, or
+                  when the reader explicitly asked for one outcome. */}
+              {groups.length > 1 || selectedSlo ? (
+                <OutcomeHeading slo={group.slo} curriculum={board.curriculum} />
+              ) : null}
+              {group.tasks.map((task) => (
+                <TaskSection
+                  key={task.task_id}
+                  task={task}
+                  curriculum={board.curriculum}
+                />
+              ))}
+            </section>
           ))}
         </>
       )}

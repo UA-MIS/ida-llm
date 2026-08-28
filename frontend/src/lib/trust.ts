@@ -12,7 +12,14 @@
  * badge components below take a `TrustTell` rather than a score.
  */
 
-import type { Confidence, DataResidency, ModelResult } from "./types";
+import type {
+  Confidence,
+  CurriculumView,
+  DataResidency,
+  ModelResult,
+  OutcomeView,
+  TaskLeaderboard,
+} from "./types";
 
 /** Which colour a confidence tier is drawn in. */
 export function confidenceColorVar(confidence: Confidence): string {
@@ -98,32 +105,110 @@ export function isDeEmphasised(result: ModelResult): boolean {
 }
 
 /**
- * Group a task's tags into the facets that mean something.
+ * A task's descriptive tags — everything the SLO axes have not already claimed.
  *
- * `slo:`/`use-mode:`/`audience:` come back from the API already parsed into
- * `facets`; this turns the remainder into plain descriptive tags so the UI can
- * show both without printing `slo:mis200-3` twice.
+ * `slo:` / `use-mode:` / `slo-benchmark` arrive on the row already parsed
+ * (`task.slo`, `task.use_mode`, `task.in_benchmark`), so printing them again as
+ * raw tags would show `slo:SLO2` next to the outcome's real title. The filter
+ * matches the API's parse rule: a prefixed tag is a claim, not a description.
  */
 export function plainTags(tags: string[]): string[] {
-  return tags.filter((tag) => !tag.includes(":"));
+  return tags.filter((tag) => !tag.includes(":") && tag !== BENCHMARK_TAG);
 }
 
-export const FACET_LABEL: Record<string, string> = {
+export const BENCHMARK_TAG = "slo-benchmark";
+
+/**
+ * The title for a use mode, from the curriculum — never a table in this file.
+ *
+ * ⚠ THERE IS NO HARDCODED LABEL MAP HERE, and that is deliberate. An earlier
+ * version of this file carried one, invented before the vocabulary existed, and
+ * every entry in it was wrong (`professor-assist` for what the curriculum calls
+ * `assistive`). `curriculum/slo.yaml` is the authority for both the spelling and
+ * the wording; a component that captions it from memory is a component that
+ * disagrees with the programme.
+ *
+ * Falls back to the raw id when the curriculum is unavailable — an id is honest,
+ * an invented caption is not.
+ *
+ * ⚠ NOT `useModeTitle`. A `use`-prefixed export is read as a React hook by
+ * `react-hooks/rules-of-hooks`, which then fails the build the first time it is
+ * called inside a conditional — which this legitimately is.
+ */
+export function titleForUseMode(
+  curriculum: CurriculumView | undefined,
+  modeId: string,
+): string {
+  return curriculum?.use_modes.find((mode) => mode.id === modeId)?.title ?? modeId;
+}
+
+/** The outcome record for an id, or undefined when the curriculum is unavailable. */
+export function outcomeOf(
+  curriculum: CurriculumView | undefined,
+  outcomeId: string | null,
+): OutcomeView | undefined {
+  if (!outcomeId) return undefined;
+  return curriculum?.outcomes.find((outcome) => outcome.id === outcomeId);
+}
+
+/**
+ * Heading for an outcome group.
+ *
+ * `SLO2 · Quantitative Literacy` when the curriculum is loaded, bare `SLO2`
+ * when it is not. Never a guess at the title.
+ */
+export function outcomeHeading(
+  curriculum: CurriculumView | undefined,
+  outcomeId: string,
+): string {
+  const outcome = outcomeOf(curriculum, outcomeId);
+  return outcome ? `${outcome.id} · ${outcome.title}` : outcomeId;
+}
+
+/**
+ * Group task boards by outcome, in the order the API returned the ids.
+ *
+ * The API orders them by the curriculum's own sequence (SLO10 must not sort
+ * before SLO2). Tasks with no outcome go last under a null key — the exemplar
+ * and demo families predate the benchmark and are not errors.
+ */
+export function groupByOutcome(
+  tasks: TaskLeaderboard[],
+  slos: string[],
+): { slo: string | null; tasks: TaskLeaderboard[] }[] {
+  const groups: { slo: string | null; tasks: TaskLeaderboard[] }[] = [];
+  for (const slo of slos) {
+    const inGroup = tasks.filter((task) => task.slo === slo);
+    if (inGroup.length > 0) groups.push({ slo, tasks: inGroup });
+  }
+  const untagged = tasks.filter((task) => !task.slo);
+  if (untagged.length > 0) groups.push({ slo: null, tasks: untagged });
+  return groups;
+}
+
+/**
+ * The per-sample drill-down keys, in a fixed reading order.
+ *
+ * `slo` and `use_mode` repeat the task's tags (the validator requires them to
+ * agree, so they are context rather than news); `skill` and `provenance` are the
+ * sample's own and are the reason to drill in at all. Everything else the author
+ * put in `metadata` is left alone — a dashboard that decided which of an
+ * author's keys were interesting would eventually hide the one that mattered.
+ */
+const SAMPLE_FACET_ORDER = ["slo", "use_mode", "skill", "provenance"] as const;
+
+export const SAMPLE_FACET_LABEL: Record<string, string> = {
   slo: "Learning outcome",
   use_mode: "Use mode",
-  audience: "Audience",
+  skill: "Skill",
+  provenance: "Provenance",
 };
 
-/** Human label for a `use-mode:` value, per the project-direction dimensions. */
-export const USE_MODE_LABEL: Record<string, string> = {
-  "capability": "Can a model just do this? (integrity risk)",
-  "integrity-risk": "Can a model just do this? (integrity risk)",
-  "professor-assist": "Can it help the professor?",
-  "student-learning-aid": "Can it help a student learn?",
-  "researcher-assist": "Can it help with research?",
-};
-
-export function facetValueLabel(facet: string, value: string): string {
-  if (facet === "use_mode") return USE_MODE_LABEL[value] ?? value;
-  return value;
+export function sampleFacets(
+  metadata: Record<string, unknown> | undefined,
+): [string, string][] {
+  if (!metadata) return [];
+  return SAMPLE_FACET_ORDER.filter(
+    (key) => metadata[key] !== undefined && metadata[key] !== null && metadata[key] !== "",
+  ).map((key) => [key, String(metadata[key])]);
 }

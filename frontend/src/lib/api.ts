@@ -26,6 +26,7 @@ import type {
   RunDetail,
   RunListResponse,
   SampleTranscript,
+  TaskDetail,
 } from "./types";
 
 const SERVER_BASE =
@@ -102,8 +103,12 @@ export function getLeaderboard(params?: {
   taskId?: string;
   family?: string;
   domain?: string;
+  /** A Student Learning Outcome id, e.g. `SLO2`. */
   slo?: string;
+  /** `capability` today; `assistive`/`instructional` are declared, not in use. */
   useMode?: string;
+  /** Only tasks carrying `slo-benchmark` — one filter, the whole benchmark. */
+  benchmark?: boolean;
 }): Promise<LeaderboardResponse> {
   const query = new URLSearchParams();
   if (params?.taskId) query.set("task_id", params.taskId);
@@ -111,8 +116,14 @@ export function getLeaderboard(params?: {
   if (params?.domain) query.set("domain", params.domain);
   if (params?.slo) query.set("slo", params.slo);
   if (params?.useMode) query.set("use_mode", params.useMode);
+  if (params?.benchmark) query.set("benchmark", "true");
   const suffix = query.toString() ? `?${query}` : "";
   return getJson<LeaderboardResponse>(`/leaderboard${suffix}`);
+}
+
+/** One full task spec, including each sample's authored `metadata`. */
+export function getTask(taskId: string): Promise<TaskDetail> {
+  return getJson<TaskDetail>(`/tasks/${taskId}`, 60);
 }
 
 /**

@@ -335,6 +335,20 @@ def applicable_questions(answers: dict[str, str]) -> list[IntakeQuestion]:
 # Mapping an answer onto the benchmark
 # ==========================================================================
 
+USE_MODE_CAPABILITY = "capability"
+"""Can the model just DO this outright?  The only mode in use today."""
+
+USE_MODE_ASSISTIVE = "assistive"
+"""Can it help the professor prepare, grade or create?  Declared, not yet in use."""
+
+USE_MODE_INSTRUCTIONAL = "instructional"
+"""Can it help a STUDENT learn this, rather than hand over the answer?
+
+Declared, not yet in use.  Named here so the tutoring area starts matching the
+moment a task carries it -- with no code change, which is the property the SLO
+plan depends on.
+"""
+
 
 @dataclass(frozen=True)
 class TaskArea:
@@ -342,9 +356,14 @@ class TaskArea:
 
     ``match_tags`` / ``match_domains`` are matched against the *task catalog*
     rather than hardcoding task ids, so authoring a new task family into an
-    existing area is a YAML edit here too.  ``match_use_modes`` reads the
-    ``use-mode:`` facet from ``project-direction-2026-08-26.md`` the moment task
-    files start carrying it; until then it simply matches nothing.
+    existing area is a YAML edit here too.
+
+    ``match_use_modes`` names values from the use-mode axis in
+    ``curriculum/slo.yaml``.  Only ``capability`` is ``in_use`` today; the other
+    two are declared spellings that no task may carry yet, so naming them here
+    matches nothing until they are turned on -- which is the intended behaviour,
+    not a gap.  The authoritative list is the file; these are the subset this
+    engine knows how to reason about.
     """
 
     value: str
@@ -502,7 +521,7 @@ TASK_AREAS: dict[str, TaskArea] = {
         label="Grading student work",
         match_tags=frozenset({"conceptual-grading", "grading", "marking"}),
         match_domains=frozenset({"assessment"}),
-        match_use_modes=frozenset({"professor-assist"}),
+        match_use_modes=frozenset({USE_MODE_ASSISTIVE}),
         prompt_template=GRADING_TEMPLATE,
         student_facing_guardrails=(
             "Grading is not a student-facing use. If students see the output, they see "
@@ -516,7 +535,7 @@ TASK_AREAS: dict[str, TaskArea] = {
             {"quantitative-quiz", "item-generation", "distractor-design", "arithmetic"}
         ),
         match_domains=frozenset({"quantitative-methods"}),
-        match_use_modes=frozenset({"professor-assist"}),
+        match_use_modes=frozenset({USE_MODE_ASSISTIVE}),
         prompt_template=QUIZ_TEMPLATE,
     ),
     "feedback": TaskArea(
@@ -524,21 +543,21 @@ TASK_AREAS: dict[str, TaskArea] = {
         label="Writing feedback to students",
         match_tags=frozenset({"feedback"}),
         match_domains=frozenset({"writing"}),
-        match_use_modes=frozenset({"professor-assist"}),
+        match_use_modes=frozenset({USE_MODE_ASSISTIVE}),
         prompt_template=FEEDBACK_TEMPLATE,
     ),
     "content_slides": TaskArea(
         value="content_slides",
         label="Course content and slides",
         match_tags=frozenset({"content", "slides", "course-content"}),
-        match_use_modes=frozenset({"professor-assist"}),
+        match_use_modes=frozenset({USE_MODE_ASSISTIVE}),
         prompt_template=CONTENT_TEMPLATE,
     ),
     "tutoring": TaskArea(
         value="tutoring",
         label="Tutoring or explaining concepts",
         match_tags=frozenset({"tutoring", "learning-aid", "scaffolding"}),
-        match_use_modes=frozenset({"student-learning-aid"}),
+        match_use_modes=frozenset({USE_MODE_INSTRUCTIONAL}),
         prompt_template=TUTORING_TEMPLATE,
         student_facing_guardrails=(
             "Set it up as a tutor, not an answer engine — the template below refuses to "
@@ -563,20 +582,21 @@ TASK_AREAS: dict[str, TaskArea] = {
             }
         ),
         match_domains=frozenset({"statistics", "quantitative-methods", "mathematics"}),
+        match_use_modes=frozenset({USE_MODE_CAPABILITY}),
         prompt_template=ANALYSIS_TEMPLATE,
     ),
     "literature_review": TaskArea(
         value="literature_review",
         label="Literature review and summarising",
         match_tags=frozenset({"literature-review", "summarisation"}),
-        match_use_modes=frozenset({"researcher-assist"}),
+        match_use_modes=frozenset({USE_MODE_ASSISTIVE}),
         prompt_template=LITERATURE_TEMPLATE,
     ),
     "drafting_editing": TaskArea(
         value="drafting_editing",
         label="Drafting and editing papers",
         match_tags=frozenset({"drafting", "editing", "academic-writing"}),
-        match_use_modes=frozenset({"researcher-assist"}),
+        match_use_modes=frozenset({USE_MODE_ASSISTIVE}),
         prompt_template=DRAFTING_TEMPLATE,
     ),
     "research_data_analysis": TaskArea(
@@ -586,6 +606,7 @@ TASK_AREAS: dict[str, TaskArea] = {
             {"descriptive-statistics", "inference", "regression", "hypothesis-testing"}
         ),
         match_domains=frozenset({"statistics", "quantitative-methods"}),
+        match_use_modes=frozenset({USE_MODE_CAPABILITY}),
         prompt_template=ANALYSIS_TEMPLATE,
     ),
     "coding_for_research": TaskArea(
@@ -599,7 +620,7 @@ TASK_AREAS: dict[str, TaskArea] = {
         value="grant_writing",
         label="Grant writing",
         match_tags=frozenset({"grant-writing"}),
-        match_use_modes=frozenset({"researcher-assist"}),
+        match_use_modes=frozenset({USE_MODE_ASSISTIVE}),
         prompt_template=GRANT_TEMPLATE,
     ),
 }
@@ -625,11 +646,11 @@ def matched_task_ids(area: TaskArea, boards: list[TaskLeaderboard]) -> list[str]
     matches: list[str] = []
     for board in boards:
         tags = {t.lower() for t in board.tags}
-        use_modes = {v.lower() for v in board.facets.get("use_mode", [])}
+        use_mode = (board.use_mode or "").lower()
         if (
             tags & area.match_tags
             or board.domain.lower() in area.match_domains
-            or use_modes & area.match_use_modes
+            or (use_mode and use_mode in area.match_use_modes)
         ):
             matches.append(board.task_id)
     return matches

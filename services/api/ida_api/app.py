@@ -15,6 +15,7 @@ Route map
 ``GET  /runs/{run_id}/results/{sample_id}/transcript``
                             the archived transcript, fetched from object storage
 ``GET  /leaderboard``       task-first results: every model measured, per task
+``GET  /curriculum``        the SLOs and use modes, read from curriculum/slo.yaml
 ``GET  /recommend/questions``
                             the intake question tree the dashboard renders
 ``POST /recommend``         intake answers -> a recommendation, or a stated refusal
@@ -60,6 +61,7 @@ from ida_api.schemas import (
     TaskDetail,
     TaskSummary,
 )
+from ida_api.slo import CurriculumView, in_benchmark, slo_of, use_mode_of
 from ida_core import artifacts as artifact_paths
 from ida_core.contracts import (
     RunDetail,
@@ -523,9 +525,23 @@ def create_app(context: AppContext | None = None) -> FastAPI:
         task_id: str | None = Query(None, description="One task only."),
         family: str | None = Query(None, description="Task family, e.g. 'quantitative-quiz'."),
         domain: str | None = Query(None),
-        slo: str | None = Query(None, description="A `slo:` tag value, when tasks carry one."),
+        slo: str | None = Query(
+            None,
+            description=(
+                "A Student Learning Outcome id, e.g. 'SLO2'. The ids and their "
+                "statements come from curriculum/slo.yaml."
+            ),
+        ),
         use_mode: str | None = Query(
-            None, description="A `use-mode:` tag value: professor-assist, student-learning-aid, ..."
+            None,
+            description="A use mode: 'capability' today; 'assistive'/'instructional' reserved.",
+        ),
+        benchmark: bool = Query(
+            False,
+            description=(
+                "Only tasks carrying the 'slo-benchmark' tag. One filter selects the "
+                "whole SLO-anchored benchmark."
+            ),
         ),
     ) -> LeaderboardResponse:
         """Task-first results: for each task, every model measured on it, best first.
@@ -554,14 +570,42 @@ def create_app(context: AppContext | None = None) -> FastAPI:
             specs = [s for s in specs if task_family(s) == family]
         if domain is not None:
             specs = [s for s in specs if s.domain == domain]
+        # The two SLO axes are matched through `ida_api.slo`, never by rebuilding
+        # the tag string here: `slo_of` returns None for a task carrying TWO
+        # outcome tags (ambiguous, and a CI failure), whereas an `f"slo:{slo}"
+        # in s.tags` test would happily match one of them and file the results
+        # under a heading the author did not choose.
         if slo is not None:
-            specs = [s for s in specs if f"slo:{slo}" in s.tags]
+            specs = [s for s in specs if slo_of(list(s.tags)) == slo]
         if use_mode is not None:
-            specs = [s for s in specs if f"use-mode:{use_mode}" in s.tags]
+            specs = [s for s in specs if use_mode_of(list(s.tags)) == use_mode]
+        if benchmark:
+            specs = [s for s in specs if in_benchmark(list(s.tags))]
 
         registry_by_key = {entry.key: entry for entry in ctx.registry.models}
         with session_scope(ctx.session_factory) as session:
-            return build_leaderboard(session, specs=specs, registry_by_key=registry_by_key)
+            return build_leaderboard(
+                session,
+                specs=specs,
+                registry_by_key=registry_by_key,
+                curriculum=ctx.curriculum,
+            )
+
+    @app.get("/curriculum", response_model=CurriculumView, tags=["results"])
+    def get_curriculum(ctx: AppContext = Depends(get_context)) -> CurriculumView:
+        """The Student Learning Outcomes and use modes, from ``curriculum/slo.yaml``.
+
+        Served so that no consumer -- this dashboard included -- ever holds its
+        own copy of the nine outcomes. There are nine, two of them cannot be
+        measured by a text benchmark, and the wording is the registrar's: a list
+        typed into a component is a list that silently disagrees with the
+        programme the first time that wording is edited.
+
+        ``available: false`` is a legitimate answer and carries the reason. A
+        deployment without the map still serves results grouped by outcome id;
+        it just cannot render the statements, and says so rather than guessing.
+        """
+        return ctx.curriculum
 
     # ------------------------------------------------------ recommendation --
 
@@ -607,7 +651,12 @@ def create_app(context: AppContext | None = None) -> FastAPI:
         specs = list(ctx.catalog.all())
         registry_by_key = {entry.key: entry for entry in ctx.registry.models}
         with session_scope(ctx.session_factory) as session:
-            board = build_leaderboard(session, specs=specs, registry_by_key=registry_by_key)
+            board = build_leaderboard(
+                session,
+                specs=specs,
+                registry_by_key=registry_by_key,
+                curriculum=ctx.curriculum,
+            )
         return evaluate(
             request.answers,
             boards=board.tasks,

@@ -18,7 +18,14 @@ from _dashboard_helpers import (
 from fastapi.testclient import TestClient
 
 from ida_api.deps import AppContext
-from ida_api.leaderboard import data_residency, task_facets, task_family
+from ida_api.leaderboard import (
+    TaskLeaderboard,
+    _ordered_slos,
+    data_residency,
+    task_axes,
+    task_family,
+)
+from ida_api.slo import CurriculumView, OutcomeView, load_curriculum_view
 from ida_api.trust import assess
 from ida_core.contracts import RunStatus, ScorerKind, TaskKind
 
@@ -291,7 +298,7 @@ class TestResidency:
         assert result["data_residency_label"] == "Sends data to a third party"
 
 
-class TestFiltersAndFacets:
+class TestFilters:
     def test_task_id_filter_narrows_to_one_task(self, client: TestClient) -> None:
         body = client.get(f"/leaderboard?task_id={QUIZ_TASK}").json()
         assert [t["task_id"] for t in body["tasks"]] == [QUIZ_TASK]
@@ -314,32 +321,162 @@ class TestFiltersAndFacets:
     def test_family_is_the_id_prefix(self, context: AppContext) -> None:
         assert task_family(context.catalog.get(GRADING_TASK)) == "conceptual-grading"
 
-    def test_slo_and_use_mode_facets_are_read_from_prefixed_tags(self, context: AppContext) -> None:
-        """No task carries these tags today.
 
-        The facet reader is written against the tag convention so that tagging a
-        task file is the ONLY step needed to make per-SLO and per-use-mode
-        grouping appear -- the same "adding a class is a YAML edit" property the
-        curriculum-map plan depends on.
-        """
+class TestSloAxes:
+    """The SLO-benchmark tag contract, as the dashboard consumes it.
+
+    The contract itself lives in ``ida_core.curriculum`` and is enforced by the
+    ``task-schema`` CI gate. What these pin is that the dashboard reads it the
+    same way -- and, in particular, that it never invents an outcome.
+    """
+
+    def test_the_two_axes_and_benchmark_membership_come_off_the_tags(
+        self, context: AppContext
+    ) -> None:
         spec = context.catalog.get(QUIZ_TASK).model_copy(
             update={
                 "tags": [
-                    "quantitative-quiz",
-                    "slo:mis200-3",
-                    "use-mode:professor-assist",
-                    "audience:teacher",
-                    "not-a-facet",
-                    "malformed:",
+                    "slo-benchmark",
+                    "slo:SLO2",
+                    "use-mode:capability",
+                    "ladder-l1",
+                    "unit-economics",
                 ]
             }
         )
-        assert task_facets(spec) == {
-            "slo": ["mis200-3"],
-            "use_mode": ["professor-assist"],
-            "audience": ["teacher"],
-        }
+        assert task_axes(spec) == ("SLO2", "capability", True)
 
-    def test_facet_filters_match_nothing_until_tasks_are_tagged(self, client: TestClient) -> None:
-        body = client.get("/leaderboard?use_mode=professor-assist").json()
-        assert body["tasks"] == []
+    def test_a_value_containing_a_colon_survives_the_split(self, context: AppContext) -> None:
+        """Split on the FIRST colon -- the rule ida_core.curriculum documents."""
+        spec = context.catalog.get(QUIZ_TASK).model_copy(
+            update={"tags": ["slo-benchmark", "slo:SLO2:draft", "use-mode:capability"]}
+        )
+        assert task_axes(spec)[0] == "SLO2:draft"
+
+    def test_two_outcome_tags_group_under_neither(self, context: AppContext) -> None:
+        """Ambiguity is not a claim.
+
+        Picking one of two would file a real score under a heading the author
+        did not choose. The validator reports it; the dashboard declines to
+        guess, which is why `slo_of` returns None rather than `values[0]`.
+        """
+        spec = context.catalog.get(QUIZ_TASK).model_copy(
+            update={"tags": ["slo-benchmark", "slo:SLO2", "slo:SLO9", "use-mode:capability"]}
+        )
+        assert task_axes(spec)[0] is None
+
+    def test_an_untagged_task_claims_no_outcome(self, context: AppContext) -> None:
+        """The exemplar and demo families predate the benchmark and stay clean."""
+        assert task_axes(context.catalog.get(QUIZ_TASK)) == (None, None, False)
+
+    def test_the_benchmark_tag_is_one_filter_over_the_whole_benchmark(
+        self, client: TestClient
+    ) -> None:
+        body = client.get("/leaderboard?benchmark=true").json()
+        assert all(t["in_benchmark"] for t in body["tasks"])
+        assert body["benchmark_task_count"] == len(body["tasks"])
+
+    def test_slo_and_use_mode_filters_are_served(self, client: TestClient) -> None:
+        for query in ("slo=SLO2", "use_mode=capability"):
+            response = client.get(f"/leaderboard?{query}")
+            assert response.status_code == 200
+            body = response.json()
+            # Whether anything matches depends on whether this checkout carries
+            # the SLO task families; either way the shape is valid and nothing
+            # is invented.
+            assert all(t["slo"] == "SLO2" for t in body["tasks"] if query.startswith("slo="))
+
+    def test_outcome_ids_are_listed_in_curriculum_order_not_alphabetical(self) -> None:
+        """SLO10 sorts before SLO2 alphabetically, and that is not the order the
+        programme publishes its outcomes in."""
+        curriculum = CurriculumView(
+            available=True,
+            outcomes=[
+                OutcomeView(
+                    id=f"SLO{n}",
+                    title=f"Outcome {n}",
+                    statement="...",
+                    text_benchmarkable=True,
+                    benchmark_note="...",
+                )
+                for n in (1, 2, 9, 10)
+            ],
+        )
+        boards = [
+            TaskLeaderboard(
+                task_id=f"t{n}",
+                title="t",
+                description="d",
+                kind=TaskKind.VERIFIABLE,
+                domain="statistics",
+                scorer="numeric_match",
+                family="f",
+                slo=slo,
+                sample_count=1,
+                scorable=True,
+                has_results=False,
+            )
+            for n, slo in enumerate(["SLO10", "SLO2", "SLO1", "SLO-UNKNOWN"])
+        ]
+        assert _ordered_slos(boards, curriculum) == ["SLO1", "SLO2", "SLO10", "SLO-UNKNOWN"]
+
+    def test_an_id_the_curriculum_does_not_know_is_surfaced_not_dropped(self) -> None:
+        """It is a tagging error the CI gate reports. Hiding the row here would
+        hide it from the person who has to fix it."""
+        curriculum = CurriculumView(available=False, unavailable_reason="none here")
+        boards = [
+            TaskLeaderboard(
+                task_id="t",
+                title="t",
+                description="d",
+                kind=TaskKind.VERIFIABLE,
+                domain="statistics",
+                scorer="numeric_match",
+                family="f",
+                slo="SL02",  # a zero, not a letter O — the classic typo
+                sample_count=1,
+                scorable=True,
+                has_results=False,
+            )
+        ]
+        assert _ordered_slos(boards, curriculum) == ["SL02"]
+
+
+class TestCurriculum:
+    """``curriculum/slo.yaml`` is read, never retyped."""
+
+    def test_the_curriculum_is_served_so_no_ui_holds_its_own_copy(self, client: TestClient) -> None:
+        response = client.get("/curriculum")
+        assert response.status_code == 200
+        body = response.json()
+        assert "available" in body
+        if body["available"]:
+            # Real map present: every outcome carries the registrar's wording,
+            # and the un-benchmarkable ones are surfaced rather than filtered.
+            assert body["outcomes"]
+            assert all(o["statement"] for o in body["outcomes"])
+            assert any(o["text_benchmarkable"] is False for o in body["outcomes"]), (
+                "SLO5 and SLO8 are not text-benchmarkable; a map that hid them "
+                "would read as though the programme has seven outcomes"
+            )
+        else:
+            # Absent map: a legitimate state that must carry its reason.
+            assert body["unavailable_reason"]
+            assert body["outcomes"] == []
+
+    def test_the_leaderboard_carries_the_curriculum_for_the_ui(self, client: TestClient) -> None:
+        body = client.get("/leaderboard").json()
+        assert body["curriculum"] == client.get("/curriculum").json()
+
+    def test_a_missing_curriculum_never_invents_statements(self) -> None:
+        view = CurriculumView(available=False, unavailable_reason="not here")
+        assert view.outcomes == []
+        assert view.outcome("SLO2") is None
+
+    def test_the_loader_degrades_rather_than_raising_on_a_bad_path(self, tmp_path) -> None:
+        """A malformed or missing map is `make lint-tasks`'s problem to fail a PR
+        over. Taking the results page down would swap a visible data error for an
+        invisible outage."""
+        view = load_curriculum_view(tmp_path)
+        assert view.available is False
+        assert view.unavailable_reason

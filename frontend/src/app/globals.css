@@ -265,3 +265,19 @@ button.secondary { background: transparent; color: var(--accent); border-color: 
 
 .empty h2 { margin-top: 0; }
 .empty code { display: inline-block; margin-top: 0.5rem; text-align: left; }
+
+/* --- the SLO axis ------------------------------------------------------- */
+
+.outcome-group { margin: 2.5rem 0; }
+.outcome-heading { margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 2px solid var(--border); }
+.outcome-heading h2 { margin: 0 0 0.4rem; font-size: 1.25rem; }
+/* The programme's own wording, quoted rather than paraphrased — that quotation
+   IS the credibility claim of the SLO framing. */
+.outcome-statement {
+  margin: 0; padding: 0.5rem 0 0.5rem 0.9rem;
+  border-left: 3px solid var(--accent);
+  font-size: 0.92rem; line-height: 1.5;
+}
+.outcome-note { font-size: 0.8rem; margin: 0.5rem 0 0; }
+.sample-facets { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.35rem; }
+.sample-facets .badge { font-weight: 400; font-size: 0.7rem; }

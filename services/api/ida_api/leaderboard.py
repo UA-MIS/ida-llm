@@ -15,15 +15,18 @@ model) pair with no finished run is simply absent, and a task with no measured
 model reports ``has_results: false`` so the UI can say so in words.  There is no
 code path in this file that can produce a number the database did not.
 
-**Faceting (SLOs and use-modes).** ``project-direction-2026-08-26.md`` puts the
-benchmark on the curriculum's own Student Learning Outcomes and splits each task
-by use-mode (capability/integrity-risk, professor-assist, student-learning-aid).
-No task carries those tags yet.  Rather than hardcode a taxonomy that does not
-exist, this module reads *prefixed tags* (``slo:mis200-3``,
-``use-mode:professor-assist``, ``audience:researcher``) out of the tag list the
-task schema already exposes, and reports whichever facets it finds.  Tagging a
-task file is therefore the only step needed to make the grouping appear -- no
-code change, which is the same "adding a class is a YAML edit" property the SLO
+**Faceting is the SLO benchmark's contract, not this module's invention.** A
+task's two axes live in its ``tags`` -- ``slo:<ID>`` and ``use-mode:<id>``, with
+``slo-benchmark`` marking membership -- and they are parsed by
+:mod:`ida_api.slo`, which delegates to ``ida_core.curriculum``.  Outcome ids,
+titles and statements are read from ``curriculum/slo.yaml``; **nothing here
+hardcodes an outcome or a use mode.**  Results group by ``tags``; per-sample
+drill-down reads each sample's un-prefixed ``metadata`` (``slo``, ``use_mode``,
+``skill``, ``provenance``), and the validator requires the two spellings to
+agree, so a consumer never has to reconcile them.
+
+Tagging a task file therefore remains the only step needed to make a new outcome
+appear on this page -- the same "adding a class is a YAML edit" property the SLO
 plan depends on.
 """
 
@@ -34,21 +37,11 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
+from ida_api.slo import CurriculumView, in_benchmark, slo_of, use_mode_of
 from ida_api.trust import TrustTell, assess
 from ida_core.contracts import ModelEntry, RunRecord, RunStatus, TaskKind, TaskSpec
 from ida_core.repositories import latest_terminal_run_per_pair, run_row_to_record
 from ida_harness.runner import unscorable_reason
-
-FACET_PREFIXES: dict[str, str] = {
-    "slo": "slo",
-    "use-mode": "use_mode",
-    "audience": "audience",
-}
-"""Tag prefixes promoted to first-class facets, ``prefix:value``.
-
-Kept to a closed set on purpose.  Treating *every* colon-tag as a facet would
-turn a typo into a new filter category that looks official in the UI.
-"""
 
 DataResidency = Literal["on_campus", "third_party", "not_a_real_model", "unknown"]
 
@@ -90,18 +83,16 @@ RESIDENCY_LABEL: dict[DataResidency, str] = {
 }
 
 
-def task_facets(spec: TaskSpec) -> dict[str, list[str]]:
-    """Extract ``slo:``/``use-mode:``/``audience:`` facets from a task's tags."""
-    facets: dict[str, list[str]] = {}
-    for tag in spec.tags:
-        prefix, sep, value = tag.partition(":")
-        if not sep or not value:
-            continue
-        field = FACET_PREFIXES.get(prefix.strip().lower())
-        if field is None:
-            continue
-        facets.setdefault(field, []).append(value.strip())
-    return facets
+def task_axes(spec: TaskSpec) -> tuple[str | None, str | None, bool]:
+    """A task's ``(outcome, use mode, is in the benchmark)``.
+
+    Thin on purpose: every rule lives in :mod:`ida_api.slo`, which delegates to
+    ``ida_core.curriculum``.  A second parser here is exactly the drift the
+    single-source rule exists to prevent -- and a dashboard that parsed tags its
+    own way would disagree with the CI gate that validates them.
+    """
+    tags = list(spec.tags)
+    return slo_of(tags), use_mode_of(tags), in_benchmark(tags)
 
 
 def task_family(spec: TaskSpec) -> str:
@@ -163,7 +154,24 @@ class TaskLeaderboard(BaseModel):
     scorer: str
     family: str
     tags: list[str] = Field(default_factory=list)
-    facets: dict[str, list[str]] = Field(default_factory=dict)
+
+    slo: str | None = None
+    """The outcome this task measures, e.g. ``SLO2``.  ``None`` when untagged.
+
+    The grouping key for the per-outcome view.  Its *meaning* -- title,
+    statement, whether it is text-benchmarkable -- comes from
+    ``curriculum/slo.yaml`` via :attr:`LeaderboardResponse.curriculum`, never
+    from this row and never from the UI.
+    """
+
+    use_mode: str | None = None
+    """What is asked of the model: ``capability`` today; ``assistive`` and
+    ``instructional`` are declared but not yet in use."""
+
+    in_benchmark: bool = False
+    """Carries the ``slo-benchmark`` tag.  One filter selects the whole
+    benchmark, which is why the tag exists at all."""
+
     sample_count: int
     scorable: bool
     unscorable_reason: str | None = None
@@ -200,9 +208,28 @@ class LeaderboardResponse(BaseModel):
     """False on a fresh install.  The UI renders an honest empty state on this
     flag rather than an empty table that looks like a rendering bug."""
 
-    facet_values: dict[str, list[str]] = Field(default_factory=dict)
-    """Every facet value present in the returned tasks, for building filters."""
+    curriculum: CurriculumView
+    """``curriculum/slo.yaml``, read not retyped.
 
+    Carried on the response so the UI can render an outcome's real title and
+    statement beside its results without ever holding a copy of the nine.
+    ``available: false`` is a legitimate state and says so in words.
+    """
+
+    benchmark_task_count: int = 0
+    """Tasks carrying the ``slo-benchmark`` tag."""
+
+    slos: list[str] = Field(default_factory=list)
+    """Outcome ids present in the returned tasks, in curriculum order.
+
+    Curriculum order, not alphabetical: ``SLO10`` would sort before ``SLO2``,
+    and a programme's outcomes have an order its own document defines. Ids the
+    curriculum does not know are appended rather than dropped -- an unknown id
+    is a tagging error the CI gate reports, and hiding it here would hide a real
+    row from the person who has to fix it.
+    """
+
+    use_modes: list[str] = Field(default_factory=list)
     families: list[str] = Field(default_factory=list)
     domains: list[str] = Field(default_factory=list)
 
@@ -266,6 +293,7 @@ def build_task_leaderboard(
         )
     results.sort(key=_sort_key)
 
+    slo, use_mode, benchmark_member = task_axes(spec)
     best = next(
         (r.model_key for r in results if r.mean_score is not None and r.recommendable),
         None,
@@ -279,7 +307,9 @@ def build_task_leaderboard(
         scorer=spec.scorer.kind.value,
         family=task_family(spec),
         tags=list(spec.tags),
-        facets=task_facets(spec),
+        slo=slo,
+        use_mode=use_mode,
+        in_benchmark=benchmark_member,
         sample_count=len(spec.samples),
         scorable=spec.is_scorable,
         unscorable_reason=unscorable_reason(spec),
@@ -289,17 +319,38 @@ def build_task_leaderboard(
     )
 
 
+def _ordered_slos(boards: list[TaskLeaderboard], curriculum: CurriculumView) -> list[str]:
+    """Outcome ids present, in the order the curriculum publishes them.
+
+    NOT alphabetical: ``SLO10`` sorts before ``SLO2``, and a programme's
+    outcomes have an order its own document defines. An id the curriculum does
+    not know is appended rather than dropped -- it is a tagging error, the CI
+    gate reports it, and hiding the row here would hide it from the person who
+    has to fix it.
+    """
+    present = {b.slo for b in boards if b.slo}
+    known = [o.id for o in curriculum.outcomes if o.id in present]
+    unknown = sorted(present - set(known))
+    return known + unknown
+
+
 def build_leaderboard(
     session: Session,
     *,
     specs: list[TaskSpec],
     registry_by_key: dict[str, ModelEntry],
+    curriculum: CurriculumView,
 ) -> LeaderboardResponse:
     """Aggregate the newest finished run per (task, model) into the results view.
 
     One database round trip for every task on the page: the per-pair reduction
     happens in SQL (see :func:`latest_terminal_run_per_pair`), not in a loop of
     queries per task.
+
+    ``curriculum`` is passed in rather than loaded here so it is read once per
+    process at startup, not once per request -- and so a test can exercise both
+    the "curriculum available" and "curriculum missing" paths without touching
+    the filesystem.
     """
     spec_ids = [spec.id for spec in specs]
     rows = latest_terminal_run_per_pair(session, task_ids=spec_ids)
@@ -317,23 +368,16 @@ def build_leaderboard(
     # ids already sort into.
     boards.sort(key=lambda b: (not b.has_results, b.task_id))
 
-    facet_values: dict[str, list[str]] = {}
-    for board in boards:
-        for field, values in board.facets.items():
-            bucket = facet_values.setdefault(field, [])
-            for value in values:
-                if value not in bucket:
-                    bucket.append(value)
-    for bucket in facet_values.values():
-        bucket.sort()
-
     return LeaderboardResponse(
         tasks=boards,
         task_count=len(boards),
         measured_task_count=sum(1 for b in boards if b.has_results),
         runs_considered=len(rows),
         has_any_results=any(b.has_results for b in boards),
-        facet_values=facet_values,
+        curriculum=curriculum,
+        benchmark_task_count=sum(1 for b in boards if b.in_benchmark),
+        slos=_ordered_slos(boards, curriculum),
+        use_modes=sorted({b.use_mode for b in boards if b.use_mode}),
         families=sorted({b.family for b in boards}),
         domains=sorted({b.domain for b in boards}),
     )
