@@ -59,6 +59,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
+      - name: Cache pip packages
+        # Keyed on the FIVE distributions' pyproject.toml (their pinned runtime
+        # deps) plus requirements-dev.txt (the pinned dev/CI tooling) -- anything
+        # that can change what `pip install` downloads. ~90s/job saved on a hit;
+        # a miss just falls through to a normal cold install, so this is
+        # correctness-neutral either way.
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('packages/core/pyproject.toml', 'packages/harness/pyproject.toml', 'services/api/pyproject.toml', 'services/runner/pyproject.toml', 'services/mock-model/pyproject.toml', 'requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install the workspace (editable) + dev tooling
         run: |
           set -eu
@@ -186,6 +199,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
+      - name: Cache pip packages
+        # Same key composition as the `python` job above -- see that step's
+        # comment. Shared across jobs on purpose: pip's cache is a content
+        # store, so a job that only needs a subset of the pinned deps still
+        # gets a hit off a cache another job populated.
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('packages/core/pyproject.toml', 'packages/harness/pyproject.toml', 'services/api/pyproject.toml', 'services/runner/pyproject.toml', 'services/mock-model/pyproject.toml', 'requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install ida-core (the JSON Schemas + the pydantic contracts)
         # Bare PyYAML is no longer enough: the validator now checks BOTH layers
         # -- the JSON Schema in packages/core/ida_core/schemas/ and then the
@@ -255,6 +280,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
+      - name: Cache pip packages
+        # Same key composition as the `python` job above -- see that step's
+        # comment.
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('packages/core/pyproject.toml', 'packages/harness/pyproject.toml', 'services/api/pyproject.toml', 'services/runner/pyproject.toml', 'services/mock-model/pyproject.toml', 'requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install
         run: |
           set -eu
@@ -301,6 +336,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Cache pip packages
+        # Same key composition as the `python` job above -- see that step's
+        # comment. This job only installs PyYAML, but sharing the key means it
+        # can still land a hit off a cache another job already populated.
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('packages/core/pyproject.toml', 'packages/harness/pyproject.toml', 'services/api/pyproject.toml', 'services/runner/pyproject.toml', 'services/mock-model/pyproject.toml', 'requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
       - name: Install kubectl (for `kubectl kustomize`) + PyYAML
         # ⚠ NO apt-get. These runners have external egress on :443 ONLY, and

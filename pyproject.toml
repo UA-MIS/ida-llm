@@ -53,7 +53,20 @@ known-first-party = ["ida_core", "ida_harness", "ida_api", "ida_runner", "ida_mo
 # package. Under the default `prepend` import mode, two test files anywhere in
 # the tree sharing a basename collide with `import file mismatch`. There are no
 # duplicates today; importlib means the next one does not break the build.
-addopts = "-q --strict-markers --import-mode=importlib"
+#
+# `-n auto` (pytest-xdist) parallelises across CPUs -- 1432+ tests single-process
+# was ~67% of CI's Python-check wall clock. In addopts (not a CI-only flag) so
+# local `pytest` gets the same speedup as CI, and both `ci.yml`'s `python` job
+# and `build-and-push.yaml`'s `checks-python` job benefit automatically since
+# both just run bare `pytest`. Verified locally: full suite green across
+# multiple repeated runs under -n auto, including deliberately oversubscribed
+# worker counts targeting the timing-sensitive services/runner/tests/test_worker.py
+# and test_sweeps.py heartbeat/TTL/poll races -- no flakes observed, so no
+# xdist_group isolation was needed. If a genuinely timing-sensitive test is
+# added later and flakes under parallel CPU contention, mark it
+# `@pytest.mark.xdist_group("name")` (or move it to a serial lane) rather than
+# reaching for `-p no:xdist` globally.
+addopts = "-q --strict-markers --import-mode=importlib -n auto"
 testpaths = ["packages", "services", "tools", "e2e"]
 filterwarnings = [
     "error::DeprecationWarning:ida_.*",
