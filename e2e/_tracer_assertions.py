@@ -135,9 +135,7 @@ def assert_tracer_run_is_complete(detail: dict) -> None:
     for result in results:
         uri = result["transcript_uri"]
         assert uri is not None, "a score with no traceable evidence is not citable"
-        assert uri == (
-            f"s3://{bucket}/runs/{run['id']}/transcripts/{result['sample_id']}.json"
-        )
+        assert uri == (f"s3://{bucket}/runs/{run['id']}/transcripts/{result['sample_id']}.json")
 
 
 def assert_transcript_is_faithful(transcript: dict, run_id: str, sample_id: str) -> None:

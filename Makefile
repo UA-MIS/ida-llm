@@ -103,7 +103,7 @@ venv: ## Create the project virtualenv (.venv) if it is missing or incomplete
 .PHONY: install-python
 install-python: venv ## Install Python packages editable + dev tooling
 	$(PIP) install -r requirements-dev.txt
-	$(PIP) install --no-deps $(foreach p,$(PY_ALL),-e $(p))
+	$(PIP) install $(foreach p,$(PY_ALL),-e $(p))
 	@echo
 	@echo "  Python deps installed into $(if $(VENV),$(VENV)/,the active interpreter)"
 	@echo "  Activate with: source $(VENV)/bin/activate   (or just use make)"
