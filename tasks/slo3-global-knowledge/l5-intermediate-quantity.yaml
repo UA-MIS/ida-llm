@@ -1,0 +1,165 @@
+# slo3-global-knowledge, rung 5 of 6.
+#
+# What this rung adds over rung 4: the quantity the item ASKS for is not the
+# quantity the item HANDS you. Every sample requires computing an unstated
+# intermediate first -- a covered-interest-parity forward rate, an implied PPP
+# rate, a duty-inclusive contribution margin, an after-corporate-tax profit, a
+# currency cross rate -- and only then the answer.
+#
+# This is where a model that pattern-matches on the supplied numbers stops
+# scoring, because on every item the plausible one-step answer is a DIFFERENT
+# number that the comment records. Rung 4 could be passed by reading carefully;
+# this rung cannot.
+#
+# The parameters below are chosen so that every intermediate is exact -- the
+# forward rate is exactly 8.80, the implied PPP rate exactly 9.00, the
+# contribution margin exactly 18.00. That is a reviewing convenience and not a
+# hint to the model: it means a reviewer re-deriving these five keys never has
+# to decide how much rounding to carry through a chain.
+version: 1
+id: slo3-global-knowledge/l5-intermediate-quantity
+title: Global business figures -- computing the unstated intermediate first
+description: >
+  Rung 5 of the slo3-global-knowledge ladder. Each item requires an intermediate
+  quantity that the item does not supply and does not name in the form it is
+  needed: a forward exchange rate implied by an interest differential, an
+  exchange rate implied by relative price levels, a contribution margin net of
+  ad valorem duty, an after-tax distributable profit, and a cross rate between
+  two currencies quoted only against a third.
+
+  It is its own rung because the failure it isolates is different: not a wrong
+  method and not a wrong row, but stopping one step early. On every item the
+  answer a model reaches by stopping early is recorded in the comment, and it is
+  never within tolerance of the key.
+
+  Provenance: every country, firm, currency, rate and figure is synthetic,
+  invented for this file. No real tariff schedule, exchange rate, interest rate,
+  company or trade agreement is referenced, and no textbook or question-bank
+  content is reproduced.
+kind: verifiable
+domain: international-business
+system_prompt: >-
+  You are a business analyst preparing figures for an international-operations
+  briefing. Use exactly the convention, rate or table row the item names. Every
+  reference value you need is supplied in the item; do not substitute
+  real-world data. Round to two decimal places. Put the final numeric answer
+  alone on the last line, with no units, no currency symbol, no label and no
+  other text on that line.
+scorer:
+  kind: numeric_match
+  # Two decimal places -> 0.005 worst-case rounding; 0.01 admits it. Every
+  # intermediate in this file is exact, so no rounding is carried through any
+  # chain and the keys are not sensitive to where a solver rounds. The smallest
+  # distance to a stopped-early answer is 0.87 (ppp-implied-overvaluation),
+  # 87x the tolerance.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-knowledge, ladder-l5, international-business, verifiable, multi-step]
+samples:
+  - id: hedged-receivable-at-forward-rate
+    input: >-
+      Vasterly Foods holds a receivable of 528,000 Marenna dinar due in one year
+      and will hedge it with a one-year forward contract. The spot rate is 8.20
+      dinar per US dollar. The one-year interest rate is 10.0% in Marenna and
+      2.5% in the United States. The forward rate satisfies covered interest
+      parity: forward = spot * (1 + foreign interest rate) / (1 + domestic
+      interest rate), with the dinar as the foreign currency and the dollar as
+      the domestic currency, and the rate quoted as dinar per US dollar. How
+      many US dollars will the hedged receivable produce at maturity?
+    # Intermediate: forward = 8.20 * 1.10 / 1.025 = 9.02 / 1.025 = 8.80 exactly.
+    # Answer: 528,000 / 8.80 = 60,000.00 exactly.
+    # Stopping early and converting at the SPOT rate -- the single most likely
+    # wrong answer, and the one a model reaches by ignoring the interest
+    # differential entirely -- gives 528,000 / 8.20 = 64,390.24, which is
+    # 4,390.24 away.
+    # Inverting the parity ratio gives 8.20 * 1.025 / 1.10 = 7.6409... and
+    # 69,101.55 -- 9,101.55 away.
+    # Reporting the forward rate itself (8.80) instead of the dollar proceeds is
+    # 59,991.20 away, so the item also enforces which quantity was asked for.
+    target: "60000"
+    metadata: { slo: SLO3, use_mode: capability, skill: covered-interest-parity, factor: currency-risk-management, provenance: synthetic }
+
+  - id: ppp-implied-overvaluation
+    input: >-
+      A standardised basket of goods costs 270.00 Marenna dinar in Marenna and
+      30.00 US dollars in the United States. Under absolute purchasing power
+      parity the implied exchange rate is the ratio of the two price levels, in
+      dinar per US dollar. The observed spot rate is 8.20 dinar per US dollar.
+      By what percentage is the dinar OVERVALUED relative to its purchasing
+      power parity value? Express the overvaluation as a percentage of the
+      implied parity rate.
+    # Intermediate: implied PPP rate = 270.00 / 30.00 = 9.00 dinar per dollar,
+    # exactly. Fewer dinar per dollar are required at the spot rate (8.20) than
+    # parity implies (9.00), so the dinar is overvalued.
+    # Answer: (9.00 - 8.20) / 9.00 = 0.0888888... -> 8.89 percent.
+    # Taking the SPOT rate as the base instead of the parity rate -- the wrong
+    # denominator, and the reason the item states which base to use -- gives
+    # 0.80 / 8.20 = 9.7561 -> 9.76, which is 0.87 away: 87x the tolerance and
+    # the tightest gap in this file.
+    # Reporting the implied rate itself (9.00) instead of the percentage is
+    # 0.11 away from the key -- close in absolute terms but eleven times the
+    # tolerance, and the units instruction rules it out.
+    # 8.8888... is not near a .xx5 boundary.
+    target: "8.89"
+    metadata: { slo: SLO3, use_mode: capability, skill: purchasing-power-parity, factor: exchange-rate-misalignment, provenance: synthetic }
+
+  - id: export-breakeven-net-of-duty
+    input: >-
+      Vasterly Foods is considering serving the Marenna market by export. The
+      unit selling price delivered into Marenna is 60.00 US dollars and the unit
+      variable cost of production is 36.00 US dollars. Marenna levies an ad
+      valorem import duty of 10% of the selling price on each unit, payable by
+      Vasterly. The fixed cost of establishing and running the export channel is
+      90,000 US dollars per year. How many units must Vasterly sell per year to
+      break even on the export channel?
+    # Intermediate: duty per unit = 0.10 * 60.00 = 6.00, so the contribution
+    # margin per unit is 60.00 - 36.00 - 6.00 = 18.00 exactly.
+    # Answer: 90,000 / 18.00 = 5,000 units.
+    # Ignoring the duty -- stopping early, and treating a global trade barrier
+    # as if it were not a cost -- gives 90,000 / 24.00 = 3,750, which is 1,250
+    # away. That understatement of the breakeven volume by a quarter is exactly
+    # the decision error the item is about.
+    target: "5000"
+    metadata: { slo: SLO3, use_mode: capability, skill: breakeven-with-trade-barrier, factor: trade-policy, provenance: synthetic }
+
+  - id: net-repatriated-dividend
+    input: >-
+      Vasterly Foods' Marenna subsidiary earns a pre-tax profit of 480,000
+      Marenna dinar. Marenna levies corporate income tax at 25% of pre-tax
+      profit. The subsidiary distributes 60% of its AFTER-TAX profit to the
+      parent as a dividend. Marenna then levies a dividend withholding tax of
+      10% on the amount distributed. The spot rate is 8.00 dinar per US dollar.
+      How many US dollars does the parent receive?
+    # Intermediate 1: after-tax profit = 480,000 * 0.75 = 360,000 dinar.
+    # Intermediate 2: dividend declared = 360,000 * 0.60 = 216,000 dinar.
+    # Intermediate 3: net of withholding = 216,000 * 0.90 = 194,400 dinar.
+    # Answer: 194,400 / 8.00 = 24,300.00 US dollars.
+    # Stopping before the withholding tax gives 216,000 / 8.00 = 27,000 --
+    # 2,700 away.
+    # Applying the 60% distribution to PRE-tax profit gives 480,000 * 0.60 *
+    # 0.90 / 8.00 = 32,400 -- 8,100 away.
+    # Both wrong answers are clean round numbers, which is deliberate: a
+    # plausible-looking wrong answer is what makes the item discriminate.
+    target: "24300"
+    metadata: { slo: SLO3, use_mode: capability, skill: profit-repatriation-chain, factor: multinational-tax, provenance: synthetic }
+
+  - id: cross-rate-settlement
+    input: >-
+      Neither the Marenna dinar nor the Cadrenne peso is quoted directly
+      against the other; both are quoted against the US dollar. The spot rates
+      are 8.00 dinar per US dollar and 4.00 pesos per US dollar. A Marenna firm
+      must settle an invoice of 96,000 Cadrenne pesos. How many Marenna dinar
+      does the firm need?
+    # Intermediate: the cross rate is (dinar per dollar) / (pesos per dollar)
+    # = 8.00 / 4.00 = 2.00 dinar per peso, exactly.
+    # Answer: 96,000 * 2.00 = 192,000 dinar.
+    # Inverting the cross rate gives 96,000 * 0.50 = 48,000 -- 144,000 away.
+    # Converting to dollars and stopping there gives 96,000 / 4.00 = 24,000 --
+    # 168,000 away.
+    # Multiplying the two quotes together (8.00 * 4.00 = 32) gives 3,072,000 --
+    # far outside anything defensible.
+    target: "192000"
+    metadata: { slo: SLO3, use_mode: capability, skill: cross-rate-derivation, factor: exchange-rates, provenance: synthetic }

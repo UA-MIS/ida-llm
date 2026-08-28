@@ -52,6 +52,27 @@ def by_outcome(slo_tasks) -> dict[str, list]:
     return dict(grouped)
 
 
+@pytest.fixture
+def by_family(slo_tasks) -> dict[str, list]:
+    """The SLO tasks grouped by FAMILY -- the directory -- not by outcome.
+
+    ``tasks/SCHEMA.md`` defines a family as a directory, and one outcome may
+    legitimately span several of them: SLO3 ships a *verifiable* knowledge
+    ladder and a *subjective* analysis ladder precisely because SCHEMA.md
+    forbids mixing kinds inside one family. Grouping by outcome would read that
+    correct split as a malformed family.
+
+    The key is the id prefix, which
+    :meth:`TestFamilyStructure.test_task_ids_are_prefixed_by_their_family_directory`
+    pins to the directory name -- so this grouping cannot drift from the layout
+    on disk without that test failing first.
+    """
+    grouped: dict[str, list] = collections.defaultdict(list)
+    for spec in slo_tasks:
+        grouped[spec.id.split("/")[0]].append(spec)
+    return dict(grouped)
+
+
 class TestTheBenchmarkIsWellFormed:
     def test_every_shipped_task_satisfies_the_tag_contract(
         self, catalog: TaskCatalog, curriculum: CurriculumMap
@@ -165,17 +186,29 @@ class TestCoverageOfTheCurriculum:
 
 
 class TestFamilyStructure:
-    def test_each_outcomes_tasks_share_one_kind(self, by_outcome) -> None:
-        """`tasks/SCHEMA.md`: a family mixing kinds is two families in a directory."""
-        for outcome_id, specs in by_outcome.items():
-            kinds = {t.kind for t in specs}
-            assert len(kinds) == 1, f"{outcome_id} mixes kinds: {kinds}"
+    def test_each_family_shares_one_kind(self, by_family) -> None:
+        """`tasks/SCHEMA.md`: a family mixing kinds is two families in a directory.
 
-    def test_ladder_rungs_are_unique_within_an_outcome(self, by_outcome) -> None:
-        """Two tasks on rung 3 is not a ladder, and the duplicate would be invisible."""
-        for outcome_id, specs in by_outcome.items():
+        Scoped to the FAMILY, not the outcome. An outcome may span several
+        single-kind families -- SLO3 is a verifiable knowledge ladder plus a
+        subjective analysis ladder -- and that split exists *because* of this
+        very rule. Asserting one kind per outcome would forbid the structure
+        SCHEMA.md prescribes.
+        """
+        for family, specs in by_family.items():
+            kinds = {t.kind for t in specs}
+            assert len(kinds) == 1, f"{family} mixes kinds: {kinds}"
+
+    def test_ladder_rungs_are_unique_within_a_family(self, by_family) -> None:
+        """Two tasks on rung 3 is not a ladder, and the duplicate would be invisible.
+
+        Per family: a ladder belongs to a directory, so two families under one
+        outcome each start at l1 legitimately. Collapsing them would report
+        every multi-family outcome as duplicated.
+        """
+        for family, specs in by_family.items():
             rungs = [t for s in specs for t in s.tags if t.startswith("ladder-l")]
-            assert len(rungs) == len(set(rungs)), f"{outcome_id} has duplicate rungs: {rungs}"
+            assert len(rungs) == len(set(rungs)), f"{family} has duplicate rungs: {rungs}"
 
     def test_task_ids_are_prefixed_by_their_family_directory(self, by_outcome, catalog) -> None:
         """The id prefix and the directory name are the same string, so a result

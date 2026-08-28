@@ -1,0 +1,268 @@
+# slo4-cultural-societal, rung 3 of 5.
+#
+# What this rung adds over rung 2: TWO contexts at once. Rung 2 traced one
+# aspect into one practice. Here the same decision is posed in the firm's home
+# country and in another, and the response must say what transfers, what does
+# not, and why.
+#
+# THE CRITERION THAT MAKES THIS RUNG WORTH ITS OWN FILE:
+# `home-context-not-treated-as-neutral`. The default failure on a
+# domestic-versus-international comparison is to treat the home practice as the
+# neutral baseline and the foreign one as the deviation requiring explanation.
+# That is not a matter of manners -- it is an analytical error, because the home
+# practice is just as culturally and societally shaped as the other, and a
+# response that cannot see that will miss the cases where the HOME context is
+# the outlier. Sample two is exactly that case.
+#
+# SLO 4 names "domestic and international contexts" in one breath. This rung is
+# where that conjunction is actually tested.
+version: 1
+id: slo4-cultural-societal/l3-domestic-international-contrast
+title: Cultural and societal perspective -- the same decision in domestic and international contexts
+description: >
+  Rung 3 of the slo4-cultural-societal ladder. Each item poses one business
+  decision in two contexts -- Vasterly's home country and another society -- and
+  asks what transfers between them, what does not, and what accounts for the
+  difference. The rubric requires the home context to be analysed as a
+  culturally and societally shaped setting in its own right rather than as a
+  neutral baseline.
+
+  It is its own rung because the demand is comparative rather than causal: a
+  response can trace both practices correctly and still get the comparison
+  wrong by treating one as the default.
+
+  Every society in this family is invented and every cultural or societal fact a
+  scenario depends on is stated in the scenario. No claim about any real
+  national culture is asserted or rewarded.
+
+  This is a subjective task. With no judge model configured it will load, run
+  and store transcripts, and report no score -- see docs/llm-judge.md.
+
+  Provenance: every firm, country, society and scenario is synthetic, invented
+  for this file. No real company, country or culture is described, no student
+  work is used, and no textbook or question-bank content is reproduced.
+kind: subjective
+domain: organisational-behaviour
+system_prompt: >-
+  You are advising the management team of a mid-sized firm. Each item describes
+  one business decision as it arises in the firm's home country and in another
+  society. Say which elements of the firm's approach should be the same in both
+  contexts and which should differ, and for each difference name the cultural or
+  societal aspect that accounts for it. Treat both settings as shaped by their
+  own culture and society: do not assume the home-country approach is the
+  neutral one. Use only what the items state, and do not appeal to general
+  claims about any national culture.
+scorer:
+  kind: llm_judge
+  rubric_id: slo4-cultural-societal-context-contrast-v1
+rubric:
+  id: slo4-cultural-societal-context-contrast-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: both-contexts-analysed
+      description: |-
+        Does the response analyse the decision in both settings, rather than
+        analysing one and describing the other as a departure from it?
+
+        1.0 -- the aspects operating in each setting are set out for both.
+        0.5 -- both are addressed but one is given only as a list of differences
+               from the other.
+        0.0 -- only one setting is analysed.
+      weight: 3.0
+    - name: separates-what-transfers-from-what-does-not
+      description: |-
+        Does the response say explicitly which elements of the approach should
+        hold in both settings and which should differ?
+
+        1.0 -- both lists are given and each item on the "differs" list is tied
+               to a specific aspect that accounts for it; where the facts put
+               nothing on the "differs" list, the response says so explicitly
+               and says what it considered and rejected.
+        0.5 -- the lists are given but at least one difference is asserted with
+               no aspect named to account for it.
+        0.0 -- no separation is made, or the response concludes only that the
+               approach should be "adapted".
+      weight: 3.0
+    - name: home-context-not-treated-as-neutral
+      description: |-
+        Does the response treat the home-country setting as culturally and
+        societally shaped in its own right? This is scored as an analytical
+        matter: a response that treats the home practice as the default cannot
+        detect a case in which the home practice is the one that should change.
+
+        1.0 -- names at least one cultural or societal aspect that shapes the
+               HOME practice, and where the item makes the home practice the
+               outlier, says so.
+        0.5 -- acknowledges in general terms that the home setting has its own
+               culture, but every specific aspect named is attributed to the
+               other setting.
+        0.0 -- treats the home approach as the neutral standard and the other
+               setting as the deviation throughout.
+      weight: 3.0
+    - name: differences-are-specific
+      description: |-
+        Are the differences named at the level of concrete elements -- a step, a
+        criterion, a document, a timetable, a payment term -- rather than as
+        broad postures?
+
+        1.0 -- every difference names a concrete element of the approach; where
+               the response finds no difference, the elements it examined are
+               named just as concretely.
+        0.5 -- some differences are concrete and others are postures ("be more
+               patient", "build relationships first").
+        0.0 -- the differences, or the reasons given for finding none, are all
+               posture, or would fit any pair of countries unchanged.
+      weight: 2.0
+    - name: no-appeal-to-national-stereotype
+      description: |-
+        Does the response reason from the facts the items state rather than from
+        general claims about how people in a country or region behave? Scored on
+        the warrant, not the politeness: an unsupported generalisation about a
+        group cannot be checked against the item.
+
+        1.0 -- every claim about either society is traceable to a stated fact.
+        0.5 -- one general claim about a national or regional culture is made,
+               consistent with the stated facts and not load-bearing.
+        0.0 -- a generalisation about a national, ethnic or religious group is
+               asserted as fact and carries part of the comparison.
+      weight: 2.0
+tags: [slo-benchmark, "slo:SLO4", "use-mode:capability", slo4-cultural-societal, ladder-l3, organisational-behaviour, subjective, not-yet-scorable]
+samples:
+  # CLEAN. Genuine differences in both directions, each traceable to a stated
+  # aspect, and a core that plainly should transfer.
+  - id: graduate-engineer-recruitment
+    input: >-
+      Vasterly Foods recruits graduate engineers. In its HOME country, degree
+      classifications are awarded on a five-point scale that employers widely
+      use to screen, students routinely take paid internships during their
+      degrees, and it is customary for candidates to negotiate the initial
+      salary offer. In MARENNA, the universities award a pass or fail with no
+      classification, the statutory academic calendar prohibits paid employment
+      during term for enrolled students, entry-level salaries at firms above a
+      certain size are set by a sector-wide agreement that Vasterly would be
+      party to, and a Marenna government transparency rule requires that any
+      employer with more than 50 staff publish the criteria on which it selects
+      candidates. Vasterly wants one graduate recruitment approach it can run in
+      both. What should be the same and what should differ?
+    # Author's note: what transfers -- the competencies being recruited for, the
+    # assessment of engineering capability itself, and the firm's own standard
+    # for a good hire. What differs, each tied to a stated aspect: the screening
+    # signal (no classification in Marenna, so an alternative structured
+    # assessment is needed where the home country uses a five-point scale); the
+    # experience expectation (a term-time work prohibition means Marenna
+    # graduates will have less prior paid experience, so requiring internship
+    # experience would screen out the whole cohort for a reason unrelated to
+    # capability); the salary step (negotiable at home, set by sector agreement
+    # in Marenna, so negotiation skill must not leak into the selection); and
+    # documentation (Marenna's transparency rule requires published criteria,
+    # which constrains how the criteria are written, not only whether they are
+    # disclosed).
+    # A response that treats the home five-point scale as "the" screen and
+    # Marenna as lacking one has missed that the scale is itself a local
+    # institution.
+    metadata: { slo: SLO4, use_mode: capability, probe: graduate-recruitment, provenance: synthetic }
+
+  # THE HOME PRACTICE IS THE OUTLIER. This is the sample the
+  # home-context-not-treated-as-neutral criterion exists for. A response that
+  # reasons from "how do we adapt our approach for them" cannot reach the right
+  # answer, because the answer is that the home approach is the one that does
+  # not survive scrutiny.
+  - id: manager-reference-requirement
+    input: >-
+      Vasterly Foods' HOME-country practice is to require a personal reference
+      from a current or former manager before confirming any hire, a practice it
+      has followed for thirty years. Vasterly's own internal audit found that
+      home-country candidates whose parents had worked in the industry supplied
+      references from senior managers at a rate four times that of other
+      candidates, and that reference content did not predict subsequent
+      performance ratings at all. In ALDENMARK, personal references of this kind
+      are not customary; employers verify dates of employment only, and a data
+      protection statute makes an opinion-based reference disclosable to the
+      candidate on request, which has all but ended the practice. Vasterly's
+      Aldenmark plant hires without them and its performance and retention
+      outcomes match the home country's. Vasterly is deciding what its group-wide
+      hiring standard should be. What should be the same and what should differ?
+    # Author's note: the natural framing is "how do we adapt our reference
+    # requirement for Aldenmark". The facts do not support it. The home practice
+    # has an audited adverse-impact finding -- a four-fold difference in access
+    # to senior references correlated with parental industry background -- and
+    # an audited absence of predictive validity, while the Aldenmark plant
+    # matches its outcomes without it. The reference requirement is a
+    # home-country CUSTOM that has survived because nobody examined it, and the
+    # Aldenmark statute is what forced the examination.
+    # The strong answer is that the group standard should drop the opinion-based
+    # reference everywhere and keep employment verification everywhere -- the
+    # home practice is the outlier and the international comparison is what
+    # revealed it. A response that recommends keeping the practice at home and
+    # waiving it in Aldenmark has treated the home context as neutral and should
+    # score 0.0 on that criterion, however fluent the rest is.
+    metadata: { slo: SLO4, use_mode: capability, probe: reference-checking, provenance: synthetic }
+
+  # BORDERLINE. Two defensible standards, and the difference is genuine rather
+  # than one setting being wrong. What is graded is whether the response
+  # recognises that both are internally coherent.
+  - id: production-line-closure-notice
+    input: >-
+      Vasterly Foods must decide how much notice to give before closing a
+      production line. In its HOME country, employment is terminable on statutory
+      minimum notice, severance is set by a formula in the employment code, the
+      state provides retraining allowances to displaced workers within four
+      weeks, and Vasterly's home plants sit in a metropolitan labour market where
+      the average displaced manufacturing worker in its own outplacement data
+      was re-employed within eleven weeks. In NYSTRIA, the plant is the largest
+      employer in a town of 9,000 with no other manufacturing employer within 80
+      kilometres, there is no state retraining provision, and Nystria's
+      commercial custom -- not its law -- is that a major employer announces a
+      closure a year ahead and works with the municipality on a transition plan.
+      Vasterly's legal minimum notice obligation is the same 90 days in both.
+      What should be the same and what should differ?
+    # Author's note: both settings are internally coherent and the honest
+    # analysis says so. The home setting's short notice is defensible BECAUSE
+    # the surrounding society absorbs the shock -- statutory severance, state
+    # retraining inside four weeks, a thick labour market with eleven-week
+    # re-employment. Nystria's year-ahead custom does the same work through a
+    # different institution: with no state provision and no alternative
+    # employer within 80km, the transition has to be arranged by the firm and
+    # the municipality, and time is what makes that possible.
+    # So the LEGAL floor transfers (90 days in both) and the appropriate
+    # PRACTICE differs -- and the reason is societal structure, not a difference
+    # in how much either society values workers. A response that frames Nystria
+    # as "more relationship-oriented" or the home country as "more transactional"
+    # has substituted a cultural stereotype for a structural account that the
+    # facts fully support, and should lose no-appeal-to-national-stereotype.
+    metadata: { slo: SLO4, use_mode: capability, probe: closure-notice-period, provenance: synthetic }
+
+  # TRANSFERS UNCHANGED. The correct answer is that nothing should differ. A
+  # family whose every item produces a difference teaches that difference is
+  # always the answer, and this is the item that refuses it.
+  - id: product-defect-response
+    input: >-
+      Vasterly Foods is deciding how to handle a product defect that could injure
+      a user. Its HOME-country protocol is: stop shipment within 24 hours of a
+      credible report, notify the regulator, notify distributors and retailers,
+      publish a consumer notice, and offer a free remedy regardless of proof of
+      purchase. In MARENNA, the product safety statute requires notification of
+      the regulator within 72 hours and permits a firm to require proof of
+      purchase before providing a remedy. Marenna's retail sector custom is that
+      consumer notices are placed through distributors rather than published
+      directly by manufacturers, and Vasterly's Marenna distributor has asked to
+      handle the notice itself to protect its retailer relationships. Vasterly
+      has 40,000 potentially affected units in Marenna. What should be the same
+      and what should differ?
+    # Author's note: everything that protects the user should transfer
+    # unchanged. Marenna's statute sets a FLOOR (72 hours, proof of purchase
+    # permitted), not a ceiling, and a floor lower than Vasterly's own standard
+    # is no reason to lower the standard: the 24-hour stop, the direct consumer
+    # notice and the no-proof-required remedy all carry over.
+    # The distributor's request is a genuine local custom and the honest answer
+    # is that it may shape the CHANNEL -- notices may additionally go through
+    # the distributor -- but may not replace direct publication, because the
+    # distributor's interest in protecting retailer relationships runs against
+    # the notice reaching users. That is the one element where local practice
+    # legitimately adds something, and it adds rather than substitutes.
+    # A response that trades away the direct notice or the proof-of-purchase
+    # waiver as a cultural adaptation has confused adapting to a society with
+    # deferring to a counterparty's commercial preference -- which is the
+    # distinction rung 4 is built around.
+    metadata: { slo: SLO4, use_mode: capability, probe: product-safety-recall, provenance: synthetic }

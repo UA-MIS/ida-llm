@@ -1,0 +1,183 @@
+# slo3-global-knowledge, rung 4 of 6.
+#
+# What this rung adds over rung 3: an EXTERNAL REFERENCE. Rung 3 handed the
+# model a formula and its parameters; here the model must first select the right
+# row from a supplied table, and only then compute. Choosing the row is the
+# graded step -- the arithmetic after it is rung-1 easy in every item.
+#
+# WHY THE TABLES ARE SUPPLIED IN FULL, AND INVENTED.
+# Two reasons, and they compound. First, an item that expects the model to recall
+# a real tariff line or a real treaty rate measures which schedule the model
+# memorised, not whether it can read a schedule -- and it will mark a model wrong
+# for citing a more recent revision. Second, real schedules and treaty rates are
+# amended, so a key pinned to one starts silently rotting the day it is written.
+# Every table below is therefore invented and reproduced in the prompt in full.
+# The system prompt's "do not substitute real-world data" is doing real work on
+# this rung.
+#
+# Each table also carries at least one DECOY row -- a row that is plausible for
+# the described consignment but wrong on a stated detail. A table whose rows are
+# all obviously distinguishable does not measure row selection.
+version: 1
+id: slo3-global-knowledge/l4-supplied-reference-tables
+title: Global business figures -- selecting the governing row from a supplied schedule
+description: >
+  Rung 4 of the slo3-global-knowledge ladder. Each item supplies a complete
+  synthetic reference table -- a tariff schedule, a delivery-terms cost
+  allocation, a preferential-origin rate band, a withholding-tax treaty matrix,
+  and a sovereign-risk premium band -- together with a described consignment or
+  payment. The model must select the governing row and apply it. Every table
+  contains a decoy row that matches the scenario on everything but one stated
+  detail.
+
+  It is its own rung because the graded step has moved: the arithmetic is
+  trivial and the selection is the whole item. A model that computes flawlessly
+  from the wrong row scores zero here, which is the intended discrimination.
+
+  Provenance: every country, firm, currency, schedule, rate band, treaty and
+  figure is synthetic, invented for this file. No real tariff schedule, tax
+  treaty, trade agreement, delivery-terms standard, exchange rate or company is
+  referenced, and no textbook or question-bank content is reproduced.
+kind: verifiable
+domain: international-business
+system_prompt: >-
+  You are a business analyst preparing figures for an international-operations
+  briefing. Use exactly the convention, rate or table row the item names. Every
+  reference value you need is supplied in the item; do not substitute
+  real-world data. Round to two decimal places. Put the final numeric answer
+  alone on the last line, with no units, no currency symbol, no label and no
+  other text on that line.
+scorer:
+  kind: numeric_match
+  # Two decimal places -> 0.005 worst-case rounding; 0.01 admits it. On this
+  # rung the distance that matters is between the correct row's answer and the
+  # DECOY row's answer: a decoy within tolerance of the key is not a decoy, it
+  # is a second correct row. The smallest such gap below is 1.60
+  # (sovereign-risk-band-premium), 160x the tolerance.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-knowledge, ladder-l4, international-business, verifiable, reference-lookup]
+samples:
+  - id: tariff-schedule-row-selection
+    input: |-
+      The Republic of Marenna's import tariff schedule contains these lines:
+
+        line 0401  Fruit puree, unsweetened, in bulk containers      4.0%
+        line 0402  Fruit puree, sweetened, in bulk containers        9.5%
+        line 0403  Fruit puree, sweetened, in retail packs          14.0%
+        line 0404  Fruit juice concentrate, in bulk containers       6.0%
+
+      Vasterly Foods is importing sweetened mango puree into Marenna in
+      200-litre drums for sale to industrial food manufacturers. The
+      consignment's customs value is 86,000 US dollars. What import duty is
+      payable, in US dollars?
+    # 200-litre drums sold to industrial buyers are bulk containers, not retail
+    # packs, and the puree is sweetened -> line 0402 at 9.5%.
+    # 86,000 * 0.095 = 8,170.00.
+    # Decoy line 0403 (sweetened, but retail packs) gives 86,000 * 0.14 =
+    # 12,040 -- 3,870 away.
+    # Decoy line 0401 (bulk, but unsweetened) gives 3,440 -- 4,730 away.
+    target: "8170"
+    metadata: { slo: SLO3, use_mode: capability, skill: tariff-line-classification, factor: trade-policy, provenance: synthetic }
+
+  - id: delivery-terms-cost-allocation
+    input: |-
+      Marenna Delivery Terms allocate shipment costs between seller and
+      buyer as follows:
+
+        Terms A  Seller pays inland carriage to the port of export only.
+        Terms B  Seller pays inland carriage to the port of export and ocean
+                 freight.
+        Terms C  Seller pays inland carriage to the port of export, ocean
+                 freight, marine insurance and import duty.
+
+      Vasterly Foods has contracted on Terms B. The shipment's costs are:
+      inland carriage 2,400 US dollars; ocean freight 7,800 US dollars; marine
+      insurance 1,150 US dollars; import duty 5,600 US dollars. What is the
+      seller's total cost under the contracted terms, in US dollars?
+    # Terms B = inland carriage + ocean freight = 2,400 + 7,800 = 10,200.00
+    # Decoy Terms C gives 2,400 + 7,800 + 1,150 + 5,600 = 16,950 -- 6,750 away.
+    # Decoy Terms A gives 2,400 -- 7,800 away.
+    # The four cost figures are all supplied precisely so that selecting the
+    # wrong term produces a clean, confident, wrong number rather than an error.
+    target: "10200"
+    metadata: { slo: SLO3, use_mode: capability, skill: delivery-terms-allocation, factor: global-logistics, provenance: synthetic }
+
+  - id: preferential-origin-rate-band
+    input: |-
+      The Marenna-Cadrenne trade agreement sets import duty on finished
+      appliances by the exporter's origin status and the consignment's regional
+      value content (RVC):
+
+        Band A  Non-member state                                   11.0%
+        Band B  Member state, RVC below 45%                         11.0%
+        Band C  Member state, RVC from 45% up to but not including
+                60%                                                 4.0%
+        Band D  Member state, RVC of 60% or above                    0.0%
+
+      Cadrenne is a member state of the agreement. A consignment of finished
+      appliances exported from Cadrenne into Marenna has a regional value
+      content of 52.0% and a customs value of 240,000 US dollars. What import
+      duty is payable, in US dollars?
+    # Member state, RVC 52.0% falls in [45%, 60%) -> Band C at 4.0%.
+    # 240,000 * 0.04 = 9,600.00
+    # Decoy Band D (member, but the RVC threshold is not met) gives 0 --
+    # 9,600 away.
+    # Decoy Band B (member, but RVC is not below 45%) gives 26,400 --
+    # 16,800 away.
+    # 52.0 sits comfortably inside the band, well clear of both the 45 and 60
+    # edges, so the item does not turn on how the endpoints are read.
+    target: "9600"
+    metadata: { slo: SLO3, use_mode: capability, skill: preferential-origin-band, factor: trade-agreements, provenance: synthetic }
+
+  - id: treaty-withholding-net-dividend
+    input: |-
+      Withholding tax on outbound dividends under Marenna and Cadrenne law:
+
+        Payer Marenna     -> recipient in the home country, treaty applies    5.0%
+        Payer Marenna     -> recipient elsewhere, no treaty                  20.0%
+        Payer Cadrenne -> recipient in the home country, treaty applies   10.0%
+        Payer Cadrenne -> recipient elsewhere, no treaty                  25.0%
+
+      Vasterly Foods' Cadrenne subsidiary pays a dividend of 150,000 US
+      dollars to the home-country parent, which qualifies for treaty benefits.
+      What amount does the parent receive net of withholding tax, in US dollars?
+    # Payer is Cadrenne and the treaty applies -> 10.0%.
+    # 150,000 * (1 - 0.10) = 135,000.00
+    # Decoy: the Cadrenne non-treaty row gives 150,000 * 0.75 = 112,500 --
+    # 22,500 away.
+    # Decoy: the Marenna treaty row -- right treaty status, wrong payer country
+    # -- gives 150,000 * 0.95 = 142,500 -- 7,500 away. This is the decoy the
+    # item is really built around: two of the four rows say "treaty applies".
+    # Reporting the tax withheld (15,000) instead of the net receipt is
+    # 120,000 away, so the item also enforces which quantity was asked for.
+    target: "135000"
+    metadata: { slo: SLO3, use_mode: capability, skill: treaty-rate-selection, factor: multinational-tax, provenance: synthetic }
+
+  - id: sovereign-risk-band-premium
+    input: |-
+      Vasterly Foods' treasury adds a country risk premium to the cost of equity
+      of any project outside the home country, taken from this band table:
+
+        Sovereign score 80 to 100      0.5%
+        Sovereign score 65 to 79       1.8%
+        Sovereign score 50 to 64       3.4%
+        Sovereign score below 50       6.1%
+
+      A proposed project in Marenna has a base cost of equity, before any
+      country adjustment, of 9.20%. Marenna's sovereign score is 58. What is the
+      project's cost of equity including the country risk premium, as a
+      percentage?
+    # Score 58 falls in the 50-64 band -> premium 3.4%.
+    # 9.20 + 3.40 = 12.60 percent.
+    # Decoy: the adjacent 65-79 band gives 9.20 + 1.80 = 11.00 -- 1.60 away,
+    # 160x the tolerance and the tightest decoy gap in this file.
+    # Decoy: the below-50 band gives 15.30 -- 2.70 away.
+    # Omitting the premium entirely gives 9.20 -- 3.40 away.
+    # 58 is not on a band boundary, so the item does not turn on whether the
+    # bands are read as inclusive.
+    target: "12.6"
+    metadata: { slo: SLO3, use_mode: capability, skill: risk-band-selection, factor: country-risk, provenance: synthetic }

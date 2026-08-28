@@ -1,0 +1,141 @@
+# slo3-global-knowledge, rung 3 of 6.
+#
+# What this rung adds over rung 2: the model is handed a FORMULA TEMPLATE and a
+# set of named parameters, and must instantiate it. Rung 2 asked which of two
+# conventions applies; this rung asks the model to bind values to named
+# variables it has just been given, including a piecewise one.
+#
+# Templates are how an assessment bank scales -- one template, many parameter
+# sets -- so this is a capability worth measuring on its own. It is also where
+# the failure mode changes: a model that misreads rung 2 has picked the wrong
+# method, while a model that misreads this rung has bound a parameter to the
+# wrong slot, and those are different deficits.
+version: 1
+id: slo3-global-knowledge/l3-parameterised-items
+title: Global business figures -- instantiating a named parameter template
+description: >
+  Rung 3 of the slo3-global-knowledge ladder. Each item supplies a formula in
+  terms of named parameters and a set of values to bind to them: a landed
+  unit-cost formula, a purchasing-power-adjusted salary, a country-risk-adjusted
+  cost of equity, a piecewise tariff-rate quota, and a weighted blended margin
+  across three national markets.
+
+  It is its own rung because the demand is different in kind from rung 2:
+  nothing has to be chosen, but the parameters must be bound to the right slots,
+  and one of the five templates is piecewise.
+
+  Provenance: every country, firm, currency, rate and figure is synthetic,
+  invented for this file. No real tariff schedule, exchange rate, company or
+  trade agreement is referenced, and no textbook or question-bank content is
+  reproduced.
+kind: verifiable
+domain: international-business
+system_prompt: >-
+  You are a business analyst preparing figures for an international-operations
+  briefing. Use exactly the convention, rate or table row the item names. Every
+  reference value you need is supplied in the item; do not substitute
+  real-world data. Round to two decimal places. Put the final numeric answer
+  alone on the last line, with no units, no currency symbol, no label and no
+  other text on that line.
+scorer:
+  kind: numeric_match
+  # Two decimal places -> 0.005 worst-case rounding; 0.01 admits it. Every
+  # comment below records the distance to the nearest mis-binding of the
+  # template. The smallest is 1.13 (template-landed-unit-cost, the parameter
+  # dropped entirely), 113x the tolerance.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-knowledge, ladder-l3, international-business, verifiable, item-generation]
+samples:
+  - id: template-landed-unit-cost
+    input: >-
+      Instantiate this template and report the resulting value.
+      Template: landed_unit_cost = (fob_total + freight + insurance) *
+      (1 + duty_rate) / units.
+      Parameters: fob_total = 58000, freight = 4100, insurance = 620,
+      duty_rate = 0.045, units = 2500.
+    # fob_total + freight + insurance = 58,000 + 4,100 + 620 = 62,720
+    # 62,720 * 1.045 = 65,542.40 ; / 2,500 = 26.21696 -> 26.22
+    # Dropping the duty factor gives 62,720 / 2,500 = 25.088 -> 25.09,
+    # which is 1.13 away: 113x the tolerance, and the smallest gap in this file.
+    # 26.21696 is not near a .xx5 boundary.
+    target: "26.22"
+    metadata: { slo: SLO3, use_mode: capability, skill: template-binding, template: landed-unit-cost, factor: global-sourcing, provenance: synthetic }
+
+  - id: template-ppp-adjusted-salary
+    input: >-
+      Instantiate this template and report the resulting value.
+      Template: adjusted_salary = base_salary * (target_ppp_index /
+      home_ppp_index).
+      Parameters: base_salary = 78000, home_ppp_index = 100.0,
+      target_ppp_index = 63.5.
+    # 78,000 * (63.5 / 100.0) = 78,000 * 0.635 = 49,530 exactly.
+    # Inverting the index ratio gives 78,000 * (100 / 63.5) = 122,834.65 --
+    # 73,304.65 away. Inversion is the only plausible mis-binding here, and it
+    # is unmissable.
+    target: "49530"
+    metadata: { slo: SLO3, use_mode: capability, skill: template-binding, template: ppp-adjusted-salary, factor: cost-of-living-differentials, provenance: synthetic }
+
+  - id: template-country-risk-cost-of-equity
+    input: >-
+      Instantiate this template and report the resulting value as a percentage.
+      Template: cost_of_equity = risk_free_rate + beta * equity_risk_premium +
+      country_risk_premium, where every rate is a decimal fraction.
+      Parameters: risk_free_rate = 0.031, beta = 1.20,
+      equity_risk_premium = 0.055, country_risk_premium = 0.024.
+      Report the result as a percentage, not as a decimal fraction.
+    # 1.20 * 0.055 = 0.066
+    # 0.031 + 0.066 + 0.024 = 0.121 -> 12.10 percent.
+    # Omitting the country risk premium -- the mis-binding this item is built to
+    # catch, because it is the parameter that carries the GLOBAL content --
+    # gives 9.70, which is 2.40 away: 240x the tolerance.
+    # Reporting the decimal fraction 0.121 instead of the percentage is 11.979
+    # away, so the units instruction is enforced by the key and not only by the
+    # prompt.
+    # beta is 1.20 rather than 1.15 deliberately: 1.15 would give 11.825, which
+    # sits exactly on a .xx5 rounding boundary and would have two defensible
+    # keys under round-half-up and round-half-even.
+    target: "12.1"
+    metadata: { slo: SLO3, use_mode: capability, skill: template-binding, template: country-risk-cost-of-equity, factor: country-risk, provenance: synthetic }
+
+  - id: template-tariff-rate-quota
+    input: >-
+      Instantiate this piecewise template and report the resulting value.
+      Template: duty = min(quantity, quota) * in_quota_rate * unit_value +
+      max(0, quantity - quota) * out_quota_rate * unit_value.
+      Parameters: quantity = 9000, quota = 6000, in_quota_rate = 0.02,
+      out_quota_rate = 0.18, unit_value = 45.00.
+    # min(9000, 6000) = 6,000 -> 6,000 * 0.02 * 45.00 = 5,400.00
+    # max(0, 9000 - 6000) = 3,000 -> 3,000 * 0.18 * 45.00 = 24,300.00
+    # duty = 5,400 + 24,300 = 29,700.00
+    # Applying the in-quota rate to the whole quantity -- ignoring the piecewise
+    # split, which is the entire point of a tariff-rate quota as a trade-policy
+    # instrument -- gives 9,000 * 0.02 * 45 = 8,100 -- 21,600 away.
+    # Applying the out-quota rate to the whole quantity gives 72,900 --
+    # 43,200 away.
+    target: "29700"
+    metadata: { slo: SLO3, use_mode: capability, skill: template-binding, template: tariff-rate-quota, factor: trade-policy, provenance: synthetic }
+
+  - id: template-weighted-blended-margin
+    input: >-
+      Instantiate this template and report the resulting value as a percentage.
+      Template: blended_margin = w1 * m1 + w2 * m2 + w3 * m3, where the weights
+      are each market's share of total volume and every margin is a decimal
+      fraction.
+      Parameters: w1 = 0.45, m1 = 0.22, w2 = 0.30, m2 = 0.155, w3 = 0.25,
+      m3 = 0.09.
+      Report the result as a percentage, not as a decimal fraction.
+    # 0.45 * 0.22   = 0.0990
+    # 0.30 * 0.155  = 0.0465
+    # 0.25 * 0.09   = 0.0225
+    # sum           = 0.1680 -> 16.80 percent.
+    # Taking the UNWEIGHTED mean of the three margins -- the mis-binding that
+    # ignores the volume weights, and the one that matters commercially, since
+    # it silently assumes the three national markets are the same size -- gives
+    # (0.22 + 0.155 + 0.09) / 3 = 0.155 -> 15.50, which is 1.30 away:
+    # 130x the tolerance.
+    target: "16.8"
+    metadata: { slo: SLO3, use_mode: capability, skill: template-binding, template: weighted-blended-margin, factor: multi-market-portfolio, provenance: synthetic }
