@@ -102,3 +102,166 @@ pre {
 
 .empty { text-align: center; color: var(--muted); padding: 3rem 1rem; }
 .back { display: inline-block; margin-bottom: 1rem; font-size: 0.9rem; }
+
+/* ===========================================================================
+   Dashboard v1 — the results view and the recommendation flow.
+
+   Still no framework: the skeleton's rule ("do not commit the project to a
+   design system before there is a design") holds, and everything below is
+   plain CSS on the same four variables. Wider than 1080px is deliberate for
+   the result cards, which carry a score, three badges and a link on one row.
+   =========================================================================== */
+
+main { max-width: 1140px; }
+
+.nav {
+  display: flex; flex-wrap: wrap; gap: 1.25rem;
+  margin: 0.5rem 0 1.75rem; font-size: 0.9rem;
+  border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;
+}
+
+button {
+  font: inherit; font-weight: 600; cursor: pointer;
+  background: var(--accent); color: #fff; border: 1px solid transparent;
+  border-radius: var(--radius); padding: 0.5rem 1rem;
+}
+button:disabled { opacity: 0.6; cursor: progress; }
+button.secondary { background: transparent; color: var(--accent); border-color: var(--border); }
+
+.cta-row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin: 1.25rem 0; }
+.cta {
+  display: inline-block; padding: 0.55rem 1rem; border-radius: var(--radius);
+  border: 1px solid var(--accent); font-weight: 600; text-decoration: none;
+}
+
+/* --- the task chooser: "I want help with: [ ... ]" ----------------------- */
+
+.chooser { margin: 1.5rem 0; }
+.chooser-label {
+  color: var(--muted); font-size: 0.78rem; text-transform: uppercase;
+  letter-spacing: 0.03em; font-weight: 600; margin-bottom: 0.5rem;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.chip {
+  display: inline-block; padding: 0.35rem 0.75rem; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: inherit; text-decoration: none; font-size: 0.85rem;
+}
+.chip:hover { border-color: var(--accent); }
+.chip-active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+/* An unmeasured task is still shown — dashed, so "nothing measured yet" is
+   visible at a glance rather than discovered by clicking. */
+.chip-empty { border-style: dashed; color: var(--muted); }
+.chooser-more { margin-top: 0.75rem; }
+.chooser-more summary { cursor: pointer; font-size: 0.85rem; }
+.chooser-more .chips { margin-top: 0.6rem; }
+
+/* --- the standing trust legend ------------------------------------------- */
+
+.legend {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem 1.5rem; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--surface);
+  padding: 0.9rem 1rem; margin: 1.5rem 0;
+}
+.legend strong { display: block; font-size: 0.85rem; }
+.legend p { margin: 0.15rem 0 0; font-size: 0.8rem; line-height: 1.45; }
+
+/* --- badges -------------------------------------------------------------- */
+
+/* Trust tier is NOT colour-coded: green-vs-amber would read as good-vs-bad,
+   and a subjective task is differently evidenced, not worse. Colour is spent
+   on confidence, where a scale genuinely applies. */
+.badge-trust { border-color: var(--fg); }
+.badge-facet { color: var(--accent); border-color: currentColor; }
+.badge-tag { color: var(--muted); }
+.badge-hard { color: var(--fail); border-color: currentColor; margin-left: 0.4rem; }
+.badge-residency-on_campus { color: var(--pass); border-color: currentColor; }
+.badge-residency-third_party { color: var(--muted); }
+.badge-residency-not_a_real_model { color: var(--pending); border-color: currentColor; }
+
+.confidence { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; font-weight: 600; }
+.confidence-pips { display: inline-flex; gap: 2px; }
+.pip { width: 7px; height: 7px; border-radius: 50%; border: 1px solid; display: inline-block; }
+
+/* --- a task and its ranked models ---------------------------------------- */
+
+.results-meta { font-size: 0.85rem; margin: 1.5rem 0 0.5rem; }
+.task-section { margin: 2.5rem 0; }
+.task-title { margin: 0 0 0.2rem; font-size: 1.15rem; }
+.task-description { margin: 0 0 0.6rem; font-size: 0.9rem; }
+.facet-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.9rem; }
+
+.result-list { list-style: none; margin: 0; padding: 0; }
+.result-card {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); padding: 0.85rem 1rem; margin-bottom: 0.6rem;
+}
+/* De-emphasised, never hidden: a test stub and an unmeasured pair are real
+   facts about the benchmark, and a results page that drops inconvenient rows
+   is the thing this project exists to replace. */
+.result-card-muted { opacity: 0.72; }
+
+.result-head { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; }
+.result-identity { min-width: 0; }
+.result-name { display: flex; align-items: baseline; gap: 0.4rem; flex-wrap: wrap; }
+.result-name .star { color: var(--pending); }
+.result-name .rank { font-variant-numeric: tabular-nums; min-width: 1ch; }
+.result-badges { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; align-items: center; }
+
+.score-block { text-align: right; flex-shrink: 0; }
+.score-value { font-size: 1.6rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.score-sub { font-size: 0.75rem; }
+
+.result-reason { font-size: 0.82rem; margin: 0.6rem 0 0; }
+.caveats { margin: 0.4rem 0 0; padding-left: 1.1rem; font-size: 0.8rem; color: var(--muted); }
+.caveats li { margin-bottom: 0.2rem; }
+.result-foot {
+  display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center;
+  margin-top: 0.7rem; padding-top: 0.6rem; border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+}
+
+/* --- the intake ---------------------------------------------------------- */
+
+.progress { height: 4px; background: var(--border); border-radius: 999px; overflow: hidden; margin: 1.5rem 0 0.5rem; }
+.progress-fill { height: 100%; background: var(--accent); transition: width 160ms ease; }
+
+.question { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 1rem 1.25rem; margin: 1rem 0; }
+.question legend { padding: 0 0.4rem; }
+.question-prompt { font-size: 1.05rem; margin: 0; }
+.notice-branch { border-left-color: var(--accent); }
+
+.options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem; margin: 0.9rem 0; }
+.option {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem;
+  text-align: left; background: var(--bg); color: inherit;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 0.65rem 0.8rem; font-weight: 400;
+}
+.option:hover { border-color: var(--accent); }
+.option-selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.option-label { font-weight: 600; }
+.option-detail { font-size: 0.8rem; line-height: 1.4; }
+.why { font-size: 0.8rem; margin: 0; }
+
+.answered { margin: 1.5rem 0; }
+.answered > summary { cursor: pointer; font-size: 0.9rem; }
+
+/* --- the recommendation -------------------------------------------------- */
+
+.rec-result { margin-top: 1rem; }
+.rec-card { padding: 1.25rem; }
+.rec-primary { border-color: var(--accent); }
+.rec-card h3 { font-size: 1.15rem; margin-top: 0; }
+.why-list { margin: 0.5rem 0 1rem; padding-left: 1.1rem; }
+.why-list li { margin-bottom: 0.35rem; }
+.receipts { margin-top: 1.25rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
+.receipts h4 { margin: 0 0 0.3rem; }
+.receipts ul { margin: 0.5rem 0 0; padding-left: 1.1rem; font-size: 0.88rem; }
+.receipts li { margin-bottom: 0.3rem; }
+/* A refusal is an ANSWER, not an error — accent, never the failure colour. */
+.notice-refusal { border-left-color: var(--accent); }
+
+.empty h2 { margin-top: 0; }
+.empty code { display: inline-block; margin-top: 0.5rem; text-align: left; }

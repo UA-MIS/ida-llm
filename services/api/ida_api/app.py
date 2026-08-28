@@ -14,6 +14,10 @@ Route map
 ``GET  /runs/{run_id}``     one run plus its results (score + artifact pointer)
 ``GET  /runs/{run_id}/results/{sample_id}/transcript``
                             the archived transcript, fetched from object storage
+``GET  /leaderboard``       task-first results: every model measured, per task
+``GET  /recommend/questions``
+                            the intake question tree the dashboard renders
+``POST /recommend``         intake answers -> a recommendation, or a stated refusal
 
 The API is a thin, honest layer over :mod:`ida_core.repositories`.  Any logic
 that is about *evaluating* belongs in the harness, not here.
@@ -39,6 +43,15 @@ from sqlalchemy import text
 from ida_api import __version__
 from ida_api.auth import Principal, current_principal, validate_auth_config
 from ida_api.deps import AppContext, build_context, get_context
+from ida_api.leaderboard import LeaderboardResponse, build_leaderboard, task_family
+from ida_api.recommend import (
+    QUESTIONS,
+    IntakeQuestion,
+    RecommendationRequest,
+    RecommendationResponse,
+    evaluate,
+    validate_answers,
+)
 from ida_api.schemas import (
     EnqueueResponse,
     HealthResponse,
@@ -501,6 +514,105 @@ def create_app(context: AppContext | None = None) -> FastAPI:
                 results_limit=limit,
                 results_offset=offset,
             )
+
+    # -------------------------------------------------------- leaderboard --
+
+    @app.get("/leaderboard", response_model=LeaderboardResponse, tags=["results"])
+    def get_leaderboard(
+        ctx: AppContext = Depends(get_context),
+        task_id: str | None = Query(None, description="One task only."),
+        family: str | None = Query(None, description="Task family, e.g. 'quantitative-quiz'."),
+        domain: str | None = Query(None),
+        slo: str | None = Query(None, description="A `slo:` tag value, when tasks carry one."),
+        use_mode: str | None = Query(
+            None, description="A `use-mode:` tag value: professor-assist, student-learning-aid, ..."
+        ),
+    ) -> LeaderboardResponse:
+        """Task-first results: for each task, every model measured on it, best first.
+
+        **This is the product's front door, and its shape is a decision.** A
+        professor arrives asking "can it grade my quizzes?", not "rank these
+        seven models" -- so the task is the top-level object and the cross-model
+        comparison is what you read *inside* one, rather than the thing you
+        start from.
+
+        Every number here carries a trust tell (verifiable vs AI-judged, plus a
+        confidence tier and its reason) and a ``run_id``, so no score on the
+        page is more than one click from the transcripts, scorer and serving
+        config that produced it (D-3).
+
+        Filters narrow the *catalog*, not the results: a task matching the
+        filter with no finished run still appears, with ``has_results: false``.
+        Dropping it would make an unbenchmarked task indistinguishable from one
+        that does not exist, and "we have not measured this yet" is exactly the
+        kind of thing this platform has to be able to say.
+        """
+        specs = list(ctx.catalog.all())
+        if task_id is not None:
+            specs = [s for s in specs if s.id == task_id]
+        if family is not None:
+            specs = [s for s in specs if task_family(s) == family]
+        if domain is not None:
+            specs = [s for s in specs if s.domain == domain]
+        if slo is not None:
+            specs = [s for s in specs if f"slo:{slo}" in s.tags]
+        if use_mode is not None:
+            specs = [s for s in specs if f"use-mode:{use_mode}" in s.tags]
+
+        registry_by_key = {entry.key: entry for entry in ctx.registry.models}
+        with session_scope(ctx.session_factory) as session:
+            return build_leaderboard(session, specs=specs, registry_by_key=registry_by_key)
+
+    # ------------------------------------------------------ recommendation --
+
+    @app.get(
+        "/recommend/questions",
+        response_model=list[IntakeQuestion],
+        tags=["recommendation"],
+    )
+    def get_intake_questions() -> list[IntakeQuestion]:
+        """The intake question tree, including each question's branch condition.
+
+        Served rather than duplicated in the frontend so that the questions a
+        client asks and the questions the engine gates on cannot drift apart --
+        and so a new question is a change in one file.
+        """
+        return QUESTIONS
+
+    @app.post("/recommend", response_model=RecommendationResponse, tags=["recommendation"])
+    def post_recommendation(
+        request: RecommendationRequest,
+        ctx: AppContext = Depends(get_context),
+    ) -> RecommendationResponse:
+        """Intake answers in, a recommendation *or a stated refusal* out.
+
+        **POST, but not gated.** Every other write-shaped route on this API
+        spends provider money and is behind ``require_role``; this one spends
+        nothing. It is a read that happens to need a request body -- the answers
+        do not fit in a query string and must not end up in an access log. So it
+        stays anonymous like the rest of the reads (``docs/sensitive-material.md``
+        § 1), and nothing it receives is persisted.
+
+        The engine refuses in three distinguishable ways -- not enough context,
+        no model that satisfies a stated hard constraint, no benchmark evidence
+        -- and a refusal is a 200 with a status, not an error: "I need three more
+        things from you" is a successful answer to the question asked.
+        """
+        problems = validate_answers(request.answers)
+        if problems:
+            # 422 as a literal: starlette has deprecated both spellings of the
+            # constant in turn, and this is not a number that is going to move.
+            raise HTTPException(422, "; ".join(problems))
+
+        specs = list(ctx.catalog.all())
+        registry_by_key = {entry.key: entry for entry in ctx.registry.models}
+        with session_scope(ctx.session_factory) as session:
+            board = build_leaderboard(session, specs=specs, registry_by_key=registry_by_key)
+        return evaluate(
+            request.answers,
+            boards=board.tasks,
+            registry=list(ctx.registry.models),
+        )
 
     @app.get("/runs/{run_id}/results/{sample_id}/transcript", tags=["runs"])
     def get_transcript(run_id: str, sample_id: str, ctx: AppContext = Depends(get_context)) -> dict:

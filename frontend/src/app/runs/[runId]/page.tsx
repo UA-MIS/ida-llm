@@ -259,7 +259,7 @@ export default async function RunDetailPage({
 
   return (
     <>
-      <Link href="/" className="back">
+      <Link href="/runs" className="back">
         ← All runs
       </Link>
       <p className="subtitle mono">{run.id}</p>

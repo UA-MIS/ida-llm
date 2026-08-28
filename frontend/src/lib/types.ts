@@ -211,3 +211,211 @@ export interface SampleTranscript {
   request_id: string | null;
   raw_response: Record<string, unknown>;
 }
+
+// ---------------------------------------------------------------------------
+// The results view (`GET /leaderboard`)
+//
+// Task-first: one entry per TASK, with every model measured on it ranked
+// inside. The cross-model comparison is what you read within a task, not the
+// thing you start from -- a professor arrives asking "can it grade my
+// quizzes?", never "rank these seven models".
+// ---------------------------------------------------------------------------
+
+/** How much one number supports itself. Never a claim about the model. */
+export type Confidence = "high" | "moderate" | "low" | "none";
+
+/**
+ * The trust tell, computed server-side so one rule serves every consumer.
+ *
+ * `tier_label` is the badge; `headline` is the sentence that says what kind of
+ * evidence this is; `caveats` is everything a reader should know before
+ * repeating the number. A judged score can never be `high` confidence -- see
+ * `ida_api/trust.py` for why.
+ */
+export interface TrustTell {
+  kind: TaskKind;
+  scorer: string;
+  tier_label: string;
+  headline: string;
+  confidence: Confidence;
+  confidence_label: string;
+  confidence_reason: string;
+  caveats: string[];
+}
+
+/** Where a prompt sent to this model physically goes. The FERPA-relevant fact. */
+export type DataResidency =
+  | "on_campus"
+  | "third_party"
+  | "not_a_real_model"
+  | "unknown";
+
+export interface ModelResult {
+  model_key: string;
+  display_name: string;
+  model_tags: string[];
+  data_residency: DataResidency;
+  data_residency_label: string;
+  enabled: boolean;
+  /** False for test stubs. The recommendation engine must never return one. */
+  recommendable: boolean;
+  /** Null is never zero — `trust` says which kind of null it is. */
+  mean_score: number | null;
+  scored_count: number;
+  sample_count: number;
+  error_count: number;
+  total_cost_usd: number;
+  trust: TrustTell;
+  /** THE receipt (D-3): one click to the transcripts, scorer and serving config. */
+  run_id: string;
+  run_status: RunStatus;
+  task_content_sha: string | null;
+  measured_at: string | null;
+}
+
+export interface TaskLeaderboard {
+  task_id: string;
+  title: string;
+  description: string;
+  kind: TaskKind;
+  domain: string;
+  scorer: string;
+  family: string;
+  tags: string[];
+  /** `slo:` / `use-mode:` / `audience:` tag values, once tasks carry them. */
+  facets: Record<string, string[]>;
+  sample_count: number;
+  scorable: boolean;
+  unscorable_reason: string | null;
+  results: ModelResult[];
+  /** False when no model has a finished run — distinct from "measured, all null". */
+  has_results: boolean;
+  /** Excludes test stubs, so the winner is never a fixture. */
+  best_model_key: string | null;
+}
+
+export interface LeaderboardResponse {
+  tasks: TaskLeaderboard[];
+  task_count: number;
+  measured_task_count: number;
+  runs_considered: number;
+  /** False on a fresh install: render an honest empty state, not an empty table. */
+  has_any_results: boolean;
+  facet_values: Record<string, string[]>;
+  families: string[];
+  domains: string[];
+}
+
+// ---------------------------------------------------------------------------
+// The recommendation flow (`GET /recommend/questions`, `POST /recommend`)
+// ---------------------------------------------------------------------------
+
+export interface IntakeOption {
+  value: string;
+  label: string;
+  detail: string | null;
+}
+
+/** "Ask this only if `question_id` was answered with one of `values`." */
+export interface IntakeCondition {
+  question_id: string;
+  values: string[];
+}
+
+export interface IntakeQuestion {
+  id: string;
+  prompt: string;
+  detail: string | null;
+  options: IntakeOption[];
+  /** Required *when it applies*. An unmet condition makes it never required. */
+  required: boolean;
+  why_it_matters: string;
+  depends_on: IntakeCondition | null;
+  /** Shown when the question appears because of a previous answer (the FERPA branch). */
+  branch_note: string | null;
+}
+
+/**
+ * Three refusals and one answer, and they are genuinely different things.
+ *
+ * `need_more_context`   we were not told enough — the gaps are named
+ * `no_eligible_model`   a hard constraint you stated rules out every model
+ * `insufficient_evidence` nothing resembling your task has been benchmarked
+ */
+export type RecommendationStatus =
+  | "ok"
+  | "need_more_context"
+  | "no_eligible_model"
+  | "insufficient_evidence";
+
+export interface Gap {
+  question_id: string;
+  prompt: string;
+  why_it_matters: string;
+}
+
+export interface Receipt {
+  task_id: string;
+  task_title: string;
+  task_kind: TaskKind;
+  model_key: string;
+  run_id: string;
+  mean_score: number | null;
+  scored_count: number;
+  sample_count: number;
+  confidence: Confidence;
+  trust_label: string;
+}
+
+export interface CostNote {
+  tier: "free" | "campus_hosted" | "paid";
+  label: string;
+  detail: string;
+  input_usd_per_mtok: number;
+  output_usd_per_mtok: number;
+}
+
+export interface Constraint {
+  label: string;
+  detail: string;
+  /** Hard constraints eliminate models outright; soft ones only reorder. */
+  hard: boolean;
+}
+
+export interface Recommendation {
+  model_key: string;
+  display_name: string;
+  headline: string;
+  why: string[];
+  surface: string;
+  surface_label: string;
+  surface_rationale: string;
+  cost: CostNote;
+  data_residency: DataResidency;
+  data_residency_label: string;
+  prompt_template: string;
+  guardrails: string[];
+  caveats: string[];
+  receipts: Receipt[];
+  /** Shown, not hidden: a ranking whose basis is invisible is a black box. */
+  evidence_score: number | null;
+  verifiable_evidence: boolean;
+}
+
+export interface ContextItem {
+  label: string;
+  value: string;
+}
+
+export interface RecommendationResponse {
+  status: RecommendationStatus;
+  message: string;
+  context_summary: ContextItem[];
+  gaps: Gap[];
+  constraints: Constraint[];
+  primary: Recommendation | null;
+  alternatives: Recommendation[];
+  matched_task_ids: string[];
+  missing_benchmarks: string[];
+  what_would_change_this: string[];
+}
