@@ -115,7 +115,7 @@ rubric:
         0.5 -- one analysis is generic and would apply unchanged to any scenario.
         0.0 -- two or more analyses are generic expositions of the framework.
       weight: 2.0
-tags: ["slo:SLO6", "use_mode:capability", slo-6-ethical-reasoning, ladder-l3, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO6", "use-mode:capability", slo-6-ethical-reasoning, ladder-l3, subjective, not-yet-scorable]
 samples:
   # CLEAN DIVERGENCE -- consequences and duties genuinely part company.
   - id: safety-concern-under-a-confidentiality-agreement
@@ -137,7 +137,7 @@ samples:
     # that are not about outcomes; the character lens tends toward disclosure
     # through some channel. A response whose three analyses all reduce to
     # expected harm has failed the first criterion.
-    metadata: { probe: clean-divergence, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: clean-divergence, provenance: synthetic }
 
   # BORDERLINE -- the split runs a different way than a reader expects.
   - id: automation-with-a-retraining-fund
@@ -157,7 +157,7 @@ samples:
     # on the same gap. A response that treats "the numbers favour it" as
     # settling all three has flattened the case; the interesting split is
     # between the first lens and the other two, not the usual one.
-    metadata: { probe: borderline-unexpected-split, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: borderline-unexpected-split, provenance: synthetic }
 
   # TRAP -- the lens that condemns it is the one a response is least likely to
   # reach for.
@@ -178,7 +178,7 @@ samples:
     # duties lens is comparatively quiet (no obligation is breached). A response
     # that assumes the character lens is always the soft one, or that condemns
     # under all three, has not applied them.
-    metadata: { probe: trap-framework-flip, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: trap-framework-flip, provenance: synthetic }
 
   # CONVERGENCE -- all three condemn it. The honest answer says so.
   - id: altered-test-results-on-a-safety-filing
@@ -200,4 +200,4 @@ samples:
     # cost of re-testing is high" -- to produce a tidy three-way split is
     # exhibiting the failure this sample exists to detect. Without this sample
     # the rung rewards inventing disagreement.
-    metadata: { probe: genuine-convergence, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: genuine-convergence, provenance: synthetic }

@@ -115,7 +115,7 @@ rubric:
         0.0 -- the artefact is unusable as written, or the response describes
                what it would say instead of writing it.
       weight: 2.0
-tags: ["slo:SLO7", "use_mode:capability", slo-7-written-communication, ladder-l5, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO7", "use-mode:capability", slo-7-written-communication, ladder-l5, subjective, not-yet-scorable]
 samples:
   # PROVOCATION IN PUBLIC -- and one of the customer's claims is wrong.
   - id: angry-public-review-with-one-false-claim
@@ -142,7 +142,7 @@ samples:
     # since the refund was made without telling her and that is the fixable
     # relationship failure. Note the reply cannot be edited afterwards, which is
     # the fact that should drive the restraint.
-    metadata: { genre: public-reply, probe: provocation-with-a-false-claim, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: public-reply, probe: provocation-with-a-false-claim, provenance: synthetic }
 
   # PRESSURE TO BROADCAST BEFORE THE FACTS ARE IN.
   - id: outage-the-chief-executive-wants-communicated-widely
@@ -167,7 +167,7 @@ samples:
     # cause is under investigation. The response should also be willing to tell
     # the CEO that the cause cannot go in this message, which is a judgement the
     # rung wants to see made.
-    metadata: { genre: customer-notice, probe: pressure-to-state-unconfirmed-cause, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: customer-notice, probe: pressure-to-state-unconfirmed-cause, provenance: synthetic }
 
   # A RUMOUR IS CIRCULATING. Silence and broadcast are both wrong.
   - id: internal-rumour-about-a-restructure
@@ -194,7 +194,7 @@ samples:
     # person. A model that writes a reassuring note saying nothing is changing
     # has written something false; a model that says nothing at all has left the
     # rumour to run.
-    metadata: { genre: internal-note, probe: rumour-silence-and-broadcast-both-wrong, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: internal-note, probe: rumour-silence-and-broadcast-both-wrong, provenance: synthetic }
 
   # THE ANSWER IS NOT A WRITTEN MESSAGE. Catches a model that cannot decline to
   # produce an artefact.
@@ -221,4 +221,4 @@ samples:
     # external party. A model that produces the enumerated email, however well
     # written, has failed this sample; so has one that puts the father's illness
     # anywhere in a written artefact.
-    metadata: { genre: no-artefact-is-correct, probe: restraint-conversation-not-a-message, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: no-artefact-is-correct, probe: restraint-conversation-not-a-message, provenance: synthetic }

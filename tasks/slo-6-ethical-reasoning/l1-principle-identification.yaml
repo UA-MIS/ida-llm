@@ -118,7 +118,7 @@ rubric:
         0.0 -- recommends a course of action instead of identifying a principle,
                so that the identification must be inferred by the reader.
       weight: 1.0
-tags: ["slo:SLO6", "use_mode:capability", slo-6-ethical-reasoning, ladder-l1, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO6", "use-mode:capability", slo-6-ethical-reasoning, ladder-l1, subjective, not-yet-scorable]
 samples:
   # CLEAN -- the principle is unambiguous. Rung 1's floor should be nearly free.
   - id: supplier-gift-during-open-tender
@@ -136,7 +136,7 @@ samples:
     # there to tempt a response into answering "it is within policy, so it is
     # fine", which is a rung-5 move and is not what was asked. Independence of
     # judgement is an acceptable near-synonym for the central principle.
-    metadata: { probe: clean-single-principle, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: clean-single-principle, provenance: synthetic }
 
   # BORDERLINE -- two principles are genuinely defensible. Grade the reasoning,
   # not which of the two the response picks.
@@ -154,7 +154,7 @@ samples:
     # points at the direct question as the fact that creates it -- not which
     # side it names first. A response naming only one and not noticing the other
     # is the 0.5 case for `names-the-principle-the-facts-raise`.
-    metadata: { probe: borderline-two-defensible-principles, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: borderline-two-defensible-principles, provenance: synthetic }
 
   # TRAP -- looks like ordinary networking, is not.
   - id: referred-candidate-fast-tracked
@@ -175,7 +175,7 @@ samples:
     # confused the outcome with the process and scores 0.0 on the first
     # criterion. Conflict of interest is an acceptable second principle IF the
     # response says what raises it.
-    metadata: { probe: trap-looks-benign, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: trap-looks-benign, provenance: synthetic }
 
   # NOTHING IS WRONG -- the honest answer is that no ethical principle is at
   # stake. Without this sample the family teaches a model to always find a
@@ -195,4 +195,4 @@ samples:
     # failure this sample exists to detect: an ethics detector with no off
     # switch. Note the increase is BELOW the cost rise, which forecloses the
     # price-gouging reading a response might reach for.
-    metadata: { probe: no-issue-present, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: no-issue-present, provenance: synthetic }

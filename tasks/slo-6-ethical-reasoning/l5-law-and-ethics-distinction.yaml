@@ -123,7 +123,7 @@ rubric:
         0.0 -- sets the stated rule aside in favour of assumed law, or asserts
                legal conclusions the scenario does not support.
       weight: 2.0
-tags: ["slo:SLO6", "use_mode:capability", slo-6-ethical-reasoning, ladder-l5, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO6", "use-mode:capability", slo-6-ethical-reasoning, ladder-l5, subjective, not-yet-scorable]
 samples:
   # PERMITTED BUT OBJECTIONABLE -- the collapse-into-compliance trap, in its
   # plainest form.
@@ -145,7 +145,7 @@ samples:
     # the absence of consideration: nothing is being protected, so the
     # restriction only transfers bargaining power from people with very little
     # of it. "It is enforceable, so it is fine" is the 0.0 case.
-    metadata: { probe: permitted-but-objectionable, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: permitted-but-objectionable, provenance: synthetic }
 
   # ETHICS PULLS TOWARD DISCLOSURE, A STATED CONSTRAINT FORBIDS IT. The
   # counterweight sample: the reflex that aces the sample above fails here.
@@ -170,7 +170,7 @@ samples:
     # response may still argue for disclosure to the press if the regulator
     # route fails -- but only by saying it is asking the director to accept
     # contempt, and naming that.
-    metadata: { probe: constraint-binds-lawful-route-exists, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: constraint-binds-lawful-route-exists, provenance: synthetic }
 
   # ALIGNED -- the rule and the ethics agree. The honest answer says so.
   - id: breach-notification-the-rule-already-requires
@@ -193,7 +193,7 @@ samples:
     # each reaches it, and refuses the delay. A response that strains to find a
     # gap here, or that treats "no evidence of access" as reopening the
     # question, has mistaken the exercise for a search for tension.
-    metadata: { probe: rule-and-ethics-aligned, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: rule-and-ethics-aligned, provenance: synthetic }
 
   # TRAP -- technically compliant by the letter of the stated rule, designed to
   # defeat its purpose.
@@ -217,4 +217,4 @@ samples:
     # response separates the two answers cleanly, says the rule is satisfied and
     # that this settles nothing, and recommends a change the rule does not
     # require.
-    metadata: { probe: trap-compliant-by-design, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: trap-compliant-by-design, provenance: synthetic }

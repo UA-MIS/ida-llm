@@ -117,7 +117,7 @@ rubric:
         0.0 -- no reasons are given at all, or the reason offered is a
                non-explanation such as a reference to unspecified policy.
       weight: 2.0
-tags: ["slo:SLO7", "use_mode:capability", slo-7-written-communication, ladder-l3, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO7", "use-mode:capability", slo-7-written-communication, ladder-l3, subjective, not-yet-scorable]
 samples:
   # CLEAN -- a declined proposal, with a genuinely available future route.
   - id: decline-an-internal-project-proposal
@@ -141,7 +141,7 @@ samples:
     # survivable; the three weeks and the in-person presentation are what the
     # relationship criterion wants acknowledged specifically rather than
     # generically.
-    metadata: { genre: internal-email, probe: clean-refusal-route-exists, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: internal-email, probe: clean-refusal-route-exists, provenance: synthetic }
 
   # TRAP -- the customer is right on the facts and still gets a no. The
   # temptation is to imply a goodwill exception nobody authorised.
@@ -167,7 +167,7 @@ samples:
     # 0.0 case for the promises criterion, because Callum's manager has already
     # ruled. The purchase-note fact is available but leading with it reads as
     # blaming the recipient.
-    metadata: { genre: customer-email, probe: trap-sympathetic-recipient-firm-no, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: customer-email, probe: trap-sympathetic-recipient-firm-no, provenance: synthetic }
 
   # HARD -- a reduction affecting many people, where the sender is a decision
   # maker and the passive voice is the tempting hiding place.
@@ -193,7 +193,7 @@ samples:
     # reported as exactly that. "We hope to restore it next year" is the 0.0
     # promises case. The manager-discretion and committed-balance facts are the
     # two most likely to be dropped and both change what a reader does next.
-    metadata: { genre: internal-announcement, probe: many-recipients-sender-decided, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: internal-announcement, probe: many-recipients-sender-decided, provenance: synthetic }
 
   # NO CONSOLATION AVAILABLE -- nothing can be offered. Catches a model that
   # cannot end a message without a silver lining.
@@ -218,4 +218,4 @@ samples:
     # that is true and useful -- what the gap is -- and honest that she cannot
     # say when it can be closed. A model that cannot end a refusal without a
     # silver lining will fail here, which is exactly what this sample is for.
-    metadata: { genre: internal-email, probe: nothing-can-be-offered, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: internal-email, probe: nothing-can-be-offered, provenance: synthetic }

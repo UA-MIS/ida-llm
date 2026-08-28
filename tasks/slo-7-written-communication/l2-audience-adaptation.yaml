@@ -110,7 +110,7 @@ rubric:
         0.0 -- the register would be noticed as wrong by the recipient, or the
                message adopts a stance the sender is not in a position to take.
       weight: 2.0
-tags: ["slo:SLO7", "use_mode:capability", slo-7-written-communication, ladder-l2, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO7", "use-mode:capability", slo-7-written-communication, ladder-l2, subjective, not-yet-scorable]
 samples:
   # CLEAN -- technical to executive. The archetypal case.
   - id: engineering-memo-to-a-non-technical-executive
@@ -137,7 +137,7 @@ samples:
     # survive unexplained. A response that writes "testing shows it will handle
     # three times peak load comfortably" is fluent, readable, and scores 0.0 on
     # `does-not-overstate-what-the-source-supports`.
-    metadata: { genre: executive-brief, probe: technical-to-executive, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: executive-brief, probe: technical-to-executive, provenance: synthetic }
 
   # TRAP -- the reader is a customer, and the source contains internal blame.
   - id: internal-incident-note-to-an-affected-customer
@@ -168,7 +168,7 @@ samples:
     # duplicated, that it is fixed, and a recurrence answer that does not
     # overclaim -- the tooling gate is real, the runbook rewrite is only
     # scheduled.
-    metadata: { genre: customer-message, probe: source-contains-internal-material, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: customer-message, probe: source-contains-internal-material, provenance: synthetic }
 
   # BORDERLINE -- downward to a frontline team who must act, not decide.
   - id: policy-change-to-the-frontline-team-who-must-apply-it
@@ -194,7 +194,7 @@ samples:
     # easiest simplification -- "the window is now 45 days" -- silently deletes
     # all four exceptions and is the 0.0 case for the accuracy criterion, which
     # is why this sample sits under that criterion too.
-    metadata: { genre: team-instruction, probe: reorganise-not-simplify, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: team-instruction, probe: reorganise-not-simplify, provenance: synthetic }
 
   # LITTLE ADAPTATION NEEDED -- the reader is a peer specialist. Catches
   # reflexive simplification.
@@ -221,4 +221,4 @@ samples:
     # adaptation has adapted to the wrong reader and should score 0.0 on
     # `speaks-the-named-readers-language` -- the criterion is about the NAMED
     # reader, not about simplification.
-    metadata: { genre: peer-handover, probe: minimal-adaptation-correct, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: peer-handover, probe: minimal-adaptation-correct, provenance: synthetic }

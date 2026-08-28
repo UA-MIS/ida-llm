@@ -37,15 +37,32 @@ TASKS_DIR = Path(__file__).resolve().parents[3] / "tasks"
 SLO6_PREFIX = "slo-6-ethical-reasoning/"
 SLO7_PREFIX = "slo-7-written-communication/"
 
-#: The tag a dashboard groups on, per family. Colon-delimited tag strings rather
+#: The SLO a dashboard groups on, per family. Colon-delimited tag strings rather
 #: than top-level YAML keys, because ``task.schema.json`` sets
 #: ``additionalProperties: false`` and ``tags`` is the only free-form field the
-#: schema exposes -- see the PR description. If the schema later grows real
-#: ``slo``/``use_mode`` fields, this mapping is what has to move.
+#: schema exposes. The uppercase ``SLO6``/``SLO7`` spelling is load-bearing:
+#: ``make lint-tasks`` fails a ``slo:`` tag naming an SLO absent from
+#: ``curriculum/slo.yaml``.
 SLO_TAG = {SLO6_PREFIX: "slo:SLO6", SLO7_PREFIX: "slo:SLO7"}
 
+#: The SLO id on its own, as it appears in sample metadata.
+SLO_ID = {SLO6_PREFIX: "SLO6", SLO7_PREFIX: "SLO7"}
+
+#: Every task across all five SLO families carries this, so the benchmark can be
+#: selected as one body of work.
+BENCHMARK_TAG = "slo-benchmark"
+
 #: Every task in both families is a capability probe, not a use-mode simulation.
-USE_MODE_TAG = "use_mode:capability"
+#:
+#: HYPHEN in the tag, UNDERSCORE in the sample metadata key below. That is not a
+#: typo and not a preference: tags are a flat string list whose convention is
+#: ``key:value`` with hyphenated keys, while metadata is a dict whose keys are
+#: un-prefixed snake_case. The two spellings are pinned separately here because
+#: the shapes are agreed across five independently authored SLO families and a
+#: silent drift in either one degroups this family on the dashboard without
+#: failing anything else.
+USE_MODE_TAG = "use-mode:capability"
+USE_MODE_METADATA = ("use_mode", "capability")
 
 RUNGS = ("l1", "l2", "l3", "l4", "l5")
 
@@ -54,7 +71,7 @@ RUNGS = ("l1", "l2", "l3", "l4", "l5")
 #: useful to a consumer belong there; author's notes and expected verdicts live
 #: in YAML comments. Pinning the allowed key set is what stops a future edit
 #: from parking an expected answer in a published field.
-PUBLISHABLE_METADATA_KEYS = {"probe", "genre", "provenance"}
+PUBLISHABLE_METADATA_KEYS = {"slo", "use_mode", "probe", "genre", "provenance"}
 
 ANCHOR_LINE = re.compile(r"^\s*(1\.0|0\.5|0\.0) --", re.MULTILINE)
 
@@ -160,6 +177,20 @@ class TestTheDashboardTagContract:
     def test_every_task_declares_the_capability_use_mode(self, slo_tasks: list) -> None:
         for task in slo_tasks:
             assert USE_MODE_TAG in task.tags, f"{task.id}: missing {USE_MODE_TAG!r}"
+
+    def test_the_use_mode_tag_is_hyphenated_not_underscored(self, slo_tasks: list) -> None:
+        """The exact failure this pins: ``use_mode:capability`` in ``tags`` reads
+        fine, validates fine, and silently drops the task out of the dashboard's
+        grouping. The underscore spelling belongs in sample metadata, not here."""
+        for task in slo_tasks:
+            assert "use_mode:capability" not in task.tags, (
+                f"{task.id}: tag must be {USE_MODE_TAG!r} (hyphen); the underscore "
+                "spelling is the sample-metadata key, not the tag"
+            )
+
+    def test_every_task_carries_the_benchmark_family_tag(self, slo_tasks: list) -> None:
+        for task in slo_tasks:
+            assert BENCHMARK_TAG in task.tags, f"{task.id}: missing {BENCHMARK_TAG!r}"
 
     def test_the_ladder_tag_agrees_with_the_id(self, slo_tasks: list) -> None:
         """``ladder-l3`` in tags and ``l3-`` in the id are the same claim written
@@ -330,6 +361,35 @@ class TestDatasetHygiene:
             for sample in task.samples:
                 assert sample.metadata.get("provenance") == "synthetic", (
                     f"{task.id}/{sample.id}: provenance is {sample.metadata.get('provenance')!r}"
+                )
+
+    def test_every_sample_repeats_its_slo_and_use_mode_for_drill_down(
+        self, slo_tasks: list
+    ) -> None:
+        """Task ``tags`` group the dashboard; sample ``metadata`` is what a
+        drill-down reads, and it is served to everyone unauthenticated. Both
+        carry the same two facts, so they have to be asserted to agree -- a
+        sample that disagrees with its own task is worse than one that omits
+        the keys, because it reads as authoritative."""
+        key, value = USE_MODE_METADATA
+        for task in slo_tasks:
+            expected_slo = SLO_ID[_prefix_of(task)]
+            for sample in task.samples:
+                assert sample.metadata.get("slo") == expected_slo, (
+                    f"{task.id}/{sample.id}: metadata slo is "
+                    f"{sample.metadata.get('slo')!r}, task is {expected_slo!r}"
+                )
+                assert sample.metadata.get(key) == value, (
+                    f"{task.id}/{sample.id}: metadata {key} is {sample.metadata.get(key)!r}"
+                )
+
+    def test_sample_metadata_uses_the_underscore_spelling(self, slo_tasks: list) -> None:
+        """The mirror of the tag test above, and the other half of the trap."""
+        for task in slo_tasks:
+            for sample in task.samples:
+                assert "use-mode" not in sample.metadata, (
+                    f"{task.id}/{sample.id}: metadata key must be 'use_mode' (underscore); "
+                    "the hyphen spelling is the tag, not the metadata key"
                 )
 
     def test_sample_metadata_carries_only_publishable_keys(self, slo_tasks: list) -> None:

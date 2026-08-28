@@ -114,7 +114,7 @@ rubric:
         0.0 -- over the limit by more than about a tenth, or so far under it that
                required elements are missing.
       weight: 2.0
-tags: ["slo:SLO7", "use_mode:capability", slo-7-written-communication, ladder-l4, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO7", "use-mode:capability", slo-7-written-communication, ladder-l4, subjective, not-yet-scorable]
 samples:
   # CLEAN -- the evidence is good, the objection is obvious and real.
   - id: capital-request-for-a-second-packing-line
@@ -138,7 +138,7 @@ samples:
     # status quo. Note the $1.1m is orders TURNED AWAY, not margin -- a brief
     # that treats it as profit has overstated, which is the 0.5 case on the
     # first criterion.
-    metadata: { genre: decision-brief, probe: clean-strong-evidence, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: decision-brief, probe: clean-strong-evidence, provenance: synthetic }
 
   # BORDERLINE -- the decision-maker has a stake in the status quo.
   - id: switch-the-payroll-vendor
@@ -162,7 +162,7 @@ samples:
     # that scores points off that choice loses him, while one that never
     # acknowledges he has a position is naive. The three-year commitment is the
     # fact that makes the price hold answerable.
-    metadata: { genre: decision-brief, probe: borderline-reader-has-a-stake, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: decision-brief, probe: borderline-reader-has-a-stake, provenance: synthetic }
 
   # HARD -- a tight limit and an ask that must be narrowed to be defensible.
   - id: exception-to-a-hiring-freeze
@@ -189,7 +189,7 @@ samples:
     # permanent hires without engaging the cash objection has ignored the reason
     # for the freeze; one that proposes contractors for some and hires for the
     # contractual gap is doing the rung's actual work.
-    metadata: { genre: decision-brief, probe: tight-limit-ask-should-narrow, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: decision-brief, probe: tight-limit-ask-should-narrow, provenance: synthetic }
 
   # THE EVIDENCE DOES NOT SUPPORT THE ASK. The honest brief says so. Without
   # this sample the rung rewards advocacy regardless of the evidence.
@@ -218,4 +218,4 @@ samples:
     # for the full spend is the 0.0 case on the first criterion no matter how
     # well written it is -- and that is the discrimination this rung exists to
     # make.
-    metadata: { genre: decision-brief, probe: evidence-does-not-reach-the-ask, provenance: synthetic }
+    metadata: { slo: SLO7, use_mode: capability, genre: decision-brief, probe: evidence-does-not-reach-the-ask, provenance: synthetic }

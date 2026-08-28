@@ -97,7 +97,7 @@ rubric:
         0.5 -- one or two parties are named with no stated exposure.
         0.0 -- parties are listed as labels with no gains or losses attached.
       weight: 2.0
-tags: ["slo:SLO6", "use_mode:capability", slo-6-ethical-reasoning, ladder-l2, subjective, not-yet-scorable]
+tags: [slo-benchmark, "slo:SLO6", "use-mode:capability", slo-6-ethical-reasoning, ladder-l2, subjective, not-yet-scorable]
 samples:
   # CLEAN -- many parties, all reachable from the facts.
   - id: plant-relocation-across-state-lines
@@ -116,7 +116,7 @@ samples:
     # missed the one that takes a second read. The ranking should put the 200
     # employees without an offer and the two suppliers highest, on
     # concentration and inability to avoid the loss.
-    metadata: { probe: clean-many-parties, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: clean-many-parties, provenance: synthetic }
 
   # BORDERLINE -- whether one party is materially affected at all is arguable.
   - id: anonymised-data-shared-with-an-analytics-partner
@@ -136,7 +136,7 @@ samples:
     # even after de-identification). A response that says "anonymised, so no
     # customer stake" without engaging those two facts is the 0.5 case; one that
     # engages them and still concludes the stake is small is fine.
-    metadata: { probe: borderline-material-exposure, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: borderline-material-exposure, provenance: synthetic }
 
   # TRAP -- reads as a purely internal finance decision. It is not.
   - id: supplier-payment-terms-extended
@@ -154,7 +154,7 @@ samples:
     # finance it, and the "no committed credit lines" fact is the one that makes
     # their stake the largest in the scenario. Missing them is the 0.0 case for
     # the first criterion.
-    metadata: { probe: trap-hidden-bearer-of-cost, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: trap-hidden-bearer-of-cost, provenance: synthetic }
 
   # LOW STAKES -- the honest answer is a short list and a statement that the
   # stakes are minor. Catches a model that inflates every decision.
@@ -174,4 +174,4 @@ samples:
     # or the environment without any fact supporting it, is the failure this
     # sample detects and should score badly on
     # `does-not-invent-parties-the-scenario-does-not-support`.
-    metadata: { probe: minor-stakes, provenance: synthetic }
+    metadata: { slo: SLO6, use_mode: capability, probe: minor-stakes, provenance: synthetic }
