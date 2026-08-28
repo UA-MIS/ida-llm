@@ -1,0 +1,132 @@
+# research-analysis, rung 4 of 6.
+#
+# What this rung ADDS over rung 3: an EXTERNAL REFERENCE VALUE. A power
+# calculation needs standard-normal quantiles, and a benchmark that withholds
+# them is measuring which z-table the model memorised rather than whether it can
+# run the calculation. Every quantile the file needs is supplied -- the shared
+# ones in the system prompt, the item-specific normal CDF values in the item.
+#
+# The rung also pins the rounding CONVENTION (round a participant count up, not
+# to nearest), because "62.79 participants" has two defensible integer readings
+# and an item with two defensible answers is invalid, not hard.
+#
+# Note the design of the achieved-power item: it supplies a SHORT TABLE of four
+# normal CDF values rather than the single one it needs, so a model cannot pass
+# by echoing the supplied figure. It has to compute the right z first to know
+# which row to read.
+version: 1
+id: research-analysis/l4-power-and-sample-size
+title: Manuscript check -- power, sample size and minimum detectable effect
+description: >
+  Rung 4 of the research-analysis ladder. Given a target effect size, alpha and
+  power -- or a realised sample size -- produce the figure a methods section or
+  a reviewer response would report: participants per arm, total enrolment,
+  achieved power, or the minimum detectable effect. The rung adds one demand
+  over rung 3: applying a formula that needs external quantiles, all of which
+  are supplied in the prompt.
+
+  Provenance: every design scenario is synthetic, authored for this file. The
+  standard-normal quantiles supplied are ordinary published constants, not
+  content taken from any source. No real study data, no unpublished results.
+kind: verifiable
+domain: research-methods
+system_prompt: >-
+  You are a research assistant checking the power analysis in a colleague's
+  manuscript. Assume an independent-samples comparison of two means with equal
+  group sizes, a two-sided test, and the classical normal approximation
+  n_per_group = 2 * (z_alpha + z_beta)^2 / d^2. Use exactly these quantiles when
+  an item calls for them: z = 1.96 for a two-sided alpha of 0.05, z = 0.8416 for
+  80% power, z = 1.2816 for 90% power. Report participant counts as whole
+  numbers, always rounding UP to the next whole participant. Report anything
+  that is not a participant count to two decimal places. Put the final numeric
+  answer alone on the last line, with no units, no label and no other text on
+  that line.
+scorer:
+  kind: numeric_match
+  # 0.01 admits a two-decimal answer (worst case 0.005 of error) for the two
+  # items that report a non-integer, and is a hundred times narrower than the
+  # gap to any wrong participant count. The loosest rounding any item in the
+  # file asks for is two decimal places, so 0.01 is the tolerance the file must
+  # carry even though four of its five keys are exact integers.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [research-analysis, ladder-l4, persona-researcher, use-mode-assist, study-design]
+samples:
+  - id: n-per-group-medium-effect
+    input: >-
+      A colleague is designing a synthetic two-arm experiment and wants 80%
+      power to detect a standardised effect of d = 0.5 at a two-sided alpha of
+      0.05. How many participants are needed PER GROUP?
+    # (1.96 + 0.8416) = 2.8016; squared = 7.848961; times 2 = 15.697922;
+    # divided by 0.25 = 62.7917 -> round up -> 63.
+    # Truncating instead of rounding up gives 62 -- one whole participant away,
+    # a hundred times the tolerance, which is why the convention is pinned in
+    # the system prompt. Dropping the factor of 2 (the commonest error, and the
+    # one that halves a study) gives 32.
+    target: "63"
+    metadata: { skill: sample-size-per-group, provenance: synthetic }
+
+  - id: total-n-large-effect
+    input: >-
+      A colleague is designing a synthetic two-arm experiment and wants 90%
+      power to detect a standardised effect of d = 0.8 at a two-sided alpha of
+      0.05. How many participants are needed in TOTAL across both groups?
+    # (1.96 + 1.2816) = 3.2416; squared = 10.507973; times 2 = 21.015946;
+    # divided by 0.64 = 32.8374 -> 33 per group -> 66 total.
+    # The item asks for the total, not the per-group figure: reporting 33 is
+    # 33 away from the key. Using the 80% quantile by mistake gives 25 per
+    # group and 50 total.
+    target: "66"
+    metadata: { skill: total-enrolment, provenance: synthetic }
+
+  - id: achieved-power
+    input: >-
+      A synthetic study enrolled 64 participants per group and the reviewers
+      have asked what power it had to detect a standardised effect of d = 0.5 at
+      a two-sided alpha of 0.05. Use z_beta = d * sqrt(n_per_group / 2) - 1.96,
+      then read the power off this table of the standard normal CDF:
+      Phi(0.55) = 0.7088, Phi(0.87) = 0.8078, Phi(1.20) = 0.8849,
+      Phi(1.64) = 0.9495. Report the achieved power as a proportion.
+    # z_beta = 0.5 * sqrt(32) - 1.96 = 2.828427 - 1.96 = 0.868427 -> 0.87
+    # Power = Phi(0.87) = 0.8078 -> 0.81 at two decimal places.
+    # A model that reports the unrounded 0.8078 is 0.0022 from the key and
+    # passes, which is correct: it did the work. A model that echoes the LAST
+    # supplied figure (0.9495) is 0.14 away and fails -- which is why four CDF
+    # values are supplied rather than the one the item needs. Forgetting to
+    # subtract 1.96 gives z = 2.83, which is not in the table at all.
+    target: "0.81"
+    metadata: { skill: achieved-power, provenance: synthetic }
+
+  - id: minimum-detectable-effect
+    input: >-
+      A synthetic study is limited to 100 participants per group by its budget.
+      With 80% power and a two-sided alpha of 0.05, what is the smallest
+      standardised effect size d it could detect? Use
+      d = (z_alpha + z_beta) * sqrt(2 / n_per_group).
+    # (1.96 + 0.8416) * sqrt(2/100) = 2.8016 * 0.1414214 = 0.396206 -> 0.40
+    # Dropping the sqrt(2) factor gives 2.8016/10 = 0.28 -- 0.12 away, twelve
+    # times the tolerance. Using sqrt(2/200) (confusing per-group with total n)
+    # gives 0.28 as well.
+    target: "0.4"
+    metadata: { skill: minimum-detectable-effect, provenance: synthetic }
+
+  - id: n-with-expected-attrition
+    input: >-
+      A colleague is designing a synthetic two-arm experiment and wants 80%
+      power to detect a standardised effect of d = 0.6 at a two-sided alpha of
+      0.05. They expect 15% of enrolled participants to drop out before the
+      outcome is measured. How many participants must they ENROL per group so
+      that the analysed sample still meets the power requirement?
+    # Analysed n per group: 2 * (2.8016)^2 / 0.36 = 15.697922 / 0.36 = 43.605
+    #   -> round up -> 44 analysed per group.
+    # Enrolment must satisfy 0.85 * enrolled >= 44, so enrolled = 44 / 0.85
+    #   = 51.7647 -> round up -> 52.
+    # This is the chained item: an error in the first step propagates. Inflating
+    # by MULTIPLYING by 1.15 instead of dividing by 0.85 gives 50.6 -> 51 --
+    # one participant away, a hundred times the tolerance, so the item still
+    # separates the two inflation conventions. Ignoring attrition gives 44.
+    target: "52"
+    metadata: { skill: attrition-inflated-enrolment, provenance: synthetic }

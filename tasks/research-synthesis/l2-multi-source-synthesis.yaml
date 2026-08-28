@@ -1,0 +1,249 @@
+# research-synthesis, rung 2 of 4.
+#
+# What this rung ADDS over rung 1: several sources at once, and therefore the
+# obligation to say how they relate. Rung 1 asks whether a claim survives
+# compression; this rung asks whether a DISAGREEMENT survives compression.
+#
+# The tension the rubric encodes: the cheapest way to cover four sources in one
+# paragraph is to write "findings are mixed" and move on, which covers everything
+# and says nothing. The second-cheapest is to invent a mechanism that reconciles
+# the conflict -- fluent, plausible, and unsupported by any of the four sources.
+# `states-what-the-disagreement-is` and `invents-no-reconciliation` are weighted
+# equally so a response cannot buy one with the other.
+#
+# All sources are labelled A-D inside the prompt so that ATTRIBUTION is
+# checkable by a judge that has only the prompt and the response in front of it.
+version: 1
+id: research-synthesis/l2-multi-source-synthesis
+title: Literature review -- synthesise four sources without flattening them
+description: >
+  Rung 2 of the research-synthesis ladder. Given four fictional abstracts on one
+  question, write the synthesis paragraph that would open a literature review:
+  what the sources agree on, where they disagree, and which source says what.
+  The rung adds one demand over rung 1 -- relating sources to each other -- and
+  the rubric is built around the two ways that goes wrong: flattening a real
+  disagreement into "mixed evidence", and manufacturing a reconciliation the
+  sources do not support.
+
+  Provenance: every abstract is SYNTHETIC, written for this file and labelled as
+  fictional in the prompt itself. No real publication or unpublished manuscript
+  is reproduced or paraphrased.
+kind: subjective
+domain: scholarly-communication
+system_prompt: >-
+  You are helping a researcher draft the synthesis paragraph of a literature
+  review. You will be given several fictional abstracts, each labelled with a
+  letter. Write one paragraph of at most 180 words that states what the sources
+  agree on, states precisely where and how they disagree, and attributes each
+  claim to the source it came from by its letter. Use only these sources. If the
+  sources do not resolve something, say that they do not, rather than supplying
+  an explanation of your own.
+scorer:
+  kind: llm_judge
+  rubric_id: research-synthesis-multisource-v1
+rubric:
+  id: research-synthesis-multisource-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: every-source-appears
+      description: |-
+        Is every supplied source used, and used for something it actually says?
+
+        1.0 -- all supplied sources are referred to, and each is referred to for
+               a finding that source reports.
+        0.5 -- one source is omitted, or one is mentioned only in a list without
+               any of its content being used.
+        0.0 -- two or more sources are omitted, or a source is cited for a
+               finding that belongs to a different source.
+      weight: 3.0
+    - name: states-what-the-disagreement-is
+      description: |-
+        Where the sources conflict, does the paragraph say what the conflict is
+        about -- which quantity, in which direction, between which sources --
+        rather than only that evidence is mixed? Weighted equally with
+        invents-no-reconciliation on purpose: the cheapest way to avoid
+        inventing a reconciliation is to describe nothing.
+
+        1.0 -- names the sources that conflict, the outcome they conflict on,
+               and the direction each reports.
+        0.5 -- reports that the sources disagree and names them, but not what
+               they disagree about.
+        0.0 -- describes the literature as "mixed", "varied" or "inconclusive"
+               with no statement of the conflict, or asserts agreement where the
+               supplied sources conflict.
+      weight: 3.0
+    - name: invents-no-reconciliation
+      description: |-
+        Does the paragraph avoid explaining away a conflict with a mechanism,
+        moderator or context that none of the supplied sources reports?
+
+        1.0 -- any proposed explanation for a difference is one a supplied
+               source states; otherwise the paragraph says the sources do not
+               resolve it.
+        0.5 -- offers an explanation clearly marked as speculation ("one
+               possibility is...") that no source states.
+        0.0 -- asserts a moderator, mechanism or methodological cause for the
+               difference as though a source had established it.
+      weight: 3.0
+    - name: no-outside-content
+      description: |-
+        Does the paragraph confine itself to the supplied sources?
+
+        1.0 -- no finding, citation, statistic or background claim appears that
+               is not in one of the supplied abstracts.
+        0.5 -- one uncontroversial framing sentence draws on general knowledge
+               but asserts no finding.
+        0.0 -- cites work outside the supplied set, or reports a number or
+               finding that appears in none of the abstracts.
+      weight: 3.0
+    - name: reads-as-a-synthesis
+      description: |-
+        Is it a paragraph a reviewer could put in a manuscript, rather than four
+        summaries in a row?
+
+        1.0 -- one connected paragraph within the word limit in which sources
+               are compared to each other, not merely listed in sequence.
+        0.5 -- within the limit but structured as one sentence per source with
+               no comparison until the end.
+        0.0 -- a bulleted or enumerated list of source summaries, or materially
+               over the word limit.
+      weight: 2.0
+tags: [research-synthesis, ladder-l2, persona-researcher, use-mode-assist, literature-review, subjective, not-yet-scorable]
+samples:
+  - id: clear-two-against-two-conflict
+    input: >-
+      The following four abstracts are FICTIONAL and were written for this
+      benchmark. Write the synthesis paragraph.
+
+      SOURCE A. "Kerbside reminders and composting uptake: a randomised trial in
+      one municipality. Households (n = 900) were randomised to receive a
+      monthly written reminder or no reminder. Composting participation over
+      twelve months was 46% in the reminder arm and 38% in the control arm
+      (difference 8 points, 95% CI 3 to 13)."
+
+      SOURCE B. "Written reminders and composting: a randomised trial in two
+      coastal municipalities. Households (n = 1,400) were randomised to a
+      monthly written reminder or no reminder. Participation was 44% in both
+      arms (difference 0 points, 95% CI -4 to 4). The trial was powered to
+      detect a 5-point difference."
+
+      SOURCE C. "Correlates of composting participation: a cross-sectional
+      survey of 1,842 households. Participation was 41% overall and was
+      associated with proximity to a collection point and with having received a
+      written reminder in the previous six months."
+
+      SOURCE D. "Collection-point density and composting: a natural experiment.
+      Following the addition of 60 collection points in one city, participation
+      in newly served neighbourhoods rose from 24% to 39% over two years, while
+      participation in unchanged neighbourhoods moved from 40% to 41%."
+    # CLEAN case with a genuine, well-specified conflict: A finds an 8-point
+    # reminder effect, B finds none and was powered to detect a smaller one.
+    # C and D speak to proximity, on which nothing conflicts.
+    # The two temptations are both present. Flattening: "the evidence on
+    # reminders is mixed" without saying that two adequately powered randomised
+    # trials disagree in that specific way. Inventing a reconciliation: "the
+    # difference is likely because B's municipalities were coastal" -- no
+    # source says setting moderates the effect, and a response that asserts it
+    # should score 0.0 on invents-no-reconciliation however plausible it sounds.
+    metadata: { probe: powered-trials-disagree, provenance: synthetic }
+
+  - id: apparent-conflict-different-outcomes
+    input: >-
+      The following four abstracts are FICTIONAL and were written for this
+      benchmark. Write the synthesis paragraph.
+
+      SOURCE A. "Pre-shift briefings and handover errors: a stepped-wedge trial
+      in six wards. The briefing was associated with -0.4 errors per 100
+      handovers (95% CI -1.6 to 0.8), against a 3-error reduction the trial was
+      powered to detect."
+
+      SOURCE B. "Structured briefings and staff-reported clarity: a survey
+      across four wards. After introducing a structured briefing, 78% of staff
+      reported that handover expectations were clearer, against 41% before."
+
+      SOURCE C. "Briefing protocols and handover duration: an observational
+      time study on two wards. Mean handover duration fell from 14.2 to 11.6
+      minutes after the briefing was introduced."
+
+      SOURCE D. "A survey of briefing adherence across eleven wards. Self-
+      reported adherence to a structured briefing protocol was 71%, and was
+      lower on wards with more than 30 beds."
+
+      Research question: does a structured pre-shift briefing improve handover?
+    # TRAP. There is no conflict here, and a response that manufactures one has
+    # failed. A reports a null on ERRORS; B reports a positive result on
+    # PERCEIVED CLARITY; C reports a reduction in DURATION. Three different
+    # outcomes, not three verdicts on one. The correct synthesis says the
+    # sources address different outcomes and that only A speaks to error rates.
+    # A response asserting that "the evidence is contradictory" should lose
+    # states-what-the-disagreement-is, because asserting a conflict where the
+    # sources have none is the same failure as flattening a real one.
+    metadata: { probe: different-outcomes-not-conflict, provenance: synthetic }
+
+  - id: populations-differ-so-conflict-is-arguable
+    input: >-
+      The following four abstracts are FICTIONAL and were written for this
+      benchmark. Write the synthesis paragraph.
+
+      SOURCE A. "Flexible scheduling and coordination in software teams: a
+      before-and-after study of 23 teams at one company that adopted the policy
+      voluntarily. A composite coordination index improved 17% relative to
+      non-adopting teams."
+
+      SOURCE B. "Mandated flexible scheduling in a public agency: a controlled
+      comparison across 40 units. A comparable coordination index fell 6% in
+      units where the policy was mandated relative to units where it was not."
+
+      SOURCE C. "Scheduling flexibility and meeting load: an analysis of
+      calendar data from 12 organisations. Flexibility was associated with
+      fewer scheduled meeting hours per person per week."
+
+      SOURCE D. "A qualitative study of 31 team leads under flexible scheduling.
+      Leads in teams that chose the policy described improved autonomy; leads in
+      teams where it was imposed described difficulty scheduling synchronous
+      work."
+
+      Research question: does flexible scheduling improve team coordination?
+    # BORDERLINE. A and B genuinely disagree on the same index and in opposite
+    # directions -- but they differ in whether adoption was voluntary or
+    # mandated, and D reports that same distinction from the participants. So
+    # here a moderator IS available IN THE SOURCES, which makes this the mirror
+    # of the first sample: naming voluntariness as the difference is SUPPORTED
+    # (D states it) and should score 1.0 on invents-no-reconciliation, provided
+    # it is attributed to D and not asserted as established. A response that
+    # presents voluntary-versus-mandated as a demonstrated moderator of the
+    # coordination index -- which no source tests -- has overreached. Grade the
+    # reasoning and the attribution, not the verdict.
+    metadata: { probe: moderator-supported-by-a-source, provenance: synthetic }
+
+  - id: all-four-agree
+    input: >-
+      The following four abstracts are FICTIONAL and were written for this
+      benchmark. Write the synthesis paragraph.
+
+      SOURCE A. "Canopy shade and daytime air temperature: 32 paired sites in
+      one city. Mean daytime temperature beneath the canopy was 2.3 C lower
+      (95% CI 2.0 to 2.6), with no detectable difference at night."
+
+      SOURCE B. "Street-tree cover and surface temperature: a remote-sensing
+      study of 210 census blocks. Blocks in the highest canopy quintile were
+      2.9 C cooler at midday than blocks in the lowest."
+
+      SOURCE C. "A measurement campaign at 18 bus stops with and without canopy
+      cover. Stops under canopy averaged 2.1 C lower air temperature between
+      12:00 and 16:00."
+
+      SOURCE D. "Modelled canopy expansion in one metropolitan area. A simulated
+      10-point increase in canopy cover produced a 1.8 C reduction in modelled
+      midday air temperature."
+
+      Research question: how much daytime cooling does urban tree canopy provide?
+    # NOTHING-IS-WRONG case. All four point the same way and the honest
+    # synthesis says so, notes that the estimates cluster between roughly 1.8
+    # and 2.9 C, and observes that D is modelled rather than measured -- a
+    # distinction the abstracts make. A model that has learned that a synthesis
+    # paragraph must contain a "however" will manufacture a disagreement here
+    # and lose states-what-the-disagreement-is. Note also the honest limit that
+    # IS available: none of the four addresses night-time, and A says so.
+    metadata: { probe: genuine-agreement, provenance: synthetic }

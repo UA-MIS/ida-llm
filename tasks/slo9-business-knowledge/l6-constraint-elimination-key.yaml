@@ -1,0 +1,183 @@
+# slo9-business-knowledge, rung 6 of 6 -- the ceiling.
+#
+# WHAT THIS RUNG ADDS: ELIMINATION AGAINST A STATED CONSTRAINT. In every item
+# here, more than one option would be right in a slightly different scenario,
+# and one specific sentence in the stem rules the others out -- capacity is
+# fixed, the machine is the binding constraint, both systems are working as
+# designed, the cost continues after closure. The rung measures whether the
+# constraint is READ and USED, not whether the concept is known.
+#
+# ITEM-VALIDITY NOTE, and it is the reason this file is written the way it is.
+# The obvious way to build a hard rung is to ask which option is "strongest" or
+# "best". That produces items with two defensible answers, which SCHEMA.md is
+# explicit about: an item with two defensible answers and one key is not a hard
+# item, it is an INVALID one. So every stem here asks which statement is
+# CORRECT GIVEN THE STATED FACTS, or which action follows from them -- a
+# question the constraint settles -- rather than which consideration matters
+# most, which it does not.
+version: 1
+id: slo9-business-knowledge/l6-constraint-elimination-key
+title: SLO9 rung 6 -- options ruled out by a constraint stated in the scenario
+description: >
+  Rung 6 of the SLO9 ladder and its ceiling. Five of its six items state a
+  scenario in which several options would be defensible on their own, plus one
+  constraint that eliminates all but one of them: fixed capacity, a serial
+  line, a cost that continues after closure, two systems both behaving as
+  designed, a binding machine constraint. The sixth
+  (which-pair-of-measures-settles-it) works differently -- what eliminates its
+  distractors is the question being asked, not a fact about the scenario -- and
+  it is here because choosing a measure that can answer the question is the
+  same skill applied to a different object. The concepts are no harder than
+  rung 3; the work is in noticing which sentence is load-bearing.
+
+  Four options, so the guessing floor is 0.25. This rung should be the one that
+  separates models at the top of the range; if every model clears it, the right
+  next step is more constraints per stem, not more obscure content.
+
+  Provenance: every item and every scenario was written for this file. No
+  textbook, question-bank, past-paper or other institution's examination
+  content is reproduced, and no real firm is described.
+kind: verifiable
+domain: general-business
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate general
+  business examination. Exactly one option is correct. You may reason briefly
+  first, but you must then put the letter of the correct option alone on the
+  last line, with no punctuation and no other text on that line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", ladder-l6, business-knowledge, forced-choice]
+samples:
+  - id: special-order-at-full-capacity
+    input: >-
+      A bakery sells its single product at $6.00 a unit with a variable cost of
+      $2.40 a unit. It is running at full oven capacity and cannot add capacity
+      this year. A grocery chain offers to buy 30% of the bakery's annual
+      output at $3.60 a unit, on condition that the bakery drops two retail
+      accounts that between them take exactly 30% of output at the full $6.00
+      price. Which statement about the offer is correct on these facts?
+      A) Accepting reduces total contribution, because each displaced unit
+      earned $3.60 of contribution and each replacement unit earns $1.20
+      B) Accepting increases total contribution, because the $3.60 price is
+      above the $2.40 variable cost
+      C) Accepting leaves total contribution unchanged, because the same number
+      of units is sold
+      D) The comparison cannot be made without knowing the bakery's fixed costs
+    # A. Contribution at the list price is 6.00 - 2.40 = 3.60; at the offered
+    # price it is 3.60 - 2.40 = 1.20. Because capacity is fixed and the volumes
+    # are equal, every offered unit DISPLACES a list-price unit.
+    # THE CONSTRAINT: "full capacity, cannot add capacity". Remove it and B
+    # becomes correct -- accepting incremental business above variable cost is
+    # the rung-5 answer, and B is worded exactly as that reasoning would be.
+    # C ignores price entirely; D is the "need more data" reflex, and fixed
+    # costs are irrelevant because they are unchanged under both options.
+    target: "A"
+    metadata: { skill: special-order-under-capacity-constraint, function: managerial-accounting, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: which-pair-of-measures-settles-it
+    input: >-
+      A subscription firm's total monthly revenue has been flat for six months.
+      Management wants to know whether this is because fewer new customers are
+      joining or because more existing customers are leaving. Which pair of
+      measures would settle that question?
+      A) Average revenue per user, and gross margin percentage
+      B) New customers added per month, and the monthly customer churn rate
+      C) Total marketing spend, and support headcount
+      D) Total revenue, and total customer count
+    # B. The question names two flows -- joining and leaving -- so the measures
+    # that answer it are the two flows.
+    # THE CONSTRAINT: the question asks which is responsible, so a measure of
+    # the NET position cannot answer it. D is the trap: revenue and customer
+    # count are both stocks, and flat revenue with a flat count is consistent
+    # with high churn plus high acquisition AND with neither happening. A
+    # measures value per customer, not customer movement; C measures inputs.
+    target: "B"
+    metadata: { skill: choosing-a-diagnostic-measure, function: analytics, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: serial-line-investment-priority
+    input: >-
+      A workshop's three stations process work in sequence at 40, 25 and 55
+      units an hour respectively. Every unit must pass through all three in
+      that order. Demand is 50 units an hour and the firm wants to raise
+      output. It should invest first in:
+      A) Station 1, because it is the first step and sets the pace
+      B) Station 3, because it has the most capacity to build on
+      C) All three equally, because they operate in sequence
+      D) Station 2, because at 25 units an hour it is the bottleneck
+    # D. Throughput of a serial line is the slowest station's rate, so only
+    # station 2 constrains output; investing anywhere else changes nothing.
+    # THE CONSTRAINT: "in sequence" and "every unit must pass through all
+    # three". Without that, the stations would be independent and C could be
+    # argued. Station 1 at 40 is also below demand, which is deliberate: it
+    # will become the constraint AFTER station 2 is fixed, but it is not the
+    # constraint now, and A is worded to be attractive to a reader who spots
+    # the 40 and stops.
+    target: "D"
+    metadata: { skill: serial-line-capacity, function: operations, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: which-cost-is-relevant-to-closure
+    input: >-
+      A firm is deciding whether to close a loss-making branch. Which of the
+      following costs is relevant to that decision?
+      A) The branch's lease, which can be terminated without penalty on closure
+      B) The original cost of the branch's fittings, which has already been paid
+      C) The branch's share of head-office costs, which would simply be
+      reallocated to the other branches if it closed
+      D) The depreciation charged each year on the branch's fittings
+    # A. A relevant cost is one that DIFFERS between the alternatives. Only the
+    # lease changes: it stops on closure.
+    # THE CONSTRAINT: the qualifying clause attached to each option. C says the
+    # head-office charge would be reallocated, so total firm cost is unchanged
+    # -- it appears in the branch's accounts and is still not relevant, which
+    # is the discrimination this item is built on. B is sunk; D is the
+    # accounting spread of that same sunk amount.
+    target: "A"
+    metadata: { skill: relevant-costs, function: managerial-accounting, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: two-systems-both-working-as-designed
+    input: >-
+      Finance and sales report different revenue figures for the same month.
+      Finance's figure comes from the general ledger; sales' figure comes from
+      the CRM and counts signed orders. Which explanation is most consistent
+      with BOTH systems working exactly as designed?
+      A) One of the two systems contains a defect
+      B) The two departments are reporting in different currencies
+      C) One department has entered duplicate records
+      D) The CRM counts an order when it is signed, while the ledger records
+      revenue when the goods are delivered
+    # D. Different recognition points produce different figures from correct
+    # data, which is the everyday reason two systems disagree.
+    # THE CONSTRAINT: "both systems working exactly as designed". A, B and C
+    # are all real and common causes of a reconciliation gap, and each would be
+    # a defensible answer to "why might these differ?" -- the qualifying clause
+    # is the only thing that eliminates them, which is precisely what this rung
+    # tests. An item without that clause would have four defensible answers.
+    target: "D"
+    metadata: { skill: cross-system-figure-differences, function: information-systems, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: two-products-one-machine
+    input: >-
+      A firm makes two products on one machine. Product P earns $18 of
+      contribution per unit and takes 3 machine-minutes; product Q earns $14
+      per unit and takes 2 machine-minutes. Machine time is the binding
+      constraint, and either product can be sold in any quantity the firm can
+      make. To maximise profit the firm should make:
+      A) Product P, because its contribution per unit is higher
+      B) Equal quantities of both, to spread its risk
+      C) Product Q, because it earns more contribution per machine-minute
+      D) Product P, because it uses the machine more fully per unit
+    # C. Per machine-minute: P earns 18/3 = $6.00, Q earns 14/2 = $7.00. When a
+    # resource is scarce, contribution per unit OF THAT RESOURCE governs.
+    # THE CONSTRAINT: "machine time is the binding constraint" and "either can
+    # be sold in any quantity". Remove the first and A is right; remove the
+    # second and the answer depends on demand. A is the intuitive answer and is
+    # stated in the form a manager would state it. D is A's reasoning dressed
+    # up as though using more of a scarce resource were a virtue.
+    target: "C"
+    metadata: { skill: product-mix-choice, function: managerial-accounting, provenance: synthetic, slo: SLO9, use_mode: capability }

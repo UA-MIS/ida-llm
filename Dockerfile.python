@@ -130,6 +130,11 @@ COPY --from=build --chown=65532:65532 /src/alembic.ini  /app/alembic.ini
 COPY --from=build --chown=65532:65532 /src/migrations   /app/migrations
 COPY --chown=65532:65532 tasks/      /app/tasks/
 COPY --chown=65532:65532 models.yaml /app/models.yaml
+# curriculum/slo.yaml is authored DATA like the two above, not documentation:
+# ida_core.curriculum resolves it relative to IDA_REPO_ROOT (/app here), so a
+# service that reads it would fail at runtime rather than at build time if it
+# were left out of the image.
+COPY --chown=65532:65532 curriculum/ /app/curriculum/
 COPY --chown=65532:65532 tools/      /app/tools/
 
 USER 65532:65532
