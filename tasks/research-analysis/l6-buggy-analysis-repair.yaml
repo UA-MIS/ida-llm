@@ -1,0 +1,146 @@
+# research-analysis, rung 6 of 6 -- the top of the ladder, and genuinely hard.
+#
+# What this rung ADDS over rung 5: the model must find a defect and then report
+# the value the script SHOULD have produced. Rung 5 asks what the code prints;
+# this rung asks what the code was trying to print. An error at either step
+# propagates into the answer, so a single number grades both the diagnosis and
+# the repair.
+#
+# It is also the rung that separates instruction-following from pattern
+# matching. A model that has settled into the family's rhythm -- "trace the
+# code, report the output" -- reports the BUGGY value and scores zero, which is
+# exactly the behaviour a researcher needs to know about before handing a model
+# an analysis script to check.
+#
+# Each defect is a real one from research code, not a syntax error: a window
+# that is one observation short, a standard error divided by n instead of
+# sqrt(n), an exclusion filter that keeps what it meant to drop, a percent
+# change taken against the wrong base, and a duplicated participant that was
+# never de-duplicated. None of them raises; all of them change the result.
+version: 1
+id: research-analysis/l6-buggy-analysis-repair
+title: Coding for research -- find the defect and report the corrected figure
+description: >
+  Rung 6 of the research-analysis ladder, and its ceiling. Each item states what
+  an analysis snippet is intended to compute and shows a version containing
+  exactly one defect. Report the value the corrected script would print. The
+  rung adds two demands over rung 5 at once -- locate a silent defect, then
+  recompute -- and an error in either step propagates to the answer, so it is
+  meant to be the rung where models separate.
+
+  Provenance: every data set and every snippet is synthetic, authored for this
+  file. No real study data, no unpublished results, no code copied from any
+  project or textbook.
+kind: verifiable
+domain: research-methods
+system_prompt: >-
+  You are a research assistant reviewing a colleague's analysis script before it
+  goes into a manuscript. Each item states what the snippet is intended to
+  compute and then shows the snippet, which contains exactly one defect relative
+  to that intent. Report the number the CORRECTED script would print -- not the
+  number the script as written prints. Round to four decimal places if the
+  result is not exact. Put that number alone on the last line, with no label and
+  no other text on that line.
+scorer:
+  kind: numeric_match
+  # 0.0001 admits four-decimal rounding (worst case 0.00005 of error). The
+  # thinnest gap between a corrected key and the value the buggy script actually
+  # prints is 0.5, on duplicate-not-dropped -- five thousand times the
+  # tolerance. A model that reports the buggy output cannot pass any item here.
+  tolerance: 0.0001
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [research-analysis, ladder-l6, persona-researcher, use-mode-assist, coding-for-research, debugging]
+samples:
+  - id: window-off-by-one
+    input: |-
+      This snippet is intended to print the mean of the LAST THREE observations.
+      It contains one defect. What would the corrected script print?
+
+      import pandas as pd
+      df = pd.DataFrame({"x": [10, 12, 15, 11, 14, 18]})
+      print(round(df["x"].tail(2).mean(), 4))
+    # Defect: tail(2) should be tail(3).
+    # Corrected: (11 + 14 + 18) / 3 = 43 / 3 = 14.333333 -> 14.3333
+    # The script as written prints (14 + 18) / 2 = 16.0 -- 1.6667 away, so a
+    # model that traces the code faithfully and ignores the instruction fails.
+    target: "14.3333"
+    metadata: { skill: window-size-defect, provenance: synthetic }
+
+  - id: standard-error-divided-by-n
+    input: |-
+      This snippet is intended to print the standard error of the mean. It
+      contains one defect. What would the corrected script print?
+
+      import pandas as pd
+      df = pd.DataFrame({"x": [4, 8, 6, 5, 3]})
+      print(round(df["x"].std() / len(df), 4))
+    # Defect: the sample SD must be divided by sqrt(n), not by n.
+    # pandas std is ddof=1: sqrt(14.8/4) = sqrt(3.7) = 1.923538.
+    # Corrected: 1.923538 / sqrt(5) = sqrt(3.7/5) = sqrt(0.74) = 0.860233
+    #            -> 0.8602
+    # The script as written prints 1.923538 / 5 = 0.3847 -- 0.4755 away.
+    # Note the two defensible-looking readings are NOT both defensible: the
+    # intent is stated as the standard error, so ddof stays at the pandas
+    # default and the only defect is the denominator.
+    target: "0.8602"
+    metadata: { skill: standard-error-denominator, provenance: synthetic }
+
+  - id: exclusion-filter-inverted
+    input: |-
+      This snippet is intended to print the mean reaction time after EXCLUDING
+      trials slower than 1000 ms. It contains one defect. What would the
+      corrected script print?
+
+      import pandas as pd
+      df = pd.DataFrame({"rt": [420, 500, 1200, 640, 1500, 380]})
+      kept = df[df["rt"] > 1000]
+      print(round(kept["rt"].mean(), 4))
+    # Defect: the comparison keeps exactly the trials it was meant to drop.
+    # Corrected: mean of 420, 500, 640, 380 = 1940 / 4 = 485.0
+    # The script as written prints (1200 + 1500) / 2 = 1350.0 -- 865 away. This
+    # is the defect that most often survives review, because the filtered frame
+    # is non-empty and the printed number looks like a reaction time.
+    target: "485"
+    metadata: { skill: inverted-exclusion, provenance: synthetic }
+
+  - id: percent-change-wrong-base
+    input: |-
+      This snippet is intended to print the percent change in the outcome FROM
+      baseline TO follow-up, expressed as a percentage of the baseline value. It
+      contains one defect. What would the corrected script print?
+
+      baseline = 40.0
+      followup = 52.0
+      print(round((followup - baseline) / followup * 100, 4))
+    # Defect: the denominator is the follow-up value, not the baseline.
+    # Corrected: (52.0 - 40.0) / 40.0 * 100 = 12 / 40 * 100 = 30.0
+    # The script as written prints 12 / 52 * 100 = 23.0769 -- 6.9231 away.
+    # Both numbers are plausible percent changes, which is why this defect
+    # travels: nothing about 23.08 looks wrong on the page.
+    target: "30"
+    metadata: { skill: percent-change-base, provenance: synthetic }
+
+  - id: duplicate-not-dropped
+    input: |-
+      This snippet is intended to print the mean score across DISTINCT
+      participants; the export it reads from contains one participant twice. It
+      contains one defect. What would the corrected script print?
+
+      import pandas as pd
+      df = pd.DataFrame({
+          "participant": ["p1", "p2", "p3", "p2"],
+          "score": [70, 88, 96, 88],
+      })
+      print(round(df["score"].mean(), 4))
+    # Defect: the duplicated participant row is never dropped.
+    # Corrected: drop_duplicates on participant leaves p1, p2, p3 ->
+    #            (70 + 88 + 96) / 3 = 254 / 3 = 84.666667 -> 84.6667
+    # The script as written prints 342 / 4 = 85.5 -- 0.8333 away, the THINNEST
+    # margin in this file and still 8333x the tolerance. It is deliberately the
+    # thinnest: a duplicated record moves a mean by very little, which is
+    # precisely why the defect survives into published tables.
+    target: "84.6667"
+    metadata: { skill: duplicate-records, provenance: synthetic }

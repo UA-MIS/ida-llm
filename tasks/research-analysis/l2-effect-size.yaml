@@ -1,0 +1,129 @@
+# research-analysis, rung 2 of 6.
+#
+# What this rung ADDS over rung 1: an estimator to get right. The arithmetic is
+# still elementary; what is being measured is whether the model knows what
+# "Cohen's d with the pooled standard deviation" actually denotes, rather than
+# dividing the mean difference by whichever standard deviation is nearest.
+#
+# The prompt NAMES the estimator and its denominator convention but does not
+# supply the algebra. That line matters: leaving the estimator unnamed would
+# make every item ambiguous (Hedges' g, Glass's delta and the two pooling
+# conventions are all defensible answers, and an item with two defensible
+# answers and one key is invalid, not hard). Supplying the formula would turn
+# the rung back into rung 1 with more digits.
+#
+# WHY THREE DECIMAL PLACES. The nearest wrong pooling conventions land 0.010 to
+# 0.118 from the key. At two decimal places (tolerance 0.01) the closest of
+# those would sit ON the tolerance and the item would stop separating them. At
+# three decimal places the tolerance is 0.001 and the thinnest margin in the
+# file is 10x it. Effect sizes are routinely reported to three places, so the
+# demand is not artificial.
+version: 1
+id: research-analysis/l2-effect-size
+title: Manuscript check -- Cohen's d from reported summary statistics
+description: >
+  Rung 2 of the research-analysis ladder. Given the group sizes, means and
+  dispersions a manuscript reports, compute Cohen's d using the pooled standard
+  deviation. The rung adds one demand over rung 1: knowing which denominator the
+  named estimator uses. Each item is built so that the nearest wrong pooling
+  convention -- an unweighted root-mean-square of the two SDs, the arithmetic
+  mean of the two SDs, one group's SD alone, or Glass's delta -- lands far
+  outside the tolerance.
+
+  Provenance: every set of summary statistics is synthetic, authored for this
+  file. No real study data, no unpublished results, no textbook content.
+kind: verifiable
+domain: research-methods
+system_prompt: >-
+  You are a research assistant checking the effect sizes in a colleague's
+  manuscript. Unless an item says otherwise, report Cohen's d computed with the
+  pooled standard deviation, using the (n1 + n2 - 2) denominator. Preserve the
+  sign of the difference in the direction the item asks for. Round to three
+  decimal places and put the final numeric answer alone on the last line, with
+  no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  # 0.001 admits an answer rounded to three decimal places (worst case 0.0005 of
+  # error). The thinnest gap to a wrong convention in this file is 0.010, on
+  # d-pooled-equal-n -- ten times the tolerance, which is the margin the
+  # authoring guide calls comfortable. Every other item's margin is 14x-1412x.
+  tolerance: 0.001
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [research-analysis, ladder-l2, persona-researcher, use-mode-assist, effect-size]
+samples:
+  - id: d-pooled-unequal-n
+    input: >-
+      A synthetic manuscript reports a between-subjects comparison. Group 1:
+      n = 30, M = 61.0, SD = 10.0. Group 2: n = 10, M = 55.0, SD = 4.0. Report
+      Cohen's d for group 1 minus group 2.
+    # pooled SD = sqrt((29*100 + 9*16)/38) = sqrt(3044/38) = sqrt(80.105...)
+    #           = 8.950154...
+    # d = 6.0 / 8.950154 = 0.670379... -> 0.670
+    # Nearest wrong conventions: unweighted RMS of the two SDs, sqrt((100+16)/2)
+    # = 7.6158, gives 0.788 -- 0.118 away, 118x the tolerance. Group 1's SD
+    # alone gives 0.600 (0.070 away). Glass's delta on group 2 gives 1.500.
+    # This item exists specifically to punish ignoring the n-weighting, which is
+    # invisible when the groups are the same size.
+    target: "0.670"
+    metadata: { skill: pooled-sd-unequal-groups, provenance: synthetic }
+
+  - id: d-pooled-equal-n
+    input: >-
+      A synthetic manuscript reports a between-subjects comparison. Group 1:
+      n = 50, M = 13.4, SD = 5.0. Group 2: n = 50, M = 12.1, SD = 3.0. Report
+      Cohen's d for group 1 minus group 2.
+    # pooled SD = sqrt((49*25 + 49*9)/98) = sqrt(1666/98) = sqrt(17) = 4.123106
+    # d = 1.3 / 4.123106 = 0.315296... -> 0.315
+    # THIN MARGIN, stated rather than left for a reviewer to find: averaging the
+    # two SDs arithmetically gives 1.3/4.0 = 0.325 -- 0.010 away, exactly ten
+    # times the tolerance. That is the closest wrong answer anywhere in this
+    # file and it is why the file reports three decimal places rather than two.
+    # Group 1's SD alone gives 0.260 (0.055 away).
+    target: "0.315"
+    metadata: { skill: pooled-sd-equal-groups, provenance: synthetic }
+
+  - id: d-negative-direction
+    input: >-
+      A synthetic manuscript reports a between-subjects comparison on a symptom
+      scale where lower is better. Treatment: n = 24, M = 18.0, SD = 6.0.
+      Control: n = 24, M = 23.4, SD = 9.0. Report Cohen's d for treatment minus
+      control, preserving the sign.
+    # pooled SD = sqrt((23*36 + 23*81)/46) = sqrt(58.5) = 7.648529
+    # d = (18.0 - 23.4) / 7.648529 = -5.4 / 7.648529 = -0.706018... -> -0.706
+    # Dropping the sign gives +0.706 -- 1.412 away, 1412x the tolerance, which
+    # is the point of the item: a reported effect size with the direction lost
+    # is a reported effect size that says the opposite thing. Averaging the SDs
+    # gives -0.720 (0.014 away, 14x).
+    target: "-0.706"
+    metadata: { skill: signed-effect-direction, provenance: synthetic }
+
+  - id: d-from-reported-variances
+    input: >-
+      A synthetic manuscript reports variances rather than standard deviations.
+      Group 1: n = 18, M = 44.2, variance = 64.0. Group 2: n = 22, M = 39.8,
+      variance = 25.0. Report Cohen's d for group 1 minus group 2.
+    # pooled SD = sqrt((17*64.0 + 21*25.0)/38) = sqrt(1613/38)
+    #           = sqrt(42.447...) = 6.515164
+    # d = 4.4 / 6.515164 = 0.675347... -> 0.675
+    # Note the pooling formula takes VARIANCES, so the given values go straight
+    # in with no squaring. Squaring them first (treating 64.0 and 25.0 as SDs)
+    # gives a pooled SD of 46.667 and d = 0.094 -- 0.581 away, 581x tolerance.
+    target: "0.675"
+    metadata: { skill: pooling-from-variances, provenance: synthetic }
+
+  - id: d-small-group-large-sd
+    input: >-
+      A synthetic manuscript reports a between-subjects comparison with very
+      unequal group sizes. Group 1: n = 12, M = 88.5, SD = 6.5. Group 2: n = 48,
+      M = 81.0, SD = 13.0. Report Cohen's d for group 1 minus group 2.
+    # pooled SD = sqrt((11*42.25 + 47*169)/58) = sqrt(8407.75/58)
+    #           = sqrt(144.961...) = 12.039984
+    # d = 7.5 / 12.039984 = 0.622924... -> 0.623
+    # The larger, more variable group carries most of the weight. Ignoring the
+    # weighting (unweighted RMS = 10.2774) gives 0.730 -- 0.107 away, 107x.
+    # Using the small group's SD alone gives 1.154 -- 0.531 away.
+    target: "0.623"
+    metadata: { skill: weighting-dominant-group, provenance: synthetic }

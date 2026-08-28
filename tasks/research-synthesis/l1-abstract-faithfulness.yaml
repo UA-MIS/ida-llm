@@ -1,0 +1,206 @@
+# research-synthesis, rung 1 of 4 -- the floor of the ladder.
+#
+# RESEARCHER TRACK. The subjective half of the researcher-facing benchmark: the
+# tasks a model is actually asked to do during a literature review. See
+# docs/researcher-track.md.
+#
+# What this rung measures: can the model compress ONE abstract into a
+# lit-review card without changing what it claims? Every later rung adds
+# sources or judgement on top of this; a model that inflates a single abstract's
+# claim cannot be trusted with four of them.
+#
+# ALL SOURCES IN THIS FAMILY ARE FICTIONAL and are labelled as such inside the
+# prompt the model sees. That is deliberate on two counts: no real unpublished
+# work enters a public repository, and a model cannot pass by recognising a
+# paper it was trained on rather than reading the one in front of it.
+#
+# The laziest response that scores well on "faithful" is one that copies the
+# abstract verbatim. `usable-as-a-card` is the criterion that catches it.
+version: 1
+id: research-synthesis/l1-abstract-faithfulness
+title: Literature review -- summarise one abstract without changing its claim
+description: >
+  Rung 1 of the research-synthesis ladder. Given one fictional abstract, write
+  the two-or-three-sentence card that would go into a literature-review matrix.
+  The rung measures fidelity under compression: whether the hedges, the scope
+  conditions and the strength of the original claim survive being made shorter.
+  Upgrading "was associated with" to "caused", dropping the population the study
+  actually sampled, or adding a finding the abstract does not report are the
+  three failures that make an AI-assisted literature review unusable.
+
+  Provenance: every abstract is SYNTHETIC, written for this file and labelled as
+  fictional in the prompt itself. No real publication, no unpublished
+  manuscript, no author's work is reproduced or paraphrased here.
+kind: subjective
+domain: scholarly-communication
+system_prompt: >-
+  You are helping a researcher build a literature-review matrix. You will be
+  given one fictional abstract. Write the entry for that abstract: two or three
+  sentences that a reader of the matrix could rely on without going back to the
+  source. Report only what the abstract states, keep its hedging and its
+  population as stated, and do not evaluate the study or add context of your
+  own.
+scorer:
+  kind: llm_judge
+  rubric_id: research-synthesis-faithfulness-v1
+rubric:
+  id: research-synthesis-faithfulness-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: reports-the-actual-finding
+      description: |-
+        Does the card state the abstract's primary finding, including its
+        direction and the quantity it was measured on?
+
+        1.0 -- names the primary outcome and the direction of the result, and
+               any effect size the abstract gives is carried over unchanged.
+        0.5 -- names the outcome but loses the direction, the magnitude, or
+               reports a secondary finding as though it were the primary one.
+        0.0 -- states a finding the abstract does not report, reverses the
+               direction, or is too vague to identify which outcome moved.
+      weight: 3.0
+    - name: preserves-hedging-and-strength
+      description: |-
+        Does the card claim exactly as much as the abstract claimed -- no more
+        and no less? This is the failure that propagates: an inflated card is
+        cited from the matrix and the hedge never comes back.
+
+        1.0 -- associational language stays associational, stated uncertainty
+               (confidence intervals, "may", "suggests", null results) is
+               carried over, and no causal verb is introduced that the abstract
+               did not use.
+        0.5 -- one hedge is dropped or one claim is stated more firmly than the
+               abstract stated it, but the overall strength is recognisable.
+        0.0 -- an associational finding is rendered as causal, a null or
+               inconclusive result is rendered as a positive finding, or a
+               stated limitation is presented as resolved.
+      weight: 3.0
+    - name: preserves-scope-and-population
+      description: |-
+        Does the card say who or what was studied, where the abstract says so?
+
+        1.0 -- the sample, setting or population the abstract names appears in
+               the card.
+        0.5 -- the population is gestured at but generalised (for example
+               "adults" where the abstract said "adults over 65 in two clinics").
+        0.0 -- the population is omitted entirely, or is stated more broadly
+               than the abstract supports.
+      weight: 2.0
+    - name: adds-nothing
+      description: |-
+        Does the card avoid content that is not in the abstract?
+
+        1.0 -- every statement in the card can be traced to a sentence of the
+               abstract.
+        0.5 -- includes one piece of general background or one evaluative aside
+               that the abstract does not contain.
+        0.0 -- introduces a number, a citation, a mechanism or a critique that
+               does not appear in the abstract.
+      weight: 3.0
+    - name: usable-as-a-card
+      description: |-
+        Is it actually a card -- shorter than the abstract, and readable on its
+        own? This is the criterion that catches the response which guarantees
+        fidelity by copying the abstract out.
+
+        1.0 -- three sentences or fewer, materially shorter than the abstract,
+               and comprehensible without reading the source.
+        0.5 -- within the length but so compressed that a reader could not tell
+               what was measured, or over-length by a sentence or two.
+        0.0 -- reproduces the abstract more or less verbatim, or is longer than
+               the abstract.
+      weight: 2.0
+tags: [research-synthesis, ladder-l1, persona-researcher, use-mode-assist, literature-review, subjective, not-yet-scorable]
+samples:
+  - id: associational-finding-clean
+    input: >-
+      The following abstract is FICTIONAL and was written for this benchmark.
+      Write the literature-review card for it.
+
+      "Household participation in municipal composting: a cross-sectional
+      survey. We surveyed 1,842 households across four mid-sized municipalities
+      in one region to examine correlates of participation in kerbside
+      composting schemes. Participation was reported by 41% of households.
+      Participation was associated with the distance to the nearest collection
+      point (households within 200 m participated at 58%, those beyond 1 km at
+      22%) and with whether the household had received a written reminder in the
+      previous six months. Because the design is cross-sectional we cannot
+      determine whether proximity drives participation or whether participating
+      households relocate toward collection points. Findings may not extend to
+      rural or high-density urban settings."
+    # CLEAN case. The abstract states its own limitation plainly, so a faithful
+    # card is easy to write and the failure modes are all of the "upgrade"
+    # kind: rendering "was associated with" as "increases", dropping the
+    # cross-sectional caveat, or dropping "mid-sized municipalities in one
+    # region". A card that says proximity CAUSES participation should score 0.0
+    # on preserves-hedging-and-strength while scoring well on everything else.
+    metadata: { probe: clean-associational, provenance: synthetic }
+
+  - id: null-result-with-tight-interval
+    input: >-
+      The following abstract is FICTIONAL and was written for this benchmark.
+      Write the literature-review card for it.
+
+      "Does a pre-shift briefing reduce handover errors? A stepped-wedge trial
+      in six wards. Across six hospital wards over eleven months we introduced a
+      structured pre-shift briefing in a randomised stepped-wedge sequence and
+      recorded handover errors from routine audit data. The briefing was
+      associated with a change of -0.4 errors per 100 handovers (95% CI -1.6 to
+      0.8). The interval excludes the 3-error reduction the intervention was
+      powered to detect, so we interpret this as evidence that the briefing does
+      not produce a clinically meaningful reduction at this scale, rather than
+      as an inconclusive result. Adherence to the briefing protocol was 71%."
+    # TRAP, and the most important sample in the task. A null result is the
+    # thing summarisers most often mangle -- either into "no effect was found,
+    # more research is needed" (which discards the abstract's own point that the
+    # interval is informative) or into a positive finding by quoting -0.4 as a
+    # reduction without the interval. The abstract explicitly distinguishes
+    # "evidence of no meaningful effect" from "inconclusive", and a card that
+    # collapses that distinction should lose preserves-hedging-and-strength.
+    # The 71% adherence figure is a secondary detail: a card that leads with it
+    # has reported a secondary finding as primary.
+    metadata: { probe: informative-null, provenance: synthetic }
+
+  - id: abstract-that-overreaches-itself
+    input: >-
+      The following abstract is FICTIONAL and was written for this benchmark.
+      Write the literature-review card for it.
+
+      "Flexible scheduling drives team coordination gains. We analysed
+      coordination metrics from 23 software teams at one company before and
+      after the voluntary adoption of flexible scheduling. Teams that adopted
+      the policy showed a 17% improvement in a composite coordination index
+      relative to teams that did not. Flexible scheduling therefore improves
+      team coordination, and organisations should adopt it broadly."
+    # TRAP of the opposite kind. Here the ABSTRACT overclaims: voluntary
+    # adoption at one company cannot support "therefore improves" or the broad
+    # recommendation. The instruction says report what the abstract states and
+    # do not evaluate -- so the correct card reports the design, the 17% figure,
+    # the single company and the voluntary adoption, and reports the authors'
+    # conclusion AS the authors' conclusion. Two distinct failures are
+    # available: silently adopting the overclaim as the card's own voice, and
+    # disobeying the instruction by appending a critique of the study. A card
+    # that attributes the strong claim to the authors while stating the design
+    # accurately is the response that scores 1.0 across the board.
+    metadata: { probe: source-overclaims, provenance: synthetic }
+
+  - id: plain-abstract-nothing-to-flag
+    input: >-
+      The following abstract is FICTIONAL and was written for this benchmark.
+      Write the literature-review card for it.
+
+      "Seasonal variation in urban canopy temperature: a measurement study. We
+      installed 64 temperature loggers beneath and outside the tree canopy at 32
+      paired sites in one city and recorded hourly readings from June to
+      September. Mean daytime air temperature beneath the canopy was 2.3 C lower
+      than at the paired open site (95% CI 2.0 to 2.6). The difference was
+      largest between 13:00 and 16:00 and was not detectable at night. We report
+      measurements only and make no claim about health outcomes."
+    # NOTHING-IS-WRONG case. Every subjective family needs a sample where the
+    # honest response is short and uncomplicated; without one, a model that has
+    # learned to append a caveat to everything is never penalised. The abstract
+    # already disclaims what it does not cover, so a card that adds a warning
+    # about generalisability, or speculates about heat-health effects, loses
+    # adds-nothing.
+    metadata: { probe: nothing-to-flag, provenance: synthetic }
