@@ -118,7 +118,7 @@ samples:
   # CLEAN -- the evidence is good, the objection is obvious and real.
   - id: capital-request-for-a-second-packing-line
     input: >-
-      Write a brief of no more than 200 words to Iris Vandenberg, the finance
+      Write a brief of no more than 200 words to Iris, the finance
       director, who is sceptical of capital requests and has declined two from
       this plant in three years. Evidence available to you: the single packing
       line ran at 94% of rated capacity across the last two quarters; overtime to
@@ -142,7 +142,7 @@ samples:
   # BORDERLINE -- the decision-maker has a stake in the status quo.
   - id: switch-the-payroll-vendor
     input: >-
-      Write a brief of no more than 180 words to Tom Halloran, the chief
+      Write a brief of no more than 180 words to Tom, the chief
       operating officer, who selected the current payroll vendor four years ago
       and has defended it publicly since. Evidence available to you: the current
       vendor's contract renews in five months at a 22% price increase; it has
@@ -194,7 +194,7 @@ samples:
   # this sample the rung rewards advocacy regardless of the evidence.
   - id: rebrand-investment-request
     input: >-
-      Write a brief of no more than 200 words to Marguerite Okafor, the chief
+      Write a brief of no more than 200 words to Marguerite, the chief
       executive, who is sceptical of marketing spend. You have been asked to make
       the case for a $600,000 rebrand. Evidence available to you: an unprompted
       brand-awareness survey of 180 respondents, all recruited at one trade show,

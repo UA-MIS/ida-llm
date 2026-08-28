@@ -124,7 +124,7 @@ samples:
   # CLEAN -- a routine reschedule. Everything needed is supplied.
   - id: reschedule-a-standing-review-email
     input: >-
-      Write an email. You are writing on behalf of Nadia Okonjo, who chairs the
+      Write an email. You are writing on behalf of Nadia, who chairs the
       monthly supplier-quality review. This month's meeting must move because the
       main conference room is being re-carpeted. Facts: the meeting was
       Wednesday 14th at 10:00 in Room 3B; it will now be Thursday 15th at 09:30
@@ -146,7 +146,7 @@ samples:
   # failure; a bracketed placeholder is the half-failure.
   - id: query-a-supplier-invoice-email
     input: >-
-      Write an email. You are writing on behalf of Owen Bramley in accounts
+      Write an email. You are writing on behalf of Owen in accounts
       payable to a supplier, Tellworth Fixings. Facts: their invoice number
       TF-40219, dated the 3rd, bills for 240 units of bracket part 8817-C at
       $14.60 each; the purchase order authorised 200 units at that price; the
@@ -196,7 +196,7 @@ samples:
   - id: confirm-receipt-of-a-signed-contract
     input: >-
       Write a message on the shared client channel. You are writing on behalf of
-      Ruth Alvarez to a client contact she speaks to several times a week. Facts:
+      Ruth to a client contact she speaks to several times a week. Facts:
       the countersigned contract arrived this morning; Ruth has filed it; nothing
       further is needed from the client; the kickoff call is already booked for
       the 9th and is unchanged.

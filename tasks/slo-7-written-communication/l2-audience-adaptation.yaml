@@ -128,7 +128,7 @@ samples:
       session-store shard remains a single point of failure; it was not exercised
       under load in this round."
 
-      Now write to: Angela Reyes, the chief operating officer, who is not
+      Now write to: Angela, the chief operating officer, who is not
       technical. She must decide by Friday whether to approve the v4 launch for
       the holiday trading period. She has asked, in her words, "will it hold up
       and what could still bite us". She and the sender are two levels apart and
@@ -156,7 +156,7 @@ samples:
       Fix shipped 13:05. Runbook rewrite now scheduled and the sign-off gate is
       being enforced in tooling."
 
-      Now write to: Priya Raman, the operations lead at one affected customer,
+      Now write to: Priya, the operations lead at one affected customer,
       whom the sender has worked with for two years. She noticed the delay,
       raised a ticket, and wants to know what happened, whether her orders are
       safe, and whether it will recur.
@@ -212,7 +212,7 @@ samples:
       training window. Recommend refitting on a window excluding the promotion
       before the model is used for the spring campaign."
 
-      Now write to: Dev Iyer, a senior data scientist on a sister team who will
+      Now write to: Dev, a senior data scientist on a sister team who will
       inherit this model next week and refit it himself. He asked for "whatever
       you have". He and the sender are peers who exchange work regularly.
     # Author's note: the counterweight sample. Dev needs the AUC numbers, the

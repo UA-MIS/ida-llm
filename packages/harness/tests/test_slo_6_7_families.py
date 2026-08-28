@@ -678,3 +678,55 @@ class TestTheUndramaticAnswerCanStillScoreFull:
                     f"{task_id}/{criterion_name}: the alternative branch did not survive "
                     "into the judge prompt"
                 )
+
+
+#: Surnames these scenarios were renamed AWAY from.
+#:
+#: The SLO 6 scenarios describe misconduct -- expense padding, an altered safety
+#: filing, an anonymous allegation -- and they carry it off with roles alone ("a
+#: top performer", "a manager"), which is the right pattern. The SLO 7 scenarios
+#: originally paired a first name with a realistic surname, and several of those
+#: are adverse personnel or customer matters: a refused promotion, a declined
+#: refund, a rejected proposal. A published benchmark should not attach an
+#: adverse account to a full name that could match a real individual, so the
+#: surnames are gone and the scenarios run on first name plus role.
+#:
+#: Checked whitespace-insensitively against the raw file text, because a name
+#: wrapped across two lines of a folded scalar is exactly how the equivalent
+#: check was fooled once already.
+TASKS_DIR = Path(__file__).resolve().parents[3] / "tasks"
+
+REMOVED_SURNAMES = (
+    "Reyes",
+    "Reid",
+    "Faraj",
+    "Iyer",
+    "Sørensen",
+    "Sorensen",
+    "Vandenberg",
+    "Ostrowski",
+    "Whitfield",
+    "Okafor",
+    "Okonjo",
+    "Bramley",
+    "Raman",
+    "Alvarez",
+    "Beaufort",
+    "Halloran",
+    "Adeyemi",
+)
+
+
+class TestScenariosDoNotNameAPlausibleRealIndividual:
+    def test_no_removed_surname_comes_back(self, slo_tasks: list) -> None:
+        offenders = []
+        for path in sorted(TASKS_DIR.glob("slo-*/*.yaml")):
+            text = path.read_text()
+            for surname in REMOVED_SURNAMES:
+                for match in re.finditer(rf"\b{re.escape(surname)}\b", text, re.IGNORECASE):
+                    line = text[: match.start()].count("\n") + 1
+                    offenders.append(f"{path.name}:{line} {match.group(0)!r}")
+        assert not offenders, (
+            "these scenarios run on first name plus role so that no adverse account is "
+            "attached to a plausible real individual; a surname came back: " + "; ".join(offenders)
+        )
