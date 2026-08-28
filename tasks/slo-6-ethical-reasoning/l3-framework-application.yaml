@@ -100,9 +100,13 @@ rubric:
         contributes?
 
         1.0 -- three distinct analyses, each reaching its own stated
-               recommendation.
-        0.5 -- three headings are present but one of them defers to another
-               ("as above", "for the same reasons") instead of reasoning.
+               recommendation by its own reasoning. Where the three converge on
+               the same recommendation that is not a defect: this level asks
+               that each lens got there on its own grounds, not that they
+               disagree.
+        0.5 -- three headings are present but one of them defers to another's
+               REASONING ("as above", "for the same reasons") rather than
+               working from its own framework.
         0.0 -- the three are blended into one continuous argument, or a single
                overall verdict is delivered in place of the three.
       weight: 2.0

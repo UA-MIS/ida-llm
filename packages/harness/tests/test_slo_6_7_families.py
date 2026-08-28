@@ -620,6 +620,9 @@ COUNTERWEIGHT_BRANCHES = {
         "does-not-shotgun-extra-principles": "where the facts raise no principle",
         "quotes-or-cites-a-specific-fact": "where the facts raise no principle",
     },
+    "slo-6-ethical-reasoning/l3-framework-application": {
+        "keeps-the-three-analyses-unmerged": "converge on the same recommendation",
+    },
     "slo-6-ethical-reasoning/l2-stakeholder-analysis": {
         "ranks-the-stakes-against-each-other": "genuinely small and comparable",
     },
