@@ -1,0 +1,130 @@
+# slo2-quantitative-literacy, rung 3 of 6.
+#
+# WHAT THIS RUNG ADDS: a CHAIN. Every item needs an intermediate quantity --
+# almost always a contribution margin -- computed before the quantity asked
+# for. Rung 2's items were one substitution deep; here a wrong first step
+# propagates, so an item can be failed twice over.
+#
+# All six items are cost-volume-profit, on purpose: this is the analysis a
+# business core actually asks a student to run, and holding the topic fixed
+# means the rung measures the chain rather than topic coverage.
+version: 1
+id: slo2-quantitative-literacy/l3-break-even-key
+title: SLO2 rung 3 -- cost-volume-profit chains
+description: >
+  Rung 3 of the SLO2 ladder. Break-even volume, break-even revenue, target
+  profit volume and margin of safety: each needs an intermediate computed
+  first, and each has a wrong first step that lands a long way from the key.
+
+  Provenance: every figure and every scenario is synthetic, authored for this
+  file. No course material, no textbook content, no real firm's data.
+kind: verifiable
+domain: business-analytics
+system_prompt: >-
+  You are producing the answer key for an undergraduate business-analytics
+  assessment. Use only the figures the item supplies, and use exactly the
+  convention the item names. Round to two decimal places unless the item says
+  otherwise. Show your working, then put the final numeric answer alone on the
+  last line, with no units, no currency symbol, no percent sign, no thousands
+  separator and no other text on that line.
+scorer:
+  kind: numeric_match
+  # 0.01, as the rest of the ladder. Every key in this file is exact by
+  # construction (the figures were chosen so no item lands on a fraction), so
+  # the tolerance is only absorbing the two-decimal instruction and no correct
+  # answer consumes any of it. Wrong-method gaps, per item: 933.33, 33,495.00,
+  # 125.00, 6.53, 91,800.00 and 37.39. The narrowest is 6.53
+  # (margin-of-safety-percentage, expected sales against break-even sales as
+  # the base), which is 653x the tolerance.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", ladder-l3, quantitative-literacy, cost-volume-profit]
+samples:
+  - id: break-even-units
+    input: >-
+      An assessment item reads: "A subscription-box business has fixed costs of
+      $57,750 per quarter. Each box sells for $39.00 and carries a variable
+      cost of $22.50. Compute the break-even volume, in boxes per quarter."
+      Produce the value for the answer key.
+    # contribution margin = 39.00 - 22.50 = 16.50
+    # break-even = 57,750 / 16.50 = 3,500 exactly (16.50 * 3,500 = 57,750)
+    # Dividing by PRICE instead gives 57,750 / 39.00 = 1,480.77 -- 2,019.23
+    # away. Dividing by VARIABLE COST gives 2,566.67 -- 933.33 away.
+    # The figures were chosen to divide exactly so the key is not a repeating
+    # decimal a marker would have to round.
+    target: "3500"
+    metadata: { skill: break-even-volume, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: break-even-revenue-from-ratio
+    input: >-
+      An assessment item reads: "A cafe has fixed costs of $18,900 per month
+      and a contribution margin RATIO of 0.45. Compute the break-even sales
+      revenue, in dollars per month." Produce the value for the answer key.
+    # 18,900 / 0.45 = 42,000
+    # Multiplying instead gives 18,900 * 0.45 = 8,505 -- 33,495 away. The item
+    # supplies the ratio rather than a price and a variable cost so that the
+    # only available move is the correct one or its inverse.
+    target: "42000"
+    metadata: { skill: break-even-revenue, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: target-profit-volume
+    input: >-
+      An assessment item reads: "A training workshop has fixed costs of $26,400
+      per year. Each seat sells for $180.00 and carries a variable cost of
+      $84.00. Compute the number of seats that must be sold in the year to earn
+      a target operating profit of $12,000." Produce the value for the answer
+      key.
+    # contribution margin = 180.00 - 84.00 = 96.00
+    # (26,400 + 12,000) / 96.00 = 38,400 / 96.00 = 400 exactly
+    # Ignoring the target profit -- computing plain break-even -- gives
+    # 26,400 / 96.00 = 275 -- 125 away. That is the substitution this item
+    # exists to catch, and 125 is 12,500x the tolerance.
+    target: "400"
+    metadata: { skill: target-profit-volume, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: margin-of-safety-percentage
+    input: >-
+      An assessment item reads: "A firm expects sales of $960,000 next year and
+      its break-even sales are $744,000. Compute the margin of safety as a
+      percentage OF EXPECTED SALES, rounded to two decimal places." Produce the
+      value for the answer key.
+    # margin of safety in dollars = 960,000 - 744,000 = 216,000
+    # 216,000 / 960,000 = 0.225 -> 22.50 percent
+    # Dividing by BREAK-EVEN sales instead gives 216,000 / 744,000 = 29.03 --
+    # 6.53 away. The base is named in the item because both are in use.
+    target: "22.5"
+    metadata: { skill: margin-of-safety, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: operating-profit-at-volume
+    input: >-
+      An assessment item reads: "A studio sells a single product at $75.00 per
+      unit with a variable cost of $48.00 per unit, against fixed costs of
+      $91,800 per period. It sold 5,000 units this period. Compute operating
+      profit for the period, in dollars." Produce the value for the answer key.
+    # contribution margin = 75.00 - 48.00 = 27.00
+    # total contribution = 27.00 * 5,000 = 135,000
+    # operating profit = 135,000 - 91,800 = 43,200
+    # Forgetting fixed costs gives 135,000 -- 91,800 away. Subtracting fixed
+    # costs from REVENUE (375,000 - 91,800 = 283,200) is 240,000 away.
+    target: "43200"
+    metadata: { skill: operating-profit, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: break-even-bookings-mixed-fixed
+    input: >-
+      An assessment item reads: "An events business pays $7,200 per month in
+      rent and $4,300 per month in salaried staff; both are fixed. It charges
+      $250.00 per booking and incurs $135.00 of variable cost per booking.
+      Compute the break-even bookings per month." Produce the value for the
+      answer key.
+    # total fixed = 7,200 + 4,300 = 11,500
+    # contribution margin = 250.00 - 135.00 = 115.00
+    # 11,500 / 115.00 = 100 exactly
+    # This item splits the fixed cost across two lines so the first step is a
+    # sum a careless reader skips: using rent alone gives 7,200 / 115.00 =
+    # 62.61 -- 37.39 away, the narrowest wrong-method gap in this file, and
+    # still 3,739x the tolerance.
+    target: "100"
+    metadata: { skill: break-even-with-split-fixed-costs, provenance: synthetic, slo: SLO2, use_mode: capability }

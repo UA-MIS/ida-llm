@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://capstone-ida.dev/schemas/curriculum.schema.json",
+  "title": "curriculum/slo.yaml -- the Student Learning Outcomes and the course coverage grid",
+  "description": "The backbone every SLO-anchored task tags to. Structural layer only; the cross-file rules (a coverage cell naming an undeclared outcome, a task tag naming an undeclared SLO) are enforced by ida_core.curriculum and tools/validate_tasks.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "program", "source", "retrieved", "outcomes", "use_modes", "coverage"],
+  "properties": {
+    "version": { "const": 1 },
+    "program": { "type": "string", "minLength": 1 },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Where the outcomes and the grid were transcribed from. Required: an outcome list with no cited source is an assertion, not a record."
+    },
+    "source_title": { "type": "string" },
+    "source_last_modified": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "The 'last modified' the source itself reports, if it reports one."
+    },
+    "retrieved": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "The date the source was read. Separate from source_last_modified because a curriculum map is edited in place: a later disagreement should be attributable to a moved goalpost rather than blamed on the transcription."
+    },
+    "outcomes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/outcome" }
+    },
+    "use_modes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/useMode" }
+    },
+    "coverage": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/courseCoverage" }
+    }
+  },
+  "$defs": {
+    "outcomeId": {
+      "type": "string",
+      "pattern": "^SLO[1-9][0-9]*$",
+      "description": "Uppercase, no space, no separator: SLO1 .. SLO9. This exact spelling is what an `slo:<ID>` task tag must carry."
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "statement", "text_benchmarkable", "benchmark_note"],
+      "properties": {
+        "id": { "$ref": "#/$defs/outcomeId" },
+        "title": { "type": "string", "minLength": 1 },
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The outcome as the programme publishes it. Reworded only to expand ampersands; not paraphrased."
+        },
+        "text_benchmarkable": {
+          "type": "boolean",
+          "description": "Whether a single-turn text benchmark can measure this outcome at all. Recorded rather than assumed: it is false for two of the nine, and a benchmark that silently dropped them would misrepresent the programme."
+        },
+        "benchmark_note": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required in both directions. For a benchmarkable outcome: why it is scored the way it is. For a non-benchmarkable one: why not, so the omission is a stated decision rather than a gap."
+        }
+      }
+    },
+    "useMode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "statement", "in_use"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "This exact spelling is what a `use-mode:<id>` task tag must carry."
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "statement": { "type": "string", "minLength": 1 },
+        "in_use": {
+          "type": "boolean",
+          "description": "False declares a mode's spelling before anyone authors against an invented one. A task may only tag a mode that is in use."
+        }
+      }
+    },
+    "courseCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["course", "title", "outcomes"],
+      "properties": {
+        "course": {
+          "type": "string",
+          "pattern": "^[A-Z]{2,4} [0-9]{3}$",
+          "description": "Course code as the map prints it, e.g. 'MIS 200'."
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "outcomes": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "description": "Only the cells the published map fills in. An omitted key means the map does not mark that pair -- NOT that the level is unknown.",
+          "patternProperties": {
+            "^SLO[1-9][0-9]*$": {
+              "type": "string",
+              "enum": ["I", "R", "M", "A", "M+A"],
+              "description": "Introduced / Reinforced / Mastered / Assessment Point / Mastered + Assessment Point."
+            }
+          }
+        }
+      }
+    }
+  }
+}

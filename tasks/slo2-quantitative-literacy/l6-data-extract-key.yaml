@@ -1,0 +1,182 @@
+# slo2-quantitative-literacy, rung 6 of 6 -- the top rung.
+#
+# WHAT THIS RUNG ADDS: a DATA SOURCE. Every item above hands the model the two
+# or three numbers it needs. Here the model gets a six-row extract and has to
+# select the rows and the columns itself before any arithmetic happens. That is
+# the clause of SLO2 nothing else in this family touches -- "using appropriate
+# software, DATA SOURCES and tools" -- and it is the clause MIS 200 is about.
+#
+# ONE SHARED EXTRACT. All six items read the SAME six rows, restated in full in
+# every item so each sample stands alone as a prompt. A reviewer therefore
+# checks one table of six products once, not six independent chains. The row
+# products are:
+#     1001 North Online  40 @ 12.50 =   500.00
+#     1002 South Retail  15 @ 18.00 =   270.00
+#     1003 North Retail  60 @ 12.50 =   750.00
+#     1004 West  Online  25 @ 22.00 =   550.00
+#     1005 South Online  80 @  9.75 =   780.00
+#     1006 North Online  10 @ 22.00 =   220.00
+#   totals: revenue 3,070.00 over 230 units
+#
+# The extract was built so that no filter is a no-op and no two filters select
+# the same rows: North != Online != West, the highest-revenue row is not the
+# highest-unit-price row, and the highest unit price is a TIE across two rows.
+# A table where "filter correctly" and "do not filter at all" give the same
+# answer measures nothing.
+#
+# IS THIS RUNG HARD ENOUGH? Six rows is small, and a strong model should clear
+# it. It is the top rung because it is the only one that tests selection at
+# all, not because filtering six rows is difficult. When models saturate it,
+# the right next rung is more rows plus a second table to join against -- not a
+# harder sum.
+version: 1
+id: slo2-quantitative-literacy/l6-data-extract-key
+title: SLO2 rung 6 -- filtered aggregation over a supplied data extract
+description: >
+  Rung 6 of the SLO2 ladder and its ceiling. Each item states a six-row sales
+  extract and asks for an aggregate over a subset of it: one filter, two
+  filters, an exclusion, a ratio of two totals, and a tie. The arithmetic is
+  deliberately trivial; the difficulty is entirely in choosing the rows and the
+  columns, which is the part of quantitative literacy that a hand-fed figure
+  never exercises.
+
+  Provenance: the extract is synthetic, authored for this file. It is not an
+  export from any system and contains no real orders, customers or firms.
+kind: verifiable
+domain: business-analytics
+system_prompt: >-
+  You are producing the answer key for an undergraduate business-analytics
+  assessment. Use only the figures the item supplies, and use exactly the
+  convention the item names. Round to two decimal places unless the item says
+  otherwise. Show your working, then put the final numeric answer alone on the
+  last line, with no units, no currency symbol, no percent sign, no thousands
+  separator and no other text on that line.
+scorer:
+  kind: numeric_match
+  # 0.01. Only one key in this file is not an integer (13.35), and every wrong
+  # SELECTION lands hundreds away rather than fractions, because a filter error
+  # adds or drops a whole row. Narrowest gap in this file is 2.78
+  # (realised-average-unit-price, against averaging the posted unit prices).
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", ladder-l6, quantitative-literacy, data-extract]
+samples:
+  - id: online-channel-revenue
+    input: >-
+      An assessment item reads: "A sales extract holds one row per order with
+      the columns Order, Region, Channel, Units and UnitPrice. The rows are:
+      1001 North Online 40 units at $12.50; 1002 South Retail 15 units at
+      $18.00; 1003 North Retail 60 units at $12.50; 1004 West Online 25 units
+      at $22.00; 1005 South Online 80 units at $9.75; 1006 North Online 10
+      units at $22.00. Revenue for a row is Units multiplied by UnitPrice.
+      Compute the total revenue of the ONLINE orders only, in dollars." Produce
+      the value for the answer key.
+    # Online rows are 1001, 1004, 1005, 1006:
+    #   500.00 + 550.00 + 780.00 + 220.00 = 2,050.00
+    # Failing to filter at all gives the extract total, 3,070.00 -- 1,020.00
+    # away. Every retail row carries revenue, so the no-filter answer is not
+    # accidentally correct.
+    target: "2050"
+    metadata: { skill: single-condition-filtered-sum, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: north-region-average-revenue
+    input: >-
+      An assessment item reads: "A sales extract holds one row per order with
+      the columns Order, Region, Channel, Units and UnitPrice. The rows are:
+      1001 North Online 40 units at $12.50; 1002 South Retail 15 units at
+      $18.00; 1003 North Retail 60 units at $12.50; 1004 West Online 25 units
+      at $22.00; 1005 South Online 80 units at $9.75; 1006 North Online 10
+      units at $22.00. Revenue for a row is Units multiplied by UnitPrice.
+      Compute the average revenue per order for orders in the NORTH region, in
+      dollars." Produce the value for the answer key.
+    # North rows are 1001, 1003, 1006: 500.00 + 750.00 + 220.00 = 1,470.00
+    # 1,470.00 / 3 = 490.00
+    # Dividing the North total by the SIX orders in the extract rather than the
+    # three it selected gives 245.00 -- 245.00 away. Averaging over all six
+    # orders' revenue gives 3,070.00 / 6 = 511.67 -- 21.67 away.
+    target: "490"
+    metadata: { skill: filtered-mean, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: north-and-online-units
+    input: >-
+      An assessment item reads: "A sales extract holds one row per order with
+      the columns Order, Region, Channel, Units and UnitPrice. The rows are:
+      1001 North Online 40 units at $12.50; 1002 South Retail 15 units at
+      $18.00; 1003 North Retail 60 units at $12.50; 1004 West Online 25 units
+      at $22.00; 1005 South Online 80 units at $9.75; 1006 North Online 10
+      units at $22.00. Compute the total Units for the orders that are BOTH in
+      the North region AND placed through the Online channel." Produce the
+      value for the answer key.
+    # North AND Online is rows 1001 and 1006 only: 40 + 10 = 50
+    # North alone gives 40 + 60 + 10 = 110 -- 60 away.
+    # Online alone gives 40 + 25 + 80 + 10 = 155 -- 105 away.
+    # Reading AND as OR gives 40 + 60 + 10 + 25 + 80 = 215 -- 165 away.
+    # 50 is not a value in the extract, so the key cannot be lifted from it.
+    target: "50"
+    metadata: { skill: two-condition-filtered-sum, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: realised-average-unit-price
+    input: >-
+      An assessment item reads: "A sales extract holds one row per order with
+      the columns Order, Region, Channel, Units and UnitPrice. The rows are:
+      1001 North Online 40 units at $12.50; 1002 South Retail 15 units at
+      $18.00; 1003 North Retail 60 units at $12.50; 1004 West Online 25 units
+      at $22.00; 1005 South Online 80 units at $9.75; 1006 North Online 10
+      units at $22.00. Revenue for a row is Units multiplied by UnitPrice.
+      Compute the average price per unit actually realised across the whole
+      extract, in dollars rounded to two decimal places. This is total revenue
+      divided by total units." Produce the value for the answer key.
+    # total revenue = 3,070.00 ; total units = 230
+    # 3,070.00 / 230 = 13.347826... -> 13.35
+    # This is the weighted-versus-simple trap from rung 2 wearing a table:
+    # averaging the six POSTED unit prices gives
+    # (12.50 + 18.00 + 12.50 + 22.00 + 9.75 + 22.00) / 6 = 16.125 -> 16.13,
+    # which is 2.78 away. The convention is spelled out in the item so the two
+    # readings cannot both be defensible.
+    target: "13.35"
+    metadata: { skill: weighted-mean-over-extract, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: revenue-excluding-south
+    input: >-
+      An assessment item reads: "A sales extract holds one row per order with
+      the columns Order, Region, Channel, Units and UnitPrice. The rows are:
+      1001 North Online 40 units at $12.50; 1002 South Retail 15 units at
+      $18.00; 1003 North Retail 60 units at $12.50; 1004 West Online 25 units
+      at $22.00; 1005 South Online 80 units at $9.75; 1006 North Online 10
+      units at $22.00. Revenue for a row is Units multiplied by UnitPrice.
+      Compute the total revenue of every order EXCEPT those in the South
+      region, in dollars." Produce the value for the answer key.
+    # Everything but 1002 and 1005: 500.00 + 750.00 + 550.00 + 220.00 = 2,020.00
+    # equivalently 3,070.00 - 270.00 - 780.00 = 2,020.00
+    # Inverting the exclusion -- returning South only -- gives 1,050.00, which
+    # is 970.00 away. No filter at all gives 3,070.00 -- 1,050.00 away.
+    # Note 2,020.00 is close to the ONLINE answer of 2,050.00 in the first
+    # sample by coincidence, not construction; they differ by 30.00, which is
+    # 3,000x the tolerance, so the two cannot be confused by the scorer.
+    target: "2020"
+    metadata: { skill: exclusion-filtered-sum, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: highest-unit-price-revenue
+    input: >-
+      An assessment item reads: "A sales extract holds one row per order with
+      the columns Order, Region, Channel, Units and UnitPrice. The rows are:
+      1001 North Online 40 units at $12.50; 1002 South Retail 15 units at
+      $18.00; 1003 North Retail 60 units at $12.50; 1004 West Online 25 units
+      at $22.00; 1005 South Online 80 units at $9.75; 1006 North Online 10
+      units at $22.00. Revenue for a row is Units multiplied by UnitPrice.
+      Compute the combined revenue of every order carrying the HIGHEST unit
+      price in the extract, in dollars." Produce the value for the answer key.
+    # The highest unit price is 22.00 and it is a TIE: rows 1004 and 1006.
+    # 550.00 + 220.00 = 770.00
+    # Taking only the first matching row gives 550.00 -- 220.00 away; taking
+    # only the last gives 220.00 -- 550.00 away. The tie is the whole item: a
+    # max-lookup that returns one row silently drops half the answer, and the
+    # extract was built with a duplicated 22.00 so that it does.
+    # The highest-REVENUE row is 1005 at 780.00 and its unit price is the
+    # LOWEST in the extract, so a model that confuses the two ranks lands
+    # 10.00 away -- deliberately not zero.
+    target: "770"
+    metadata: { skill: tie-aware-selection, provenance: synthetic, slo: SLO2, use_mode: capability }

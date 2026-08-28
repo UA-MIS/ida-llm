@@ -1,0 +1,266 @@
+# slo4-cultural-societal, rung 1 of 5 -- the floor.
+#
+# SLO 4 (Cultural & Societal Perspective): "students evaluate how cultural and
+# societal aspects influence business decisions and practices in domestic and
+# international contexts."
+#
+# Three things in that sentence shape this whole family:
+#   - "cultural AND societal" are not synonyms. Cultural aspects are shared
+#     norms, values and expectations about how people deal with one another --
+#     hierarchy, directness, obligation, time. Societal aspects are structural
+#     features of a society -- demography, education, labour organisation,
+#     institutional trust, the reach of the safety net, the public role of
+#     religion. They influence business differently and a family that conflates
+#     them measures one thing under two names, so every task here contains
+#     samples of each.
+#   - "domestic AND international". Cultural and societal influence is not a
+#     thing that begins at a border, and a family whose scenarios are all
+#     cross-border teaches that it is. Two of the four samples below are
+#     entirely domestic.
+#   - "EVALUATE", not "describe". That is what rung 5 is for.
+#
+# WHY EVERY SOCIETY HERE IS INVENTED, AND WHY THAT IS NOT JUST HYGIENE.
+# A benchmark that says "in country X, business is done thus" encodes a
+# stereotype about real people and then rewards a model for reproducing it -- and
+# it would do so in a public repository, with the answer key attached. Marenna,
+# Cadrenne, Aldenmark and Nystria are invented, and each scenario STATES the
+# cultural or societal facts it depends on. The model is graded on reasoning
+# from stated facts about an invented society, never on recalling claims about a
+# real one. This is a deliberate design constraint on the family, not an
+# accident of anonymisation.
+version: 1
+id: slo4-cultural-societal/l1-aspect-identification
+title: Cultural and societal perspective -- identifying the aspects at work in a practice
+description: >
+  Rung 1 of the slo4-cultural-societal ladder, and its floor. Given a synthetic
+  business scenario, identify the cultural aspects and the societal aspects that
+  bear on the practice described, and say which is which. Two of the four
+  scenarios are domestic and two are cross-border; the rubric requires the
+  cultural/societal distinction to be drawn, because a response that treats them
+  as one category cannot reason about them separately at the higher rungs.
+
+  Every society in this family is invented and every cultural or societal fact a
+  scenario depends on is stated in the scenario. No claim about any real
+  national culture is asserted or rewarded.
+
+  This is a subjective task. With no judge model configured it will load, run
+  and store transcripts, and report no score -- see docs/llm-judge.md.
+
+  Provenance: every firm, country, society and scenario is synthetic, invented
+  for this file. No real company, country or culture is described, no student
+  work is used, and no textbook or question-bank content is reproduced.
+kind: subjective
+domain: organisational-behaviour
+system_prompt: >-
+  You are advising the management team of a mid-sized firm. Read the scenario
+  and identify the aspects of the surrounding culture or society that bear on
+  the business practice described. For each one, say whether it is a CULTURAL
+  aspect -- a shared norm, value or expectation about how people deal with one
+  another -- or a SOCIETAL aspect -- a structural feature of the society such as
+  its demography, education system, labour institutions, or the reach of its
+  public provision -- and name the specific part of the practice it touches.
+  Use only what the scenario states. Do not appeal to general claims about any
+  national culture.
+scorer:
+  kind: llm_judge
+  rubric_id: slo4-cultural-societal-identification-v1
+rubric:
+  id: slo4-cultural-societal-identification-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: recall-of-operative-aspects
+      description: |-
+        Does the response name the cultural and societal aspects the scenario
+        actually supplies facts about? Count only aspects the scenario states --
+        a norm it describes, a demographic fact it gives, an institution it
+        names.
+
+        1.0 -- every aspect the scenario supplies facts about is named.
+        0.5 -- one is missing, or one is named so vaguely ("cultural
+               differences", "social factors") that it cannot be matched to
+               anything stated.
+        0.0 -- two or more are missing, or no named aspect can be traced to a
+               fact in the scenario.
+      weight: 3.0
+    - name: cultural-societal-distinction
+      description: |-
+        Does the response classify each aspect as cultural or societal, and are
+        the classifications defensible on the definitions given in the prompt?
+        A norm about how people treat one another is cultural; a structural
+        feature of the society -- who exists, what institutions operate, what
+        the state provides -- is societal.
+
+        1.0 -- every aspect is classified and every classification is
+               defensible.
+        0.5 -- every aspect is classified and exactly one classification is not
+               defensible, or one aspect is left unclassified.
+        0.0 -- the classification is not attempted, or two or more are
+               indefensible, or the response treats the two categories as
+               interchangeable.
+      weight: 3.0
+    - name: touchpoint-is-specific
+      description: |-
+        For each aspect named, does the response say which specific part of the
+        practice it touches, rather than restating that the aspect exists?
+
+        1.0 -- every aspect is tied to a named element of the practice (a pay
+               structure, a meeting format, a hiring criterion, a schedule, a
+               contract term).
+        0.5 -- some aspects are tied to a specific element and others are left
+               as bare labels.
+        0.0 -- aspects are listed as labels with no link to the practice, or the
+               links given would fit any scenario unchanged.
+      weight: 2.0
+    - name: no-appeal-to-national-stereotype
+      description: |-
+        Does the response reason from the facts the scenario states, rather than
+        from general claims about how business is done in a country or region?
+        This criterion is scored on the response's warrant, not its politeness:
+        an unsupported generalisation about a group is a reasoning defect
+        because it is not checkable against the scenario.
+
+        1.0 -- every claim about the society is traceable to a fact stated in
+               the scenario.
+        0.5 -- one general claim about a national or regional culture is made,
+               and it is consistent with the stated facts and not load-bearing.
+        0.0 -- a generalisation about a national, ethnic or religious group is
+               asserted as fact and carries part of the analysis.
+      weight: 2.0
+    - name: applies-to-domestic-scenarios-too
+      description: |-
+        Where the scenario is entirely within one country, does the response
+        still identify cultural and societal aspects, rather than treating
+        "cultural" as a synonym for "foreign"?
+
+        1.0 -- the domestic scenario is analysed for cultural and societal
+               aspects as readily as a cross-border one would be.
+        0.5 -- some aspects are identified but the response frames the absence
+               of a border as making the analysis marginal.
+        0.0 -- the response states or implies that a single-country scenario has
+               no cultural or societal dimension.
+      weight: 2.0
+tags: [slo-benchmark, "slo:SLO4", "use-mode:capability", slo4-cultural-societal, ladder-l1, organisational-behaviour, subjective, not-yet-scorable]
+samples:
+  # CLEAN, INTERNATIONAL. Both categories are present and explicitly stated:
+  # two cultural norms and two societal structures. An adequate response finds
+  # all four and sorts them correctly.
+  - id: annual-performance-review
+    input: >-
+      Vasterly Foods runs annual performance reviews in which a manager rates
+      each employee against peers and the ratings are disclosed to the employee
+      individually. It is extending the practice to its new plant in Aldenmark.
+      In Aldenmark, workplace surveys conducted by the plant's own HR team
+      report that employees expect criticism to be delivered privately and
+      indirectly, and that being singled out relative to colleagues is
+      experienced as a loss of standing within the work group. Aldenmark law
+      requires that any workplace policy affecting pay or promotion be
+      negotiated with the elected works council before it takes effect, and 78%
+      of Aldenmark manufacturing employees are covered by such councils. The
+      median tenure at the Aldenmark plant is fourteen years, against three
+      years at Vasterly's home plants. Should Vasterly extend the practice
+      unchanged?
+    # Author's note: two CULTURAL aspects -- the norm that criticism is
+    # delivered privately and indirectly, and the norm that peer-relative
+    # singling-out costs standing in the group. Two SOCIETAL aspects -- the
+    # works council institution with its 78% coverage and statutory negotiation
+    # right, and the fourteen-year median tenure, which is a demographic and
+    # labour-market structure rather than a norm.
+    # The classification of tenure is the one worth checking in a response:
+    # long tenure is a structural fact about the workforce, not a value people
+    # hold, though it interacts with the cultural norms because a rating
+    # disclosed among colleagues who will work together for another decade
+    # carries differently than among colleagues who will not.
+    metadata: { slo: SLO4, use_mode: capability, probe: performance-review, context: international, provenance: synthetic }
+
+  # CLEAN, DOMESTIC. Same analysis, no border. This sample exists because a
+  # family whose scenarios are all cross-border teaches that "cultural" means
+  # "foreign" -- which is exactly the misreading SLO 4 names by including
+  # "domestic" in the outcome.
+  - id: shift-bidding-system
+    input: >-
+      Vasterly Foods' home-country plants have run a shift-bidding system for
+      twenty years in which the most senior employee choosing first gets the
+      preferred shifts, and in which taking overtime when offered is widely
+      understood as a sign of commitment and is informally weighed in promotion
+      decisions. Over the past six years the median age of the home-country
+      workforce has fallen from 48 to 34 as long-tenured employees have retired.
+      Exit interviews conducted by Vasterly's HR team over that period record
+      that departing employees under 35 cite predictable schedules as their
+      primary reason for leaving more often than pay. The home country
+      introduced a statutory right to request flexible working two years ago.
+      Voluntary turnover at the plants has risen from 6% to 19%. Should Vasterly
+      change the shift-bidding system?
+    # Author's note: entirely domestic, and dense with both categories.
+    # CULTURAL: the norm that accepting overtime signals commitment, and the
+    # seniority-first entitlement embedded in shift bidding -- both are shared
+    # expectations about how people should treat one another at work.
+    # SOCIETAL: the demographic shift from median age 48 to 34, and the new
+    # statutory right to request flexible working -- structural features, not
+    # values. The turnover figure is evidence of the mismatch rather than an
+    # aspect in itself, and a response that lists it as a cultural aspect has
+    # confused a symptom with a cause.
+    # A response that says this scenario has no cultural dimension because it is
+    # single-country should score 0.0 on applies-to-domestic-scenarios-too.
+    metadata: { slo: SLO4, use_mode: capability, probe: shift-bidding-seniority, context: domestic, provenance: synthetic }
+
+  # TRAP. The scenario is cross-border and reads as though culture explains the
+  # outcome, but every fact it supplies is structural: a societal-aspect
+  # scenario dressed as a cultural one. A response that reaches for cultural
+  # explanation has stopped reading the facts.
+  - id: sales-team-call-conversion
+    input: >-
+      Vasterly Foods' Marenna sales team closes far fewer deals per call than its
+      home-country team, and the Marenna country manager has reported to head
+      office that "the selling culture here is more relationship-driven and
+      slower." Head office has since gathered the following: Marenna's
+      commercial code requires that any supply contract above a threshold value
+      be registered with a public registry before it binds, and the registry
+      currently takes nine to eleven weeks. The Marenna team's commission is
+      paid on registered contracts only. Marenna's two largest buyers are
+      state-owned enterprises subject to a statutory competitive tendering
+      process with fixed annual windows. Vasterly's home-country team sells to
+      privately held buyers under contracts that bind on signature. What aspects
+      bear on the difference in closing rates?
+    # Author's note: the country manager's "relationship-driven culture"
+    # framing is a hypothesis in the scenario, not a fact of it -- and every
+    # fact supplied is SOCIETAL and structural: a registration requirement with
+    # a nine-to-eleven week queue, a commission scheme keyed to registration, a
+    # state-owned buyer base, and statutory tendering windows. Those four
+    # explain a lower closing rate per call without any appeal to norms at all.
+    # The honest response identifies the structural aspects, and treats the
+    # country manager's cultural claim as an unverified hypothesis rather than a
+    # supplied fact. A response that adopts the cultural framing and elaborates
+    # on it should lose no-appeal-to-national-stereotype -- and this is the
+    # sample that most directly rehearses rung 5, where evaluating exactly this
+    # kind of attribution is the whole task.
+    metadata: { slo: SLO4, use_mode: capability, probe: sales-call-conversion, context: international, provenance: synthetic }
+
+  # THIN, DOMESTIC. Very little genuine cultural or societal content, and the
+  # honest list is short. Without this sample the rubric rewards a model that
+  # always produces a rich cultural reading, which is the identification-task
+  # equivalent of always finding a fault.
+  - id: warehouse-site-selection
+    input: >-
+      Vasterly Foods is choosing between two home-country warehouse locations,
+      forty kilometres apart in the same metropolitan area and the same
+      jurisdiction. Site A costs 240,000 US dollars a year to lease and sits
+      eight minutes from the motorway junction. Site B costs 205,000 US dollars
+      a year and sits twenty-six minutes from the same junction. Both sites draw
+      on the same regional labour market and the same public transport network,
+      and Vasterly's own survey of its warehouse staff found no difference in
+      stated willingness to commute to either site. Wage rates, the applicable
+      employment law, and the available shift patterns are identical at both
+      sites. Which site should Vasterly choose?
+    # Author's note: this is a logistics and cost decision. The scenario goes
+    # out of its way to neutralise the aspects that would otherwise be live --
+    # same labour market, same transport network, same law, same wages, same
+    # shift patterns, and a survey showing no difference in commuting
+    # willingness. The one arguable societal aspect is the labour market and
+    # transport network the sites share, and the honest observation is that
+    # because it is SHARED it does not distinguish the options.
+    # A response that constructs a cultural analysis here -- neighbourhood
+    # character, community identity, the symbolism of the location -- should
+    # lose recall-of-operative-aspects and no-appeal-to-national-stereotype
+    # both, since nothing in the scenario supports any of it.
+    metadata: { slo: SLO4, use_mode: capability, probe: warehouse-location-choice, context: domestic, provenance: synthetic }

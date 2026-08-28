@@ -1,0 +1,132 @@
+# slo9-business-knowledge, rung 1 of 6 -- the floor.
+#
+# WHAT THIS RUNG ADDS: nothing. Six definitions, one per business function
+# (accounting, law/structure, cost behaviour, finance, marketing, management),
+# each with distractors that name a real but clearly different concept. If a
+# model scores below 1.00 here, a low score higher up is about the format or
+# the model, not about difficulty.
+#
+# Read `_shared-header-notes.md` in this directory first: the guessing floor on
+# every task in this family is 0.25, not 0.00.
+version: 1
+id: slo9-business-knowledge/l1-core-definitions-key
+title: SLO9 rung 1 -- core definitions across the business functions
+description: >
+  Rung 1 of the SLO9 ladder. One recall item per core function, with
+  distractors drawn from adjacent concepts a student meets in the same course.
+  It exists as a floor: it establishes that a model can read the item format
+  and answer in it, so that a low score on rung 5 means something.
+
+  Note that four options give a 0.25 guessing floor, so a mean near 0.25 on any
+  task in this family indicates no signal rather than weak knowledge.
+
+  Provenance: every item was written for this file. No textbook, question-bank,
+  past-paper or other institution's examination content is reproduced anywhere
+  in this family, and no real student work is used.
+kind: verifiable
+domain: general-business
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate general
+  business examination. Exactly one option is correct. You may reason briefly
+  first, but you must then put the letter of the correct option alone on the
+  last line, with no punctuation and no other text on that line.
+scorer:
+  kind: exact_match
+  # exact_match, not numeric_match: the answer is a letter. Punctuation is
+  # stripped and case folded so that "B", "b", "B." and "**B**" all score the
+  # same -- the item measures whether the model knows the answer, not whether
+  # it emitted a bare character. Normalisation is applied to the target too, so
+  # the comparison stays symmetric.
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", ladder-l1, business-knowledge, forced-choice]
+samples:
+  - id: cost-of-goods-sold
+    input: >-
+      Which of the following does cost of goods sold measure?
+      A) The total cash a firm paid its suppliers during the period.
+      B) The direct cost of producing or purchasing the goods the firm actually
+      sold during the period.
+      C) Every operating expense the firm incurred during the period.
+      D) The value of the inventory the firm still held at the end of the
+      period.
+    # B. A is cash paid to suppliers (a cash-flow item); C is total operating
+    # expense, which includes selling and administrative costs; D is closing
+    # inventory, a balance-sheet figure. Each distractor is a real quantity a
+    # student meets in the same chapter, which is what makes it a distractor
+    # rather than filler.
+    target: "B"
+    metadata: { skill: accounting-definitions, function: accounting, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: corporate-form-feature
+    input: >-
+      A shareholder in a corporation is generally not personally responsible
+      for the corporation's debts beyond the amount they invested. What is this
+      feature of the corporate form called?
+      A) Perpetual existence
+      B) Double taxation
+      C) Fiduciary duty
+      D) Limited liability
+    # D. A, B and C are all genuine features of the corporate form -- which is
+    # the point -- but none of them is the one described.
+    target: "D"
+    metadata: { skill: business-structures, function: legal-environment, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: cost-behaviour-term
+    input: >-
+      A cost that does not change in total when output changes, within the
+      relevant range, is best described as:
+      A) A fixed cost
+      B) A variable cost
+      C) A marginal cost
+      D) A sunk cost
+    # A. "In total" and "within the relevant range" are both load-bearing and
+    # both stated: a fixed cost per UNIT does change with output, and outside
+    # the relevant range a fixed cost steps. An item that omitted either
+    # qualifier would have more than one defensible answer.
+    target: "A"
+    metadata: { skill: cost-behaviour, function: managerial-accounting, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: working-capital
+    input: >-
+      Working capital is defined as:
+      A) Total assets minus total liabilities
+      B) Cash held at the end of the period
+      C) Current assets minus current liabilities
+      D) Revenue minus operating expenses
+    # C. A is equity (net assets); B is a single balance; D is operating
+    # profit. All three are quantities the same course computes.
+    target: "C"
+    metadata: { skill: finance-definitions, function: finance, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: dividing-a-market-term
+    input: >-
+      Dividing a broad market into groups of buyers with distinct needs, so
+      that a different offer can be aimed at each group, is called:
+      A) Product differentiation
+      B) Market segmentation
+      C) Vertical integration
+      D) Price skimming
+    # B. A is differentiating the PRODUCT rather than the market; C is a
+    # structural strategy about owning stages of the supply chain; D is a
+    # pricing tactic. Each is a term from the same syllabus.
+    target: "B"
+    metadata: { skill: marketing-concepts, function: marketing, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: direct-reports-term
+    input: >-
+      In an organisation chart, the number of subordinates reporting directly
+      to one manager is that manager's:
+      A) Chain of command
+      B) Line of authority
+      C) Unity of command
+      D) Span of control
+    # D. A is the reporting path up the organisation; B is the route by which
+    # authority is delegated; C is the principle that an employee reports to
+    # one manager. All three are adjacent terms about the same chart.
+    target: "D"
+    metadata: { skill: organisation-structure, function: management, provenance: synthetic, slo: SLO9, use_mode: capability }

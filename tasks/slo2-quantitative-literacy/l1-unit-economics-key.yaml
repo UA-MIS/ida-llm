@@ -1,0 +1,111 @@
+# slo2-quantitative-literacy, rung 1 of 6 -- the floor.
+#
+# WHAT THIS RUNG ADDS: nothing. That is its job. Every item is one arithmetic
+# step on figures the prompt hands over, with no method choice to get wrong. If
+# a model scores below 1.00 here, a low score on rung 3 is about this family's
+# prompt format or the model being broken, NOT about difficulty -- which is the
+# only reason a floor rung is worth spending samples on.
+#
+# ANCHOR: SLO2 Quantitative Literacy. MIS 200 carries SLO2 at level A
+# (Assessment Point) in curriculum/slo.yaml, which is why this family is
+# authored to full depth ahead of the others.
+version: 1
+id: slo2-quantitative-literacy/l1-unit-economics-key
+title: SLO2 rung 1 -- single-step unit economics
+description: >
+  Rung 1 of the SLO2 ladder, and deliberately nearly free: one operation per
+  item on figures the item supplies. It exists to separate "this model cannot
+  do the higher rungs" from "this model could not parse our answer format",
+  which a family with no floor cannot distinguish.
+
+  Provenance: every figure and every scenario is synthetic, authored for this
+  file. No course material, no textbook content, no real firm's data.
+kind: verifiable
+domain: business-analytics
+system_prompt: >-
+  You are producing the answer key for an undergraduate business-analytics
+  assessment. Use only the figures the item supplies, and use exactly the
+  convention the item names. Round to two decimal places unless the item says
+  otherwise. Show your working, then put the final numeric answer alone on the
+  last line, with no units, no currency symbol, no percent sign, no thousands
+  separator and no other text on that line.
+scorer:
+  kind: numeric_match
+  # Two decimal places -> at most 0.005 of rounding error, so 0.01 is the
+  # smallest tolerance that never fails a correctly-rounded answer. The
+  # narrowest gap to a wrong method in this file is 1.09 (percentage-change-
+  # revenue), 109x the tolerance.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", ladder-l1, quantitative-literacy, unit-economics]
+samples:
+  - id: contribution-margin-per-unit
+    input: >-
+      An assessment item reads: "A product sells for $48.00 per unit and its
+      variable cost is $31.50 per unit. Compute the contribution margin per
+      unit, in dollars." Produce the value for the answer key.
+    # 48.00 - 31.50 = 16.50
+    # The plausible confusion is reporting the contribution margin RATIO,
+    # 16.50 / 48.00 = 0.34 -- 16.16 away, far outside tolerance.
+    target: "16.5"
+    metadata: { skill: contribution-margin-per-unit, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: total-variable-cost
+    input: >-
+      An assessment item reads: "A bakery's variable cost is $2.35 per loaf and
+      it bakes 1,840 loaves in a week. Compute the total variable cost for the
+      week, in dollars." Produce the value for the answer key.
+    # 2.35 * 1840 = 4324
+    # (2.35 * 1800 = 4230; 2.35 * 40 = 94; 4230 + 94 = 4324)
+    # Dividing instead gives 1840 / 2.35 = 782.98 -- 3541.02 away.
+    target: "4324"
+    metadata: { skill: total-variable-cost, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: percentage-change-revenue
+    input: >-
+      An assessment item reads: "Quarterly revenue rose from $412,000 to
+      $457,320. Compute the percentage increase, as a percentage rounded to two
+      decimal places." Produce the value for the answer key.
+    # increase = 457,320 - 412,000 = 45,320
+    # 45,320 / 412,000 = 0.11 exactly -> 11.00 percent
+    # Dividing by the NEW value instead (the standard error here) gives
+    # 45,320 / 457,320 = 9.91 -- 1.09 away. That is the narrowest wrong-method
+    # gap in this file and it is still 109x the tolerance.
+    target: "11"
+    metadata: { skill: percentage-change, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: markup-on-cost-selling-price
+    input: >-
+      An assessment item reads: "An item costs a retailer $64.00 and is marked
+      up 35% ON COST. Compute the selling price, in dollars." Produce the value
+      for the answer key.
+    # 64.00 * 1.35 = 86.40
+    # The item says ON COST on purpose. Reading it as a 35% MARGIN gives
+    # 64.00 / 0.65 = 98.46 -- 12.06 away. An item that left the base implicit
+    # would have two defensible keys and could not be scored at all.
+    target: "86.4"
+    metadata: { skill: markup-on-cost, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: average-order-value
+    input: >-
+      An assessment item reads: "A store recorded five orders in a day, valued
+      at $34.00, $19.50, $87.25, $42.00 and $61.25. Compute the average order
+      value, in dollars." Produce the value for the answer key.
+    # 34.00 + 19.50 + 87.25 + 42.00 + 61.25 = 244.00 ; 244.00 / 5 = 48.80
+    # Reporting the median instead gives 42.00 -- 6.80 away.
+    target: "48.8"
+    metadata: { skill: arithmetic-mean, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: gross-profit-dollars
+    input: >-
+      An assessment item reads: "A firm reports net sales of $918,000 and cost
+      of goods sold of $605,880. Compute gross profit, in dollars." Produce the
+      value for the answer key.
+    # 918,000 - 605,880 = 312,120
+    # Reporting the gross margin percentage instead gives 34.00 -- 312,086
+    # away.
+    target: "312120"
+    metadata: { skill: gross-profit, provenance: synthetic, slo: SLO2, use_mode: capability }

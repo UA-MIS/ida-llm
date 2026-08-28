@@ -1,0 +1,139 @@
+# slo2-quantitative-literacy, rung 4 of 6.
+#
+# WHAT THIS RUNG ADDS: an EXTERNAL REFERENCE VALUE, supplied in the prompt.
+#
+# Every discount, annuity and compounding factor an item needs is written into
+# the item. That is deliberate and it is the design note worth reading before
+# editing this file: an item that says "at 7% for 4 years" and nothing else is
+# measuring which table the model memorised, and would mark a model wrong for
+# reading a three-decimal table when the key was computed from a six-decimal
+# one. Supplying the factor moves the item back onto what SLO2 names --
+# analysing and solving with the data source you were given.
+#
+# Every key below was chosen so the exact product does NOT land on a half-cent
+# boundary, because round-half-up and round-half-even disagree there and the
+# item would have two defensible keys.
+version: 1
+id: slo2-quantitative-literacy/l4-time-value-key
+title: SLO2 rung 4 -- time value of money against supplied factors
+description: >
+  Rung 4 of the SLO2 ladder. Present value, net present value, future value and
+  a two-option comparison, each against a discount or annuity factor the item
+  supplies. The added demand over rung 3 is applying a reference value
+  correctly rather than deriving one.
+
+  Provenance: every figure and every scenario is synthetic, authored for this
+  file. The present-value, annuity and future-value factors are ordinary
+  compound-interest arithmetic computed for this file, not reproduced from any
+  published table. No course material, no textbook content.
+kind: verifiable
+domain: business-analytics
+system_prompt: >-
+  You are producing the answer key for an undergraduate business-analytics
+  assessment. Use only the figures the item supplies, and use exactly the
+  convention the item names. Round to two decimal places unless the item says
+  otherwise. Show your working, then put the final numeric answer alone on the
+  last line, with no units, no currency symbol, no percent sign, no thousands
+  separator and no other text on that line.
+scorer:
+  kind: numeric_match
+  # 0.01. These are dollar answers rounded to the cent, and every exact product
+  # sits clear of a half-cent boundary (each item's comment records its
+  # clearance: 0.005, 0.003, 0.003, 0.001 and 0.005 respectively), so 0.01
+  # admits the correct answer and nothing else. Narrowest wrong-method gap in this file is
+  # 1,414.36 (future-value-compound, compound against simple interest).
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", ladder-l4, quantitative-literacy, time-value-of-money]
+samples:
+  - id: present-value-single-sum
+    input: >-
+      An assessment item reads: "An investment pays a single lump sum of
+      $84,000 exactly four years from now. The present-value factor for four
+      periods at 7% is 0.762895. Compute the present value of that payment, in
+      dollars, rounded to two decimal places." Produce the value for the answer
+      key.
+    # 84,000 * 0.762895 = 64,083.18 exactly (762,895 * 84 = 64,083,180)
+    # No rounding-boundary risk: the exact product terminates at the cent.
+    # Dividing by the factor instead gives 110,106.90 -- 46,023.72 away.
+    # Reporting the undiscounted sum gives 84,000 -- 19,916.82 away.
+    target: "64083.18"
+    metadata: { skill: present-value-single-sum, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: net-present-value-annuity
+    input: >-
+      An assessment item reads: "A machine costs $120,000 today and returns
+      $28,000 at the end of each year for six years. The present-value annuity
+      factor for six periods at 9% is 4.485919. Compute the net present value
+      of the machine, in dollars, rounded to two decimal places." Produce the
+      value for the answer key.
+    # present value of the inflows = 28,000 * 4.485919 = 125,605.732
+    # net present value = 125,605.732 - 120,000 = 5,605.732 -> 5,605.73
+    # Exact value is 5,605.732, which clears the 5,605.735 half-cent boundary
+    # by 0.003 -- three tenths of a cent -- so round-half-up and
+    # round-half-even agree.
+    # Forgetting the initial outlay gives 125,605.73 -- 120,000 away.
+    # Using the UNDISCOUNTED inflows (6 * 28,000 = 168,000) gives 48,000 --
+    # 42,394.27 away, which is the error this item is really aimed at.
+    target: "5605.73"
+    metadata: { skill: net-present-value, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: future-value-compound
+    input: >-
+      An assessment item reads: "A deposit of $37,000 earns interest for five
+      years. The future-value factor for five periods at 6% is 1.338226.
+      Compute the future value, in dollars, rounded to two decimal places."
+      Produce the value for the answer key.
+    # 37,000 * 1.338226 = 49,514.362 -> 49,514.36
+    # Exact value 49,514.362 is clear of the .365 boundary.
+    # SIMPLE interest -- 37,000 * (1 + 0.06 * 5) = 48,100 -- is the near miss
+    # this item exists to separate, and it is 1,414.36 away: the narrowest
+    # wrong-method gap in this file, still 141,436x the tolerance.
+    target: "49514.36"
+    metadata: { skill: future-value-compound, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: present-value-uneven-flows
+    input: >-
+      An assessment item reads: "A contract pays $30,000 at the end of year one
+      and $44,000 at the end of year two. The present-value factors at 8% are
+      0.925926 for one period and 0.857339 for two periods. Compute the present
+      value of the contract, in dollars, rounded to two decimal places."
+      Produce the value for the answer key.
+    # 30,000 * 0.925926 = 27,777.78
+    # 44,000 * 0.857339 = 37,722.916
+    # total = 65,500.696 -> 65,500.70
+    # Rounding each flow first (27,777.78 + 37,722.92) also gives 65,500.70, so
+    # the item does not turn on rounding order -- checked deliberately, because
+    # an item whose key depends on when you round has two keys.
+    # BOUNDARY CLEARANCE, and this is the thinnest in the file: the exact total
+    # 65,500.696 sits 0.001 above the 65,500.695 half-cent boundary, a tenth of
+    # a cent, against 0.003 to 0.005 for the other four items. Both rounding
+    # modes still give 65,500.70, so the key is single -- but this is the item
+    # to re-check first if the figures are ever edited.
+    # Discounting BOTH flows at the two-period factor gives
+    # 74,000 * 0.857339 = 63,443.09 -- 2,057.61 away.
+    # Leaving the flows undiscounted gives 74,000 -- 8,499.30 away.
+    target: "65500.70"
+    metadata: { skill: present-value-uneven-flows, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: lease-comparison-present-value
+    input: >-
+      An assessment item reads: "One lease requires $16,000 at the end of each
+      year for ten years; the present-value annuity factor for ten periods at
+      5% is 7.721735. A competing lease requires a single payment of $128,000
+      today. Compute how much cheaper the better option is, in present-value
+      dollars, rounded to two decimal places. Report a positive number."
+      Produce the value for the answer key.
+    # present value of the ten-year lease = 16,000 * 7.721735 = 123,547.76
+    # (7,721,735 * 16 = 123,547,760, so the product terminates at the cent)
+    # difference = 128,000 - 123,547.76 = 4,452.24
+    # Comparing UNDISCOUNTED totals -- 160,000 against 128,000 -- gives 32,000
+    # and also picks the WRONG lease, which is the point of the item: the
+    # answer and the recommendation both flip. 27,547.76 away.
+    # Note this item asks for the difference, not the present value, so the
+    # intermediate (123,547.76) is 119,095.52 away from the key.
+    target: "4452.24"
+    metadata: { skill: present-value-option-comparison, provenance: synthetic, slo: SLO2, use_mode: capability }

@@ -1,0 +1,231 @@
+# slo3-global-analysis, rung 2 of 4.
+#
+# What this rung adds over rung 1: rung 1 asked WHICH factors bear on a
+# decision. This rung names the factor for the model and asks HOW it reaches the
+# decision -- the causal chain from the factor to the number or the choice that
+# actually moves. Naming a factor is recall; tracing its transmission is the
+# thing SLO 3's "and their role in business decisions" clause is actually about.
+#
+# The degenerate response this rubric is built to catch is the fluent
+# restatement: "a weaker dinar affects costs, which affects margins, which
+# affects the decision." Every link in that chain is unfalsifiable and it would
+# fit any factor and any scenario. The direction-and-sign criterion is what
+# catches it -- a response must commit to WHICH WAY the effect runs, and one of
+# the four samples has a direction most responses get backwards.
+version: 1
+id: slo3-global-analysis/l2-transmission-mechanism
+title: Global perspective -- tracing how a named global factor reaches the decision
+description: >
+  Rung 2 of the slo3-global-analysis ladder. Each scenario names one global
+  factor and asks for the mechanism by which it reaches a specific decision
+  variable: the intermediate steps, the direction of the effect, and what would
+  have to be true for the chain to break. The rubric requires the chain to be
+  falsifiable and to commit to a direction, which is what separates a mechanism
+  from a fluent restatement of the factor's name.
+
+  It is its own rung because the failure mode is different from rung 1's. A
+  response can name every factor correctly and still have no account of how any
+  of them operates.
+
+  This is a subjective task. With no judge model configured it will load, run
+  and store transcripts, and report no score -- see docs/llm-judge.md.
+
+  Provenance: every firm, country, currency and scenario is synthetic, invented
+  for this file. No real company, trade agreement or market is described, no
+  student work is used, and no textbook or question-bank content is reproduced.
+kind: subjective
+domain: international-business
+system_prompt: >-
+  You are advising the management team of a mid-sized firm. Each scenario names
+  one global factor and one decision. Explain the mechanism by which that factor
+  reaches that decision: set out the intermediate steps in order, state which
+  way each one moves, and end by naming one condition that, if it held, would
+  break the chain. Be specific about the direction of every effect. Do not list
+  other factors; explain this one.
+scorer:
+  kind: llm_judge
+  rubric_id: slo3-global-analysis-mechanism-v1
+rubric:
+  id: slo3-global-analysis-mechanism-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: chain-is-complete
+      description: |-
+        Does the response set out the intermediate steps between the named
+        global factor and the named decision, rather than jumping from one to
+        the other? Count a step as present only if it names a quantity or a
+        contractual fact that changes.
+
+        1.0 -- every step needed to get from the factor to the decision is
+               present, and each names something that changes; where a stated
+               fact breaks the chain before it reaches the decision, the
+               response traces it to that fact and names the term that stops it
+               rather than manufacturing steps past it.
+        0.5 -- one step is skipped, or one step is asserted without naming what
+               changes at it.
+        0.0 -- two or more steps are skipped, or the response asserts the
+               factor affects the decision without any intermediate step, or
+               asserts a chain that a stated fact rules out.
+      weight: 3.0
+    - name: direction-and-sign-committed
+      description: |-
+        Does the response state which WAY each effect runs -- up or down, larger
+        or smaller, sooner or later -- and are those directions correct for this
+        scenario? A chain whose links have no direction cannot be checked and
+        cannot be wrong, which is why it is worth no credit here.
+
+        1.0 -- every link states a direction and every direction is correct;
+               where the chain does not reach the decision at all, the response
+               says so plainly instead of assigning the decision a direction it
+               does not have.
+        0.5 -- every link states a direction and exactly one is backwards, or
+               one link is left directionless.
+        0.0 -- two or more links are directionless or backwards, or the
+               response's overall conclusion runs the wrong way -- including
+               claiming a net effect where a stated fact removes one.
+      weight: 3.0
+    - name: names-a-breaking-condition
+      description: |-
+        Does the response name a specific condition under which the chain would
+        NOT operate, as the prompt asks?
+
+        1.0 -- names a condition that is specific to this scenario and would
+               genuinely break the chain if it held.
+        0.5 -- names a condition that would weaken rather than break the chain,
+               or one so general it would apply to any scenario.
+        0.0 -- names no breaking condition, or names one that would not affect
+               the chain at all.
+      weight: 2.0
+    - name: stays-on-the-named-factor
+      description: |-
+        Does the response explain the factor it was given, rather than
+        substituting a different one or surveying several? The prompt asks for
+        one mechanism.
+
+        1.0 -- the response is about the named factor throughout.
+        0.5 -- the response explains the named factor but appends a list of
+               other factors the prompt did not ask about.
+        0.0 -- the response's main chain is about a different factor than the
+               one named.
+      weight: 2.0
+    - name: no-fabricated-quantities
+      description: |-
+        Does the response avoid inventing figures the scenario does not supply
+        and presenting them as facts of the case? Invented magnitudes make a
+        vague chain look rigorous.
+
+        1.0 -- every figure used appears in the scenario, or any illustrative
+               figure is explicitly flagged as an assumption.
+        0.5 -- one unflagged figure is introduced that is plausible and not
+               load-bearing.
+        0.0 -- an invented figure carries the argument, or two or more unflagged
+               figures are introduced.
+      weight: 2.0
+tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-analysis, ladder-l2, international-business, subjective, not-yet-scorable]
+samples:
+  # CLEAN. A long but unambiguous chain, and every direction is the intuitive
+  # one. This is the sample that should separate "has a mechanism" from "has
+  # none" without also testing whether the model can resist a counterintuitive
+  # direction.
+  - id: dinar-depreciation-and-sourcing
+    input: >-
+      Global factor: the Marenna dinar has depreciated against the US dollar,
+      moving from 8.00 to 10.00 dinar per dollar over six months, and Vasterly
+      Foods' analysts expect it to stay near the new level. Decision: whether
+      Vasterly should shift a larger share of its component purchasing to its
+      Marenna supplier, whose prices are fixed in dinar for the next two years.
+      Explain the mechanism.
+    # Author's note: the intended chain is -- more dinar per dollar means each
+    # dinar costs fewer dollars; the supplier's dinar-denominated price is
+    # contractually fixed, so its DOLLAR cost to Vasterly falls by 20%; the
+    # landed cost per component falls (freight and duty do not fall, so by less
+    # than 20%); Marenna's landed cost moves further below the alternatives;
+    # so the case for shifting share strengthens. A breaking condition that
+    # earns 1.0: the supplier reopens or indexes the fixed-price contract, or
+    # duty is levied on a transaction value that recalculates. Note the trap for
+    # no-fabricated-quantities -- the scenario gives the rates but no prices, so
+    # a response that computes a specific landed cost has invented one.
+    metadata: { slo: SLO3, use_mode: capability, probe: currency-to-sourcing, provenance: synthetic }
+
+  # TRAP: the direction most responses get backwards. A home-currency
+  # APPRECIATION helps an importer and hurts an exporter, and the scenario is
+  # about the export side of a firm that is mostly discussed as an importer.
+  - id: home-currency-appreciation
+    input: >-
+      Global factor: Vasterly Foods' home currency has appreciated sharply
+      against the currencies of every country it sells into. Vasterly is both an
+      importer of components and an exporter of finished goods. Decision:
+      whether to hold the local-currency shelf price of its finished goods
+      constant in its three largest export markets, or to raise it. Vasterly's
+      export prices are quoted in each market's local currency and its costs are
+      incurred in the home currency. Explain the mechanism.
+    # Author's note: the direction here is the whole item. A stronger home
+    # currency means each unit of local-currency revenue converts into FEWER
+    # home-currency units, so holding the local shelf price constant CUTS
+    # Vasterly's realised home-currency margin -- while its home-currency costs
+    # are unchanged. Raising the local price restores the margin but reduces
+    # volume. The chain that runs "a strong home currency is good for the firm"
+    # is backwards for the export side and should score 0.0 on
+    # direction-and-sign-committed even if it is fluent.
+    # A response that answers about the IMPORT side instead -- where
+    # appreciation genuinely helps -- has substituted a different factor and
+    # should also lose stays-on-the-named-factor.
+    # A breaking condition that earns 1.0: costs are not in fact all
+    # home-currency (local sourcing or a natural hedge in the export markets),
+    # or the export contracts are denominated in the home currency after all.
+    metadata: { slo: SLO3, use_mode: capability, probe: currency-to-export-margin, provenance: synthetic }
+
+  # BORDERLINE. Two chains are defensible and they run in opposite directions;
+  # the grading is of the reasoning, not the verdict. This is the sample that
+  # stops the rubric from having a single expected answer.
+  - id: tariff-on-finished-appliances
+    input: >-
+      Global factor: Marenna has imposed a 15% import duty on finished small
+      appliances, but not on the sub-assemblies used to make them. Decision:
+      whether Vasterly Foods should keep serving Marenna by exporting finished
+      appliances, or ship sub-assemblies and complete final assembly inside
+      Marenna. Vasterly's two largest competitors in Marenna both manufacture
+      locally. Explain the mechanism.
+    # Author's note: both verdicts are defensible and the chains differ.
+    # Toward local assembly: the duty applies to Vasterly's finished exports and
+    # not to its competitors' local output, so Vasterly's landed cost rises
+    # relative to theirs and its price position erodes; shipping sub-assemblies
+    # moves the border crossing to an untaxed line and restores parity.
+    # Toward continuing to export: local assembly carries fixed cost and a
+    # minimum efficient scale that Marenna volume may not support, so the duty
+    # may be cheaper than the fixed cost of escaping it -- an argument that
+    # depends on volume the scenario does not supply, and a response that
+    # asserts a volume figure to settle it should lose
+    # no-fabricated-quantities. Grade the chain, not the verdict.
+    metadata: { slo: SLO3, use_mode: capability, probe: tariff-on-a-competitor-input, provenance: synthetic }
+
+  # NOTHING-IS-WRONG: the named factor genuinely does NOT reach this decision,
+  # because a stated contract term insulates it. The honest mechanism is a short
+  # one that ends in "and therefore it does not reach the decision". A model
+  # that always manufactures a transmission chain will manufacture one here.
+  - id: ocean-freight-and-renewal
+    input: >-
+      Global factor: ocean freight rates on the Marenna-to-home-country lane
+      have tripled over the past year. Decision: whether Vasterly Foods should
+      renew its two-year supply agreement with its Marenna component supplier,
+      which expires in one month. Under the agreement as it stands and as it
+      would be renewed, the supplier delivers duty-paid to Vasterly's
+      home-country warehouse at a fixed price per unit in home currency, bears
+      all freight and insurance itself, and has no right to surcharge or reopen
+      the price for any reason during the term. Explain the mechanism.
+    # Author's note: the honest answer is that the freight spike does NOT reach
+    # this decision through Vasterly's costs during the term -- the delivered-
+    # duty-paid fixed-price term places the entire exposure on the supplier.
+    # The one legitimate chain that survives is indirect and should be graded
+    # generously if it is stated as such: a supplier absorbing tripled freight
+    # under a fixed price may be loss-making on the contract, which is a
+    # counterparty-viability and renewal-pricing risk rather than a cost risk --
+    # and the renewal price will reflect it.
+    # A response that runs "freight rates up, so Vasterly's landed cost up, so
+    # renew or not" has ignored the stated contract term and should score 0.0 on
+    # direction-and-sign-committed: its central direction is wrong for this
+    # scenario. Every subjective family needs at least one sample where the
+    # honest answer is "this factor does not do what you would expect", and this
+    # is that sample.
+    metadata: { slo: SLO3, use_mode: capability, probe: ocean-freight-and-renewal, provenance: synthetic }

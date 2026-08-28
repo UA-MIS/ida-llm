@@ -1,0 +1,129 @@
+# slo3-global-knowledge, rung 2 of 6 -- the first rung that requires a CHOICE.
+#
+# What this rung adds over rung 1: every item here has a well-known wrong
+# sibling, and executing the arithmetic carefully is not enough to pass. Markup
+# and margin, direct and indirect quotes, FOB and landed value, cost-plus on
+# cost and cost-plus on price, nominal minus inflation and the exact Fisher
+# relation -- each pair is a place where international-business practice has two
+# conventions that give different numbers.
+#
+# Every item NAMES its convention. An item that says only "compute the landed
+# cost" has more than one defensible answer and one key, which makes it an
+# INVALID item rather than a hard one.
+version: 1
+id: slo3-global-knowledge/l2-convention-choice
+title: Global business figures -- choosing between two competing conventions
+description: >
+  Rung 2 of the slo3-global-knowledge ladder. Each item can be computed two
+  ways, both of them in real commercial use, and the item names which one
+  applies: margin against markup, an indirect currency quote against a direct
+  one, duty on the FOB value against duty on the CIF customs value, a
+  transfer-price mark-up on cost against a margin on price, and the exact real
+  growth relation against the subtract-inflation approximation.
+
+  This is its own rung because rung 1 can be passed by careful arithmetic and
+  this rung cannot: the wrong convention, executed perfectly, is still wrong.
+
+  Provenance: every country, firm, currency, rate and figure is synthetic,
+  invented for this file. No real tariff schedule, exchange rate, company or
+  trade agreement is referenced, and no textbook or question-bank content is
+  reproduced.
+kind: verifiable
+domain: international-business
+system_prompt: >-
+  You are a business analyst preparing figures for an international-operations
+  briefing. Use exactly the convention, rate or table row the item names. Every
+  reference value you need is supplied in the item; do not substitute
+  real-world data. Round to two decimal places. Put the final numeric answer
+  alone on the last line, with no units, no currency symbol, no label and no
+  other text on that line.
+scorer:
+  kind: numeric_match
+  # Two decimal places -> 0.005 worst-case rounding; 0.01 admits it. Each item's
+  # comment records the distance to the answer the OTHER convention produces.
+  # The smallest is 0.45 (real-growth-exact-fisher), forty-five times the
+  # tolerance -- so every item still separates the two conventions, which is the
+  # only reason this rung exists.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-knowledge, ladder-l2, international-business, verifiable]
+samples:
+  - id: margin-not-markup
+    input: >-
+      Vasterly Foods manufactures a unit at a full cost of 24.00 US dollars. Its
+      Cadrenne distributor contracts for a gross MARGIN of 35% of the SELLING
+      PRICE -- not a 35% mark-up on cost. What selling price per unit satisfies
+      the contract, in US dollars?
+    # Margin on price: price * (1 - 0.35) = 24.00, so price = 24 / 0.65
+    # = 36.9230769... -> 36.92.
+    # Mark-up on cost would give 24 * 1.35 = 32.40 -- 4.52 away, 452x tolerance.
+    target: "36.92"
+    metadata: { slo: SLO3, use_mode: capability, skill: margin-versus-markup, factor: cross-border-pricing, provenance: synthetic }
+
+  - id: indirect-quote-conversion
+    input: >-
+      A Marenna importer is quoted the exchange rate as 0.125 US dollars per
+      Marenna dinar. This is an indirect quote from the importer's point of
+      view. The importer must settle a supplier invoice of 6,400 US dollars. How
+      many Marenna dinar are required?
+    # The quote is USD per MRD, so MRD needed = USD / (USD per MRD)
+    # = 6,400 / 0.125 = 51,200 exactly.
+    # Treating the quote as if it were MRD per USD and multiplying gives
+    # 6,400 * 0.125 = 800 -- 50,400 away.
+    # This is the item most likely to be got wrong by a model that pattern-
+    # matches "exchange rate" to "multiply", which is the point.
+    target: "51200"
+    metadata: { slo: SLO3, use_mode: capability, skill: direct-versus-indirect-quote, factor: exchange-rates, provenance: synthetic }
+
+  - id: duty-on-cif-not-fob
+    input: >-
+      An importer's quotation for a consignment entering Marenna lists: FOB
+      value at the port of origin 40,000 US dollars; ocean freight 3,200 US
+      dollars; marine insurance 480 US dollars. Marenna levies import duty at
+      6% of the customs value, and Marenna defines the customs value as FOB plus
+      freight plus insurance. What is the total LANDED cost of the consignment,
+      in US dollars -- that is, FOB plus freight plus insurance plus duty?
+    # Customs value = 40,000 + 3,200 + 480 = 43,680.
+    # Duty = 0.06 * 43,680 = 2,620.80.
+    # Landed cost = 43,680 + 2,620.80 = 46,300.80.
+    # Levying duty on the FOB value alone -- the common error, and the rule some
+    # other jurisdictions genuinely use -- gives 0.06 * 40,000 = 2,400 and a
+    # landed cost of 46,080.00 -- 220.80 away, 22,080x the tolerance.
+    # The valuation basis is stated in the item ON PURPOSE: FOB-basis and
+    # CIF-basis customs valuation are both real conventions, so an item that
+    # left it implicit would have two defensible keys.
+    target: "46300.80"
+    metadata: { slo: SLO3, use_mode: capability, skill: customs-valuation-basis, factor: trade-policy, provenance: synthetic }
+
+  - id: transfer-price-markup-on-cost
+    input: >-
+      Vasterly Foods' Marenna subsidiary manufactures a unit at a full cost of
+      62.50 US dollars and transfers it to the parent company. The group's
+      transfer-pricing policy is cost-plus with a mark-up of 12% ON FULL COST.
+      What is the transfer price per unit, in US dollars?
+    # 62.50 * 1.12 = 70.00 exactly.
+    # A 12% margin ON THE TRANSFER PRICE -- the other reading of "cost plus 12%",
+    # and a policy some groups actually write -- gives 62.50 / 0.88 = 71.0227...
+    # -> 71.02, which is 1.02 away: 102x the tolerance. The gap is the narrowest
+    # in this file and is stated here so a reviewer does not have to find it.
+    target: "70"
+    metadata: { slo: SLO3, use_mode: capability, skill: transfer-pricing-basis, factor: multinational-tax, provenance: synthetic }
+
+  - id: real-growth-exact-fisher
+    input: >-
+      Vasterly Foods' Marenna revenue grew 14.0% over the year measured in
+      nominal Marenna dinar. Marenna consumer price inflation over the same year
+      was 6.0%. Compute the REAL growth rate as a percentage using the exact
+      relation (1 + nominal) / (1 + inflation) - 1. Do not use the
+      subtract-inflation approximation.
+    # 1.14 / 1.06 = 1.07547169...; minus 1 = 0.07547169... -> 7.55 percent.
+    # The subtract-inflation approximation gives 14.0 - 6.0 = 8.00 -- 0.45 away,
+    # 45x the tolerance. This is the tightest gap in the file; it is still ample,
+    # but it is the one to check first.
+    # 7.547169 is nowhere near a .xx5 rounding boundary, so round-half-up and
+    # round-half-even agree.
+    target: "7.55"
+    metadata: { slo: SLO3, use_mode: capability, skill: nominal-versus-real-growth, factor: inflation-differentials, provenance: synthetic }

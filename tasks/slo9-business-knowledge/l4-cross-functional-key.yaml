@@ -1,0 +1,163 @@
+# slo9-business-knowledge, rung 4 of 6.
+#
+# WHAT THIS RUNG ADDS: a SECOND FUNCTION. Every item states a decision taken in
+# one function -- marketing, operations, sales, IT -- and asks for its
+# consequence in another. Rung 3 tested one principle inside one discipline;
+# here the answer requires carrying a fact across the boundary, which is what
+# "comprehensive understanding of core business principles" means in practice
+# and what a single-subject quiz never touches.
+#
+# This is also the rung closest to MIS 200's own subject matter: two of the six
+# items turn on what an information system does to the rest of the business
+# rather than on the system itself.
+version: 1
+id: slo9-business-knowledge/l4-cross-functional-key
+title: SLO9 rung 4 -- consequences that cross a functional boundary
+description: >
+  Rung 4 of the SLO9 ladder. A decision is taken in one function and the item
+  asks what follows in another: a discount's effect on margin, an inventory
+  build's effect on cash, a credit-terms change's effect on working capital, a
+  staffing change's effect on operating leverage, a shared system's effect on
+  reconciliation, and an outsourcing saving's offset. Distractors are true
+  statements about the WRONG function, or near-miss arithmetic.
+
+  Four options, so the guessing floor is 0.25.
+
+  Provenance: every item and every scenario was written for this file. No
+  textbook, question-bank, past-paper or other institution's examination
+  content is reproduced, and no real firm is described.
+kind: verifiable
+domain: general-business
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate general
+  business examination. Exactly one option is correct. You may reason briefly
+  first, but you must then put the letter of the correct option alone on the
+  last line, with no punctuation and no other text on that line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", ladder-l4, business-knowledge, forced-choice]
+samples:
+  - id: discount-effect-on-gross-margin
+    input: >-
+      A marketing team proposes a 10% price cut on a product whose gross margin
+      is currently 30% of the selling price. Unit cost is unchanged. After the
+      cut, the gross margin percentage will be approximately:
+      A) 20%, because the margin falls by ten percentage points
+      B) 30%, because the unit cost did not change
+      C) 22%, because the same dollar cost is now spread over a lower selling price
+      D) 27%, because the margin falls by a tenth
+    # C. Take a $100 price and $70 cost: margin 30%. After the cut, price 90,
+    # cost 70, gross profit 20, margin 20/90 = 22.2%.
+    # A subtracts the discount from the margin percentage -- the single most
+    # common error and the reason the item exists. B confuses cost with margin.
+    # D scales the margin by the discount. All three are arithmetically
+    # distinct from 22%, so the item has one key.
+    # EVERY option carries a "because" clause, deliberately. An earlier draft
+    # left C bare while A, B and D explained themselves, which let a test-wise
+    # reader pick the odd one out without doing any arithmetic -- defeating the
+    # only thing the item measures.
+    target: "C"
+    metadata: { skill: pricing-and-margin, function: marketing-and-accounting, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: building-finished-goods-stock
+    input: >-
+      A production manager builds up finished-goods inventory in order to
+      shorten delivery times. Sales volume in the period is unchanged. The firm
+      has no fixed manufacturing overhead -- all of its production costs are
+      variable -- so its cost per unit does not change with production volume.
+      The most accurate description of the immediate effect on the firm's
+      financial statements is:
+      A) Operating cash flow falls while reported profit is unchanged
+      B) Both reported profit and operating cash flow fall
+      C) Reported profit rises, because inventory is an asset
+      D) Neither profit nor cash flow changes until the goods are sold
+    # A. Making goods consumes cash now; because sales are unchanged, cost of
+    # goods sold is unchanged, so profit is unchanged. This is the classic
+    # profit-and-cash divergence seen from the operations side.
+    # D is the attractive wrong answer: the cash has already moved even though
+    # the profit has not. C treats an asset as income.
+    # THE COSTING BASIS IS PINNED IN THE STEM, and it has to be. Under
+    # ABSORPTION costing -- which is what external statements actually use --
+    # producing more than you sell defers fixed manufacturing overhead into
+    # inventory, so unit cost falls, cost of goods sold falls and reported
+    # profit RISES. That makes option C defensible and the item INVALID, on a
+    # standard managerial-accounting point rather than an obscure one. Saying
+    # the firm has no fixed manufacturing overhead removes the second reading
+    # without changing what the item is about, which is the cash-versus-profit
+    # divergence. An item with two defensible answers and one key is invalid
+    # (tasks/SCHEMA.md), so this clause is load-bearing -- do not trim it.
+    target: "A"
+    metadata: { skill: stock-build-effects, function: operations-and-finance, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: extending-customer-payment-terms
+    input: >-
+      A sales team wins new business by extending customer payment terms from
+      30 days to 60 days. Nothing else changes. The most direct consequence for
+      the finance function is:
+      A) A fall in reported revenue
+      B) An increase in gross margin
+      C) A reduction in cost of goods sold
+      D) An increase in accounts receivable and in the working capital the firm
+      must fund
+    # D. Revenue and margin are unaffected by WHEN cash is collected, which is
+    # what A and B miss; C is unrelated to terms. Longer terms mean money is
+    # tied up in receivables for longer, which has to be funded.
+    target: "D"
+    metadata: { skill: effect-of-payment-terms, function: sales-and-finance, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: contractors-replaced-with-salaried-staff
+    input: >-
+      An operations lead replaces hourly contractors with salaried staff at the
+      same total annual cost at current volumes. If demand later falls sharply,
+      the effect of that earlier change is that the firm's:
+      A) Contribution margin per unit falls
+      B) Operating profit falls by more than it otherwise would, because a
+      larger share of its costs is now fixed
+      C) Break-even volume falls
+      D) Variable cost per unit rises
+    # B. Converting variable cost to fixed cost raises operating leverage: the
+    # same fall in volume now cuts deeper. A and D describe the opposite
+    # substitution; C is backwards, since more fixed cost RAISES break-even.
+    # "At the same total annual cost at current volumes" is stated so the item
+    # cannot be answered by observing that one option is simply cheaper.
+    target: "B"
+    metadata: { skill: operating-leverage, function: operations-and-finance, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: single-system-of-record
+    input: >-
+      A firm replaces the separate spreadsheets each department maintains with
+      one shared system of record. Which is the most direct business benefit of
+      that change?
+      A) Lower software licensing cost
+      B) Fewer staff needed in every department
+      C) One agreed set of figures, so departments stop reconciling conflicting
+      numbers against each other
+      D) Faster keystroke-level data entry for individual users
+    # C. A and B are possible downstream effects and often do not occur; D is
+    # frequently made WORSE by a shared system, since a controlled form takes
+    # longer to complete than a spreadsheet cell. The benefit that follows
+    # directly from having one system of record is a single agreed figure.
+    target: "C"
+    metadata: { skill: systems-of-record, function: information-systems, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: outsourcing-saving-offset
+    input: >-
+      A firm outsources its customer support and cuts cost per contact by 40%.
+      Which single measure would most directly reveal whether that saving is
+      being paid for elsewhere in the business?
+      A) Customer retention rate
+      B) Support cost per contact
+      C) Contacts handled per agent hour
+      D) Support headcount
+    # A. B is the measure that already showed the saving and cannot show its
+    # cost; C and D are further measures of the support function itself. Only
+    # retention sits OUTSIDE the function whose cost was cut, which is where an
+    # offset would appear -- and identifying that is the cross-functional step.
+    target: "A"
+    metadata: { skill: cost-savings-and-offsets, function: operations-and-marketing, provenance: synthetic, slo: SLO9, use_mode: capability }

@@ -1,0 +1,255 @@
+# slo1-problem-solving, rung 2 of 5.
+#
+# WHAT THIS RUNG ADDS: the second verb -- CHOOSE the appropriate business tool.
+# The rung stops short of applying it, which is rung 3, so that a model that
+# can run an analysis it should not have run is separable from one that picks
+# correctly.
+#
+# THE DEGENERATE STRATEGY THIS RUNG EXISTS TO CATCH is the framework drop:
+# naming a well-known tool, asserting it is appropriate, and moving on. It is
+# the laziest response that would score 1.0 against a naive rubric, so the
+# rubric requires the justification to turn on a property of THIS problem and
+# requires a named rejected alternative -- a choice with nothing rejected is
+# not a choice.
+#
+# One sample's correct answer is that no framework is warranted and the
+# question is settled by arithmetic. Without it the rung would reward reaching
+# for a tool, which is the opposite of choosing one.
+#
+# FIVE CRITERIA, where every other task in this benchmark carries four. The
+# extra one is `the-tool-answers-the-question-this-decision-poses`, and it is
+# here because an earlier draft of this rubric graded the SHAPE of the
+# justification, the quality of the rejected alternative, the stated limit and
+# the headings -- and nothing at all graded whether the tool named under TOOL:
+# was the right tool. A rung whose stated demand is "choose the appropriate
+# business tool" and whose rubric cannot tell a right choice from a wrong one
+# is not measuring its own subject. The uniform four elsewhere is a convention,
+# not a rule; this is the one rung where it cost something.
+version: 1
+id: slo1-problem-solving/l2-tool-selection
+title: SLO1 rung 2 -- choosing the tool, and saying what it will not tell you
+description: >
+  Rung 2 of the SLO1 ladder. Each sample states a decision and the information
+  available, and asks which analytical approach fits, why it fits this problem
+  specifically, which plausible alternative was rejected and on what grounds,
+  and what the chosen approach will not settle. The analysis itself is rung 3
+  and is explicitly out of scope here.
+
+  Provenance: every firm, figure and scenario is synthetic, authored for this
+  file. No course material, no textbook content, no real firm's data.
+kind: subjective
+domain: business-analysis
+system_prompt: >-
+  You are a business analyst advising a decision-maker who has ten minutes.
+  Work only from the information the item supplies; where something you would
+  need is missing, say so rather than assuming a value. Use exactly the
+  headings the item asks for, in the order it asks for them, and write nothing
+  that does not earn its place under one of them. Do not invent figures, firms
+  or events that the item did not give you.
+scorer:
+  kind: llm_judge
+  rubric_id: slo1-problem-solving-tool-selection-v1
+rubric:
+  id: slo1-problem-solving-tool-selection-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: justification-turns-on-this-problem
+      description: |-
+        Does WHY IT FITS rest on a feature of this specific situation, rather
+        than on a general description of what the tool is for?
+
+        The test to apply: could the sentence be moved unchanged to a different
+        decision that uses the same tool? If yes, it describes the tool, not
+        the fit.
+
+        1.0 -- the justification names at least one specific feature of this
+               situation (a figure, a stated constraint, the structure of the
+               decision) and explains why that feature is what makes the tool
+               apply.
+        0.5 -- the justification is correct but generic: it says what the tool
+               does and asserts that it suits, without naming the feature.
+        0.0 -- the tool is named and asserted to be appropriate with no
+               justification, or the justification restates the tool's
+               definition.
+      weight: 3.0
+    - name: the-tool-answers-the-question-this-decision-poses
+      description: |-
+        Would the named tool, run on the information the item supplies,
+        actually produce the quantity or judgement this decision needs?
+
+        This grades the CHOICE, which the rest of this rubric does not. Without
+        it a response could name a structural strategy framework for a
+        make-or-buy costing decision, justify it against a specific figure,
+        reject a real alternative on specific grounds, name a real limitation,
+        use all four headings -- and score 1.0 throughout while having chosen
+        the wrong tool. That is the one failure this rung exists to detect.
+
+        1.0 -- the tool takes as inputs the kinds of fact the item supplies and
+               produces as output the quantity or judgement the stated decision
+               turns on.
+        0.5 -- the tool is defensible but answers an adjacent question, or it
+               needs an input the item does not supply and the response does not
+               say so.
+        0.0 -- the tool cannot be run on the supplied information, or its output
+               does not bear on the stated decision.
+      weight: 3.0
+    - name: rejects-a-real-alternative
+      description: |-
+        Is the REJECTED ALTERNATIVE one a competent analyst might genuinely
+        have chosen here, and is the ground for rejection specific?
+
+        A straw alternative -- one obviously unsuited to the decision -- makes
+        the choice look reasoned without it having been.
+
+        1.0 -- the rejected alternative runs on the same supplied information
+               as the chosen tool and would have produced a different answer or
+               a different recommendation, and the reason for rejecting it is a
+               property of this situation rather than a general limitation of
+               that tool.
+        0.5 -- a real alternative is named but rejected on general grounds, or
+               a straw alternative is rejected on specific grounds.
+        0.0 -- no alternative is named, or the alternative named cannot be run
+               on the supplied information at all, so rejecting it decided
+               nothing.
+      weight: 2.0
+    - name: states-a-real-limit
+      description: |-
+        Does WHAT IT WILL AND WILL NOT TELL US name something the chosen
+        approach genuinely cannot settle, and is that limitation material to
+        this decision?
+
+        1.0 -- names a limitation that bears on this decision and that the
+               chosen approach genuinely has.
+        0.5 -- names a limitation that is real but immaterial here, or hedges
+               ("no analysis is perfect") without naming one.
+        0.0 -- claims the approach settles the question, or the section is
+               absent.
+      weight: 2.0
+    - name: chooses-a-tool-rather-than-performing-the-analysis
+      description: |-
+        Does the response do rung 2's job at rung 2's length? The outcome names
+        CONCISE analysis, so a response that runs the analysis it was asked only
+        to choose has not been more thorough, it has answered a different
+        question.
+
+        1.0 -- all four headings are present, the analysis itself is not
+               performed, and no figure from the item is computed with.
+        0.5 -- all four headings are present but the response starts running
+               the analysis, or one heading is merged into another.
+        0.0 -- the response delivers an analysis or a recommendation instead of
+               a tool choice, or omits two or more headings.
+      weight: 2.0
+tags: [slo-benchmark, "slo:SLO1", "use-mode:capability", ladder-l2, problem-solving, subjective, not-yet-scorable]
+samples:
+  # CLEAN. The decision has a standard right approach and the item supplies the
+  # feature that makes it right.
+  - id: make-or-buy-a-subassembly
+    input: >-
+      A manufacturer is deciding whether to keep producing a subassembly
+      in-house or to buy it from a supplier. Its accounting system reports an
+      in-house cost of $18.40 per unit, of which $6.10 is an allocation of
+      factory overhead that the finance team confirms would continue unchanged
+      if production stopped. The supplier quotes $14.90 per unit. The line
+      making the subassembly cannot be repurposed and would stand idle. Volumes
+      are stable and the supplier's quote is fixed for two years.
+
+      Respond under exactly these headings: TOOL, WHY IT FITS, REJECTED
+      ALTERNATIVE, WHAT IT WILL AND WILL NOT TELL US. Do not perform the
+      analysis.
+    # Author's note: the fit-determining feature is that $6.10 of the $18.40 is
+    # unavoidable and the line cannot be repurposed -- so relevant/incremental
+    # cost analysis is the tool and the comparison is avoidable in-house cost
+    # against the quote. The natural rejected alternative is a full absorption
+    # cost comparison (18.40 against 14.90), which is what the accounting
+    # system invites and which reverses the answer. A real limit: incremental
+    # cost says nothing about supply risk from a single external source or
+    # about what happens after the two-year quote expires.
+    metadata: { probe: unavoidable-share-of-unit-cost-stated, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  # BORDERLINE. Two tools are both defensible because two different questions
+  # are hiding in one request. A strong response says which question it is
+  # answering; grade that, not which tool is named.
+  - id: adjacent-market-entry
+    input: >-
+      A commercial-cleaning firm operating in one city is considering entering
+      a second city 90 miles away. It has: three years of its own cost and
+      contract-length data from the current city; a count of competitors in the
+      target city and their approximate size; the target city's number of
+      commercial premises by size band; and a quote for the depot lease and
+      vehicle costs it would incur. It does not have pricing data for the
+      target city or any information on why the two largest incumbents there
+      have not expanded.
+
+      Respond under exactly these headings: TOOL, WHY IT FITS, REJECTED
+      ALTERNATIVE, WHAT IT WILL AND WILL NOT TELL US. Do not perform the
+      analysis.
+    # Author's note: two live questions -- "can we make money at plausible
+    # prices" (a break-even or contribution analysis on the supplied cost and
+    # premises-count data) and "will incumbents let us" (a structural analysis
+    # of rivalry and entry barriers). Both are defensible; what separates a
+    # strong response is naming which question its tool answers and noting that
+    # the missing target-city pricing data caps what the cost-side tool can
+    # conclude. A response that names one tool without noticing there are two
+    # questions should lose the first criterion.
+    metadata: { probe: cost-history-and-competitor-counts-supplied, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  # TRAP. The situation is framed as a forecasting problem and is not one.
+  - id: forecast-accuracy-complaint
+    input: >-
+      A distributor's planning team reports that its monthly demand forecast
+      has a mean absolute percentage error of 18%, and has asked for budget to
+      buy a better forecasting package. The stated consequence of the error is
+      that the firm either holds excess stock or misses orders.
+
+      Available information: the forecast error has been between 16% and 19%
+      for each of the last three years; the warehouse operates at 94% of
+      capacity in an average month; replenishment lead time from the main
+      supplier is 26 days and cannot be shortened; the firm's competitors in
+      the same category report forecast errors in the 15-20% range; and no
+      analysis has been done of how much error the current stockholding policy
+      can absorb before an order is missed.
+
+      Respond under exactly these headings: TOOL, WHY IT FITS, REJECTED
+      ALTERNATIVE, WHAT IT WILL AND WILL NOT TELL US. Do not perform the
+      analysis.
+    # Author's note: an 18% error against a 15-20% industry range and three
+    # years of stability is close to the achievable floor, so a better package
+    # is unlikely to move it much. The unexamined question -- stated in the
+    # last fact -- is how much error the buffer can absorb, which is a
+    # sensitivity or scenario analysis of stock policy against the error band,
+    # not a forecasting problem. The natural rejected alternative is evaluating
+    # forecasting packages, and rejecting it on the industry-range fact rather
+    # than on a general "forecasts are always wrong" is what distinguishes a
+    # strong answer.
+    metadata: { probe: forecast-error-beside-an-industry-range, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  # NO TOOL IS WARRANTED. Mandatory counterweight to the framework reflex. A
+  # rung that always rewards naming a tool has taught the wrong thing.
+  - id: vendor-contract-term
+    input: >-
+      A firm's software vendor offers a three-year contract at a 12% discount
+      to the annual-renewal price, with no early-termination right. The annual
+      price is $84,000. The category manager has asked whether to commission a
+      strategic sourcing review before deciding.
+
+      Available information: the firm has switched vendors in this category
+      twice in the last five years; both switches followed a change in its own
+      operating model rather than any vendor failure; a switch costs roughly
+      $40,000 in migration effort; and the firm's operating model is under
+      review with a decision due in eight months.
+
+      Respond under exactly these headings: TOOL, WHY IT FITS, REJECTED
+      ALTERNATIVE, WHAT IT WILL AND WILL NOT TELL US. Do not perform the
+      analysis.
+    # Author's note: the honest answer is that this needs a short expected-cost
+    # comparison -- the three-year saving against the probability that the
+    # operating-model review forces a switch inside the term -- and does not
+    # need a sourcing review at all. The response that names a strategic
+    # framework here has reached for a tool rather than chosen one. A strong
+    # response says the decision turns on one probability, that the pending
+    # review in eight months is what makes it turn on that, and rejects the
+    # sourcing review as disproportionate to a $84,000 annual line. Naming
+    # "expected value" or "decision tree" as the tool is fine and correct; what
+    # is graded is whether the justification cites the eight-month review.
+    metadata: { probe: contract-term-with-a-pending-internal-review, provenance: synthetic, slo: SLO1, use_mode: capability }

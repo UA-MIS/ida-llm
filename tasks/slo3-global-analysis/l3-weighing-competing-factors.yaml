@@ -1,0 +1,240 @@
+# slo3-global-analysis, rung 3 of 4.
+#
+# What this rung adds over rung 2: rung 2 traced ONE factor to a decision. Here
+# several global factors bear on the same decision and they point in DIFFERENT
+# directions, and the response must weigh them against each other and commit to
+# a recommendation.
+#
+# THE TENSION IS IN THE RUBRIC ON PURPOSE.
+# The cheapest way to look balanced is to refuse to recommend anything. The
+# cheapest way to look decisive is to ignore the factors that cut the other way.
+# So `commits-to-a-recommendation` and `states-the-reversing-condition` are
+# weighted EQUALLY at 3.0, and a response cannot buy one with the other. That is
+# the technique taken from conceptual-grading/l4-actionable-feedback, and it
+# applies here for the same reason: the real task has a tension in it.
+#
+# The guard against the laziest 1.0 -- the fluent "on the one hand, on the other
+# hand, it depends" -- is the fourth sample, where the factors genuinely all
+# point the same way and the honest answer is short and decisive. A model that
+# manufactures balance will manufacture it there.
+version: 1
+id: slo3-global-analysis/l3-weighing-competing-factors
+title: Global perspective -- weighing global factors that conflict, and recommending
+description: >
+  Rung 3 of the slo3-global-analysis ladder. Each scenario puts several global
+  factors on the same decision pointing in different directions -- cost against
+  currency risk, speed against trade exposure, scale against regulatory
+  fragility -- and asks for a recommendation. The rubric weights committing to a
+  recommendation and naming the condition that would reverse it equally, so
+  neither hedging nor overconfidence scores well.
+
+  It is its own rung because rung 2's chains run one at a time. Here the demand
+  is comparative: which factor dominates, and by enough to decide?
+
+  This is a subjective task. With no judge model configured it will load, run
+  and store transcripts, and report no score -- see docs/llm-judge.md.
+
+  Provenance: every firm, country, currency and scenario is synthetic, invented
+  for this file. No real company, trade agreement or market is described, no
+  student work is used, and no textbook or question-bank content is reproduced.
+kind: subjective
+domain: international-business
+system_prompt: >-
+  You are advising the management team of a mid-sized firm. Read the scenario,
+  weigh the global factors that bear on the decision against one another, and
+  recommend one course of action. Say which factor you are treating as decisive
+  and why it outweighs the others. Then name the single condition that, if it
+  turned out to be different, would reverse your recommendation. Use only the
+  facts given; if a figure you would want is not supplied, say so rather than
+  assuming one.
+scorer:
+  kind: llm_judge
+  rubric_id: slo3-global-analysis-tradeoff-v1
+rubric:
+  id: slo3-global-analysis-tradeoff-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: commits-to-a-recommendation
+      description: |-
+        Does the response recommend one course of action unambiguously? Weighted
+        equally with the reversing-condition criterion on purpose: the cheapest
+        way to appear balanced is to refuse to decide, and this rubric must not
+        reward it.
+
+        1.0 -- one course of action is recommended, and a reader would know what
+               to do on Monday.
+        0.5 -- a preference is expressed but qualified to the point that two
+               readers could act differently on it.
+        0.0 -- no recommendation is made, or the response presents options
+               without choosing, or it recommends "further analysis" in place of
+               a course of action.
+      weight: 3.0
+    - name: states-the-reversing-condition
+      description: |-
+        Does the response name a specific condition under which its own
+        recommendation would flip? Weighted equally with commitment: the
+        cheapest way to appear decisive is to suppress the counter-case.
+
+        1.0 -- names one specific condition, tied to a fact in this scenario,
+               that would reverse the recommendation if it were different;
+               where the scenario's facts leave no such condition, says which
+               fact would have to change and by roughly how much.
+        0.5 -- names a condition that would weaken the recommendation without
+               reversing it, or one so general it would apply to any decision.
+        0.0 -- names no reversing condition, or asserts the recommendation holds
+               under all circumstances.
+      weight: 3.0
+    - name: factors-are-weighed-not-listed
+      description: |-
+        Does the response compare the competing factors against each other, or
+        does it describe each one in turn and then assert a conclusion?
+
+        1.0 -- states explicitly which factor dominates which, and on what
+               basis -- magnitude, likelihood, reversibility or timing.
+        0.5 -- ranks the factors but gives no basis for the ranking beyond
+               restating what each factor is.
+        0.0 -- describes each factor separately and the recommendation does not
+               follow from any stated comparison.
+      weight: 3.0
+    - name: respects-the-supplied-magnitudes
+      description: |-
+        Where the scenario supplies figures or bounds, does the response's
+        weighing respect them -- including any stated cap or limit on a factor's
+        size?
+
+        1.0 -- every magnitude claim is consistent with the figures given, and
+               any stated cap on a factor is applied.
+        0.5 -- one magnitude claim overstates or understates a supplied figure
+               without changing the conclusion.
+        0.0 -- a supplied bound is ignored, or a figure not in the scenario is
+               asserted as fact and carries the recommendation.
+      weight: 2.0
+    - name: no-manufactured-balance
+      description: |-
+        Where the scenario's factors genuinely point the same way, does the
+        response say so, rather than inventing a counter-case to appear
+        even-handed?
+
+        1.0 -- the response's degree of hedging matches the scenario: decisive
+               where the factors align, genuinely torn where they conflict.
+        0.5 -- some even-handed framing is added that the facts do not support,
+               but the recommendation still follows the facts.
+        0.0 -- a counter-case is invented for a decision the scenario does not
+               make close, or a genuinely close call is presented as obvious.
+      weight: 2.0
+tags: [slo-benchmark, "slo:SLO3", "use-mode:capability", slo3-global-analysis, ladder-l3, international-business, subjective, not-yet-scorable]
+samples:
+  # CLEAN CONFLICT. Cost points one way, currency and lead-time risk the other,
+  # and the magnitudes are supplied so the comparison can actually be made.
+  - id: component-supplier-choice
+    input: >-
+      Vasterly Foods must choose one supplier for a component it buys 200,000 of
+      a year. The Marenna supplier quotes 6.00 US dollars a unit, prices in
+      Marenna dinar, requires payment 90 days after shipment, and ships on an
+      eleven-week ocean lead time; the dinar has moved by up to 25% against the
+      dollar within a single year in four of the past ten years, and Vasterly
+      does not currently hedge. The Cadrenne supplier quotes 7.20 US dollars
+      a unit, prices in US dollars, and ships on a two-week lead time under a
+      trade agreement that has been in force for eleven years and has three
+      years left to run. Which supplier should Vasterly choose?
+    # Author's note: the cost gap is 1.20 a unit on 200,000 units = 240,000 a
+    # year, which is supplied enough to size. Against it: an unhedged 25% dinar
+    # move on a 90-day payable, and an eleven-week lead time that ties up
+    # working capital and slows response. A response that recommends Marenna and
+    # names hedging as the condition is defensible; so is one that recommends
+    # Cadrenne and names the cost gap widening as the reversing condition.
+    # What is NOT defensible is treating the currency exposure as unbounded --
+    # the scenario bounds it at 25%, and the response that says "unlimited
+    # currency risk" should lose respects-the-supplied-magnitudes.
+    metadata: { slo: SLO3, use_mode: capability, probe: cost-against-currency-risk, provenance: synthetic }
+
+  # BORDERLINE. Genuinely close, and deliberately so: the two options are near
+  # enough that the recommendation follows from which factor the responder
+  # treats as decisive. Grade the weighing, not the verdict.
+  - id: marenna-market-entry
+    input: >-
+      Vasterly Foods can enter the Marenna market either through a distributor,
+      which requires no capital and yields Vasterly 22% of the retail price, or
+      by establishing its own sales subsidiary, which requires 1.4 million US
+      dollars of capital and would yield Vasterly 38% of the retail price at the
+      volumes it forecasts. Marenna restricts the repatriation of subsidiary
+      profits to 70% of after-tax earnings in any year, with the remainder
+      releasable only on exit. The distributor holds the customer relationships
+      and has a two-year notice period. Marenna's market is forecast to grow 11%
+      a year for five years, and Vasterly's forecasts for the last three markets
+      it entered were each within 15% of outturn. Which route should Vasterly
+      take?
+    # Author's note: this is close on purpose and both verdicts are defensible.
+    # For the subsidiary: a 16-point margin difference on a market growing 11% a
+    # year, and a forecasting record the scenario says is decent. Against it:
+    # 1.4m of capital, a repatriation restriction that traps 30% of earnings
+    # until exit, and the distributor's two-year notice period and ownership of
+    # the customer relationships, which makes the switch slow and the
+    # relationships non-transferable. What earns credit is naming which factor
+    # is decisive and why; what loses it is listing all four and concluding
+    # "it depends on Vasterly's risk appetite", which is the non-answer
+    # commits-to-a-recommendation exists to catch.
+    metadata: { slo: SLO3, use_mode: capability, probe: market-entry-mode, provenance: synthetic }
+
+  # TRAP. One factor is salient, alarming and CAPPED by a stated fact. A
+  # responder who anchors on the salient number without reading the cap will
+  # let it dominate a decision it cannot actually dominate.
+  - id: assembly-relocation-decision
+    input: >-
+      Vasterly Foods is deciding whether to move final assembly for its
+      home-market product line to Marenna, which would cut assembly cost by
+      2.1 million US dollars a year. Marenna's government has in the past
+      imposed export levies on manufactured goods. Under the Marenna-home
+      country investment treaty, to which Marenna is a party and which runs for
+      a further twelve years and cannot be unilaterally denounced, any such levy
+      on goods produced by a treaty-protected investor is capped at 1% of export
+      value; Vasterly's export value under the proposal would be 30 million US
+      dollars a year. Separately, the move would extend the replenishment lead
+      time from four days to nine weeks, and Vasterly's home market has
+      historically required it to serve 30% of annual volume from stock held
+      against unforecast demand. Should Vasterly move assembly to Marenna?
+    # Author's note: the export-levy risk is the salient, alarming factor, and
+    # it is CAPPED: 1% of 30 million is at most 300,000 a year against a
+    # 2.1 million saving, under a treaty that has twelve years to run and cannot
+    # be unilaterally denounced. It cannot be decisive, and a response that
+    # treats it as decisive should score 0.0 on respects-the-supplied-magnitudes
+    # -- the cap is stated, and ignoring it is not a judgement call.
+    # The factor that CAN be decisive is the one that is easy to skim past: a
+    # nine-week lead time against a market that must serve 30% of volume from
+    # stock, which is an inventory and service-level problem the scenario does
+    # not size. The strongest responses recommend the move, name the levy risk
+    # as bounded and immaterial, and make the lead-time and inventory question
+    # the reversing condition.
+    metadata: { slo: SLO3, use_mode: capability, probe: capped-exposure, provenance: synthetic }
+
+  # NO-REAL-TRADEOFF. Every global factor points the same way. The honest answer
+  # is short and decisive, and the reversing condition has to be a genuine one
+  # rather than a manufactured counter-case. This is the sample that catches the
+  # response whose shape is always "on the one hand, on the other hand".
+  - id: packaging-film-sourcing
+    input: >-
+      Vasterly Foods sources a packaging film from a single supplier in Marenna.
+      Marenna has announced an export licensing regime for that film effective
+      in six months, with no published criteria for granting a licence. The
+      dinar has appreciated 22% against the dollar in the past year, raising
+      Vasterly's landed cost. Ocean freight on the lane has doubled. An
+      equivalent film, qualified by Vasterly's own laboratory as meeting the same
+      specification, is available from a home-country supplier at a landed cost
+      4% below Vasterly's current Marenna landed cost, on two-week lead times,
+      with capacity for Vasterly's full volume. Should Vasterly move the film to
+      the home-country supplier?
+    # Author's note: every factor points the same way -- supply-security risk
+    # from an opaque licensing regime, an adverse currency move, doubled
+    # freight, and an already-qualified alternative that is cheaper, faster and
+    # has the capacity. There is no tradeoff here and the honest answer is a
+    # short, decisive yes.
+    # A response that manufactures a counter-case ("but consider the value of
+    # the long-standing supplier relationship", "but single-sourcing at home
+    # creates its own concentration risk" -- neither supported by anything in
+    # the scenario) should lose no-manufactured-balance.
+    # The reversing condition still has to be real, and one is available: the
+    # laboratory qualification is Vasterly's own and covers specification, not
+    # production-scale performance, so a failure at scale would reverse the
+    # recommendation. A response that finds that has read the scenario closely.
+    metadata: { slo: SLO3, use_mode: capability, probe: export-licensing-risk, provenance: synthetic }

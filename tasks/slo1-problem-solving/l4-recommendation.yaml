@@ -1,0 +1,273 @@
+# slo1-problem-solving, rung 4 of 5.
+#
+# WHAT THIS RUNG ADDS: the last verb -- PROPOSE a suitable strategic solution.
+# All three verbs of SLO1 are now in play in one response: assess, analyse,
+# recommend. The added demand over rung 3 is that the recommendation must be
+# TRACEABLE to the analysis and must state what it costs and who bears it.
+#
+# THE DEGENERATE STRATEGY THIS RUNG EXISTS TO CATCH is the consultant deck: a
+# confident recommendation, plausible in general, that does not follow from the
+# figures in front of it and is presented as though it costs nothing. Two
+# criteria are aimed at it -- one requiring the recommendation to be derivable
+# from the stated analysis, one requiring a named cost with a named bearer.
+#
+# THE PAIR THAT PULLS AGAINST ITSELF. `recommendation-follows-from-the-analysis`
+# and `earns-its-length` are both weighted 3.0, deliberately and equally. The
+# cheapest way to look rigorous is to write more, and the cheapest way to be
+# concise is to drop the derivation; a response cannot buy one with the other.
+# The outcome says "concise analysis" in its own text, so economy is part of
+# what is being measured, not a house style.
+#
+# The other two criteria sit at 3.0 and 2.0 so the pair actually STANDS OUT. An
+# earlier draft weighted all four at 3.0, which is arithmetically identical to
+# weighting them all at 1.0 and expresses no priority at all -- the pair was
+# announced in this comment and then not implemented in the numbers. The
+# technique comes from tasks/conceptual-grading/l4-actionable-feedback.yaml,
+# where the pair is 3.0/3.0 against 2.0/1.0/2.0, and it only works because the
+# rest are lower.
+#
+# Two of the four samples resolve to acting and two to not acting, and one of
+# each is the counter-intuitive direction. A rung whose answer is always "do
+# something" teaches exactly the wrong reflex, and so does one whose answer is
+# always "wait".
+version: 1
+id: slo1-problem-solving/l4-recommendation
+title: SLO1 rung 4 -- a recommendation traceable to the analysis, priced
+description: >
+  Rung 4 of the SLO1 ladder, and the first rung at which all three of the
+  outcome's verbs appear together. Each sample supplies a decision and the
+  figures bearing on it; the response must state the problem, run the
+  analysis, recommend, and say what the recommendation costs and who bears it.
+  In two of the four samples the recommendation supported by the figures is the
+  opposite of the one the framing invites.
+
+  Provenance: every firm, figure and scenario is synthetic, authored for this
+  file. No course material, no textbook content, no real firm's data.
+kind: subjective
+domain: business-analysis
+system_prompt: >-
+  You are a business analyst advising a decision-maker who has ten minutes.
+  Work only from the information the item supplies; where something you would
+  need is missing, say so rather than assuming a value. Use exactly the
+  headings the item asks for, in the order it asks for them, and write nothing
+  that does not earn its place under one of them. Do not invent figures, firms
+  or events that the item did not give you.
+scorer:
+  kind: llm_judge
+  rubric_id: slo1-problem-solving-recommendation-v1
+rubric:
+  id: slo1-problem-solving-recommendation-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: recommendation-follows-from-the-analysis
+      description: |-
+        Can the RECOMMENDATION be derived from the response's own ANALYSIS
+        section, using only figures the item supplied?
+
+        The test to apply: delete the recommendation, read the analysis, and
+        ask what it implies. If the analysis points one way and the
+        recommendation goes another, or if the analysis would equally support
+        the opposite recommendation, this criterion has failed regardless of
+        whether the recommendation happens to be sensible.
+
+        1.0 -- the recommendation is what the response's own analysis implies,
+               and at least one figure from that analysis is named in stating
+               it.
+        0.5 -- the recommendation is consistent with the analysis but no figure
+               connects them, so the analysis reads as preamble.
+        0.0 -- the recommendation does not follow from the analysis, or the
+               analysis is absent, or the recommendation is a list of options
+               rather than a recommendation.
+      weight: 3.0
+    - name: the-cost-is-named-and-borne-by-someone
+      description: |-
+        Does WHAT THIS COSTS AND WHO BEARS IT state a specific cost and a
+        specific party that carries it?
+
+        A recommendation presented as costless is the signature of the generic
+        deck. "There may be some disruption" is not a cost; "$19,000 a month,
+        carried by the hub's operating budget" is.
+
+        1.0 -- names a cost with a figure or a concrete consequence, AND names
+               who bears it -- a budget, a team, a customer group, the firm's
+               future optionality.
+        0.5 -- names a cost or a bearer but not both, or names a cost in
+               general terms with no figure where the item supplied one.
+        0.0 -- the section is absent, or asserts that the recommendation has no
+               material cost when the item supplies one.
+      weight: 3.0
+    - name: uses-the-figure-that-decides-it
+      description: |-
+        Every sample contains one figure or stated fact that turns the
+        decision. Does the response identify and use it?
+
+        1.0 -- the deciding figure is named and its role in the decision is
+               stated.
+        0.5 -- the deciding figure appears in the analysis but its role is not
+               drawn out, so the recommendation reads as reached despite it.
+        0.0 -- the deciding figure is not used, or a figure that does not
+               belong in the decision is treated as decisive.
+      weight: 2.0
+    - name: earns-its-length
+      description: |-
+        Is every sentence doing work? The outcome specifies CONCISE analysis,
+        and this criterion is weighted equally with
+        `recommendation-follows-from-the-analysis` on purpose: completeness and
+        economy pull against each other here and neither may be bought with the
+        other.
+
+        Count as unearned: restating the item's situation back before analysing
+        it, listing considerations that are never used, generic implementation
+        advice ("communicate the change to stakeholders", "monitor closely",
+        "phase the rollout") that any recommendation would carry, and risks
+        named but not weighed.
+
+        1.0 -- no unearned sentences, and all four headings present.
+        0.5 -- one or two unearned sentences, or one heading merged into
+               another.
+        0.0 -- three or more unearned sentences, or the response opens with a
+               restatement of the situation longer than two sentences, or a
+               heading is missing.
+      weight: 3.0
+tags: [slo-benchmark, "slo:SLO1", "use-mode:capability", ladder-l4, problem-solving, subjective, not-yet-scorable]
+samples:
+  # CLEAN, and ACT. The figures point one way and the framing does not fight
+  # them. The same courier as l1/courier-on-time-delivery, one step further on.
+  - id: courier-hub-capacity-decision
+    input: >-
+      A regional parcel courier's on-time delivery rate has fallen from 94% to
+      78%. Parcel volume is up 41% over four months; the single sorting hub's
+      throughput capacity is unchanged; the last loading slot has moved 70
+      minutes later and late deliveries are concentrated in the routes loaded
+      last. Driver headcount, turnover and driver-named complaints are all
+      unchanged.
+
+      The contract terms pay out service credits for missed delivery windows;
+      these ran at $34,000 a month last month, against $6,000 a month before
+      the volume rise. Two options have been costed. A second evening loading
+      shift at the existing hub costs $19,000 a month and returns loading to
+      the original slot. A third-party overflow depot costs $41,000 a month on
+      a six-month minimum term and adds a 40-minute trunking leg. Forecast
+      volume growth over the next twelve months is a further 18%.
+
+      Respond under exactly these headings: PROBLEM, ANALYSIS, RECOMMENDATION,
+      WHAT THIS COSTS AND WHO BEARS IT.
+    # Author's note. The second shift costs 19,000 against 34,000 of monthly
+    # service credits -- it pays for itself roughly twice over before any
+    # customer-retention argument, and it is the cheaper of the two options by
+    # 22,000 a month while also avoiding the overflow depot's extra 40-minute
+    # leg, which would work against the very metric being fixed.
+    # THE DECIDING FIGURE is the 34,000 of monthly service credits: without it
+    # the 19,000 is a cost with no offsetting benefit, and with it the decision
+    # is arithmetic.
+    # The cost to name: 19,000 a month on the hub's operating budget, plus
+    # evening working imposed on hub staff. The honest caveat is that the shift
+    # absorbs the 41% that has already happened and not the further 18%
+    # forecast, so this defers a capacity decision rather than settling it -- a
+    # strong response says so under the cost heading, since deferred optionality
+    # is part of what is being spent.
+    metadata: { probe: two-costed-options-and-a-service-credit-rate, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  # BORDERLINE. Both options are genuinely defensible and the choice turns on a
+  # judgement about uncertainty rather than on a calculation. Grade the naming
+  # of the sacrifice, not which option is chosen.
+  - id: extra-warehouse-versus-automation
+    input: >-
+      A distributor is out of picking capacity and has two options.
+
+      Lease a second warehouse: $290,000 a year, operational in three months,
+      terminable on twelve months' notice.
+
+      Automate picking in the existing warehouse: $1,150,000 of capital, 14
+      months to full operation, saves $340,000 a year in labour once running,
+      seven-year asset life, no resale value and no partial reversal.
+
+      The firm's own three-year demand forecast has a band of plus 5% to plus
+      25%. Current picking capacity is exhausted at today's volume. The firm
+      has $2.1m of undrawn credit and no other capital commitment this year.
+
+      Respond under exactly these headings: PROBLEM, ANALYSIS, RECOMMENDATION,
+      WHAT THIS COSTS AND WHO BEARS IT.
+    # Author's note. Automation pays back in 1,150,000 / 340,000 = 3.38 years
+    # against a seven-year life, which is comfortable IF the volume
+    # materialises; but it delivers nothing for 14 months and capacity is
+    # exhausted today. The lease is available in three months and is reversible
+    # at twelve months' notice, at 290,000 a year against automation's 340,000
+    # of annual saving -- so the lease is close to the automation's run-rate
+    # benefit while committing to nothing.
+    # THE DECIDING FACT is the 14-month lead time against capacity being
+    # exhausted TODAY: automation alone does not solve the presenting problem
+    # in any scenario. Both "lease now" and "lease now, commit to automation
+    # once the forecast band narrows" are strong answers; "automate" alone is
+    # weak because it leaves 14 months uncovered.
+    # The sacrifice to name: the lease spends 290,000 a year to buy a decision
+    # deferral and forgoes the automation saving for as long as it runs.
+    metadata: { probe: reversible-lease-against-irreversible-capital, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  # TRAP, and ACT AGAINST THE PULL. The framing supplies a reason to keep going
+  # and the contribution line says stop.
+  - id: the-founding-product-line
+    input: >-
+      A firm's original product, the one it was founded on twenty-two years
+      ago, is under review. Last year it recorded revenue of $620,000 against
+      variable costs of $710,000. It also carries $95,000 of directly
+      attributable fixed costs, on a lease terminable at six months' notice,
+      and is charged $120,000 of allocated corporate overhead which would be
+      reallocated to the firm's other lines if it closed.
+
+      The line has four dedicated staff. Its customers account for 11% of the
+      firm's customer list; the sales director estimates that between a third
+      and a half of them also buy at least one other line. The founder, now
+      chair, has asked whether the overhead allocation is the reason the line
+      looks bad.
+
+      Respond under exactly these headings: PROBLEM, ANALYSIS, RECOMMENDATION,
+      WHAT THIS COSTS AND WHO BEARS IT.
+    # Author's note. Contribution is 620,000 - 710,000 = MINUS 90,000: the line
+    # loses money before a single fixed or allocated cost is counted, so every
+    # unit sold makes the firm worse off. The chair's hypothesis is
+    # specifically wrong, and saying so plainly is part of a strong answer --
+    # removing the 120,000 allocation changes the reported figure and not the
+    # economics.
+    # THE DECIDING FIGURE is the negative contribution. A response that
+    # analyses the overhead allocation at length and never computes
+    # 620,000 - 710,000 has answered the question that was asked instead of the
+    # one that decides it.
+    # Costs to name: four staff, the six-month lease tail (about 47,500 if
+    # notice is served now), and the retention risk across the 11% of customers
+    # -- of whom half or more buy nothing else and may be lost entirely.
+    metadata: { probe: founding-line-with-an-overhead-allocation, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  # DO NOT ACT, against a headline that demands action. The mirror of the
+  # sample above: same accounting shape, opposite economics, opposite answer.
+  - id: the-loss-making-branch
+    input: >-
+      A branch appears in the management accounts with an annual loss of
+      $180,000 and the board has asked for a closure plan.
+
+      The branch's figures: revenue $1,240,000; variable costs $890,000;
+      directly attributable fixed costs $180,000, being a lease terminable on
+      six months' notice; and $350,000 of allocated head-office cost. The
+      finance director confirms that the $350,000 is an apportionment of costs
+      that would continue in full and be reallocated across the remaining
+      branches if this one closed.
+
+      Respond under exactly these headings: PROBLEM, ANALYSIS, RECOMMENDATION,
+      WHAT THIS COSTS AND WHO BEARS IT.
+    # Author's note. Contribution = 1,240,000 - 890,000 = 350,000. Less the
+    # 180,000 of genuinely attributable fixed cost = +170,000 of profit the
+    # branch actually contributes. The reported 180,000 loss appears only after
+    # subtracting the 350,000 apportionment, which does not go away on closure.
+    # Closing therefore makes the firm 170,000 a year worse off AND moves
+    # 350,000 of head-office cost onto the branches that remain, worsening
+    # their reported results in turn.
+    # THE DECIDING FACT is the finance director's confirmation that the 350,000
+    # continues. It is stated plainly and is the single sentence the whole
+    # decision turns on.
+    # A recommendation to close scores 0.0 on the first criterion however well
+    # written. The cost of NOT closing is still real and should be named: the
+    # board has asked for a closure plan and is being told no, and the reported
+    # branch loss will persist in the management accounts until the
+    # apportionment basis is changed -- which is the actual thing to fix.
+    metadata: { probe: branch-loss-with-a-head-office-apportionment, provenance: synthetic, slo: SLO1, use_mode: capability }

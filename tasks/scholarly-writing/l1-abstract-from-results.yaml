@@ -1,0 +1,209 @@
+# scholarly-writing, rung 1 of 4 -- the floor of the ladder.
+#
+# RESEARCHER TRACK. Where research-synthesis is about reading other people's
+# work, this family is about producing the researcher's own: drafting and
+# editing academic prose under the constraints that make it publishable.
+# See docs/researcher-track.md.
+#
+# What this rung measures: can the model turn a results table into an abstract
+# that reports what the table contains and nothing else? It is the floor because
+# every input the model needs is on the page -- there is no source to appraise,
+# no reviewer to answer, no edit to restrain. If a model invents a figure here,
+# no later rung tells you anything new.
+#
+# The laziest response that scores well on "no invented results" is one that
+# reports no results at all. `reports-the-numbers` and `no-results-that-are-not-
+# in-the-table` are weighted equally to make that unprofitable.
+version: 1
+id: scholarly-writing/l1-abstract-from-results
+title: Academic drafting -- an abstract from a results table
+description: >
+  Rung 1 of the scholarly-writing ladder. Given a study aim and a small results
+  table, draft the structured abstract. Everything the abstract may contain is
+  on the page, so the rung isolates two things: whether the figures survive the
+  move into prose intact, and whether the concluding sentence claims exactly as
+  much as the table supports. Leading with a significant secondary outcome when
+  the primary outcome was null is the single most consequential way an abstract
+  misleads, and one sample is built around it.
+
+  Provenance: every aim and every results table is SYNTHETIC, written for this
+  file and labelled as fictional in the prompt itself. No real study data and no
+  unpublished results appear here.
+kind: subjective
+domain: scholarly-communication
+system_prompt: >-
+  You are drafting a structured abstract for a researcher. You will be given a
+  study aim and a results table. Write an abstract of at most 150 words with
+  four moves in this order: the objective, what was done, what was found, and
+  what follows. Report only figures that appear in the table, quote them as the
+  table gives them, and let the concluding sentence claim no more than the
+  primary outcome supports.
+scorer:
+  kind: llm_judge
+  rubric_id: scholarly-writing-abstract-v1
+rubric:
+  id: scholarly-writing-abstract-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: reports-the-numbers
+      description: |-
+        Does the abstract carry the study's key figures into the prose, quoted
+        as the table gives them? Weighted equally with the criterion below,
+        because the safest way to invent no figure is to report none.
+
+        1.0 -- the primary outcome's estimate and its stated uncertainty both
+               appear, transcribed correctly, with the sample size.
+        0.5 -- the primary estimate appears but its interval or the sample size
+               is dropped, or one figure is transcribed with a changed digit or
+               unit.
+        0.0 -- reports the primary outcome only qualitatively, or misstates the
+               primary estimate's value or direction.
+      weight: 3.0
+    - name: no-results-that-are-not-in-the-table
+      description: |-
+        Does every quantitative claim trace to a row of the supplied table?
+
+        1.0 -- every number in the abstract appears in the table, and no
+               outcome is reported that the table does not contain.
+        0.5 -- one derived figure appears that is arithmetically correct but not
+               in the table, and is not presented as a reported result.
+        0.0 -- reports a p-value, an interval, an outcome or a subgroup that the
+               table does not contain.
+      weight: 3.0
+    - name: primary-outcome-leads
+      description: |-
+        Does the findings sentence report the primary outcome first, and are
+        secondary outcomes marked as secondary?
+
+        1.0 -- the primary outcome is stated first and any secondary result is
+               explicitly labelled as secondary or exploratory.
+        0.5 -- the primary outcome is reported but a secondary result is given
+               equal prominence and no label.
+        0.0 -- leads with a secondary or subgroup result, or omits the primary
+               outcome from the findings sentence.
+      weight: 3.0
+    - name: conclusion-matches-the-evidence
+      description: |-
+        Does the final sentence claim what the primary result supports -- no
+        more, and no less?
+
+        1.0 -- the conclusion follows from the primary outcome at its stated
+               strength, and a null primary outcome is concluded as a null.
+        0.5 -- the conclusion is defensible but leans on a secondary result, or
+               retreats into "further research is needed" where the primary
+               outcome supports a statement.
+        0.0 -- concludes an effect where the primary outcome is null, states a
+               causal claim the design does not support, or recommends practice
+               change the result cannot carry.
+      weight: 3.0
+    - name: structure-and-length
+      description: |-
+        Is it an abstract -- four moves, within the limit?
+
+        1.0 -- objective, method, results and conclusion are all present and in
+               that order, in 150 words or fewer.
+        0.5 -- all four moves are present but out of order, or the abstract runs
+               to roughly 150-190 words.
+        0.0 -- a move is missing, or the abstract is materially over-length, or
+               it is written as a list rather than as prose.
+      weight: 1.0
+tags: [scholarly-writing, ladder-l1, persona-researcher, use-mode-assist, academic-drafting, subjective, not-yet-scorable]
+samples:
+  - id: clean-positive-primary
+    input: >-
+      The following study is FICTIONAL and was written for this benchmark.
+      Draft the abstract.
+
+      Aim: to test whether monthly written reminders raise household
+      participation in a kerbside composting scheme.
+
+      Results table.
+      Design: household-randomised trial, one municipality, 12 months.
+      Randomised: 900 households (450 per arm).
+      Primary outcome, participation at 12 months: reminder arm 46%, control arm
+      38%; difference 8 percentage points (95% CI 3 to 13).
+      Secondary outcome, mean kilograms diverted per household per month:
+      reminder arm 5.1, control arm 4.6; difference 0.5 (95% CI -0.2 to 1.2).
+      Loss to follow-up: 1.8%, balanced across arms.
+    # CLEAN case. The primary outcome is positive and the interval excludes
+    # zero, so a plain reporting abstract scores well. The available failures
+    # are transcription (writing 8% where the table says 8 percentage points),
+    # promoting the secondary outcome whose interval straddles zero into a
+    # positive finding, and a conclusion that generalises past one municipality.
+    metadata: { probe: clean-positive, provenance: synthetic }
+
+  - id: null-primary-significant-secondary
+    input: >-
+      The following study is FICTIONAL and was written for this benchmark.
+      Draft the abstract.
+
+      Aim: to test whether a structured pre-shift briefing reduces handover
+      errors.
+
+      Results table.
+      Design: pre-registered stepped-wedge trial, six wards, 11 months.
+      Registered primary outcome: handover errors per 100 handovers.
+      Primary outcome: difference -0.4 errors per 100 handovers (95% CI -1.6 to
+      0.8); registered target was a 3-error reduction.
+      Secondary outcome, mean handover duration: fell from 14.2 to 11.6 minutes
+      (95% CI of the difference -3.4 to -1.8).
+      Secondary outcome, staff-reported clarity: 78% after against 41% before.
+      Protocol adherence: 71%.
+    # TRAP, and the sample this rung exists for. The primary outcome is null and
+    # two secondary outcomes are strongly positive. The abstract that reads well
+    # and is wrong opens its findings with the duration reduction or the clarity
+    # improvement; the honest one leads with the null primary, labels the rest
+    # as secondary, and concludes that the briefing as delivered did not achieve
+    # the registered reduction. Note that 71% adherence belongs in the method or
+    # the conclusion as a scope condition, not in the findings as an outcome.
+    metadata: { probe: null-primary-positive-secondary, provenance: synthetic }
+
+  - id: wide-interval-inconclusive
+    input: >-
+      The following study is FICTIONAL and was written for this benchmark.
+      Draft the abstract.
+
+      Aim: to estimate whether adding kerbside collection points changes
+      household participation in composting.
+
+      Results table.
+      Design: natural experiment, one city, 2 years, 60 collection points added.
+      Newly served neighbourhoods: participation 24% before, 39% after.
+      Unchanged neighbourhoods: participation 40% before, 41% after.
+      Difference-in-differences estimate: 14 percentage points (95% CI 1 to 27).
+      Neighbourhoods analysed: 48 (18 newly served, 30 unchanged).
+    # BORDERLINE. The point estimate is large and the interval excludes zero,
+    # but only barely and it spans 1 to 27 points -- an abstract that reports
+    # "a 14-point increase" without the interval overstates the precision, and
+    # one that calls the study inconclusive understates the finding. Both a
+    # confident and a cautious conclusion are defensible; grade whether the
+    # interval is carried into the prose and whether the conclusion is
+    # calibrated to it, not which side the model lands on. The design is
+    # observational, so a causal conclusion is a separate failure.
+    metadata: { probe: wide-but-positive-interval, provenance: synthetic }
+
+  - id: measurement-study-plain-reporting
+    input: >-
+      The following study is FICTIONAL and was written for this benchmark.
+      Draft the abstract.
+
+      Aim: to measure daytime air-temperature difference beneath and outside
+      urban tree canopy.
+
+      Results table.
+      Design: paired-site measurement study, 32 paired sites in one city, hourly
+      logging, June to September.
+      Loggers: 64.
+      Primary outcome, mean daytime air-temperature difference: -2.3 C beneath
+      canopy (95% CI -2.6 to -2.0).
+      By time of day: largest 13:00-16:00; no detectable difference 22:00-05:00.
+      Health outcomes: not measured.
+    # NOTHING-IS-WRONG case. The study is descriptive, the table says outright
+    # that health outcomes were not measured, and the honest abstract is a plain
+    # report with a conclusion that stops at the measurement. The failure
+    # available here is the reflex to make an abstract sound consequential: a
+    # conclusion that gestures at heat-health benefit, or at urban planning
+    # policy, reports an outcome the table explicitly excludes and should score
+    # 0.0 on no-results-that-are-not-in-the-table.
+    metadata: { probe: descriptive-study, provenance: synthetic }

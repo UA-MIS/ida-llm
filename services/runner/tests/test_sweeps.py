@@ -488,11 +488,11 @@ class TestPartialEnqueueFailure:
 
         scoped = _with(ctx, queue=_ExplodingQueue(ok_count=2))
 
-        run_rebenchmark(scoped)
+        report = run_rebenchmark(scoped)
 
         with session_scope(ctx.session_factory) as session:
             assert count_runs(session, status=RunStatus.QUEUED) == 2
-            assert count_runs(session, status=RunStatus.FAILED) == 6
+            assert count_runs(session, status=RunStatus.FAILED) == report.considered - 2
 
     def test_the_closed_out_rows_carry_a_reason_naming_the_cause(self, ctx) -> None:
         from ida_core.repositories import list_runs
@@ -509,18 +509,25 @@ class TestPartialEnqueueFailure:
     def test_the_next_sweep_re_enqueues_the_pairs_that_never_landed(self, ctx) -> None:
         """THE regression test for the highest-severity finding.
 
-        Reproduced before the fix: after one mid-sweep Redis blip, six pairs were
-        skipped as "already in flight" on every subsequent night, forever, with a
-        green CronJob each time. Two nights are asserted because the first is
-        where the fix acts and the second is where a wrong fix would loop.
+        Reproduced before the fix: after one mid-sweep Redis blip, every pair that
+        never landed was skipped as "already in flight" on every subsequent
+        night, forever, with a green CronJob each time. Two nights are asserted
+        because the first is where the fix acts and the second is where a wrong
+        fix would loop.
+
+        The counts are derived from the report rather than written down: the
+        plan is one pair per scorable task, so hard-coding them would make this
+        regression test fail the day someone authors a new verifiable family.
         """
         blip = _with(ctx, queue=_ExplodingQueue(ok_count=2))
         first = run_rebenchmark(blip)
-        assert first.failed == 6
+        orphaned = first.considered - 2
+        assert orphaned > 0
+        assert first.failed == orphaned
 
         second = run_rebenchmark(ctx)
 
-        assert second.enqueued == 6, "the orphaned pairs must come back"
+        assert second.enqueued == orphaned, "the orphaned pairs must come back"
         assert second.skipped_dedupe == 2, "the two that really landed stay skipped"
         assert second.exit_code == 0
 
