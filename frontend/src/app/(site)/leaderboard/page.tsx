@@ -35,10 +35,15 @@
 
 import Link from "next/link";
 
+import { GlossaryPanel, Term } from "@/components/glossary";
+import { HowToRead, ReadStep } from "@/components/how-to-read";
 import { ModelResultCard } from "@/components/model-result-card";
+import { PlainSummary } from "@/components/plain-summary";
 import { ScoreBar } from "@/components/score-bar";
 import { ConfidenceTell, ResidencyBadge, TrustLegend } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
+import { summariseBoard } from "@/lib/findings";
+import { LEADERBOARD_TERMS, plainTaskKind } from "@/lib/glossary";
 import { formatCost, formatScore } from "@/lib/format";
 import {
   confidenceLabel,
@@ -109,6 +114,18 @@ function OverallLeaderboard({
     <section className="panel panel-lead">
       <div className="panel-head">
         <h2>Models, ranked across the whole benchmark</h2>
+        {/* ⚠ THE COLUMN GLOSSARY LIVES HERE, ABOVE THE TABLE, AND NOT IN THE
+            `<th>`s. The table sits inside `.table-scroll`, whose `overflow-x:
+            auto` clips an absolutely-positioned card — a "?" in a header would
+            be an affordance that opens nothing. Explaining the columns in the
+            note above the table costs a line and works everywhere, including
+            on a phone where the optional columns are hidden entirely. */}
+        <p className="muted panel-note">
+          One row per model. <Term id="overall-score">Overall</Term> is its average
+          across everything measured; <Term id="confidence">Confidence</Term> says
+          how much weight that average can bear; and{" "}
+          <Term id="sample">Samples</Term> is how many attempts stand behind it.
+        </p>
         <p className="muted panel-note">{WEIGHTING_NOTE}</p>
       </div>
 
@@ -318,7 +335,9 @@ function FacetRow({
 }) {
   return (
     <div className="facet-row">
-      <span className="badge">{task.kind}</span>
+      <span className="badge" title="How this task is marked.">
+        {plainTaskKind(task.kind)}
+      </span>
       <span className="badge">{task.domain}</span>
       {task.use_mode ? (
         <span
@@ -477,7 +496,12 @@ function TaskTable({
                     </Link>
                     <div className="mono muted task-id">{task.task_id}</div>
                   </td>
-                  <td className="col-optional muted">{task.kind}</td>
+                  {/* ⚠ NOT `{task.kind}`. The raw value is our vocabulary
+                      ("subjective"), and it reads as "this result is a matter of
+                      opinion" rather than "no single right answer, so an AI
+                      marked it". Inside `.table-scroll` a definition card would
+                      be clipped, so the words carry it alone. */}
+                  <td className="col-optional muted">{plainTaskKind(task.kind)}</td>
                   <td>
                     {best ? (
                       <Link href={`/models/${encodeURIComponent(best.model_key)}`}>
@@ -611,6 +635,49 @@ export default async function ResultsPage({
         <NothingMeasuredYet taskCount={board.task_count} />
       ) : (
         <>
+          {/* ⚠ SHORT → VISUAL → DETAIL, IN THAT ORDER, AND THE ORDER IS THE
+              FEATURE. This page's own header comment sets the rule — LEAD WITH
+              THE ANSWER — and until now the answer it led with was a ranked
+              table, which is an answer only to a reader who already knows what
+              a score is. The sentence and the bars come first; the table is
+              unchanged, one scroll down, for the reader who wants it. */}
+          <PlainSummary findings={summariseBoard(board)} rollups={rollups} />
+
+          <HowToRead title="This page is evidence, not advice. Here is how to read it.">
+            <ReadStep n={1} heading="Start with the paragraph above">
+              It is the honest summary of everything measured so far, caveats
+              included. If you read nothing else on this page, that is the part
+              to read.
+            </ReadStep>
+            <ReadStep n={2} heading="Scores run from 0.00 to 1.00">
+              They are averages over several attempts, not marks out of a
+              hundred. Beside each one is a{" "}
+              <Term id="confidence">confidence</Term> — how much weight that
+              average can bear. A high score with low confidence is a promising
+              sign, not a verdict.
+            </ReadStep>
+            <ReadStep n={3} heading="A blank is a blank, never a nought">
+              Most of this benchmark is{" "}
+              <Term id="not-measured">not measured yet</Term>, and we show the
+              gaps rather than filling them. Nothing here is scored zero for
+              having gone untested.
+            </ReadStep>
+            <ReadStep n={4} heading="Every number opens">
+              Follow any &ldquo;see the proof&rdquo; link to the full record —
+              what we asked, what the model answered, and how it was marked. If
+              you disagree with a score, that is where to look.
+            </ReadStep>
+            <ReadStep n={5} heading="If you would rather just be told">
+              The <Link href="/recommend">recommendation questions</Link> ask
+              about your actual situation and give you an answer for it, rather
+              than a table to interpret.
+            </ReadStep>
+          </HowToRead>
+
+          {/* The words this project invented, all in one place, one click from
+              wherever a reader first met one. */}
+          <GlossaryPanel terms={LEADERBOARD_TERMS} />
+
           <OverallLeaderboard rollups={rollups} outcomeCount={outcomeCount} />
 
           <TrustLegend />
@@ -619,9 +686,10 @@ export default async function ResultsPage({
             <div className="panel-head">
               <h2>Browse the benchmark</h2>
               <p className="muted panel-note">
-                {board.task_count} tasks in the catalogue, grouped by the
-                outcome each one measures. Pick a task to see every model ranked
-                on it.
+                {board.task_count} <Term id="task">tasks</Term> in the catalogue,
+                grouped by the{" "}
+                <Term id="learning-outcome">learning outcome</Term> each one
+                measures. Pick a task to see every model ranked on it.
               </p>
             </div>
 
