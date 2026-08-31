@@ -19,15 +19,42 @@ import { defineConfig } from "vitest/config";
  * rather than merely computing them. A landing page that quietly dropped its
  * "not measured yet" rows would pass every pure test in this directory.
  */
+const alias = { "@": fileURLToPath(new URL("./src", import.meta.url)) };
+
 export default defineConfig({
   test: {
-    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
-    environmentMatchGlobs: [["tests/**/*.dom.test.tsx", "jsdom"]],
-    environment: "node",
+    // ⚠ TWO PROJECTS, NOT `environmentMatchGlobs`. That option is deprecated in
+    // vitest 3 and printed a warning on every run; `projects` is its
+    // replacement and expresses the same split -- one suite per environment,
+    // selected by filename -- without the notice. The BEHAVIOUR is unchanged:
+    // `*.dom.test.tsx` gets jsdom, everything else gets node.
+    //
+    // Each project carries its own `resolve`/`esbuild`: a project is a config in
+    // its own right and does NOT inherit the root's, so dropping either here
+    // breaks the `@/` alias or the JSX transform for that half of the suite.
+    projects: [
+      {
+        resolve: { alias },
+        esbuild: { jsx: "automatic" },
+        test: {
+          name: "node",
+          environment: "node",
+          include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
+          exclude: ["tests/**/*.dom.test.tsx"],
+        },
+      },
+      {
+        resolve: { alias },
+        esbuild: { jsx: "automatic" },
+        test: {
+          name: "dom",
+          environment: "jsdom",
+          include: ["tests/**/*.dom.test.tsx"],
+        },
+      },
+    ],
   },
-  resolve: {
-    alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
-  },
+  resolve: { alias },
   // ⚠ REQUIRED FOR THE .tsx TESTS. tsconfig sets `"jsx": "preserve"` because
   // Next does its own JSX transform at build time — which leaves esbuild here
   // defaulting to the CLASSIC runtime and failing with "React is not defined"
