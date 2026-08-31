@@ -83,14 +83,22 @@ const LIGHT = tokens(light);
 const DARK = tokens(dark);
 
 /** Tokens whose whole job is to be read as text somewhere on the site. */
-const TEXT_TOKENS = ["fg", "muted", "accent", "brand", "pass", "fail", "pending"];
+const TEXT_TOKENS = ["fg", "muted", "faint", "accent", "brand", "pass", "fail", "pending"];
+
+/**
+ * Every neutral. Checked for a COOL cast — see the test at the bottom of the
+ * per-theme block for why this list is longer than the four it used to be.
+ */
+const NEUTRAL_TOKENS = [
+  "bg", "surface", "surface-2", "fg", "muted", "faint", "border", "border-strong",
+];
 
 describe.each([
   ["light", LIGHT],
   ["dark", DARK],
 ])("%s theme", (_name, theme) => {
   it("defines every token the sheet relies on", () => {
-    for (const key of [...TEXT_TOKENS, "bg", "surface", "surface-2", "border", "border-strong"]) {
+    for (const key of [...new Set([...TEXT_TOKENS, ...NEUTRAL_TOKENS])]) {
       expect(theme[key], `missing --${key}`).toBeDefined();
     }
   });
@@ -126,8 +134,9 @@ describe.each([
   });
 
   it("uses no pure black and no pure white anywhere", () => {
-    // The specific complaint this palette answers: pure neutrals have no
-    // temperature, and a page built from them reads as clinical.
+    // The original complaint survives the warm-to-cool migration unchanged:
+    // pure neutrals have no temperature at all, and a page built from them
+    // reads as unconsidered. Cool is a temperature; #fff is the absence of one.
     for (const [key, hex] of Object.entries(theme)) {
       const { r, g, b } = parseHex(hex);
       expect([r, g, b], `--${key} is pure white`).not.toEqual([255, 255, 255]);
@@ -135,12 +144,22 @@ describe.each([
     }
   });
 
-  it("keeps the two neutrals warm rather than dead grey", () => {
-    // Every neutral carries the same faint warm cast; a neutral with r === b is
-    // the flat grey the redesign exists to remove.
-    for (const key of ["bg", "surface", "fg", "muted"]) {
+  it("keeps every neutral cool rather than warm or dead grey", () => {
+    // ⚠ THIS ASSERTION USED TO RUN THE OTHER WAY, and the inversion is the
+    // whole palette-unification change in one line. It read
+    // `expect(r).toBeGreaterThan(b)` — every neutral warm — because the tool
+    // pages were warm paper. The landing then shipped cool, the warm ground was
+    // reviewed as reading BROWN, and the app moved onto the landing's values
+    // rather than the other way round.
+    //
+    // It is INVERTED rather than deleted on purpose: a direction-free "not dead
+    // grey" test would pass for a warm value silently reintroduced by hand, and
+    // reintroducing one is exactly how the seam comes back. It also covers all
+    // eight neutrals now, not the four it used to, because the seam appeared in
+    // the borders as readily as in the background.
+    for (const key of NEUTRAL_TOKENS) {
       const { r, b } = parseHex(theme[key]!);
-      expect(r, `--${key} has no warm cast`).toBeGreaterThan(b);
+      expect(b, `--${key} is warm or neutral, not cool`).toBeGreaterThan(r);
     }
   });
 
@@ -157,6 +176,70 @@ describe.each([
     // being claimed, so hue is what is measured.
     expect(hueDistance(theme.accent!, theme.fail!)).toBeGreaterThan(90);
     expect(hueDistance(theme.brand!, theme.accent!)).toBeGreaterThan(90);
+  });
+});
+
+describe("one palette, not two", () => {
+  /**
+   * ⚠ THE REGRESSION THIS EXISTS TO CATCH IS INVISIBLE. The landing shipped with
+   * its own `--ld-*` cool-neutral palette while the tool pages were warm, and
+   * the result was a temperature seam on every click-through — a bug nobody
+   * sees in a screenshot of either page alone, only in the transition between
+   * them. The fix made the landing tokens ALIASES of the canonical ones.
+   *
+   * Re-forking is a one-line change that looks entirely reasonable in a diff
+   * ("just tweak the landing's ink"), and nothing else in this suite would fail.
+   * So: the aliases must stay aliases.
+   */
+
+  /** The only `--ld-*` tokens allowed to carry their own colour, and why. */
+  const LANDING_OWN = new Set([
+    "ld-raise",        // a surface ABOVE the page; no tool-page token does that
+    "ld-accent-deep",  // pressed state for the one filled button
+    "ld-on-accent",    // its foreground
+    "ld-pine",         // the single second hue, used on exactly one mark
+    "ld-shadow",       // a deeper cast than the tool pages' subtle lift
+  ]);
+
+  function landingDeclarations(block: string): [string, string][] {
+    return [...block.matchAll(/--(ld-[a-z0-9-]+):\s*([^;]+);/g)].map(
+      (m) => [m[1]!, m[2]!.trim()],
+    );
+  }
+
+  it.each([
+    ["light", light],
+    ["dark", dark],
+  ])("%s: every shared landing token resolves to a canonical one", (_name, block) => {
+    for (const [token, value] of landingDeclarations(block)) {
+      if (LANDING_OWN.has(token)) continue;
+      expect(value, `--${token} forks the palette instead of aliasing it`).toMatch(
+        /^var\(--[a-z0-9-]+\)$/,
+      );
+    }
+  });
+
+  it("keeps the landing's own tokens to the documented few", () => {
+    // A new `--ld-*` hex is how a second palette grows back one token at a time.
+    for (const [token, value] of landingDeclarations(light)) {
+      if (value.startsWith("var(")) continue;
+      expect(LANDING_OWN, `undocumented landing colour --${token}`).toContain(token);
+    }
+  });
+
+  it("leaves no warm token anywhere in the sheet", () => {
+    // The literal goal of the unification, stated as a value check: the old warm
+    // palette's exact hexes must not survive anywhere, in a token or a comment.
+    const RETIRED_WARM = [
+      "#fbf9f6", "#f3efea", "#eae4dc", "#1f1c1a", "#6e6862",
+      "#e6dfd6", "#d2c8bb", "#191714", "#211e1b", "#2a2622",
+      "#ede7df", "#a69d93", "#322e2a", "#474139",
+    ];
+    const declarations = CSS.replace(/\/\*[\s\S]*?\*\//g, " ");
+    for (const hex of RETIRED_WARM) {
+      expect(declarations.toLowerCase(), `retired warm value ${hex} is still declared`)
+        .not.toContain(hex);
+    }
   });
 });
 
