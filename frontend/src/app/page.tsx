@@ -278,7 +278,7 @@ export default async function LandingPage() {
       {/* -------------------------- specimen -------------------------- */}
       <section className="ld-section" style={{ paddingTop: 0 }}>
         <div className="ld-wrap">
-          <div className="ld-grid">
+          <div className="ld-grid ld-grid-wide">
             <div className="ld-rail ld-reveal ld-d4">
               One outcome
               <span className="ld-note">
@@ -309,11 +309,15 @@ export default async function LandingPage() {
         <div className="ld-wrap">
           <div className="ld-grid">
             <div className="ld-rail">Why this exists</div>
-            <div className="ld-col ld-stack">
+            {/* The one pure-argument section. `ld-split` puts the heading beside
+                the prose on a wide screen, which fills the width without ever
+                widening a line of body text past its measure. */}
+            <div className="ld-col ld-split">
               <h2 className="ld-h2">
                 You are being asked to have a position on AI, without being given
                 anything to base it on.
               </h2>
+              <div className="ld-stack">
               <p>
                 The advice available right now is mostly two slogans —{" "}
                 <strong>ban it</strong> or <strong>embrace it</strong> — and
@@ -336,6 +340,7 @@ export default async function LandingPage() {
                 and we publish what we find, including the parts that are
                 inconvenient.
               </p>
+              </div>
             </div>
           </div>
         </div>
@@ -344,7 +349,7 @@ export default async function LandingPage() {
       {/* ----------------------------- how ----------------------------- */}
       <section className="ld-section ld-band" id="how">
         <div className="ld-wrap">
-          <div className="ld-grid">
+          <div className="ld-grid ld-grid-wide">
             <div className="ld-rail">
               How it works
               <span className="ld-note">
@@ -402,7 +407,7 @@ export default async function LandingPage() {
       {/* ---------------------------- doors ---------------------------- */}
       <section className="ld-section" id="doors">
         <div className="ld-wrap">
-          <div className="ld-grid">
+          <div className="ld-grid ld-grid-wide">
             <div className="ld-rail">Two ways in</div>
             <div className="ld-col">
               <h2 className="ld-h2">Where would you like to start?</h2>
@@ -448,7 +453,7 @@ export default async function LandingPage() {
       {/* ---------------------------- trust ---------------------------- */}
       <section className="ld-section ld-band">
         <div className="ld-wrap">
-          <div className="ld-grid">
+          <div className="ld-grid ld-grid-wide">
             <div className="ld-rail">
               How to trust this
               <span className="ld-note">
