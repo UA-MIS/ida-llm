@@ -16,6 +16,9 @@ is yours, and [`.devops/README.md`](../.devops/README.md) for the deploy contrac
 | the model registry | [`models.yaml`](../models.yaml) |
 | **provider clients** -- which client answers for which entry, the Anthropic/OpenAI gotchas, retry and `Retry-After`, why there is no mock fallback | [`docs/model-clients.md`](model-clients.md) |
 | **provider keys** -- how a secret gets from Vault to a model call, adding a new one, and why `OPENAI_API_KEY` is deliberately unset locally | [`docs/provider-keys.md`](provider-keys.md) |
+| **the benchmark methodology** -- the two axes, verifiable vs subjective scoring, how means aggregate, and the validation studies (one shipped, one designed and not run) | [`docs/methodology.md`](methodology.md) |
+| **what makes the benchmark fair** -- consistent prompting, answer-leakage guards, order independence, determinism and where it is unavailable, trust-tells, and why "not measured" is never zero | [`docs/harness-fairness.md`](harness-fairness.md) |
+| **learning aid vs answer engine** -- the spec and `learning-aid-v1` rubric for the student-facing use mode, and the use-mode naming collision that must be settled first | [`docs/learning-aid-spec.md`](learning-aid-spec.md) |
 | **LLM-as-judge** -- how subjective tasks are scored, the bias controls, what judging costs, retroactive grading | [`docs/llm-judge.md`](llm-judge.md) |
 | **calibration slices** -- checking our harness against *published* benchmark numbers, and sizing a real run against the $25 cap (not the same thing as judge calibration) | [`docs/calibration.md`](calibration.md) |
 | off-cluster inference (Sparks) | [`infra/inference/README.md`](../infra/inference/README.md) |
