@@ -136,8 +136,16 @@ function Reading({ reading }: { reading: SpecimenReading }) {
             className="ld-receipt"
             href={`/leaderboard?task=${encodeURIComponent(reading.best.taskId)}`}
           >
-            See the runs behind this ({reading.best.trustLabel.toLowerCase()},{" "}
-            {reading.best.confidenceLabel.toLowerCase()})
+            {/* ⚠ NO NESTED, LOWER-CASED PARENTHESES. This used to render the
+                API's raw tier label inside brackets inside a link —
+                "See the runs behind this (subjective (ai-scored), low
+                confidence — thin evidence)" — on the one receipt the front door
+                has. It read like a build artefact on the page whose entire job
+                is the first impression. `trustLabel` now arrives already
+                translated (see `lib/specimen.ts`), and the qualification hangs
+                off an em dash instead of nesting. */}
+            See the runs behind this — {reading.best.trustLabel.toLowerCase()},{" "}
+            {reading.best.confidenceLabel.toLowerCase()}
           </Link>
         ) : null}
       </div>

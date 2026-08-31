@@ -10,6 +10,7 @@ import Link from "next/link";
 
 import { Caveats, ConfidenceMeter, ResidencyBadge, TrustBadge } from "@/components/trust-badges";
 import { formatScore, formatTimestamp } from "@/lib/format";
+import { plainLanguage } from "@/lib/plain";
 import { isDeEmphasised } from "@/lib/trust";
 import type { ModelResult } from "@/lib/types";
 
@@ -83,7 +84,10 @@ export function ModelResultCard({
         <Score result={result} />
       </div>
 
-      <p className="muted result-reason">{result.trust.confidence_reason}</p>
+      {/* Same boundary as `Caveats`: the API writes this sentence for an
+          operator as well as for a reader, so it is translated on the way in.
+          See `lib/plain.ts`. */}
+      <p className="muted result-reason">{plainLanguage(result.trust.confidence_reason)}</p>
       <Caveats caveats={result.trust.caveats} />
 
       {/* D-3, made concrete: the evidence is one click from the number, always. */}
@@ -92,7 +96,7 @@ export function ModelResultCard({
           See the proof ▸
         </Link>
         <span className="muted">
-          transcripts · scorer · exact serving config
+          what we asked, what it answered, and how it was marked
         </span>
         <span className="muted" style={{ marginLeft: "auto" }}>
           measured {formatTimestamp(result.measured_at)}

@@ -33,6 +33,7 @@
  * plain-language summary has been failed twice.
  */
 
+import { formatScoreValue } from "./format";
 import { isRanked, rollupByModel, type ModelRollup } from "./rollup";
 import type { LeaderboardResponse } from "./types";
 
@@ -210,7 +211,7 @@ export function summariseBoard(board: LeaderboardResponse): Findings {
   };
 
   // -------------------------------------------------------------- the claim
-  const scoreText = leaderScore.toFixed(2);
+  const scoreText = formatScoreValue(leaderScore);
   let headline: string;
 
   if (!comparable) {
@@ -223,7 +224,7 @@ export function summariseBoard(board: LeaderboardResponse): Findings {
   } else if (tooCloseToCall && runnerUp && runnerUpScore !== null) {
     headline =
       `${top.display_name} and ${runnerUp.display_name} come out about level at the top — ` +
-      `${scoreText} and ${runnerUpScore.toFixed(2)} out of 1.00 — ` +
+      `${scoreText} and ${formatScoreValue(runnerUpScore)} out of 1.00 — ` +
       `which on this much evidence is close enough that we would not pick between them.`;
   } else {
     headline =

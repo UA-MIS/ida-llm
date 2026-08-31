@@ -10,7 +10,37 @@
 
 export function formatScore(value: number | null): string {
   if (value === null) return "—";
-  return value.toFixed(2);
+  return formatScoreValue(value);
+}
+
+/**
+ * A score, to two places — and **never rounded up into a perfect 1.00**.
+ *
+ * ⚠ THE ONE ASYMMETRY IN THIS FILE, AND IT IS DELIBERATE. `toFixed(2)` rounds
+ * to nearest, which is right everywhere except at the ceiling: it turned a
+ * measured 0.9958 into the front door's headline "1.00", a perfect score on a
+ * benchmark that did not measure one. To a sceptical reader "1.00" reads as
+ * either fabricated or as "the AI is flawless at this" — and neither is what
+ * the data says. A benchmark must not be able to print a result it did not get.
+ *
+ * So: round as normal, then refuse the ceiling. A value below 1 floors to 0.99
+ * rather than rounding to 1.00; only an exact 1 prints as 1.00.
+ *
+ * ⚠ NOT MIRRORED AT THE BOTTOM, ON PURPOSE. Rendering 0.001 as "0.00" rounds
+ * *against* the model, which is the conservative direction — the direction this
+ * whole file already leans. It is the flattering rounding that has to be
+ * refused, not every rounding.
+ *
+ * ⚠ THE RULE LIVES HERE, NOT AT A CALL SITE. It was a one-line bug in
+ * `lib/specimen.ts` that shipped it, and a second `toFixed(2)` somewhere else
+ * would ship it again. Every score in the product renders through this.
+ */
+export function formatScoreValue(value: number): string {
+  const rounded = value.toFixed(2);
+  if (value < 1 && Number(rounded) >= 1) {
+    return (Math.floor(value * 100) / 100).toFixed(2);
+  }
+  return rounded;
 }
 
 export function formatPercent(value: number | null): string {

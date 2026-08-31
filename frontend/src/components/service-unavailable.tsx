@@ -45,20 +45,29 @@ export function ResultsUnavailable({
   what,
   retryHref,
   cause,
+  singular = false,
 }: {
   /** What could not be loaded, as a noun phrase: "the benchmark results". */
   what: string;
   /** This page's own path — the retry link, so a reload is one click. */
   retryHref: string;
   cause?: unknown;
+  /** True when `what` names one thing ("the comparison grid"), for the verb. */
+  singular?: boolean;
 }) {
   const detail = causeMessage(cause);
 
   return (
     <div className="unavailable">
+      {/* ⚠ THE VERB IS A PROP BECAUSE IT WAS WRONG HALF THE TIME. The heading
+          was built as {what} + " are temporarily unavailable", which works for
+          "the benchmark results" and produced "The comparison grid are
+          temporarily unavailable" for the other caller. A grammar error is a
+          small thing anywhere except here: this is the page whose whole job is
+          to look like the site is in careful hands while something is broken. */}
       <h2 className="unavailable-heading">
         {what[0]?.toUpperCase()}
-        {what.slice(1)} are temporarily unavailable
+        {what.slice(1)} {singular ? "is" : "are"} temporarily unavailable
       </h2>
 
       <p className="unavailable-lede">
@@ -66,10 +75,16 @@ export function ResultsUnavailable({
         you did caused it, and it is usually short-lived.
       </p>
 
+      {/* ⚠ A PLAIN <a>, NOT `next/link`, AND THAT IS THE WHOLE POINT OF THE
+          BUTTON. This link points at the route the reader is already on, so the
+          App Router was free to satisfy it from the client cache — serving back
+          the same failed render without ever re-hitting the server. A button
+          labelled "Try again" that does not try again is worse than no button.
+          A full navigation always reaches the server. */}
       <p className="unavailable-next">
-        <Link href={retryHref} className="cta">
+        <a href={retryHref} className="cta">
           Try again
-        </Link>
+        </a>
       </p>
 
       {/* ⚠ ONLY `/` IS OFFERED, AND THAT IS DELIBERATE. Every other page on this

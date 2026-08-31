@@ -407,3 +407,30 @@ export const WEIGHTING_NOTE =
   "counts for as many samples as it actually scored, so a six-sample task cannot " +
   "outweigh a sixty-sample one. Tasks with no measurement are excluded, never " +
   "counted as zero.";
+
+/**
+ * The podium's own label, which must describe the list it actually sits above.
+ *
+ * ⚠ IT USED TO BE THE LITERAL "Every model we have measured, by overall score",
+ * and both halves were false. The podium is `filter(isRanked).slice(0, 5)`, so
+ * it shows neither *every* model (unranked models were measured too — that is
+ * how we know they are unranked) nor necessarily every *ranked* one. Live it
+ * read "every model" above two rows drawn from six measured models, and it got
+ * worse with each model added.
+ *
+ * Two separate counts, because they answer two separate questions: how many
+ * models have a number at all, and how many of those this list is showing.
+ */
+export function podiumLabel(shown: number, ranked: number, measured: number): string {
+  if (shown === 0) return "No model has a rankable score yet";
+  if (shown === measured) return "Every model we have measured, by overall score";
+  if (shown < ranked) {
+    return `The top ${shown} of ${ranked} ranked models, by overall score`;
+  }
+  // Every ranked model is shown, but some measured models are not ranked at all.
+  const unranked = measured - shown;
+  return (
+    `The ${shown === 1 ? "one model" : `${shown} models`} we can rank, by overall score` +
+    ` — ${unranked} more ${unranked === 1 ? "was" : "were"} measured but cannot be ranked`
+  );
+}

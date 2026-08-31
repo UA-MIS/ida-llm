@@ -347,6 +347,12 @@ button.secondary { background: transparent; color: var(--accent); border-color: 
 .badge-residency-not_a_real_model { color: var(--pending); border-color: currentColor; }
 
 .confidence { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; font-weight: 600; }
+
+/* The trust tell where it now sits beside a number rather than in its own
+   column: under the score in the task catalogue, and under the evidence score
+   on a recommendation card. Both are places a bare number used to stand. */
+.score-trust { margin-top: 0.25rem; display: flex; justify-content: flex-end; }
+.rec-evidence-trust { margin-top: 0.2rem; }
 .confidence-pips { display: inline-flex; gap: 2px; }
 .pip { width: 7px; height: 7px; border-radius: 50%; border: 1px solid; display: inline-block; }
 
@@ -465,6 +471,8 @@ button.secondary { background: transparent; color: var(--accent); border-color: 
                    body never does.
      .col-optional a column that is real but not load-bearing, dropped below
                    760px rather than squeezed into two characters
+     .col-trust    the confidence tell. NEVER dropped, at any width — see the
+                   breakpoint block below for why it is its own class
 
    ⚠ COLOUR DISCIPLINE IS UNCHANGED AND IT IS DELIBERATE. Score bars are drawn
    in the accent at a fixed hue — NOT a red-to-green ramp. A ramp turns a 0.55
@@ -638,6 +646,17 @@ h2 { font-size: 1.15rem; }
 @media (max-width: 760px) {
   main { padding: 1.5rem 1rem 3rem; }
   .col-optional { display: none; }
+  /* ⚠ `.col-trust` IS DELIBERATELY ABSENT FROM THE LIST ABOVE, AND MUST STAY
+     ABSENT. Confidence used to carry `.col-optional`, so below 760px a phone
+     showed "0.88" where a desktop showed "0.88 · Low confidence" — on a
+     leaderboard where most results are low confidence, and on a product whose
+     stated rule is that every number keeps its trust tell. The old comment
+     justified the cut on the grounds that "the confidence is restated on the
+     model's own page"; it was not, because the model's own page hid it under
+     this very rule. A score without its tell is not a smaller version of the
+     truth, it is a different claim. It is compacted here, never dropped. */
+  .col-trust .confidence { flex-wrap: wrap; gap: 0.2rem 0.3rem; font-size: 0.7rem; }
+  .col-trust .stacked-badges { gap: 0.25rem; }
   /* The model's name is already the link to its report card, so the duplicate
      call-to-action column is the first thing to go when width is scarce. */
   .col-go { display: none; }
@@ -907,6 +926,13 @@ body:has(.ld) { background: var(--ld-paper); }
   color: var(--ld-ink-faint); font-weight: 500; margin-bottom: 1.1rem;
 }
 .ld-slo {
+  /* ⚠ `margin: 0` IS LOAD-BEARING. This is a `<blockquote>`, and the browser's
+     default is `margin: 1em 40px`. `.ld p { margin: 0 }` resets paragraphs and
+     nothing reset this, so at 375px the 80px of user-agent indent left 247px
+     for a serif quotation set at up to 1.9rem — on the element the page itself
+     calls the credibility claim of the whole SLO framing. `.outcome-statement`,
+     the same quotation on the tool pages, already gets this right. */
+  margin: 1em 0;
   font-family: var(--font-display), Georgia, serif;
   font-variation-settings: "SOFT" 42, "WONK" 0, "opsz" 60;
   font-style: italic; font-weight: 300;
@@ -1162,7 +1188,29 @@ body:has(.ld) { background: var(--ld-paper); }
   font-size: 0.95rem; color: var(--fg); text-decoration: none;
 }
 a.cg-score:hover { text-decoration: underline; }
-.cg-sub { display: block; font-size: 0.68rem; color: var(--muted); margin-top: 0.1rem; font-variant-numeric: tabular-nums; }
+/* ⚠ `--fg`, NOT `--muted`, AND THAT IS A CONTRAST FIX RATHER THAN A STYLE
+   PREFERENCE. The 58% ramp ceiling was tuned against `--fg` for `.cg-score`,
+   and `--muted` on the same tint falls to 2.85:1 at step 5 and 3.85:1 at
+   step 4 — under the 4.5:1 that 10.9px normal text needs, and every measured
+   cell in the live grid sits at step 4 or 5. The part that vanished was the
+   n/m coverage count: the exact figure that stops a strong score being read as
+   a well-evidenced one. It is still de-emphasised, by size and weight rather
+   than by a colour the ramp eats. */
+.cg-sub {
+  display: block; font-size: 0.68rem; color: var(--fg); opacity: 0.85;
+  margin-top: 0.1rem; font-variant-numeric: tabular-nums;
+}
+
+/* The confidence tell inside a grid cell: pips only, label hidden. The words
+   are already in the cell's `title` and its sr-only sentence, and a wrapped
+   "Low confidence" in every cell would turn the grid into prose. */
+.cg-confidence { display: block; margin-top: 0.2rem; }
+.cg-confidence .confidence { font-size: 0; gap: 0; }
+.cg-confidence .confidence-pips { gap: 2px; }
+.cg-confidence .pip { width: 5px; height: 5px; }
+
+/* A column the footer refuses to call, and the reason it refused. */
+.cg-foot-note { display: block; font-size: 0.68rem; font-style: italic; }
 
 /* The two empty states, drawn differently because they are different claims. */
 .cg-unmeasured { background: var(--surface); color: var(--faint); }
@@ -1559,11 +1607,20 @@ a.cg-score:hover { text-decoration: underline; }
 @media (max-width: 760px) {
   .plain-summary { padding: 1.1rem 1rem 1.2rem; }
   .plain-summary-lede { font-size: 1.05rem; }
-  /* The rank column and the confidence pips are the two things a phone can
-     afford to lose: the order is already the row order, and the confidence is
-     restated on the model's own page. The bar and the name are the picture. */
-  .podium-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 0 0.75rem; }
-  .podium-rank, .podium-confidence { display: none; }
+  /* The rank column is what a phone can afford to lose — the order is already
+     the row order. THE CONFIDENCE IS NOT. This block used to drop the pips as
+     well, on the reasoning that they are "restated on the model's own page",
+     which was not true: that page hid them under `.col-optional` at the same
+     breakpoint. The podium is the visual layer most readers actually look at,
+     and a bar chart with the confidence stripped out of it is the single
+     easiest way to read a thin result as a settled one. It wraps to its own
+     line under the bar instead. */
+  .podium-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    gap: 0.15rem 0.75rem;
+  }
+  .podium-rank { display: none; }
+  .podium-confidence { grid-column: 1 / -1; justify-self: start; }
   .glossary-list { grid-template-columns: minmax(0, 1fr); }
   .term-card { max-width: min(22rem, 86vw); }
 }

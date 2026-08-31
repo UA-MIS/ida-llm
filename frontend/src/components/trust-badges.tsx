@@ -12,6 +12,8 @@
  * results page should not need a bundle to explain itself.
  */
 
+import { plainTaskKind } from "@/lib/glossary";
+import { plainCaveats, plainLanguage } from "@/lib/plain";
 import { confidenceColorVar, confidencePips, residencyGlyph, trustGlyph } from "@/lib/trust";
 import type { Confidence, DataResidency, TrustTell } from "@/lib/types";
 
@@ -22,11 +24,20 @@ import type { Confidence, DataResidency, TrustTell } from "@/lib/types";
  * "subjective" would read as good-vs-bad, and a subjective task is not a worse
  * task — it is a differently-evidenced one. The distinction is carried by the
  * glyph and the words, and colour is left to say something else (confidence).
+ *
+ * ⚠ THE WORDS COME FROM `plainTaskKind`, NOT FROM `trust.tier_label`. The API's
+ * label is "Subjective (AI-scored)", and `lib/glossary.ts` exists in part to
+ * keep that exact word off the page: "subjective" reads as "this result is a
+ * matter of opinion" when what it means is "this work has no single right
+ * answer, so a second AI marked it". The word was carefully removed from the
+ * product and then let straight back in here, by the one component that renders
+ * on almost every row. The glossary owns both strings; this renders the one it
+ * chose.
  */
 export function TrustBadge({ trust }: { trust: TrustTell }) {
   return (
     <span className="badge badge-trust" title={trust.headline}>
-      <span aria-hidden="true">{trustGlyph(trust.kind)}</span> {trust.tier_label}
+      <span aria-hidden="true">{trustGlyph(trust.kind)}</span> {plainTaskKind(trust.kind)}
     </span>
   );
 }
@@ -43,7 +54,7 @@ export function ConfidenceMeter({ trust }: { trust: TrustTell }) {
     <ConfidenceTell
       confidence={trust.confidence}
       label={trust.confidence_label}
-      reason={trust.confidence_reason}
+      reason={plainLanguage(trust.confidence_reason)}
     />
   );
 }
@@ -115,12 +126,21 @@ export function ResidencyBadge({
   );
 }
 
-/** Every caveat attached to a number, listed rather than summarised away. */
+/**
+ * Every caveat attached to a number, listed rather than summarised away.
+ *
+ * ⚠ EVERY STRING GOES THROUGH `plainCaveats` FIRST. These arrive from the API,
+ * which writes them for two readers at once, and the operator half was reaching
+ * the page: an environment variable name and a filename rendered verbatim on
+ * hundreds of professor-facing result cards. See `lib/plain.ts` — the
+ * translation belongs at the render boundary so no caller can forget it.
+ */
 export function Caveats({ caveats }: { caveats: string[] }) {
-  if (caveats.length === 0) return null;
+  const plain = plainCaveats(caveats);
+  if (plain.length === 0) return null;
   return (
     <ul className="caveats">
-      {caveats.map((caveat) => (
+      {plain.map((caveat) => (
         <li key={caveat}>{caveat}</li>
       ))}
     </ul>

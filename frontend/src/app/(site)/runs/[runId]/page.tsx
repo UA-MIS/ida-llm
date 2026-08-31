@@ -100,11 +100,19 @@ function RunSummary({ run }: { run: RunRecord }) {
         </div>
         <div>
           <dt>Task</dt>
-          <dd className="mono">{run.task_id}</dd>
+          <dd className="mono">
+            <Link href={`/leaderboard?task=${encodeURIComponent(run.task_id)}`}>
+              {run.task_id}
+            </Link>
+          </dd>
         </div>
         <div>
           <dt>Model</dt>
-          <dd className="mono">{run.model_key}</dd>
+          <dd className="mono">
+            <Link href={`/models/${encodeURIComponent(run.model_key)}`}>
+              {run.model_key}
+            </Link>
+          </dd>
         </div>
         <div>
           <dt>Mean score</dt>
@@ -383,7 +391,14 @@ export default async function RunDetailPage({
       <Link href="/runs" className="back">
         ← All runs
       </Link>
-      <p className="subtitle mono">{run.id}</p>
+      {/* A bare UUID told the reader nothing about what they had opened. The
+          id stays — it is the thing to quote when reporting a problem — but it
+          is now labelled, and the task and model are links rather than dead
+          monospace text one page short of the evidence behind them. */}
+      <p className="subtitle">
+        The full record behind one measurement.{" "}
+        <span className="mono muted">{run.id}</span>
+      </p>
 
       <RunSummary run={run} />
 
@@ -395,30 +410,39 @@ export default async function RunDetailPage({
 
       {outcome === "all-errored" ? (
         <div className="notice notice-error">
-          <strong>No samples completed.</strong> Every call to the model failed,
-          so this run measured nothing. The scores below are absent because
-          there was nothing to score — not because this task cannot be graded.
-          Check that the model endpoint is reachable and re-run.
+          <strong>Nothing was measured.</strong> Every attempt to reach the
+          model failed, so this run produced no answers to mark. The scores
+          below are missing because there was nothing to mark — not because the
+          model did badly, and not because this work cannot be graded.
         </div>
       ) : null}
 
       {outcome === "partial" ? (
         <div className="notice">
-          <strong>Partial run.</strong> {run.error_count} of {run.sample_count}{" "}
-          sample(s) failed. Any mean score above is computed over the{" "}
-          {run.scored_count} sample(s) that completed — errored samples are
-          excluded rather than counted as zero, so this number covers only part
-          of the task.
+          <strong>Only part of this finished.</strong> {run.error_count} of{" "}
+          {run.sample_count} attempt{run.sample_count === 1 ? "" : "s"} failed
+          before producing an answer. Any score above covers only the{" "}
+          {run.scored_count} attempt{run.scored_count === 1 ? "" : "s"} that
+          completed — the failed ones are left out rather than counted as zero,
+          so the number describes part of the work, not all of it.
         </div>
       ) : null}
 
+      {/* ⚠ THIS PAGE IS THE PROOF, AND PROOF A READER CANNOT PARSE IS NOT
+          PROOF. Every "See the proof" link on the site lands here, so it is the
+          page a sceptical professor reaches at exactly the moment they have
+          decided to check us. This notice used to carry three pieces of
+          internal vocabulary in one sentence ("LLM-as-judge", "defined as an
+          interface", "the walking skeleton"). The facts below are the same
+          ones; only the vocabulary changed. */}
       {outcome === "not-yet-scorable" ? (
         <div className="notice">
-          <strong>Not yet scorable.</strong> This is a subjective task: grading
-          it needs LLM-as-judge scoring, which is defined as an interface but not
-          implemented in the walking skeleton. The model was still called and
-          every transcript below was captured, so these samples can be graded
-          retroactively once the judge lands.
+          <strong>Not marked yet.</strong> This piece of work has no single
+          right answer, so a second AI has to mark it against a written guide —
+          and no marker is switched on in this deployment. The model was still
+          asked, and everything it wrote was kept, so this can be marked later
+          without re-running anything. That is why there is no score above, and
+          it is not a score of zero.
         </div>
       ) : null}
 

@@ -21,6 +21,7 @@ import { AA_NORMAL, contrastRatio, parseHex } from "@/lib/contrast";
 import {
   bestInColumn,
   buildMatrix,
+  columnVerdict,
   rampStep,
   RAMP_STEPS,
 } from "@/lib/matrix";
@@ -265,6 +266,72 @@ describe("the column winner", () => {
     );
     const slo2 = matrix.columns.findIndex((c) => c.id === "SLO2");
     expect(bestInColumn(matrix, slo2)?.row.model.model_key).toBe("luna");
+  });
+});
+
+/**
+ * What the column footer is allowed to CLAIM, which is a different question
+ * from which cell is highest.
+ *
+ * The footer used to crown a winner in every column from `bestInColumn` alone —
+ * no minimum gap, no minimum field, none of the guards `lib/findings.ts`
+ * applies to the identical claim two pages earlier. Live it named one model in
+ * all seven columns while another model sat visibly above it in several.
+ */
+describe("the column verdict", () => {
+  const twoModels = (a: number, b: number) =>
+    buildMatrix(
+      board([
+        task({ slo: "SLO2", has_results: true, results: [
+          result({ model_key: "luna", display_name: "Luna", mean_score: a }),
+          result({ model_key: "orion", display_name: "Orion", mean_score: b }),
+        ] }),
+      ]),
+    );
+  const slo2Of = (m: ReturnType<typeof buildMatrix>) =>
+    m.columns.findIndex((c) => c.id === "SLO2");
+
+  it("names a winner when the lead is wide enough to survive the samples", () => {
+    const matrix = twoModels(0.9, 0.4);
+    const verdict = columnVerdict(matrix, slo2Of(matrix));
+    expect(verdict.kind).toBe("best");
+    expect(verdict.kind === "best" && verdict.row.model.model_key).toBe("luna");
+  });
+
+  it("REFUSES to name a winner on a gap narrower than the meaningful one", () => {
+    // 0.88 vs 0.876 — the live leaderboard's actual top two.
+    const matrix = twoModels(0.88, 0.876);
+    expect(columnVerdict(matrix, slo2Of(matrix)).kind).toBe("tooClose");
+  });
+
+  it("does not crown a model that had no competition", () => {
+    const matrix = buildMatrix(
+      board([
+        task({ slo: "SLO2", has_results: true, results: [result({ mean_score: 0.9 })] }),
+      ]),
+    );
+    const verdict = columnVerdict(matrix, slo2Of(matrix));
+    expect(verdict.kind).toBe("only");
+  });
+
+  it("says nothing at all about a column nobody measured", () => {
+    const matrix = buildMatrix(board([task({ slo: "SLO2", has_results: false })]));
+    const slo5 = matrix.columns.findIndex((c) => c.id === "SLO5");
+    expect(columnVerdict(matrix, slo5).kind).toBe("none");
+  });
+
+  it("still never lets a stub take a column", () => {
+    const matrix = buildMatrix(
+      board([
+        task({ slo: "SLO2", has_results: true, results: [
+          result({ model_key: "mock", display_name: "Mock", mean_score: 1, recommendable: false }),
+          result({ mean_score: 0.4 }),
+        ] }),
+      ]),
+    );
+    const verdict = columnVerdict(matrix, slo2Of(matrix));
+    expect(verdict.kind).toBe("only");
+    expect(verdict.kind === "only" && verdict.row.model.model_key).toBe("luna");
   });
 });
 

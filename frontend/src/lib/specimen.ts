@@ -32,6 +32,9 @@
  *      See the deferral note in the landing page.
  */
 
+import { formatScoreValue } from "./format";
+import { plainTaskKind } from "./glossary";
+
 import type {
   CurriculumView,
   LeaderboardResponse,
@@ -238,7 +241,7 @@ export function readingFor(
     detail:
       `Across ${measured.length} measured task${measured.length === 1 ? "" : "s"} ` +
       `for this outcome, the strongest result so far is ` +
-      `${result.display_name} at ${result.mean_score!.toFixed(2)} on ` +
+      `${result.display_name} at ${formatScoreValue(result.mean_score!)} on ` +
       `${result.scored_count} of ${result.sample_count} scored sample` +
       `${result.sample_count === 1 ? "" : "s"}.`,
     best: {
@@ -247,7 +250,7 @@ export function readingFor(
       meanScore: result.mean_score!,
       scoredCount: result.scored_count,
       sampleCount: result.sample_count,
-      trustLabel: result.trust.tier_label,
+      trustLabel: plainTaskKind(result.trust.kind),
       confidenceLabel: result.trust.confidence_label,
       runId: result.run_id,
       taskId: task.task_id,

@@ -13,6 +13,7 @@ import {
   filterTasks,
   findRollup,
   isRanked,
+  podiumLabel,
   rollupByModel,
   rollupByOutcome,
   weakestConfidence,
@@ -459,5 +460,39 @@ describe("filterTasks", () => {
 
   it("returns nothing rather than everything when nothing matches", () => {
     expect(filterTasks(tasks, { query: "zzzz" })).toEqual([]);
+  });
+});
+
+/**
+ * The podium's label, which has to describe the list it sits above.
+ *
+ * It was the literal "Every model we have measured, by overall score", printed
+ * over `filter(isRanked).slice(0, 5)`. Live that was two rows drawn from six
+ * measured models, so both halves of the sentence were false — and it got worse
+ * with every model added.
+ */
+describe("podiumLabel", () => {
+  it("claims 'every model' ONLY when the list really is every measured model", () => {
+    expect(podiumLabel(3, 3, 3)).toBe("Every model we have measured, by overall score");
+  });
+
+  it("does not claim 'every model' when measured models are missing from it", () => {
+    // The live shape: six measured, two rankable, two shown.
+    const label = podiumLabel(2, 2, 6);
+    expect(label).not.toMatch(/every model/i);
+    expect(label).toContain("4 more were measured");
+  });
+
+  it("says so when the list is truncated", () => {
+    const label = podiumLabel(5, 9, 9);
+    expect(label).toContain("top 5 of 9");
+  });
+
+  it("does not pluralise a single model into a ranking", () => {
+    expect(podiumLabel(1, 1, 3)).toContain("one model");
+  });
+
+  it("says nothing rankable rather than labelling an empty list", () => {
+    expect(podiumLabel(0, 0, 0)).toMatch(/no model has a rankable score/i);
   });
 });

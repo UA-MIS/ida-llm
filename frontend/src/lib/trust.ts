@@ -12,6 +12,9 @@
  * badge components below take a `TrustTell` rather than a score.
  */
 
+import { formatScoreValue } from "./format";
+import { plainTaskKind } from "./glossary";
+
 import type {
   Confidence,
   CurriculumView,
@@ -87,9 +90,9 @@ export function summariseResult(result: ModelResult): string {
     return `${result.display_name}: ${result.trust.confidence_reason}`;
   }
   return (
-    `${result.display_name}: ${result.mean_score.toFixed(2)} on ` +
+    `${result.display_name}: ${formatScoreValue(result.mean_score)} on ` +
     `${result.scored_count} of ${result.sample_count} samples — ` +
-    `${result.trust.tier_label}, ${result.trust.confidence_label.toLowerCase()}`
+    `${plainTaskKind(result.trust.kind)}, ${result.trust.confidence_label.toLowerCase()}`
   );
 }
 
