@@ -275,6 +275,25 @@ class ServingConfig(BaseModel):
     """Escape hatch for stack-specific knobs.  Recorded, never interpreted."""
 
 
+SYNTHETIC_MARKER = "synthetic"
+"""Key set to ``True`` in :attr:`ServingConfig.extra` on a row nobody measured.
+
+⚠ THE ONE PLACE THIS STRING IS SPELLED. ``tools/seed_dev_benchmark.py`` writes
+it so that a seeded row can be told from a measured one without guessing, and
+the results API reads it so the UI can say "illustrative" on exactly the rows
+where that is true. Spelling it twice is how the writer and the reader end up
+disagreeing -- and the failure is silent and points the wrong way: a synthetic
+row that stops being flagged is presented to a reader as a real measurement.
+"""
+
+SYNTHETIC_HARNESS_VERSION = "0.0.0-synthetic"
+"""``RunRecord.harness_version`` on a seeded row.
+
+The second, redundant marker. Both are written and EITHER is believed, so a
+future seeder that drops one does not silently un-flag its own rows.
+"""
+
+
 class CostRates(BaseModel):
     """USD per *million* tokens.  Zero for self-hosted models."""
 

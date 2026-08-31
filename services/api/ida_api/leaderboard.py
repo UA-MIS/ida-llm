@@ -37,9 +37,19 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
+from ida_api.pricing import CostNote, cost_note
 from ida_api.slo import CurriculumView, in_benchmark, slo_of, use_mode_of
 from ida_api.trust import TrustTell, assess
-from ida_core.contracts import ModelEntry, RunRecord, RunStatus, TaskKind, TaskSpec
+from ida_core.contracts import (
+    SYNTHETIC_HARNESS_VERSION,
+    SYNTHETIC_MARKER,
+    ModelEntry,
+    RunRecord,
+    RunStatus,
+    TaskKind,
+    TaskSpec,
+    TokenUsage,
+)
 from ida_core.repositories import latest_terminal_run_per_pair, run_row_to_record
 from ida_harness.runner import unscorable_reason
 
@@ -81,6 +91,27 @@ RESIDENCY_LABEL: dict[DataResidency, str] = {
     "not_a_real_model": "Test stub — not a usable model",
     "unknown": "Hosting not stated in the registry",
 }
+
+
+def is_demonstration(run: RunRecord) -> bool:
+    """Whether this row is seeded illustration rather than a measurement.
+
+    ⚠ A PROPERTY OF THE ROW, NOT OF THE DEPLOYMENT. The obvious alternative --
+    a page-level "this environment holds demo data" banner -- cannot be true of
+    a database holding both kinds of row, which is exactly what a dev database
+    holds the first time somebody runs a real model against a seeded catalogue.
+    Per-row is also self-clearing: the flag stops appearing when the row it
+    describes is replaced by a real one, so nobody has to remember to take a
+    disclaimer down.
+
+    Either marker is believed. ``tools/seed_dev_benchmark.py`` writes both, and
+    requiring both would mean a seeder that dropped one silently started
+    presenting its fixtures as measurements.
+    """
+    if run.harness_version == SYNTHETIC_HARNESS_VERSION:
+        return True
+    extra = run.serving_config.extra if run.serving_config else {}
+    return bool(extra.get(SYNTHETIC_MARKER))
 
 
 def task_axes(spec: TaskSpec) -> tuple[str | None, str | None, bool]:
@@ -129,6 +160,44 @@ class ModelResult(BaseModel):
     sample_count: int
     error_count: int
     total_cost_usd: float
+    """What WE spent measuring this pair -- not what the reader would pay.
+
+    ⚠ NOT A PRICE, AND THE DIFFERENCE HAS BURNED A PAGE BEFORE. This is our
+    measurement spend on this one task: it scales with how many samples we
+    chose to run, it is ``0`` on a cache hit, and it is ``0`` for every row the
+    dev seeder writes. A UI that divides it by :attr:`scored_count` and calls
+    the result "cost per answer" is describing our benchmark, not the model --
+    and on a seeded environment it would report every model as free. Use
+    :attr:`price` for anything a reader is meant to budget against.
+    """
+
+    price: CostNote | None
+    """The registry's published rate card, or ``None`` for an unregistered key.
+
+    THE number for a value comparison: it is what the provider charges, it does
+    not move when our sample counts move, and it exists for a model nobody has
+    run yet. ``None`` is not "free" -- it means the model is not in
+    ``models.yaml`` at all, so we have nothing to quote.
+    """
+
+    usage: TokenUsage
+    """Tokens behind :attr:`total_cost_usd`, so a rate card can become a figure.
+
+    :attr:`price` is per MILLION tokens, which no professor thinks in. Carrying
+    the token counts lets a consumer turn the rate card into "what one answer of
+    the length we actually observed costs" without inventing an answer length.
+    All-zero means no token accounting was recorded, which is not the same as a
+    free run -- and a consumer that cannot tell them apart should say so rather
+    than divide.
+    """
+
+    demonstration: bool
+    """True when this row was seeded for illustration and never measured.
+
+    Carried per row so a UI can label exactly the numbers that are illustrative,
+    on a board that may hold both kinds at once.
+    """
+
     trust: TrustTell
 
     run_id: str
@@ -275,6 +344,12 @@ def build_task_leaderboard(
                 sample_count=run.sample_count,
                 error_count=run.error_count,
                 total_cost_usd=run.total_cost_usd,
+                # Read off the registry entry we already resolved for the
+                # residency badge, so the price and the badge can never come
+                # from two different readings of the same entry.
+                price=cost_note(entry, residency) if entry else None,
+                usage=run.total_usage,
+                demonstration=is_demonstration(run),
                 trust=assess(
                     kind=spec.kind,
                     scorer=spec.scorer.kind.value,

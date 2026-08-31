@@ -70,12 +70,24 @@ import sys
 import psycopg
 import yaml
 
-from ida_core.contracts import RunStatus, ScorerKind, ServingConfig
+from ida_core.contracts import (
+    SYNTHETIC_HARNESS_VERSION,
+    SYNTHETIC_MARKER,
+    RunStatus,
+    ScorerKind,
+    ServingConfig,
+)
 from ida_core.ids import new_result_id, new_run_id
 from ida_harness.tasks import TaskCatalog
 
 SEED_LABEL = "synthetic-dev-seed"
-SEED_HARNESS_VERSION = "0.0.0-synthetic"
+
+# ⚠ IMPORTED, NOT RETYPED. The results API reads these same two markers to
+# decide whether to label a row "illustrative" for a reader (see
+# `ida_api.leaderboard.is_demonstration`). A local copy that drifted would
+# fail silently and in the dangerous direction: seeded rows would start being
+# presented to professors as real measurements.
+SEED_HARNESS_VERSION = SYNTHETIC_HARNESS_VERSION
 
 # Per-model character. `base` is the model's overall level; `bias` tilts it per
 # SLO so that no model wins every outcome -- a leaderboard where one row is best
@@ -140,7 +152,11 @@ def load_serving_configs(repo: pathlib.Path) -> dict[str, dict]:
         serving = dict(entries[key].get("serving") or {})
         serving["registry_key"] = key
         # The synthetic marker belongs in `extra`, the schema's own escape hatch.
-        serving["extra"] = {**(serving.get("extra") or {}), "synthetic": True, "seed": SEED_LABEL}
+        serving["extra"] = {
+            **(serving.get("extra") or {}),
+            SYNTHETIC_MARKER: True,
+            "seed": SEED_LABEL,
+        }
         out[key] = ServingConfig.model_validate(serving).model_dump(mode="json")
     return out
 
