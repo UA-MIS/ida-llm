@@ -28,11 +28,105 @@ toggles, not a second product**: one platform, one results store, one evidence
 trail, and a fork early in the intake that decides which tasks the
 recommendation is computed over.
 
-Two things follow, and this document supplies both:
+Three things follow, and this document supplies all three:
 
 1. **Task families that measure scholarship work** — authored, in `tasks/`.
 2. **A researcher branch of the recommendation** — its inputs, its output shape,
    and its data-sensitivity rule — specified here for whoever builds the engine.
+3. **The positioning** — how a researcher meets this product *before* either of
+   the above, at the front door, in a form that leads with their value rather
+   than a teacher's.
+
+---
+
+## 0. Positioning: leading with research value at the front door
+
+**Status: direction, not shipped copy — and provisional pending researcher
+interviews (#23/#43) except where it cites what already exists.** This section
+is the missing half board item #43 named: the task set above existed; how the
+product presents itself to a researcher did not.
+
+### The gap, as it stands
+
+Checked against the live front door (`frontend/src/app/page.tsx`, shipped in
+v0.1.9, the "Outcomes, Measured" landing): it is, in substance, a single
+persona's pitch. The hero ("A benchmark for teaching" / "Your syllabus already
+says what students should be able to do. We test whether AI can."), the quoted
+per-outcome specimen, the "Why this exists" section and the "How it works"
+steps are all written to a teacher deciding whether to trust AI in their
+classroom. A researcher has to read past four full sections before reaching the
+*only* two sentences on the page that speak to them — two short paragraphs
+("Teaching or research — both count...") near the bottom of the "How to trust
+this" block. That is the "researchers currently get one paragraph" gap already
+on record. This section gives the direction for closing it; building the
+frontend toggle is separate work, owned wherever #10/the landing work lands
+next.
+
+### The fork: two axes, one order
+
+Positioning has to answer two questions, in a fixed order, and the order is
+part of the point:
+
+1. **Which hat are you wearing?** *teacher* / *researcher* / *both* — the
+   primary fork. It belongs at the **top of the funnel** (the hero), not three
+   questions into `/recommend` where a researcher who bounced off the teaching
+   hero will never see it.
+2. **Who is it for?** — asked only down the *teacher* branch: *my own use* /
+   *my students*. A researcher is never asked this; "for my students" has no
+   researcher analogue. (Whether "for my collaborators" is the real analogue is
+   an open question — see §6.)
+
+This is the same fork §3.1 below already specifies for the recommendation
+intake's question flow. The point of this section is that it needs to exist
+**one level higher than the intake** — at the landing page itself — because a
+researcher who never clicks through to `/recommend` has already been lost.
+Positioning is not a new decision tree; it is the existing one, surfaced before
+the visitor has committed to reading anything.
+
+### Leading with research value, concretely
+
+If a visitor identifies as a researcher, the sections they see should swap
+content, not just append a sentence to the existing ones:
+
+| section | teacher version (shipped) | researcher version (direction) |
+|---|---|---|
+| hero | learning outcomes, syllabi, whether AI can do what a student should | lead with scholarship and the privacy question together — e.g. *"which model can you actually hand your literature review, your analysis code, your draft — and which one keeps it to itself?"* |
+| the specimen | one MIS 200 SLO, quoted, with capability / assist / learning-aid readings | the researcher analogue: one scholarship task family from §1 below, quoted — `research-synthesis` or `scholarly-writing` are the natural picks, since both are subjective and both are built around a fabrication/claim-inflation check, which *is* the research-integrity story (§1, "The two failure modes") |
+| "why this exists" | skeptical faculty have nothing to base a classroom policy on | researchers have no way to check whether a model will fabricate a citation, inflate a null result, or retain their unpublished draft — same shape of argument, different stakes |
+| "how it works" | outcomes → tasks → recommendation | scholarship tasks → the same measured pipeline → a recommendation that names a **surface**, not just a model — §4 below is why the surface matters more on this branch |
+| the two doors | see the results / get a recommendation for my class | same two doors, reworded — see how models handle scholarship tasks / get a recommendation for my research |
+
+None of this is final copy — it is the *shape* the swap should take, so
+whoever builds the toggle has a concrete target instead of "also mention
+researchers somewhere." Exact wording, and whether the swap is a hero-level
+banner or a fully persona-conditional page, should be informed by the
+researcher variant of the interviews (#23/#43). **Treat the table as a strong
+starting hypothesis, not settled copy — provisional pending interviews.**
+
+### The privacy pitch, positioned
+
+For a researcher, the sharpest hook is not "we measured this" — that is the
+teacher pitch. It is the question a hosted AI product cannot answer honestly:
+***which model can I use on work that is not published yet, without it
+leaking?*** That question does three things a capability pitch alone cannot:
+
+- it is instantly relevant to *every* researcher, regardless of field, because
+  everyone has something unpublished;
+- it does not compete with the teaching pitch for the same page real estate —
+  FERPA and research-IP are different risks (§4 spells out how), so leading
+  with it on the researcher branch costs the teacher branch nothing;
+- it lets this project say something a hosted-only competitor structurally
+  cannot: a recommendation that *refuses* to name a cloud model for sensitive
+  work, rather than quietly defaulting to one.
+
+The mechanics — the intake question, the surface-selection rule, and the
+honest gap where no local model exists yet — are specified in full in §4 and
+researched in [`docs/local-model-serving.md`](local-model-serving.md). What
+positioning adds is sequencing: **lead with the question, not the caveat.**
+"Which model can you trust with unpublished work?" belongs in the researcher
+hero; "we don't have a local answer yet, here's what we'd recommend once we
+do" belongs one click deeper — not as the first thing a researcher reads, where
+it would read as an apology before the pitch has been made.
 
 ---
 
