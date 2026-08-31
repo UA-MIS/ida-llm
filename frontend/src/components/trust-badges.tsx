@@ -143,7 +143,8 @@ export function TrustLegend() {
           <span aria-hidden="true">✓</span> Verifiable
         </strong>
         <p className="muted">
-          A program compared the answer to a known correct one. No AI judged it.
+          The work had one right answer, and a program compared what the model
+          said to it. No AI judged it — this is the strongest evidence here.
         </p>
       </div>
       <div>
@@ -151,15 +152,17 @@ export function TrustLegend() {
           <span aria-hidden="true">⚖</span> Subjective
         </strong>
         <p className="muted">
-          No single right answer, so another language model graded it against a
-          written rubric. An informed second opinion, not a measurement.
+          No single right answer, so a second AI marked it against a written
+          marking guide. An informed second opinion, not a measurement — and
+          never labelled high confidence.
         </p>
       </div>
       <div>
         <strong>Confidence</strong>
         <p className="muted">
           About the <em>measurement</em>, never about the model: how it was
-          scored, on how many samples, and whether anything failed.
+          marked, over how many attempts, and whether anything failed. A high
+          score with low confidence is not yet a verdict.
         </p>
       </div>
       <div>
@@ -168,6 +171,7 @@ export function TrustLegend() {
         </strong>
         <p className="muted">
           Runs on university hardware, so student work never leaves campus.
+          Anything else sends what you type to an outside company.
         </p>
       </div>
     </div>

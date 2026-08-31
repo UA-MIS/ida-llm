@@ -1,6 +1,9 @@
 import Link from "next/link";
 
+import { GlossaryPanel, Term } from "@/components/glossary";
+import { HowToRead, ReadStep } from "@/components/how-to-read";
 import { listRuns } from "@/lib/api";
+import { RUNS_TERMS } from "@/lib/glossary";
 import {
   formatCost,
   formatDuration,
@@ -94,10 +97,38 @@ export default async function RunsPage() {
   return (
     <>
       <p className="subtitle">
-        {runs.length} most recent benchmark run{runs.length === 1 ? "" : "s"}. This is the
-        raw log — for results by task, start at{" "}
-        <Link href="/leaderboard">the leaderboard</Link>.
+        {runs.length} most recent benchmark <Term id="run">run</Term>
+        {runs.length === 1 ? "" : "s"}. This is the raw log — for results by
+        task, start at <Link href="/leaderboard">the leaderboard</Link>.
       </p>
+
+      {/* ⚠ THE ONE PAGE WHERE THE HONEST ORIENTATION IS "YOU PROBABLY WANTED
+          THE OTHER PAGE". This is the engineering log, and it is reachable in
+          one click from the front door. Telling a professor who landed here by
+          accident that they have not broken anything, and where to go instead,
+          costs four lines and saves the visit. */}
+      <HowToRead title="This is the raw log. You may want the leaderboard instead.">
+        <ReadStep n={1} heading="One line per run">
+          A <Term id="run">run</Term> is one recorded sitting: one{" "}
+          <Term id="model">model</Term>, one <Term id="task">piece of work</Term>,
+          every attempt kept on file. This page lists them newest first, exactly
+          as they happened, including the ones that failed.
+        </ReadStep>
+        <ReadStep n={2} heading="It is deliberately technical">
+          The columns are here so a result can be audited — down to the version
+          of the task file that ran. Nothing is hidden from you, but nothing is
+          summarised for you either.
+        </ReadStep>
+        <ReadStep n={3} heading="For an answer rather than a log">
+          <Link href="/leaderboard">The leaderboard</Link> ranks the models in
+          plain language, and{" "}
+          <Link href="/recommend">the recommendation questions</Link> ask about
+          your situation and tell you what to use.
+        </ReadStep>
+      </HowToRead>
+
+      <GlossaryPanel terms={RUNS_TERMS} />
+
       <table>
         <thead>
           <tr>
@@ -105,7 +136,9 @@ export default async function RunsPage() {
             <th>Task</th>
             <th>Model</th>
             <th className="num">Mean score</th>
-            <th className="num">Tokens</th>
+            <th className="num" title="Roughly three quarters of a word each — the unit outside services bill by.">
+              Tokens
+            </th>
             <th className="num">Cost</th>
             <th className="num">Duration</th>
             <th>Task SHA</th>

@@ -21,6 +21,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { GlossaryPanel, Term } from "@/components/glossary";
+import { HowToRead, ReadStep } from "@/components/how-to-read";
 import { ScoreBar } from "@/components/score-bar";
 import {
   Caveats,
@@ -31,6 +33,7 @@ import {
 } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
 import { formatCost, formatTimestamp } from "@/lib/format";
+import { REPORT_CARD_TERMS } from "@/lib/glossary";
 import {
   confidenceLabel,
   findRollup,
@@ -111,34 +114,44 @@ function ReportHead({
 
       <dl className="grid report-stats">
         <div>
-          <dt>Outcomes covered</dt>
+          <dt>
+            <Term id="learning-outcome">Outcomes</Term> covered
+          </dt>
           <dd>
             {rollup.slos_measured.length}{" "}
             <span className="muted">of {outcomeCount} published</span>
           </dd>
         </div>
         <div>
-          <dt>Tasks measured</dt>
+          <dt>
+            <Term id="task">Tasks</Term> measured
+          </dt>
           <dd>
             {overall.measured_tasks}{" "}
             <span className="muted">of {overall.covered_tasks} attempted</span>
           </dd>
         </div>
         <div>
-          <dt>Samples scored</dt>
+          <dt>
+            <Term id="sample">Attempts</Term> scored
+          </dt>
           <dd>
             {overall.scored_samples}{" "}
             <span className="muted">of {overall.sample_count} run</span>
           </dd>
         </div>
         <div>
-          <dt>Errored samples</dt>
+          <dt>
+            <Term id="errored-sample">Failed attempts</Term>
+          </dt>
           <dd className={overall.error_count > 0 ? "" : "muted"}>
             {overall.error_count > 0 ? overall.error_count : "none"}
           </dd>
         </div>
         <div>
-          <dt>Checked vs judged</dt>
+          <dt>
+            Checked vs <Term id="judged">judged</Term>
+          </dt>
           <dd>
             {Math.round(overall.verifiable_share * 100)}%{" "}
             <span className="muted">of the weight programmatically checked</span>
@@ -325,6 +338,35 @@ export default async function ModelReportPage({
 
       <ReportHead rollup={rollup} outcomeCount={outcomeCount} />
 
+      {/* ⚠ THE ORIENTATION SITS BELOW THE HEADLINE FIGURE, NOT ABOVE IT. A
+          reader arriving here clicked a model's name; the number they came for
+          must not be pushed under a paragraph explaining what numbers are. */}
+      <HowToRead title={`How to read ${rollup.display_name}'s report card.`}>
+        <ReadStep n={1} heading="One model, everything we know about it">
+          The figure at the top is this model&rsquo;s{" "}
+          <Term id="overall-score">overall score</Term> across every piece of
+          work it has been measured on. The two tables below break that one
+          number apart — first by{" "}
+          <Term id="learning-outcome">learning outcome</Term>, then by
+          individual <Term id="task">task</Term>.
+        </ReadStep>
+        <ReadStep n={2} heading="The empty rows are the honest part">
+          Every outcome your programme publishes gets a row here, including the
+          ones this model has never been run against and the two that a written
+          test cannot measure at all. Those read{" "}
+          <Term id="not-measured">not measured yet</Term>. A report card showing
+          only the rows with data would be a highlight reel.
+        </ReadStep>
+        <ReadStep n={3} heading="Check the evidence column before you trust a row">
+          <Term id="verifiable">Checked by a program</Term> is stronger evidence
+          than <Term id="judged">marked by another AI</Term>, and the{" "}
+          <Term id="confidence">confidence</Term> beside each score says how much
+          weight it can bear.
+        </ReadStep>
+      </HowToRead>
+
+      <GlossaryPanel terms={REPORT_CARD_TERMS} />
+
       <section className="panel">
         <div className="panel-head">
           <h2>
@@ -332,7 +374,8 @@ export default async function ModelReportPage({
             {outcomeCount === 1 ? "" : "s"}
           </h2>
           <p className="muted panel-note">
-            Every outcome{board.curriculum.program ? ` ${board.curriculum.program} publishes` : " the programme publishes"} gets a row,
+            Every <Term id="learning-outcome">outcome</Term>
+            {board.curriculum.program ? ` ${board.curriculum.program} publishes` : " the programme publishes"} gets a row,
             including the ones this model has never been measured against. An
             outcome with no data says so — it is never shown as a zero.
             {!board.curriculum.available
@@ -364,10 +407,12 @@ export default async function ModelReportPage({
         <div className="panel-head">
           <h2>Task by task</h2>
           <p className="muted panel-note">
-            The {rollup.entries.length} task
+            The {rollup.entries.length} <Term id="task">task</Term>
             {rollup.entries.length === 1 ? "" : "s"} this model has been run
-            against, best first, each with the kind of evidence behind it and a
-            link to the run that produced it.
+            against, best first. &ldquo;Evidence&rdquo; says whether a program{" "}
+            <Term id="verifiable">checked</Term> the answer or another AI{" "}
+            <Term id="judged">marked</Term> it, and &ldquo;Receipt&rdquo; opens
+            the <Term id="run">full record</Term> behind the score.
           </p>
         </div>
         <TaskBreakdown rollup={rollup} curriculum={board.curriculum} />

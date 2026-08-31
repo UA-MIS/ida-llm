@@ -76,7 +76,21 @@ describe("the route map after the landing-page move", () => {
 
 describe("no link points at / expecting the leaderboard", () => {
   /** The landing is `/`; only a wordmark or a "home" link may target it. */
-  const HOME_LINK_OK = /className="ld-logo"|color: "inherit"/;
+  //
+  // ⚠ `>the introduction<` IS A NARROWING, NOT A LOOSENING. The rule this guard
+  // enforces is "no link points at `/` EXPECTING THE LEADERBOARD" — the failure
+  // being a professor who clicks for data and lands on the pitch. The error
+  // states added alongside the plain-language layer deliberately send a reader
+  // to `/` when the API is down, because the landing catches its own errors and
+  // is the one page that still works; that is a home link, which this rule
+  // always allowed, and the previous pattern simply had no way to recognise one
+  // that was not a wordmark.
+  //
+  // It is matched on the LINK TEXT rather than on a filename or a class, so it
+  // permits exactly the thing that is safe — a link labelled as the
+  // introduction — and still fails a link labelled "results" or "leaderboard"
+  // pointed at `/`, which is the mistake worth catching.
+  const HOME_LINK_OK = /className="ld-logo"|color: "inherit"|>the introduction</;
 
   it.each(SOURCES.filter(([, body]) => body.includes('href="/"')))(
     "%s only uses href=\"/\" for a home link",

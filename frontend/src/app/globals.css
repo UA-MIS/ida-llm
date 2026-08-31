@@ -1203,3 +1203,418 @@ a.cg-score:hover { text-decoration: underline; }
   .cg-corner { min-width: 9rem; }
   .cg-cell { min-width: 3.4rem; }
 }
+
+/* ===========================================================================
+   THE LEGIBILITY LAYER — everything that exists so a professor who has never
+   used a chatbot can read this site cold.
+
+   ⚠ THIS BLOCK ADDS NOTHING TO THE PALETTE. Every colour below is one of the
+   tokens defined at the top of this file, which is what keeps "one palette for
+   the whole site" a fact rather than an aspiration. If a rule here wants a
+   colour that does not exist yet, the answer is to reconsider the rule — a
+   comprehension layer is the last place that should be introducing a hue.
+
+   ⚠ IT ALSO SHIPS NO JAVASCRIPT. The disclosure behaviours below are `:hover`,
+   `:focus`, `:focus-within` and `<details>` — the same reasoning as
+   `components/trust-badges.tsx`: a page should not need a bundle to explain
+   itself, least of all to the reader least able to tell a slow page from a
+   broken one.
+   ======================================================================== */
+
+/* --- the inline "?" ------------------------------------------------------ */
+
+/* ⚠ IT IS A <button> BECAUSE IT LIVES INSIDE PARAGRAPHS. See the note in
+   `components/glossary.tsx`: a <details> is flow content and a <p> may hold
+   only phrasing, so the browser would close the paragraph early and React
+   would report a hydration mismatch. A button nests legally wherever a word
+   does — which is the whole requirement.
+
+   Everything below is undoing the site's default button styling, which is a
+   solid accent-filled control. This is a word in a sentence, and it must read
+   as one. */
+.term {
+  all: unset;
+  display: inline;
+  position: relative;
+  cursor: help;
+  /* The dotted rule is the affordance a reader recognises from a dictionary,
+     and it survives at any font size — an icon next to a word does not. */
+  border-bottom: 1px dotted var(--border-strong);
+  color: inherit;
+  font: inherit;
+}
+.term:hover { border-bottom-color: var(--accent); }
+.term:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.term-word { font: inherit; }
+.term-cue {
+  font-size: 0.68em;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: super;
+  margin-left: 0.12em;
+  color: var(--accent);
+}
+
+/* ⚠ THE CARD IS THE ENHANCEMENT; THE `title` IS THE FLOOR. Inside
+   `.table-scroll` the `overflow-x: auto` clips this card, which is exactly why
+   every definition is also complete in the native tooltip and why `plain` is
+   length-capped by test. Nothing is ever readable ONLY here. */
+.term-card {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 40;
+  display: none;
+  width: max-content;
+  max-width: min(30rem, 78vw);
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--bg);
+  /* ⚠ THE TOKEN, NOT A LITERAL. `tests/palette.test.ts` fails any colour value
+     outside `:root`, and it is right to: `--ld-shadow` is the site's raised-card
+     shadow and it already carries its own dark-theme value, so a hand-written
+     rgba here would have been a second, quietly wrong shadow in dark mode. */
+  box-shadow: var(--ld-shadow);
+  cursor: auto;
+
+  /* ⚠ THE CARD MUST NOT INHERIT ITS SURROUNDINGS, AND THIS COST A REAL BUG.
+     `.term` is deliberately `all: unset` so the WORD takes on the type around
+     it — that is what makes an inline definition look like part of the
+     sentence. But inherited properties then reach the card too, and several of
+     the places a term belongs are small-caps labels: `.podium-label`,
+     `.filter-bar label`, `.grid dt`, every `th`. Rendered inside one of those,
+     a two-sentence definition came out in FULL UPPERCASE with letter-spacing —
+     technically present, practically unreadable, which is the precise failure
+     this whole layer exists to prevent. The card is a card wherever it opens. */
+  text-transform: none;
+  letter-spacing: normal;
+  font-style: normal;
+  font-variant: normal;
+  text-align: left;
+  white-space: normal;
+}
+/* Hover for a mouse, focus for a keyboard, and — the one that matters on a
+   tablet — a tap, which focuses the button and opens the card with no script
+   running at all. Blurring closes it. */
+.term:hover .term-card,
+.term:focus .term-card,
+.term:focus-within .term-card { display: block; }
+
+.term-card-title {
+  display: block;
+  font-weight: 700;
+  font-size: 0.86rem;
+  line-height: 1.3;
+  margin-bottom: 0.3rem;
+  color: var(--fg);
+}
+.term-card-body,
+.term-card-more {
+  display: block;
+  font-weight: 400;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.term-card-more {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+  color: var(--faint);
+}
+
+/* An inline term near the right edge would open a card off-screen. Flipping the
+   anchor is one declaration and saves the only layout bug this pattern has. */
+.term-end .term-card { left: auto; right: 0; }
+
+/* --- the glossary panel -------------------------------------------------- */
+
+/* ⚠ NOT REDUNDANT WITH THE "?". The inline cue answers a word you already
+   tripped over; this answers the reader who does not yet know which word is
+   the one confusing them, and the reader who would rather read the vocabulary
+   through once before starting. */
+.glossary {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin: 1.5rem 0;
+  box-shadow: var(--shadow);
+}
+.glossary[open] { background: var(--bg); }
+.glossary-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  cursor: pointer;
+  padding: 0.85rem 1rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.glossary-summary::-webkit-details-marker { display: none; }
+.glossary-summary::marker { content: ""; }
+.glossary-summary-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.glossary-summary-hint { font-weight: 400; font-size: 0.85rem; }
+.glossary-body { padding: 0 1rem 1.1rem; }
+.glossary-intro { font-size: 0.87rem; margin: 0 0 1rem; max-width: 72ch; line-height: 1.55; }
+.glossary-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 1rem 2rem;
+  margin: 0;
+}
+.glossary-item { min-width: 0; }
+.glossary-item dt {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--fg);
+  margin-bottom: 0.2rem;
+}
+.glossary-item dd {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--muted);
+  /* The rule is the same device as `.outcome-statement`: it marks the text as
+     quoted-from-elsewhere rather than as another paragraph of page copy. */
+  border-left: 2px solid var(--border);
+  padding-left: 0.65rem;
+}
+.glossary-more { display: block; margin-top: 0.4rem; color: var(--faint); }
+
+/* --- "how to read this" -------------------------------------------------- */
+
+/* ⚠ `open` BY DEFAULT, AND THAT IS THE POINT. A collapsed orientation panel is
+   read by exactly the people who do not need it; the reader it was written for
+   does not know they are that reader. Collapsing it is one click, and the
+   summary row stays as a quiet line they can reopen. */
+.how-to-read {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin: 0 0 1.75rem;
+  box-shadow: var(--shadow);
+}
+.how-to-read-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  cursor: pointer;
+  padding: 0.9rem 1.1rem;
+}
+.how-to-read-summary::-webkit-details-marker { display: none; }
+.how-to-read-summary::marker { content: ""; }
+.how-to-read-eyebrow {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-weight: 700;
+  color: var(--accent);
+  flex: none;
+}
+.how-to-read-title { font-weight: 600; font-size: 0.98rem; }
+/* The affordance is a word rather than a triangle, because "▸" next to a
+   paragraph of prose does not read as "you may close this". */
+.how-to-read-toggle {
+  margin-left: auto;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.how-to-read-toggle::after { content: "Hide this"; }
+.how-to-read:not([open]) .how-to-read-toggle::after { content: "Show me how to read this"; }
+.how-to-read-body { padding: 0 1.1rem 1.1rem; }
+.how-to-read-body > p { font-size: 0.92rem; line-height: 1.6; color: var(--muted); max-width: 76ch; }
+.how-to-read-body > p:first-child { margin-top: 0; }
+
+.read-step {
+  display: grid;
+  grid-template-columns: 1.6rem minmax(0, 1fr);
+  gap: 0 0.85rem;
+  padding: 0.6rem 0;
+  align-items: start;
+}
+.read-step + .read-step { border-top: 1px solid var(--border); }
+.read-step-n {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--accent);
+  line-height: 1.5;
+}
+.read-step-heading { display: block; font-size: 0.92rem; }
+.read-step-body {
+  margin: 0.15rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--muted);
+  max-width: 76ch;
+}
+
+/* --- "what we found" ----------------------------------------------------- */
+
+/* ⚠ SHORT, THEN VISUAL, THEN DETAIL. This block is the "short" and the
+   "visual"; the ranked table below it is the detail. The lede is set large on
+   purpose — it is the one sentence most readers will leave with, and several
+   will read nothing else. */
+.plain-summary {
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--brand);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 1.4rem 1.5rem 1.5rem;
+  margin: 0 0 2rem;
+  box-shadow: var(--shadow);
+}
+.plain-summary-heading {
+  margin: 0 0 0.6rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.plain-summary-lede {
+  margin: 0;
+  font-size: 1.18rem;
+  line-height: 1.5;
+  max-width: 62ch;
+  color: var(--fg);
+  text-wrap: pretty;
+}
+
+/* ⚠ NEVER COLLAPSED, NEVER MOVED BELOW THE FOLD OF THIS CARD. `lib/findings.ts`
+   explains why: the headline travels — into an email, into a meeting — and the
+   caveats have to travel with it. A toggle here would be a way of publishing
+   the claim without them. */
+.plain-summary-caveats {
+  margin: 1rem 0 0;
+  padding-left: 1.05rem;
+  max-width: 76ch;
+}
+.plain-summary-caveats li {
+  font-size: 0.87rem;
+  line-height: 1.55;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+.plain-summary-next {
+  margin: 1.1rem 0 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.88rem;
+  color: var(--muted);
+  max-width: 76ch;
+}
+
+/* --- the podium ---------------------------------------------------------- */
+
+/* The picture between the sentence and the table. It answers "how far apart are
+   they?", which a column of decimals genuinely does not. */
+.podium { margin-top: 1.4rem; padding-top: 1.1rem; border-top: 1px solid var(--border); }
+.podium-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  margin: 0 0 0.7rem;
+}
+.podium-list { list-style: none; margin: 0; padding: 0; }
+.podium-row {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(6rem, 11rem) minmax(0, 1fr) auto;
+  gap: 0 1rem;
+  align-items: center;
+  padding: 0.55rem 0;
+}
+.podium-row + .podium-row { border-top: 1px solid var(--border); }
+.podium-rank { font-size: 0.85rem; text-align: right; }
+.podium-name { font-weight: 600; text-decoration: none; min-width: 0; overflow-wrap: anywhere; }
+.podium-name:hover { text-decoration: underline; }
+/* The bar is the only element allowed to grow, because comparing lengths is the
+   entire job of this row. */
+.podium-bar { min-width: 0; }
+.podium-bar .scorebar-track { max-width: none; }
+.podium-bar .scorebar-value { font-size: 1rem; }
+.podium-confidence { justify-self: end; white-space: nowrap; }
+
+@media (max-width: 760px) {
+  .plain-summary { padding: 1.1rem 1rem 1.2rem; }
+  .plain-summary-lede { font-size: 1.05rem; }
+  /* The rank column and the confidence pips are the two things a phone can
+     afford to lose: the order is already the row order, and the confidence is
+     restated on the model's own page. The bar and the name are the picture. */
+  .podium-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 0 0.75rem; }
+  .podium-rank, .podium-confidence { display: none; }
+  .glossary-list { grid-template-columns: minmax(0, 1fr); }
+  .term-card { max-width: min(22rem, 86vw); }
+}
+
+/* --- when the service is down ------------------------------------------- */
+
+/* ⚠ IT IS SET LIKE A NOTICE, NOT LIKE AN ERROR. The `--fail` red is reserved
+   for a result that genuinely went wrong; an outage is a temporary condition,
+   and painting it in the same red as a failed run tells a professor the product
+   is broken rather than busy. The pending amber, which this sheet already uses
+   for "in progress / not settled", is the honest register — and it is the same
+   left-rule device as `.notice`, so the page still looks like itself. */
+.unavailable {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--pending);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 1.6rem 1.6rem 1.5rem;
+  /* Centred as a block while the prose inside stays left-aligned. This card is
+     usually the only thing on the page, and pinned to the left of an otherwise
+     empty column it reads as a fragment of a page that failed to finish
+     rendering — which is the exact impression the whole component exists to
+     avoid. */
+  margin: 3rem auto;
+  max-width: 68ch;
+  box-shadow: var(--shadow);
+}
+.unavailable-heading { margin: 0 0 0.6rem; font-size: 1.25rem; }
+.unavailable-lede {
+  margin: 0;
+  font-size: 1.02rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.unavailable-next { margin: 1.2rem 0 0; }
+.unavailable-alt {
+  margin: 1.1rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+/* Present for whoever is on call, invisible to everyone else. */
+.unavailable-cause {
+  margin-top: 1.2rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+}
+.unavailable-cause > summary { cursor: pointer; font-size: 0.8rem; }
+.unavailable-detail {
+  margin: 0.6rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--faint);
+  overflow-wrap: anywhere;
+}

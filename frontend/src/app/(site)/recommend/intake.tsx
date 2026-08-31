@@ -23,6 +23,14 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+// ⚠ A SERVER COMPONENT IMPORTED INTO A CLIENT ONE, WHICH IS FINE HERE AND IS
+// WORTH SAYING WHY. `Term` uses no hooks, no async and no server-only API — it
+// is pure JSX over a pure lookup — so React simply renders it on the client
+// alongside this file. The alternative, leaving the result card's own invented
+// labels ("evidence score", "guardrails") undefined, fails exactly the reader
+// this flow was built for at the moment they finally get an answer.
+import { Term } from "@/components/glossary";
+
 import {
   applicableQuestions,
   missingRequired,
@@ -91,8 +99,9 @@ function Receipts({ recommendation }: { recommendation: Recommendation }) {
     <div className="receipts">
       <h4>The evidence</h4>
       <p className="muted">
-        Every claim above traces to a run you can open and read. Nobody else does
-        recommendations with receipts.
+        Every claim above traces to a <Term id="run">run</Term> you can open and
+        read. Nobody else does recommendations with{" "}
+        <Term id="receipt">receipts</Term>.
       </p>
       <ul>
         {recommendation.receipts.map((receipt) => (
@@ -141,7 +150,9 @@ function RecommendationCard({
           </dd>
         </div>
         <div>
-          <dt>Cost</dt>
+          <dt>
+            <Term id="cost">Cost</Term>
+          </dt>
           <dd>
             {recommendation.cost.label}
             <div className="muted" style={{ fontSize: "0.8rem" }}>
@@ -154,15 +165,17 @@ function RecommendationCard({
           <dd>{recommendation.data_residency_label}</dd>
         </div>
         <div>
-          <dt>Evidence score</dt>
+          <dt>
+            <Term id="evidence-score">Evidence score</Term>
+          </dt>
           <dd>
             {recommendation.evidence_score === null
               ? "—"
               : recommendation.evidence_score.toFixed(2)}
             <div className="muted" style={{ fontSize: "0.8rem" }}>
               {recommendation.verifiable_evidence
-                ? "Backed by at least one program-checked task."
-                : "AI-judged evidence only."}
+                ? "Backed by at least one piece of work a program checked, not just an AI."
+                : "Every piece of work behind this was marked by another AI, not checked by a program."}
             </div>
           </dd>
         </div>
@@ -170,7 +183,9 @@ function RecommendationCard({
 
       {recommendation.guardrails.length > 0 ? (
         <div className="notice">
-          <strong>Guardrails</strong>
+          <strong>
+            <Term id="guardrail">Guardrails</Term>
+          </strong>
           <ul>
             {recommendation.guardrails.map((guardrail) => (
               <li key={guardrail}>{guardrail}</li>
@@ -190,10 +205,13 @@ function RecommendationCard({
         </div>
       ) : null}
 
-      <h4>A prompt to start from</h4>
+      <h4>
+        A <Term id="prompt">prompt</Term> to start from
+      </h4>
       <p className="muted">
-        Paste this in and replace the bracketed parts. It is a starting point
-        that already asks for the things that make the output checkable.
+        Copy this, paste it into the tool, and replace the parts in [square
+        brackets] with your own. It is a starting point that already asks for
+        the things that make the answer checkable.
       </p>
       <pre>{recommendation.prompt_template}</pre>
 

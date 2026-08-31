@@ -23,11 +23,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { GlossaryPanel, Term } from "@/components/glossary";
+import { HowToRead, ReadStep } from "@/components/how-to-read";
+import { ResultsUnavailable } from "@/components/service-unavailable";
 import { ConfidenceTell } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
 import { formatScore } from "@/lib/format";
 import { buildMatrix, bestInColumn, RAMP_STEPS, type MatrixCell, type Matrix } from "@/lib/matrix";
+import { COMPARE_TERMS } from "@/lib/glossary";
 import { confidenceLabel } from "@/lib/rollup";
+import type { LeaderboardResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -197,7 +202,29 @@ function Grid({ matrix }: { matrix: Matrix }) {
 }
 
 export default async function ComparePage() {
-  const board = await getLeaderboard();
+  // ⚠ THE MORE VISIBLE CASE OF THE TWO. This page is in the nav, so it is one
+  // click from the front door for a reader who has just decided to trust this —
+  // and an unguarded fetch here turns a routine API blip into a stack trace
+  // shown to exactly that person. See `components/service-unavailable.tsx`.
+  //
+  // ⚠ NOT THE SAME AS THE `!matrix.available` BRANCH BELOW, AND THE TWO MUST
+  // NOT CONVERGE. That one says "there are no outcomes to compare", which is a
+  // true statement about the benchmark. This one says "we cannot see the
+  // benchmark", which is a statement about us. Rendering the fault as the
+  // finding would quietly tell a professor the grid is emptier than it is.
+  let board: LeaderboardResponse;
+  try {
+    board = await getLeaderboard();
+  } catch (cause) {
+    return (
+      <ResultsUnavailable
+        what="the comparison grid"
+        retryHref="/compare"
+        cause={cause}
+      />
+    );
+  }
+
   const matrix = buildMatrix(board);
 
   if (!matrix.available) {
@@ -228,6 +255,37 @@ export default async function ComparePage() {
           thing.
         </p>
       </section>
+
+      {/* ⚠ ORIENTATION BEFORE A GRID, NOT AFTER IT. A matrix is the densest
+          thing on this site and it is now one click from the front door. A
+          reader who does not know which axis is which, or that a blank cell is
+          not a nought, cannot get anything out of it — and a grid of mostly
+          empty squares read as zeros is actively worse than no page at all. */}
+      <HowToRead title="A grid of models against your outcomes. Here is how to read it.">
+        <ReadStep n={1} heading="Rows are models, columns are your outcomes">
+          Read across a row for one <Term id="model">model</Term>&rsquo;s
+          profile — what it is good and bad at. Read down a column to see which
+          model is strongest at one particular{" "}
+          <Term id="learning-outcome">learning outcome</Term>.
+        </ReadStep>
+        <ReadStep n={2} heading="Stronger colour means a higher score, not a better model">
+          There is no red-to-green scale here on purpose. Colour says how large a{" "}
+          <Term id="score">score</Term> is; the dots beside it say how much to
+          trust it, which is a separate question.
+        </ReadStep>
+        <ReadStep n={3} heading="An empty cell is never a zero">
+          A dash means <Term id="not-measured">nothing has been run</Term> for
+          that pairing yet. A diamond means the outcome{" "}
+          <Term id="not-benchmarkable">cannot be measured this way</Term> at all
+          — we show it rather than quietly dropping it.
+        </ReadStep>
+        <ReadStep n={4} heading="Every score opens">
+          Click any number to see the full record behind it. If a cell looks
+          wrong to you, that is where to check.
+        </ReadStep>
+      </HowToRead>
+
+      <GlossaryPanel terms={COMPARE_TERMS} />
 
       <section className="panel panel-lead">
         <div className="panel-head">
