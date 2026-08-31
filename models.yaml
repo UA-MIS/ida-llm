@@ -149,7 +149,14 @@ models:
   #     does not split `cached_tokens` out of `prompt_tokens`, so cached input
   #     is billed here at the full rate. Real spend is <= recorded spend.
   - key: luna
-    display_name: Luna (OpenAI GPT-5.6 Luna) -- test budget, $25 cap
+    # `display_name` is PUBLIC PROSE, not an operations note. It is the site's
+    # headline finding -- the landing specimen, the footer of every grid row, and
+    # the opening line of every recommendation -- so it is read by professors,
+    # not by us. The budget cap this used to carry ("test budget, $25 cap") is an
+    # internal operational fact, it is already documented in the comments above,
+    # and it does not belong in the name of the model. The duplicated "Luna" went
+    # with it.
+    display_name: Luna (OpenAI GPT-5.6)
     base_url: https://api.openai.com/v1
     api_key_env: OPENAI_API_KEY         # Vault: secret/tenants/ida-llm/<env>/app
                                         # -> Secret `ida-llm-secret`. See
@@ -201,7 +208,10 @@ models:
   # SPARKS_API_KEY. A nightly sweep that selects this model fails on an unset key
   # before it reaches the (correct) "no route" error.
   - key: sparks-local
-    display_name: Campus vLLM (Sparks) -- deferred
+    # "deferred" is already carried structurally by `enabled: false` and the
+    # `deferred` tag below, which is where a machine-readable status belongs.
+    # Repeating it inside the public label only made the label worse.
+    display_name: Campus vLLM (Sparks)
     base_url_env: SPARKS_BASE_URL
     base_url: ""                        # no fallback ON PURPOSE: fail loudly, never guess
     api_key_env: SPARKS_API_KEY
