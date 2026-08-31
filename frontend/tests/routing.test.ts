@@ -64,7 +64,7 @@ describe("the route map after the landing-page move", () => {
     // The report card and the run detail are the dense views the landing's
     // primary door promises. Losing one in a directory move is the easiest way
     // for this change to do real damage.
-    for (const route of ["/models/[key]", "/runs", "/runs/[runId]", "/recommend"]) {
+    for (const route of ["/models/[key]", "/runs", "/runs/[runId]", "/recommend", "/compare"]) {
       expect(ROUTES, `lost ${route}`).toContain(route);
     }
   });
@@ -120,8 +120,11 @@ describe("the chrome sits below the landing, not above it", () => {
     expect(site).toBeDefined();
     expect(site![1]).toContain("<nav");
     expect(site![1]).toContain("resolveVersion");
-    // And its nav names the leaderboard's real path.
+    // And its nav names the real paths.
     expect(site![1]).toContain('href: "/leaderboard"');
+    // The grid is a top-level destination; if it is only reachable from a link
+    // buried in the leaderboard's browse panel, almost nobody will find it.
+    expect(site![1]).toContain('href: "/compare"');
   });
 
   it("loads both landing typefaces from the root layout", () => {

@@ -621,7 +621,8 @@ export default async function ResultsPage({
               <p className="muted panel-note">
                 {board.task_count} tasks in the catalogue, grouped by the
                 outcome each one measures. Pick a task to see every model ranked
-                on it.
+                on it — or <Link href="/compare">compare every model by outcome
+                in one grid</Link>.
               </p>
             </div>
 
