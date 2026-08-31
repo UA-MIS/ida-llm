@@ -41,8 +41,9 @@ import { ModelResultCard } from "@/components/model-result-card";
 import { PlainSummary } from "@/components/plain-summary";
 import { ResultsUnavailable } from "@/components/service-unavailable";
 import { ScoreBar } from "@/components/score-bar";
-import { ConfidenceTell, ResidencyBadge, TrustLegend } from "@/components/trust-badges";
+import { ConfidenceMeter, ConfidenceTell, ResidencyBadge, TrustLegend } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
+import { exclusionReason, exclusionSummary } from "@/lib/exclusion";
 import { summariseBoard } from "@/lib/findings";
 import { LEADERBOARD_TERMS, plainTaskKind } from "@/lib/glossary";
 import { formatCost, formatScore } from "@/lib/format";
@@ -147,9 +148,19 @@ function OverallLeaderboard({
                 <th className="num col-optional">Outcomes</th>
                 <th className="num col-optional">Tasks</th>
                 <th className="num col-optional">Samples</th>
-                <th className="col-optional">Confidence</th>
+                {/* ⚠ `col-trust`, NOT `col-optional`. Confidence is the one
+                    column that must survive the breakpoint: this page's own
+                    rule is that every number keeps its trust tell, and dropping
+                    it below 760px meant a phone read "0.88" where a desktop
+                    read "0.88 · Low confidence". A high score with low
+                    confidence is not a verdict, and the phone was showing the
+                    score without the half that says so. */}
+                <th className="col-trust">Confidence</th>
                 <th className="num col-optional">Cost</th>
-                <th aria-label="Report card" />
+                {/* ⚠ `col-go` HERE TOO. Without it the header row rendered four
+                    cells below 760px while every body row rendered three, and
+                    the whole table shifted by one column. */}
+                <th className="col-go" aria-label="Report card" />
               </tr>
             </thead>
             <tbody>
@@ -168,10 +179,15 @@ function OverallLeaderboard({
 
       {unranked.length > 0 ? (
         <details className="also-measured">
+          {/* ⚠ COUNTED, NOT ASSUMED. This line used to read "test stubs and
+              models nothing has scored yet" whatever the drawer held — and it
+              held three models with 70 scored tasks each, one of them scoring
+              above the model this page had just crowned. They are unranked
+              because the registry has no entry for them, which is a worse fact
+              than the one being shown, and therefore the one to show. See
+              `lib/exclusion.ts`. */}
           <summary className="muted">
-            {unranked.length} more model{unranked.length === 1 ? "" : "s"} in the
-            registry — test stubs and models nothing has scored yet. Shown, but
-            never ranked.
+            {exclusionSummary(unranked.map(exclusionReason))}
           </summary>
           <div className="table-scroll">
             <table className="leaderboard leaderboard-muted">
@@ -242,7 +258,7 @@ function ModelRow({
         <span className="muted"> / {overall.covered_tasks}</span>
       </td>
       <td className="num col-optional">{overall.scored_samples}</td>
-      <td className="col-optional">
+      <td className="col-trust">
         <ConfidenceTell
           confidence={overall.confidence}
           label={confidenceLabel(overall.confidence)}
@@ -514,6 +530,10 @@ function TaskTable({
                       </span>
                     )}
                   </td>
+                  {/* Every number keeps its trust tell — including this one.
+                      The catalogue used to be the one table on the site that
+                      showed a bare score, which made it the easiest place to
+                      read a thin result as a settled one. */}
                   <td className="num">
                     {best?.mean_score !== undefined && best.mean_score !== null ? (
                       <>
@@ -521,6 +541,9 @@ function TaskTable({
                         <span className="muted score-of">
                           ({best.scored_count}/{best.sample_count})
                         </span>
+                        <div className="score-trust">
+                          <ConfidenceMeter trust={best.trust} />
+                        </div>
                       </>
                     ) : (
                       <span className="muted">—</span>

@@ -29,8 +29,16 @@ import { ResultsUnavailable } from "@/components/service-unavailable";
 import { ConfidenceTell } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
 import { formatScore } from "@/lib/format";
-import { buildMatrix, bestInColumn, RAMP_STEPS, type MatrixCell, type Matrix } from "@/lib/matrix";
+import {
+  buildMatrix,
+  columnVerdict,
+  MEANINGFUL_GAP,
+  RAMP_STEPS,
+  type MatrixCell,
+  type Matrix,
+} from "@/lib/matrix";
 import { COMPARE_TERMS } from "@/lib/glossary";
+import { exclusionLabel, exclusionReason } from "@/lib/exclusion";
 import { confidenceLabel } from "@/lib/rollup";
 import type { LeaderboardResponse } from "@/lib/types";
 
@@ -79,6 +87,24 @@ function Cell({ cell, modelName, columnHeading }: { cell: MatrixCell; modelName:
         )}
         <span className="cg-sub">
           {cell.measuredTasks}/{cell.tasksAvailable}
+        </span>
+        {/* ⚠ THE PIPS THE PAGE TELLS YOU TO LOOK FOR. Three separate pieces of
+            copy — the legend, step 2 of the how-to-read panel, and the
+            stylesheet's own comment — point the reader at a confidence tell
+            beside each number, and the cell drew the score and nothing else.
+            `MatrixCell.confidence` was declared, populated, and never read. A
+            reader who follows the instructions and finds nothing concludes they
+            have misread the page, which is the one thing this page cannot
+            afford. Compact here (`cg-confidence` drops the word, keeps the
+            pips) because the grid is dense and the label would wrap every
+            cell — the full wording stays in the title and the sr-only
+            sentence, which already carry it. */}
+        <span className="cg-confidence">
+          <ConfidenceTell
+            confidence={cell.confidence}
+            label={confidenceLabel(cell.confidence)}
+            reason={`${confidenceLabel(cell.confidence)}. How much weight this number can bear — how it was marked, over how many attempts, and whether anything failed. It is about the measurement, not about the model.`}
+          />
         </span>
         <span className="sr-only">{label}</span>
       </td>
@@ -141,7 +167,9 @@ function Grid({ matrix }: { matrix: Matrix }) {
                 </Link>
                 <span className="cg-model-sub muted">
                   {row.measuredCount} of {matrix.benchmarkableCount} measurable outcomes
-                  {!row.model.recommendable ? " · test stub" : ""}
+                  {exclusionReason(row.model)
+                    ? ` · ${exclusionLabel(exclusionReason(row.model)!)}`
+                    : ""}
                 </span>
               </th>
               {row.cells.map((cell, index) => (
@@ -177,18 +205,43 @@ function Grid({ matrix }: { matrix: Matrix }) {
           <tr>
             <th scope="row" className="cg-model cg-foot-label">
               Strongest measured
+              <span className="cg-model-sub muted">
+                only where the gap is wide enough to call
+              </span>
             </th>
             {matrix.columns.map((column, index) => {
-              const best = bestInColumn(matrix, index);
+              /* ⚠ `columnVerdict`, NOT `bestInColumn`. "Which cell is highest"
+                 is arithmetic; "who is strongest at this outcome" is a claim,
+                 and this footer used to make the second one from the first —
+                 with no minimum gap, no minimum field, and none of the guards
+                 `lib/findings.ts` applies to the very same claim two pages
+                 earlier. One measured model was crowned as a winner of a
+                 contest it was alone in. */
+              const verdict = columnVerdict(matrix, index);
               return (
                 <td key={column.id} className="cg-cell cg-foot">
-                  {best ? (
-                    <>
-                      <span className="cg-foot-name">{best.row.model.display_name}</span>
-                      <span className="cg-sub">{formatScore(best.cell.score)}</span>
-                    </>
-                  ) : (
+                  {verdict.kind === "none" ? (
                     <span className="muted">–</span>
+                  ) : verdict.kind === "tooClose" ? (
+                    <span
+                      className="muted cg-foot-note"
+                      title={`${verdict.row.model.display_name} and ${verdict.runnerUp.model.display_name} are within ${MEANINGFUL_GAP.toFixed(2)} of each other here, which on this much evidence is not a difference we will call.`}
+                    >
+                      too close to call
+                    </span>
+                  ) : (
+                    <>
+                      <span className="cg-foot-name">{verdict.row.model.display_name}</span>
+                      <span className="cg-sub">{formatScore(verdict.cell.score)}</span>
+                      {verdict.kind === "only" ? (
+                        <span
+                          className="muted cg-foot-note"
+                          title="Only one model has a measured score in this column, so this is the only reading here — not the winner of a comparison."
+                        >
+                          only one measured
+                        </span>
+                      ) : null}
+                    </>
                   )}
                 </td>
               );
@@ -221,6 +274,7 @@ export default async function ComparePage() {
         what="the comparison grid"
         retryHref="/compare"
         cause={cause}
+        singular
       />
     );
   }

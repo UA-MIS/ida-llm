@@ -93,9 +93,15 @@ describe("glyphs", () => {
 });
 
 describe("summariseResult", () => {
-  it("states the score with what it was measured on", () => {
+  it("states the score with what it was measured on, in the reader's words", () => {
+    // ⚠ "Checked by a program", NOT the API's `tier_label`. This sentence goes
+    // into headings and `title` attributes on professor-facing pages, and the
+    // raw labels are "Verifiable" and "Subjective (AI-scored)" — the second of
+    // which `lib/glossary.ts` exists in part to keep off the page. Pinning the
+    // plain form here is what stops the jargon leaking back in through a
+    // summary nobody thinks of as copy.
     expect(summariseResult(result())).toBe(
-      "Luna: 0.91 on 5 of 5 samples — Verifiable, high confidence",
+      "Luna: 0.91 on 5 of 5 samples — Checked by a program, high confidence",
     );
   });
 

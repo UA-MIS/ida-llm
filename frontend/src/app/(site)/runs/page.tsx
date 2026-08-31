@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { GlossaryPanel, Term } from "@/components/glossary";
 import { HowToRead, ReadStep } from "@/components/how-to-read";
+import { ResultsUnavailable } from "@/components/service-unavailable";
 import { listRuns } from "@/lib/api";
 import { RUNS_TERMS } from "@/lib/glossary";
 import {
@@ -71,7 +72,18 @@ function ScoreCell({ run }: { run: RunRecord }) {
  * teammate debugging a sweep starts here.
  */
 export default async function RunsPage() {
-  const { runs } = await listRuns(50);
+  // ⚠ GUARDED, LIKE `/leaderboard` AND `/compare` ALREADY ARE. An unguarded
+  // fetch here turns a routine API blip into the stripped, chrome-free error
+  // page — the outcome `components/service-unavailable.tsx` spends thirty lines
+  // of comment arguing must never happen to a reader who has just decided to
+  // trust this. Three pages were missing the guard, and one of them is a
+  // primary door off the front page.
+  let runs: Awaited<ReturnType<typeof listRuns>>["runs"];
+  try {
+    ({ runs } = await listRuns(50));
+  } catch (cause) {
+    return <ResultsUnavailable what="the run log" retryHref="/runs" cause={cause} singular />;
+  }
 
   if (runs.length === 0) {
     return (
@@ -129,6 +141,12 @@ export default async function RunsPage() {
 
       <GlossaryPanel terms={RUNS_TERMS} />
 
+      {/* ⚠ `.table-scroll`. Nine columns, and this was the one table in the
+          app outside the wrapper — so on a phone it dragged the whole page
+          sideways, breaking the invariant the stylesheet states in its own
+          comment: `.table-scroll` is the ONLY thing allowed to scroll
+          horizontally. */}
+      <div className="table-scroll">
       <table>
         <thead>
           <tr>
@@ -179,6 +197,7 @@ export default async function RunsPage() {
           ))}
         </tbody>
       </table>
+      </div>
     </>
   );
 }

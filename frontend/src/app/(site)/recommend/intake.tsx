@@ -30,6 +30,11 @@ import { useMemo, useState } from "react";
 // labels ("evidence score", "guardrails") undefined, fails exactly the reader
 // this flow was built for at the moment they finally get an answer.
 import { Term } from "@/components/glossary";
+import { ConfidenceTell } from "@/components/trust-badges";
+import { formatScoreValue } from "@/lib/format";
+import { plainTaskKind } from "@/lib/glossary";
+import { displayCaveats, evidenceStanding } from "@/lib/recommendation";
+import { confidenceLabel } from "@/lib/rollup";
 
 import {
   applicableQuestions,
@@ -99,20 +104,27 @@ function Receipts({ recommendation }: { recommendation: Recommendation }) {
     <div className="receipts">
       <h4>The evidence</h4>
       <p className="muted">
+        {/* The competitive brag that used to close this line ("nobody else
+            does recommendations with receipts") was the only unverifiable claim
+            on a page that has just promised to make none — and a sceptic notices
+            it precisely because nothing else here sounds like that. */}
         Every claim above traces to a <Term id="run">run</Term> you can open and
-        read. Nobody else does recommendations with{" "}
-        <Term id="receipt">receipts</Term>.
+        read, so you never have to take this page&rsquo;s word for it. Each{" "}
+        <Term id="receipt">receipt</Term> below is one.
       </p>
       <ul>
         {recommendation.receipts.map((receipt) => (
           <li key={`${receipt.task_id}:${receipt.run_id}`}>
             <strong>
-              {receipt.mean_score === null ? "—" : receipt.mean_score.toFixed(2)}
+              {receipt.mean_score === null ? "—" : formatScoreValue(receipt.mean_score)}
             </strong>{" "}
             on <em>{receipt.task_title}</em>{" "}
             <span className="muted">
               ({receipt.scored_count}/{receipt.sample_count} samples ·{" "}
-              {receipt.trust_label} · {receipt.confidence} confidence)
+              {plainTaskKind(receipt.task_kind)} ·{" "}
+              {/* `confidenceLabel`, not the raw enum — which includes "none"
+                  and was rendering the phrase "none confidence". */}
+              {confidenceLabel(receipt.confidence).toLowerCase()})
             </span>{" "}
             <Link href={`/runs/${receipt.run_id}`}>see the run ▸</Link>
           </li>
@@ -129,6 +141,7 @@ function RecommendationCard({
   recommendation: Recommendation;
   primary: boolean;
 }) {
+  const standing = evidenceStanding(recommendation);
   return (
     <div className={`card rec-card${primary ? " rec-primary" : ""}`}>
       <h3>{recommendation.headline}</h3>
@@ -168,11 +181,28 @@ function RecommendationCard({
           <dt>
             <Term id="evidence-score">Evidence score</Term>
           </dt>
+          {/* ⚠ THE NUMBER THE WHOLE ANSWER RESTS ON, AND IT USED TO RENDER
+              BARE. A 0.83 built on two samples was visually identical to a 0.88
+              built on fifty-one, so a professor comparing two answers had no way
+              to see that one of them was a hint. The count and the weakest
+              confidence behind it now sit with it. */}
           <dd>
             {recommendation.evidence_score === null
               ? "—"
-              : recommendation.evidence_score.toFixed(2)}
+              : formatScoreValue(recommendation.evidence_score)}
+            {standing.confidence ? (
+              <div className="rec-evidence-trust">
+                <ConfidenceTell
+                  confidence={standing.confidence}
+                  label={confidenceLabel(standing.confidence)}
+                  reason={`The weakest confidence among the ${standing.receiptCount} measured result${standing.receiptCount === 1 ? "" : "s"} behind this answer, not an average of them.`}
+                />
+              </div>
+            ) : null}
             <div className="muted" style={{ fontSize: "0.8rem" }}>
+              {standing.receiptCount === 0
+                ? "Nothing measured stands behind this number yet."
+                : `${standing.scoredAttempts} scored attempt${standing.scoredAttempts === 1 ? "" : "s"} across ${standing.receiptCount} piece${standing.receiptCount === 1 ? "" : "s"} of work. `}
               {recommendation.verifiable_evidence
                 ? "Backed by at least one piece of work a program checked, not just an AI."
                 : "Every piece of work behind this was marked by another AI, not checked by a program."}
@@ -194,16 +224,25 @@ function RecommendationCard({
         </div>
       ) : null}
 
-      {recommendation.caveats.length > 0 ? (
-        <div className="notice">
-          <strong>What to know before you rely on this</strong>
-          <ul>
-            {recommendation.caveats.map((caveat) => (
-              <li key={caveat}>{caveat}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      {/* ⚠ NOT GATED ON `caveats.length`, AND THAT GATE WAS THE BUG. The API
+          only appends caveats for unscorable tasks, errored samples and partial
+          scoring — so a verifiable result with four scored samples, which it
+          separately marks LOW confidence, arrived with `caveats: []`. This panel
+          then disappeared, leaving a confident headline and a clean score with
+          no qualification anywhere: the strongest-looking output in the
+          product, produced by the weakest evidence in it. `lib/findings.ts`
+          states the rule the rest of the site keeps — "there is no code path
+          that produces a bare headline" — and this was the code path.
+          `displayCaveats` guarantees a non-empty list, so the panel is now as
+          unconditional as the findings panel it was supposed to match. */}
+      <div className="notice">
+        <strong>What to know before you rely on this</strong>
+        <ul>
+          {displayCaveats(recommendation).map((caveat) => (
+            <li key={caveat}>{caveat}</li>
+          ))}
+        </ul>
+      </div>
 
       <h4>
         A <Term id="prompt">prompt</Term> to start from

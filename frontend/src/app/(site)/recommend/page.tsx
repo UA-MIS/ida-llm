@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { GlossaryPanel, Term } from "@/components/glossary";
 import { HowToRead, ReadStep } from "@/components/how-to-read";
+import { ResultsUnavailable } from "@/components/service-unavailable";
 import { getIntakeQuestions } from "@/lib/api";
 import { RECOMMEND_TERMS } from "@/lib/glossary";
 import { Intake } from "./intake";
@@ -16,7 +17,24 @@ import { Intake } from "./intake";
 export const dynamic = "force-dynamic";
 
 export default async function RecommendPage() {
-  const questions = await getIntakeQuestions();
+  // ⚠ GUARDED, LIKE `/leaderboard` AND `/compare` ALREADY ARE. An unguarded
+  // fetch here turns a routine API blip into the stripped, chrome-free error
+  // page — the outcome `components/service-unavailable.tsx` spends thirty lines
+  // of comment arguing must never happen to a reader who has just decided to
+  // trust this. Three pages were missing the guard, and one of them is a
+  // primary door off the front page.
+  let questions: Awaited<ReturnType<typeof getIntakeQuestions>>;
+  try {
+    questions = await getIntakeQuestions();
+  } catch (cause) {
+    return (
+      <ResultsUnavailable
+        what="the recommendation questions"
+        retryHref="/recommend"
+        cause={cause}
+      />
+    );
+  }
 
   return (
     <>

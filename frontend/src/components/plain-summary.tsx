@@ -32,14 +32,22 @@ import Link from "next/link";
 import { ScoreBar } from "@/components/score-bar";
 import { ConfidenceTell } from "@/components/trust-badges";
 import type { Findings } from "@/lib/findings";
-import { confidenceLabel, isRanked, type ModelRollup } from "@/lib/rollup";
+import { confidenceLabel, isRanked, podiumLabel, type ModelRollup } from "@/lib/rollup";
 
 /** How many bars before the picture stops being a picture and becomes a table. */
 const PODIUM_SIZE = 5;
 
 function Podium({ rollups }: { rollups: ModelRollup[] }) {
-  const ranked = rollups.filter(isRanked).slice(0, PODIUM_SIZE);
+  const rankable = rollups.filter(isRanked);
+  const ranked = rankable.slice(0, PODIUM_SIZE);
   if (ranked.length === 0) return null;
+
+  // ⚠ TWO COUNTS, BECAUSE THE OLD LABEL GOT BOTH HALVES WRONG. "Every model we
+  // have measured" sat above a list that is `isRanked` filtered and then
+  // truncated to five — live, two rows drawn from six measured models. A model
+  // excluded from the ranking was still measured; that is how we know it is
+  // excluded. See `podiumLabel`.
+  const measured = rollups.filter((rollup) => rollup.overall.score !== null).length;
 
   return (
     <div className="podium">
@@ -49,7 +57,7 @@ function Podium({ rollups }: { rollups: ModelRollup[] }) {
           into a question the page then fails to answer. "Overall score" is
           defined in the panel note above the ranked table and in the glossary;
           it does not need a third, worse, affordance here. */}
-      <p className="podium-label muted">Every model we have measured, by overall score</p>
+      <p className="podium-label muted">{podiumLabel(ranked.length, rankable.length, measured)}</p>
       <ol className="podium-list">
         {ranked.map((rollup, index) => (
           <li key={rollup.model_key} className="podium-row">

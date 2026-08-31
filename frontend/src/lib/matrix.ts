@@ -29,6 +29,7 @@
  * that with whitespace instead of a number.
  */
 
+import { formatScoreValue } from "./format";
 import { rollupByModel, rollupByOutcome, isRanked, type ModelRollup } from "./rollup";
 import type { Confidence, LeaderboardResponse, OutcomeView } from "./types";
 
@@ -149,7 +150,7 @@ function cellFor(
     score: agg.score,
     step: rampStep(agg.score),
     reason:
-      `${agg.score.toFixed(2)} across ${agg.measured_tasks} measured task` +
+      `${formatScoreValue(agg.score)} across ${agg.measured_tasks} measured task` +
       `${agg.measured_tasks === 1 ? "" : "s"} (${agg.scored_samples} scored sample` +
       `${agg.scored_samples === 1 ? "" : "s"}).`,
   };
@@ -238,4 +239,62 @@ export function bestInColumn(
     if (best === null || cell.score > best.cell.score!) best = { row, cell };
   }
   return best;
+}
+
+/**
+ * How far apart two scores in one column must be before the footer will name a
+ * winner.
+ *
+ * ⚠ THE SAME NUMBER, AND THE SAME ARGUMENT, AS `lib/findings.ts`. The findings
+ * paragraph goes to real lengths to refuse "best" without a gap wide enough to
+ * survive the sample sizes — and then the grid's own footer crowned a winner in
+ * every column with no gap test, no minimum number of competitors, and no
+ * regard for confidence. The overclaim the summary refuses two pages earlier
+ * was being made seven times along the bottom of this grid.
+ *
+ * Five points on a 0–1 scale is deliberately conservative: it fails to call
+ * real differences rather than announcing fake ones, which is the right way
+ * round here.
+ */
+export const MEANINGFUL_GAP = 0.05;
+
+export type ColumnVerdict =
+  /** Nothing measured in this column — no winner, and not a tie either. */
+  | { kind: "none" }
+  /** One model measured. A single entrant is not a contest and must not read as one. */
+  | { kind: "only"; row: MatrixRow; cell: MatrixCell }
+  /** Two or more, separated by less than the gap. Named, but not ranked. */
+  | { kind: "tooClose"; row: MatrixRow; cell: MatrixCell; runnerUp: MatrixRow }
+  /** A real lead over a real field. */
+  | { kind: "best"; row: MatrixRow; cell: MatrixCell };
+
+/**
+ * What the column footer is entitled to claim.
+ *
+ * ⚠ `bestInColumn` IS STILL THE ARITHMETIC AND THIS IS STILL THE CLAIM, kept
+ * apart on purpose. "Which cell is highest" is a fact; "which model is
+ * strongest at this outcome" is an assertion about the world, and the second one
+ * needs guards the first does not.
+ */
+export function columnVerdict(matrix: Matrix, columnIndex: number): ColumnVerdict {
+  const measured = matrix.ranked
+    .map((row) => ({ row, cell: row.cells[columnIndex] }))
+    .filter(
+      (entry): entry is { row: MatrixRow; cell: MatrixCell } =>
+        entry.cell !== undefined &&
+        entry.cell.status === "measured" &&
+        entry.cell.score !== null,
+    )
+    .sort((a, b) => b.cell.score! - a.cell.score!);
+
+  if (measured.length === 0) return { kind: "none" };
+
+  const top = measured[0]!;
+  if (measured.length === 1) return { kind: "only", row: top.row, cell: top.cell };
+
+  const runnerUp = measured[1]!;
+  if (top.cell.score! - runnerUp.cell.score! < MEANINGFUL_GAP) {
+    return { kind: "tooClose", row: top.row, cell: top.cell, runnerUp: runnerUp.row };
+  }
+  return { kind: "best", row: top.row, cell: top.cell };
 }

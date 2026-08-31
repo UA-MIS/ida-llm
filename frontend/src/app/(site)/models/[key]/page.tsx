@@ -24,6 +24,8 @@ import { notFound } from "next/navigation";
 import { GlossaryPanel, Term } from "@/components/glossary";
 import { HowToRead, ReadStep } from "@/components/how-to-read";
 import { ScoreBar } from "@/components/score-bar";
+import { ResultsUnavailable } from "@/components/service-unavailable";
+import { exclusionDetail, exclusionLabel, exclusionReason } from "@/lib/exclusion";
 import {
   Caveats,
   ConfidenceMeter,
@@ -43,7 +45,7 @@ import {
   type OutcomeRollup,
 } from "@/lib/rollup";
 import { outcomeHeading } from "@/lib/trust";
-import type { CurriculumView } from "@/lib/types";
+import type { CurriculumView, LeaderboardResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +67,7 @@ function ReportHead({
   outcomeCount: number;
 }) {
   const { overall } = rollup;
+  const exclusion = exclusionReason(rollup);
   return (
     <section className="panel panel-lead report-head">
       <div className="report-identity">
@@ -75,12 +78,14 @@ function ReportHead({
             residency={rollup.data_residency}
             label={rollup.data_residency_label}
           />
-          {!rollup.recommendable ? (
-            <span
-              className="badge badge-partial"
-              title="A deterministic stub used to exercise the pipeline. Its numbers are real; they are just not about a model."
-            >
-              test stub — never recommended
+          {/* ⚠ THE REASON IS DERIVED, NOT ASSUMED. This badge used to say
+              "test stub" for anything unrecommendable, and rendered a complete
+              report card badged that way for three models that are not stubs at
+              all — they are simply absent from the model registry, which is a
+              worse fact and the one a reader is owed. See `lib/exclusion.ts`. */}
+          {exclusion ? (
+            <span className="badge badge-partial" title={exclusionDetail(exclusion)}>
+              {exclusionLabel(exclusion)}
             </span>
           ) : null}
           {!rollup.enabled ? (
@@ -206,7 +211,7 @@ function OutcomeRow({ row }: { row: OutcomeRollup }) {
         {agg.measured_tasks}
         <span className="muted"> / {row.tasks_available}</span>
       </td>
-      <td className="col-optional">
+      <td className="col-trust">
         {agg.score === null ? (
           <span className="muted">
             {notBenchmarkable
@@ -261,7 +266,7 @@ function TaskBreakdown({
             <th>Task</th>
             <th className="col-optional">Outcome</th>
             <th className="col-score">Score</th>
-            <th className="col-optional">Evidence</th>
+            <th className="col-trust">Evidence</th>
             <th>Receipt</th>
           </tr>
         </thead>
@@ -291,7 +296,7 @@ function TaskBreakdown({
                   }
                 />
               </td>
-              <td className="col-optional">
+              <td className="col-trust">
                 <div className="stacked-badges">
                   <TrustBadge trust={entry.result.trust} />
                   <ConfidenceMeter trust={entry.result.trust} />
@@ -319,7 +324,26 @@ export default async function ModelReportPage({
   const { key } = await params;
   const modelKey = decodeURIComponent(key);
 
-  const board = await getLeaderboard();
+  // ⚠ GUARDED, LIKE `/leaderboard` AND `/compare` ALREADY ARE. An unguarded
+  // fetch here turns a routine API blip into the stripped, chrome-free error
+  // page — the outcome `components/service-unavailable.tsx` spends thirty lines
+  // of comment arguing must never happen to a reader who has just decided to
+  // trust this. Three pages were missing the guard, and one of them is a
+  // primary door off the front page.
+  let board: LeaderboardResponse;
+  try {
+    board = await getLeaderboard();
+  } catch (cause) {
+    return (
+      <ResultsUnavailable
+        what="this model's report card"
+        retryHref={`/models/${encodeURIComponent(modelKey)}`}
+        cause={cause}
+        singular
+      />
+    );
+  }
+
   const rollup = findRollup(board, modelKey);
   // A key with no rows is not an empty report card — it is a URL for a model
   // this benchmark has never run. Saying "not found" is the honest answer.
@@ -390,7 +414,11 @@ export default async function ModelReportPage({
                 <th>Outcome</th>
                 <th className="col-score">Score</th>
                 <th className="num col-optional">Tasks</th>
-                <th className="col-optional">Confidence</th>
+                {/* ⚠ `col-trust`, NOT `col-optional`. The stylesheet used to
+                    justify hiding confidence on a phone because "it is restated
+                    on the model's own page" — this IS the model's own page, and
+                    it was hidden here under the very same rule. */}
+                <th className="col-trust">Confidence</th>
                 <th>Receipt</th>
               </tr>
             </thead>
