@@ -17,15 +17,18 @@ resources:
   - ../../base
   - app-secret.externalsecret.yaml
   - database.externalsecret.yaml
-  # ── THE SPRINT BOARD LIVES HERE, NOT IN base/ ─────────────────────────────
-  # Prod-only is enforced by these files being in THIS overlay. It used to live
-  # in base/ with replicas:0 patches elsewhere, which left its Ingress HOST RULE
-  # declared on all three environments' Ingress objects — three claimants for one
-  # host, non-deterministic routing, and an intermittently broken board. See
-  # agile.yaml's header.
-  - agile-config.yaml
-  - agile.yaml
-  - agile-secret.externalsecret.yaml
+  # ── THE SPRINT BOARD IS GONE FROM HERE ────────────────────────────────────
+  # This overlay used to carry agile.yaml, agile-config.yaml and
+  # agile-secret.externalsecret.yaml, serving a team-built board at
+  # `ida-agile.capstone.uamishub.com`. The team migrated to the PLATFORM board
+  # (`ida-llm-agile.capstone.uamishub.com`, namespace `agile`, from
+  # platform-services/agile-boards), and running both left two live boards whose
+  # data had already diverged — the old one 6 items and 14 hours behind. Two
+  # boards is worse than either board, because the wrong one still answers.
+  #
+  # Removed rather than scaled to zero: the defect this file's own history
+  # records was a stale Ingress HOST RULE outliving its purpose, and a
+  # zero-replica Deployment would have kept exactly that.
 
 labels:
   - pairs:
@@ -40,6 +43,13 @@ images:
   - name: ida-llm-python-app
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-python-app
     newTag: "0.1.6"
+  # KEPT DELIBERATELY THOUGH THIS OVERLAY NO LONGER RUNS THE BOARD. The image is
+  # still BUILT (components.yaml is unchanged), and both the promotion invariant
+  # -- every overlay pins all three components at one tag -- and
+  # chart-render.test.sh's "all 3 built components have an images[] entry" are
+  # written against that build list, not against what an overlay deploys. The
+  # entry is inert here: no resource references the image, so kustomize emits
+  # nothing for it.
   - name: ida-llm-agile
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-agile
     newTag: "0.1.6"

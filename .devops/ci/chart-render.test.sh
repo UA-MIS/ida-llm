@@ -83,12 +83,12 @@ config = next((d for d in by_kind.get("ConfigMap", []) if d["metadata"]["name"] 
 named = {d["metadata"]["name"]: d for d in deploys}
 
 # ---- shape -----------------------------------------------------------------
-expected_deploys = 6 if env == "prod" else 5
+expected_deploys = 5
 check(len(deploys) == expected_deploys,
       f"{expected_deploys} Deployments (got {len(deploys)})")
 check(len(statefulsets) == 1, f"1 StatefulSet (got {len(statefulsets)})")
 check(len(cronjobs) == 3, f"3 CronJobs (got {len(cronjobs)})")
-expected_services = 7 if env == "prod" else 6
+expected_services = 6
 check(len(services) == expected_services,
       f"{expected_services} Services (got {len(services)})")
 check(len(services) <= 15, "Services within the tenant quota of 15")
@@ -250,29 +250,16 @@ agile_ingresses = [
     i for i in by_kind.get("Ingress", [])
     if any(r["host"] == "ida-agile.capstone.uamishub.com" for r in i["spec"]["rules"])
 ]
-if env == "prod":
-    check(agile is not None and agile["spec"]["replicas"] == 1,
-          "prod: the agile Deployment runs 1 replica")
-    check(len(agile_ingresses) == 1,
-          f"prod: exactly ONE Ingress claims the agile host (got {len(agile_ingresses)})")
-    if agile_ingresses:
-        ing = agile_ingresses[0]
-        # It must NOT be the app's `ida-llm` Ingress: the env ApplicationSet
-        # attaches SSO forwardAuth by targeting that NAME, and the annotation is
-        # per-OBJECT. Sharing it double-gates the UI and kills bearer-token API
-        # access, because this app does its own Dex OIDC.
-        check(ing["metadata"]["name"] == "ida-llm-agile",
-              f"prod: the agile host is on its OWN Ingress, not the app's (got {ing['metadata']['name']})")
-        check("traefik.ingress.kubernetes.io/router.middlewares"
-              not in ing["metadata"].get("annotations", {}),
-              "prod: the agile Ingress carries no forwardAuth middleware")
-        tls_hosts = {h for t in ing["spec"].get("tls", []) for h in t["hosts"]}
-        check(tls_hosts == {"ida-agile.capstone.uamishub.com"},
-              f"prod: the agile Ingress TLS matches its rule (got {sorted(tls_hosts)})")
-else:
-    check(agile is None, f"{env}: no agile Deployment (prod-only)")
-    check(not agile_ingresses,
-          f"{env}: NOTHING claims the agile host here (got {len(agile_ingresses)})")
+# THE BOARD IS GONE FROM THIS CHART, IN EVERY ENVIRONMENT. It used to be
+# prod-only, and this block used to assert prod HAD it. The team migrated to the
+# platform board (`ida-llm-agile.capstone.uamishub.com`, namespace `agile`), so
+# the assertion is inverted rather than deleted: what mattered was never "the
+# board exists", it was that exactly one thing claims that host. Zero claimants
+# is the correct count now, and this still catches the original defect -- a
+# stale host rule outliving the workload it pointed at.
+check(agile is None, f"{env}: no agile Deployment (the board moved to the platform chart)")
+check(not agile_ingresses,
+      f"{env}: NOTHING claims the old agile host (got {len(agile_ingresses)})")
 
 if ingress:
     # The app's own Ingress must never carry the board's host.
