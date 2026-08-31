@@ -6,12 +6,25 @@
    themes are defined here rather than scattered through the sheet — which is
    what makes the whole thing tunable from one screen of CSS.
 
-   ⚠ NO PURE #fff AND NO PURE #000, in either direction. A stark white page and
-   a pure-black dark mode are what made this read as clinical: pure neutrals have
-   no temperature, so nothing on the page feels considered. Light mode is warm
-   PAPER; dark mode is warm INK. Every neutral below carries the same faint warm
-   cast, so surfaces separate from the background by tone rather than by a hard
-   line.
+   ⚠ ONE PALETTE FOR THE WHOLE SITE, AND IT IS COOL. This block used to be warm
+   paper (#fbf9f6) and warm ink, tuned when the tool pages were the only pages.
+   The landing page then shipped on a brighter cool-neutral ground, because warm
+   paper was reviewed as reading BROWN and hard to read at the one job a front
+   door has. That left a visible temperature seam every time a visitor clicked
+   from the landing into the leaderboard — two palettes, one site.
+
+   The cool-neutral values won, so they are these values now. There is no
+   `--ld-*` palette any more: the landing tokens further down are ALIASES of
+   these, which is what makes "the whole site is one palette" a fact about the
+   stylesheet rather than a promise in a comment.
+
+   ⚠ STILL NO PURE #fff AND NO PURE #000, in either direction. The original
+   reasoning survives the temperature change intact: pure neutrals have no
+   temperature at all, and a page built from them reads as unconsidered. These
+   are cool neutrals — every one carries a faint blue cast (b > r), the mirror of
+   the warm cast that used to be here — so surfaces still separate from the
+   background by tone rather than by a hard line. `tests/palette.test.ts` asserts
+   the cast in that direction, so a warm value reintroduced by hand fails.
 
    ⚠ TWO ACCENTS, AND THEY DO DIFFERENT JOBS. This is not decoration:
 
@@ -35,17 +48,26 @@
    and asserts WCAG AA (4.5:1) for every text token against both the page
    background and the raised surface, in BOTH themes. Tune these values freely —
    the test is what tells you when a tweak has quietly made something unreadable.
+   Every text token currently clears 5.5:1 and most clear AAA (7:1); the
+   migration to cool neutrals raised every single pairing rather than lowering
+   any, so there is headroom above the floor.
    =========================================================================== */
 
 :root {
-  /* Paper, not white. */
-  --bg: #fbf9f6;
-  --surface: #f3efea;
-  --surface-2: #eae4dc;
-  --fg: #1f1c1a;
-  --muted: #6e6862;
-  --border: #e6dfd6;
-  --border-strong: #d2c8bb;
+  /* Bright, cool, and deliberately not white. */
+  --bg: #fbfcfd;
+  --surface: #eff3f7;
+  --surface-2: #e3eaf1;
+  --fg: #14171a;
+  /* Secondary text. 8.65:1 on the page, 7.97:1 on a surface. */
+  --muted: #414b55;
+  /* ⚠ NEW TOKEN: a THIRD text tone, quieter than --muted. The landing's rails,
+     eyebrows and side notes need a step below secondary that is still comfortably
+     readable (6.07:1 / 5.59:1) — it arrived with the landing as `--ld-ink-faint`
+     and is promoted here so the tool pages can use it too. */
+  --faint: #556270;
+  --border: #dde4eb;
+  --border-strong: #c3cdd7;
 
   --accent: #2f4c8a;
   --brand: #9e1b32;
@@ -57,69 +79,62 @@
   /* Gentle separation for raised surfaces. Light mode only carries a real
      shadow; in dark mode a cast shadow is invisible and the tone step does the
      work instead. */
-  --shadow: 0 1px 2px rgba(31, 28, 26, 0.05), 0 1px 8px rgba(31, 28, 26, 0.03);
+  --shadow: 0 1px 2px rgba(20, 23, 26, 0.06), 0 1px 8px rgba(20, 23, 26, 0.04);
 
   --radius: 8px;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
   /* -----------------------------------------------------------------------
-     THE LANDING PALETTE (`--ld-*`). A SECOND, DELIBERATELY DIFFERENT PALETTE,
-     and the difference is the whole point rather than an oversight.
+     THE LANDING TOKENS ARE NOW ALIASES, NOT A SECOND PALETTE.
 
-     The tool pages above are warm paper: a reading surface someone stares at
-     while comparing numbers, where a warm cast keeps a dense table from
-     reading as clinical. The landing page is not that. It is the front door,
-     it is read once, on a phone, by a professor deciding whether to trust
-     this at all — and it was reviewed as BROWN and hard to read at exactly
-     that job. So the landing runs a brighter, cool-neutral ground with higher
-     contrast throughout.
+     They shipped as their own cool-neutral set while the tool pages were still
+     warm paper, which is exactly the seam that got closed above: the app moved
+     onto these values rather than the landing moving back. What is left here is
+     a NAMING layer — the landing's stylesheet talks about paper/ink/rules, the
+     tool pages talk about bg/fg/borders, and both now resolve to one palette.
 
-     ⚠ THESE ARE SCOPED TO `.ld` AND NOTHING ELSE. Nothing above this comment
-     changes; the dashboard, the leaderboard and the run views keep the warm
-     palette they were tuned in. The visible consequence is a temperature shift
-     when a visitor clicks from the landing into the leaderboard — that is a
-     known, flagged seam, not an accident. See the note in the Landing block.
-
-     ⚠ NO PURE WHITE, same rule as above — `--ld-raise` is #fdfeff, not #fff,
-     and `tests/palette.test.ts` enforces it across every token here.
+     ⚠ CHANGE THE CANONICAL TOKEN, NEVER THESE. A hex typed below re-forks the
+     palette and reintroduces the seam silently — the page would still look fine
+     in isolation, which is what makes it worth a warning. Only the four genuinely
+     landing-specific values at the bottom carry their own colour.
      ----------------------------------------------------------------------- */
-  --ld-paper: #fbfcfd;
-  --ld-band: #eff3f7;
-  --ld-raise: #fdfeff;
-  --ld-ink: #14171a;
-  --ld-ink-soft: #414b55;
-  --ld-ink-faint: #556270;
-  --ld-rule: #ccd4dc;
-  --ld-rule-soft: #e1e7ec;
+  --ld-paper: var(--bg);
+  --ld-band: var(--surface);
+  --ld-ink: var(--fg);
+  --ld-ink-soft: var(--muted);
+  --ld-ink-faint: var(--faint);
+  --ld-rule: var(--border-strong);
+  --ld-rule-soft: var(--border);
+  --ld-accent: var(--brand);
 
-  /* Crimson is the university's, and on the landing it is the ONLY accent that
-     carries brand weight. It marks structure and calls to action — never a
-     status, exactly as `--brand` does above. */
-  --ld-accent: #9e1b32;
-  /* Hover goes DARKER, not lighter: a lighter crimson under white text was the
-     weakest contrast pair in the reviewed concept. */
+  /* Genuinely landing-only, because nothing on a tool page needs them:
+     a surface that sits ABOVE the page rather than below it (the two doors),
+     a pressed state for the one filled button, its foreground, and the single
+     second hue used on exactly one mark. */
+  --ld-raise: #fdfeff;
   --ld-accent-deep: #82132a;
   --ld-on-accent: #fbfcfd;
-  /* One quiet second hue, used on exactly one mark — the reading about whether
-     a model helps a student learn. It means something or it would not be here. */
   --ld-pine: #1f5449;
-
   --ld-shadow: 0 1px 2px rgba(20, 23, 26, 0.06), 0 12px 28px -18px rgba(20, 23, 26, 0.40);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Ink, not black — the same warm cast as the paper above. */
-    --bg: #191714;
-    --surface: #211e1b;
-    --surface-2: #2a2622;
-    --fg: #ede7df;
-    --muted: #a69d93;
-    --border: #322e2a;
-    --border-strong: #474139;
+    /* Cool near-black, not black — the same cool cast as the ground above. */
+    --bg: #0e1114;
+    --surface: #161a1f;
+    --surface-2: #222930;
+    --fg: #f2f5f8;
+    --muted: #b8c2cc;
+    --faint: #94a1ad;
+    --border: #2e363f;
+    --border-strong: #46515e;
 
     --accent: #93abee;
-    --brand: #e0657e;
+    /* ⚠ BRIGHTER THAN THE #e0657e IT REPLACES, and that is the unification: the
+       landing shipped its own dark crimson because #e0657e sat at 5.71:1 on the
+       cool ground. One brand colour, and it is the better-contrasting one (7.54:1). */
+    --brand: #fb7b93;
 
     --pass: #5fc08d;
     --fail: #f08a7c;
@@ -127,22 +142,13 @@
 
     --shadow: none;
 
-    /* The landing in dark: cool near-black rather than the warm ink above, and
-       lifted well clear of muddy. Same reasoning as the light block. */
-    --ld-paper: #0e1114;
-    --ld-band: #161a1f;
+    /* Only the four landing-only values need a dark variant; the eight aliases
+       above follow the canonical tokens into this block automatically, which is
+       the whole point of aliasing them. */
     --ld-raise: #1a1f25;
-    --ld-ink: #f2f5f8;
-    --ld-ink-soft: #b8c2cc;
-    --ld-ink-faint: #94a1ad;
-    --ld-rule: #2e363f;
-    --ld-rule-soft: #222930;
-
-    --ld-accent: #fb7b93;
     --ld-accent-deep: #ff9cad;
     --ld-on-accent: #0e1114;
     --ld-pine: #63cfae;
-
     --ld-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 14px 32px -18px rgba(0, 0, 0, 0.85);
   }
 }
