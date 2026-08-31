@@ -30,7 +30,12 @@ export const dynamic = "force-dynamic";
 function ServingConfigCard({ config }: { config: ServingConfig }) {
   return (
     <div className="card">
-      <h3>Serving configuration</h3>
+      {/* ⚠ `<h2>`, NOT `<h3>`. This card and the "Samples" section below it are
+          the only two sections on this page, and this one renders first — an
+          `<h3>` here with no preceding `<h2>` on the page was the only `<h3>`
+          before the only `<h2>`, an inversion heading navigation cannot make
+          sense of. */}
+      <h2 style={{ fontSize: "0.95rem", marginTop: 0 }}>Serving configuration</h2>
       <p className="muted" style={{ fontSize: "0.8rem", marginTop: 0 }}>
         Captured at run time and stored with every result. Editing the registry
         later cannot change what this run reports.

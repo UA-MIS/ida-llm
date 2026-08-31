@@ -80,7 +80,13 @@ export function ConfidenceTell({
   const { filled, total } = confidencePips(confidence);
   const color = confidenceColorVar(confidence);
   return (
-    <span className="confidence" title={reason} aria-label={`${label}. ${reason}`}>
+    // ⚠ `role="img"`, NOT A BARE SPAN. QA-24: an unstyled `<span>` is
+    // `role="generic"` in the accessibility tree, and `role="generic"`
+    // PROHIBITS an author-supplied name — conforming assistive technology is
+    // required to drop `aria-label` here and fall back to nothing, since the
+    // pips carry no text of their own (`score-bar.tsx`'s `.scorebar-track`
+    // already gets this right the same way).
+    <span className="confidence" title={reason} role="img" aria-label={`${label}. ${reason}`}>
       <span className="confidence-pips" aria-hidden="true">
         {Array.from({ length: total }, (_, index) => (
           <span

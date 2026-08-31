@@ -238,6 +238,9 @@ export default async function LandingPage() {
 
   return (
     <div className="ld">
+      <a href="#main-content" className="skip-link">
+        Skip to content
+      </a>
       <header className="ld-mast">
         <div className="ld-wrap">
           <div className="ld-mast-inner">
@@ -251,6 +254,11 @@ export default async function LandingPage() {
         </div>
       </header>
 
+      {/* ⚠ QA-25: NO `<main>` LANDMARK ON THIS PAGE AT ALL — everything below
+          was reachable only by reading through the whole DOM, never by
+          jumping to it. `.ld-content` in globals.css cancels out the generic
+          `main { max-width }` rule so this stays visually identical. */}
+      <main id="main-content" className="ld-content">
       {/* ---------------------------- hero ---------------------------- */}
       <section className="ld-hero">
         <div className="ld-wrap">
@@ -561,6 +569,7 @@ export default async function LandingPage() {
           </div>
         </div>
       </section>
+      </main>
 
       <footer className="ld-foot">
         <div className="ld-wrap">

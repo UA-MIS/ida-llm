@@ -209,9 +209,9 @@ describe("the glossary", () => {
   /**
    * ⚠ A DEAD "?" IS WORSE THAN NO "?". It promises help to the exact reader who
    * needed it and then does nothing. Every inline term must carry its full
-   * definition in the native `title`, because that is the floor that works
-   * everywhere — including inside a scrolling table, where the drawn card is
-   * clipped by `overflow-x`.
+   * definition in the native `title`, for a sighted mouse user, AND in an
+   * `.sr-only` span — QA-24: `title` alone is not exposed to touch screen
+   * readers or voice control at all, so it cannot be the only way in.
    */
   it("gives every inline '?' a real definition to open", async () => {
     await renderBoard(twoRankedModels());
@@ -225,6 +225,13 @@ describe("the glossary", () => {
         .toBeGreaterThan(20);
       // The card is the enhancement; it must still be there for a mouse.
       expect(term.querySelector(".term-card")).not.toBeNull();
+      // And the part that actually reaches every assistive technology.
+      const srOnly = term.querySelector(".sr-only");
+      expect(
+        srOnly,
+        `an inline term has no .sr-only definition, so touch screen readers and voice control cannot reach it: ${term.textContent}`,
+      ).not.toBeNull();
+      expect(srOnly!.textContent!.length).toBeGreaterThan(10);
     }
   });
 
@@ -263,5 +270,133 @@ describe("what the legibility layer must not have changed", () => {
   it("still carries the standing trust legend", async () => {
     await renderBoard(twoRankedModels());
     expect(document.querySelector(".legend")).not.toBeNull();
+  });
+});
+
+/**
+ * QA-24: the "also measured" drawer table (unranked / excluded models) had
+ * no `<thead>` at all — nine columns of numbers with zero header
+ * association for anyone navigating by table structure rather than sight.
+ */
+describe("the also-measured table's headers", () => {
+  it("has a <thead> with a header for every column, scoped to its column", async () => {
+    await renderBoard(
+      board([
+        task({
+          has_results: true,
+          best_model_key: "luna",
+          results: [
+            result({ model_key: "luna", display_name: "Luna", mean_score: 0.876 }),
+            result({
+              model_key: "demo-orion",
+              display_name: "demo-orion",
+              mean_score: 0.886,
+              recommendable: false,
+              data_residency: "unknown",
+              data_residency_label: "Hosting not stated in the registry",
+            }),
+          ],
+        }),
+      ]),
+    );
+
+    const table = document.querySelector("table.leaderboard-muted");
+    expect(table, "no also-measured table rendered").not.toBeNull();
+
+    const thead = table!.querySelector("thead");
+    expect(thead, "the also-measured table has no <thead>").not.toBeNull();
+
+    const headers = thead!.querySelectorAll("th");
+    expect(headers.length).toBeGreaterThan(0);
+    for (const header of headers) {
+      expect(
+        header.getAttribute("scope"),
+        `<th> "${header.textContent}" has no scope="col"`,
+      ).toBe("col");
+    }
+    expect(thead!.textContent).toContain("Model");
+    expect(thead!.textContent).toContain("Confidence");
+  });
+});
+
+/**
+ * QA-32: a task's `<h3>` used to nest inside its outcome's `<h3>`, giving a
+ * child section the same heading level as its parent — a skim by heading
+ * level could not tell the two apart.
+ */
+describe("the drilled-down task's heading level", () => {
+  it("nests below the outcome heading instead of matching it", async () => {
+    getLeaderboard.mockResolvedValue(twoRankedModels());
+    render(
+      await LeaderboardPage({
+        searchParams: Promise.resolve({ task: "slo2/l3-break-even" }),
+      }),
+    );
+
+    const outcomeHeading = document.querySelector(".outcome-heading h3");
+    expect(outcomeHeading, "no outcome heading rendered").not.toBeNull();
+
+    const taskHeading = document.querySelector(".task-title");
+    expect(taskHeading, "no task heading rendered").not.toBeNull();
+    expect(taskHeading!.tagName).toBe("H4");
+  });
+});
+
+/**
+ * QA-21: the filter bar is a GET form with three controls (outcome, search,
+ * "include unmeasured"). Submitting it replaces the entire query string, so
+ * without hidden inputs it silently drops `task`, `use_mode` and `benchmark`
+ * — a reader who arrives on a task deep link and touches the filter watches
+ * the page quietly expand to the whole catalogue.
+ */
+describe("the filter bar preserves params it does not own", () => {
+  it("carries task, use_mode and benchmark forward as hidden inputs", async () => {
+    getLeaderboard.mockResolvedValue(twoRankedModels());
+    render(
+      await LeaderboardPage({
+        searchParams: Promise.resolve({
+          task: "slo4/ethics",
+          use_mode: "write",
+          benchmark: "1",
+        }),
+      }),
+    );
+
+    const form = document.querySelector("form.filter-bar") as HTMLFormElement;
+    expect(form, "no filter form rendered").not.toBeNull();
+    expect((form.querySelector('input[name="task"]') as HTMLInputElement | null)?.value).toBe(
+      "slo4/ethics",
+    );
+    expect(
+      (form.querySelector('input[name="use_mode"]') as HTMLInputElement | null)?.value,
+    ).toBe("write");
+    expect(
+      (form.querySelector('input[name="benchmark"]') as HTMLInputElement | null)?.value,
+    ).toBe("1");
+  });
+
+  it("omits those hidden inputs entirely when the params are not set", async () => {
+    await renderBoard(twoRankedModels());
+
+    const form = document.querySelector("form.filter-bar") as HTMLFormElement;
+    expect(form.querySelector('input[name="task"]')).toBeNull();
+    expect(form.querySelector('input[name="use_mode"]')).toBeNull();
+    expect(form.querySelector('input[name="benchmark"]')).toBeNull();
+  });
+
+  it("still lets the outcome/search/unmeasured controls submit normally alongside the hidden ones", async () => {
+    getLeaderboard.mockResolvedValue(twoRankedModels());
+    render(
+      await LeaderboardPage({
+        searchParams: Promise.resolve({ task: "slo4/ethics", q: "ethics" }),
+      }),
+    );
+
+    const form = document.querySelector("form.filter-bar") as HTMLFormElement;
+    expect(form.querySelector("select#slo")).not.toBeNull();
+    expect((form.querySelector("input#q") as HTMLInputElement).value).toBe("ethics");
+    expect((form.querySelector('input[name="task"]') as HTMLInputElement).value).toBe(
+      "slo4/ethics",
+    );
   });
 });

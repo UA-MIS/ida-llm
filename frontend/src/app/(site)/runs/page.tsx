@@ -39,8 +39,12 @@ function ScoreCell({ run }: { run: RunRecord }) {
           ? "not yet scorable — this task needs LLM-as-judge grading"
           : "not scored";
     return (
+      // QA-33: `title` is unreachable by keyboard and by touch, and this
+      // glyph carried no other accessible text — a screen reader read a bare
+      // em dash with no reason attached to it at all.
       <span className="muted" title={reason}>
-        —
+        <span aria-hidden="true">—</span>
+        <span className="sr-only">{reason}</span>
       </span>
     );
   }
@@ -154,8 +158,14 @@ export default async function RunsPage() {
             <th>Task</th>
             <th>Model</th>
             <th className="num">Mean score</th>
+            {/* QA-33: `title` explained what a token roughly is, but that
+                explanation was unreachable by touch or voice control — the
+                sr-only span carries the same sentence without changing the
+                header's accessible name ("Tokens"), which stays what a
+                screen reader announces first. */}
             <th className="num" title="Roughly three quarters of a word each — the unit outside services bill by.">
               Tokens
+              <span className="sr-only"> — roughly three quarters of a word each, the unit outside services bill by</span>
             </th>
             <th className="num">Cost</th>
             <th className="num">Duration</th>

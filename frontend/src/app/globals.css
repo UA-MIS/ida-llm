@@ -68,6 +68,15 @@
   --faint: #556270;
   --border: #dde4eb;
   --border-strong: #c3cdd7;
+  /* QA-26: neither of the two tokens above clears WCAG 1.4.11's 3:1 floor for
+     a UI component boundary — --border-strong sits at 1.57:1 on the page and
+     1.44:1 on a card, so a form control's only edge against its own panel was
+     barely more visible than no border at all. This is the one token tuned
+     for that: 3.33:1 on the page, 3.07:1 on a raised surface. Reserved for
+     boundaries that are the ONLY affordance marking a control (an input, a
+     button, the glossary term's underline) — decorative rules stay on
+     --border/--border-strong, which would otherwise all get needlessly heavier. */
+  --border-control: #828c96;
 
   --accent: #2f4c8a;
   --brand: #9e1b32;
@@ -117,6 +126,7 @@
   --ld-ink-faint: var(--faint);
   --ld-rule: var(--border-strong);
   --ld-rule-soft: var(--border);
+  --ld-rule-control: var(--border-control);
   --ld-accent: var(--brand);
 
   /* Genuinely landing-only, because nothing on a tool page needs them:
@@ -145,6 +155,9 @@
     --faint: #94a1ad;
     --border: #2e363f;
     --border-strong: #46515e;
+    /* QA-26, dark side: --border-strong is 2.34:1 on the page and 2.16:1 on a
+       surface here — still under 3:1. 3.38:1 / 3.12:1. */
+    --border-control: #5d6976;
 
     --accent: #93abee;
     /* ⚠ BRIGHTER THAN THE #e0657e IT REPLACES, and that is the unification: the
@@ -180,7 +193,27 @@ body {
   line-height: 1.55;
 }
 
-main { max-width: var(--page-max); margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+/* ⚠ SPLIT FROM ONE `main` RULE — QA-25. `<header>` and `<nav>` used to be
+   INSIDE `<main>` in `(site)/layout.tsx`, purely so they would inherit this
+   box's centring and padding; that also cost them their `banner`/landmark
+   roles, since `<header>` only gets `banner` when it is not nested inside
+   `main`. They are now siblings of `<main>`, and `.site-header` carries the
+   same horizontal treatment `main` always gave them, split at the point
+   where the vertical padding used to sit between the nav row and the page
+   content — so this is a markup change with no visual one. */
+.site-header { max-width: var(--page-max); margin: 0 auto; padding: 2rem 1.5rem 0; }
+main { max-width: var(--page-max); margin: 0 auto; padding: 0 1.5rem 4rem; }
+
+/* Invisible until focused — the first tab stop on every tool page, so a
+   keyboard user can jump past the four nav links straight to the content. */
+.skip-link {
+  position: absolute; top: -3rem; left: 1rem; z-index: 100;
+  background: var(--fg); color: var(--bg);
+  padding: 0.5rem 1rem; border-radius: var(--radius);
+  font-weight: 600; text-decoration: none;
+  transition: top 120ms ease;
+}
+.skip-link:focus-visible { top: 1rem; }
 
 h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
 h2 { font-size: 1.1rem; margin: 2rem 0 0.75rem; }
@@ -227,7 +260,8 @@ tbody tr:hover { background: var(--surface); }
 .badge-queued    { color: var(--pending); border-color: currentColor; }
 
 .card {
-  border: 1px solid var(--border); border-radius: var(--radius);
+  /* QA-26: was --border (1.15:1 against this card's own --surface). */
+  border: 1px solid var(--border-control); border-radius: var(--radius);
   background: var(--surface); padding: 1rem; margin-bottom: 1rem;
   box-shadow: var(--shadow);
 }
@@ -273,6 +307,13 @@ pre {
   display: flex; flex-wrap: wrap; gap: 1.25rem;
   margin: 0.5rem 0 1.75rem; font-size: 0.9rem;
   border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;
+}
+/* QA-25: the nav carried no visual active state at all — `aria-current`
+   alone tells assistive technology which page you are on but leaves a
+   sighted reader to work it out from the URL bar. */
+.nav a[aria-current="page"] {
+  color: var(--fg); font-weight: 600;
+  text-decoration: underline; text-underline-offset: 0.25em;
 }
 
 /* ⚠ THE LABEL IS var(--bg), NOT #fff. A filled button inverts, and in dark mode
@@ -372,8 +413,26 @@ button.secondary { background: transparent; color: var(--accent); border-color: 
 }
 /* De-emphasised, never hidden: a test stub and an unmeasured pair are real
    facts about the benchmark, and a results page that drops inconvenient rows
-   is the thing this project exists to replace. */
-.result-card-muted { opacity: 0.72; }
+   is the thing this project exists to replace.
+
+   ⚠ QA-17: THIS USED TO BE `opacity: 0.72`. Opacity multiplies through every
+   colour inside the card uniformly — including colours `tests/palette.test.ts`
+   already asserts clear AA on their own (--fg, --muted, --accent, every tier
+   colour) — so it dragged the model name, the "See the proof" link and the
+   note text below AA in both themes, on exactly the rows the product is
+   proudest of. It also cannot be tuned: a value that fixes the worst offender
+   (the confidence label, 2.86:1 in light mode) makes the card barely
+   different from a normal one, and a value that reads as "clearly secondary"
+   fails contrast worse than this did.
+
+   The fix is TONE, not transparency: a background one step off `--surface`
+   (already proven >4.5:1 for every text token in the palette suite, not just
+   3:1) plus `color: var(--muted)`, which every descendant inherits UNLESS it
+   already carries its own AA-tested colour — a badge, the confidence tell,
+   the star. Those keep their real meaning instead of being flattened to grey;
+   only the prose around them quiets down. */
+.result-card-muted { background: var(--surface-2); color: var(--muted); }
+.result-card-muted a { color: var(--muted); }
 
 .result-head { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; }
 .result-identity { min-width: 0; }
@@ -409,7 +468,9 @@ button.secondary { background: transparent; color: var(--accent); border-color: 
 .option {
   display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem;
   text-align: left; background: var(--bg); color: inherit;
-  border: 1px solid var(--border); border-radius: var(--radius);
+  /* QA-26: was --border (1.15:1) against the --surface question card these
+     buttons sit inside. */
+  border: 1px solid var(--border-control); border-radius: var(--radius);
   padding: 0.65rem 0.8rem; font-weight: 400;
 }
 .option:hover { border-color: var(--accent); }
@@ -522,8 +583,13 @@ h2 { font-size: 1.15rem; }
 
 .leaderboard td, .task-table td, .outcome-table td { padding-top: 0.7rem; padding-bottom: 0.7rem; }
 
-/* De-emphasised, never hidden — the same rule the result cards follow. */
-.row-muted { opacity: 0.68; }
+/* De-emphasised, never hidden — the same rule the result cards follow.
+   QA-17: was `opacity: 0.68`, which failed AA on the same four kinds of
+   content (model name/link, "not measured yet", the confidence label, muted
+   secondary text) for the same reason — see the long comment on
+   `.result-card-muted` above. Same fix: tone instead of transparency. */
+.row-muted { background: var(--surface-2); color: var(--muted); }
+.row-muted a { color: var(--muted); }
 .leaderboard-muted { margin-top: 0.75rem; }
 
 .col-rank { width: 2.5rem; }
@@ -571,7 +637,9 @@ h2 { font-size: 1.15rem; }
 }
 .filter-bar select, .filter-bar input[type="search"] {
   font: inherit; font-size: 0.9rem; color: inherit; background: var(--bg);
-  border: 1px solid var(--border); border-radius: var(--radius);
+  /* QA-26: was --border (1.15:1) — the only boundary these two controls have
+     against the --surface filter bar they sit inside. */
+  border: 1px solid var(--border-control); border-radius: var(--radius);
   padding: 0.45rem 0.6rem; min-width: 12rem; max-width: 100%;
 }
 .filter-bar select:focus-visible, .filter-bar input:focus-visible {
@@ -644,7 +712,8 @@ h2 { font-size: 1.15rem; }
 .badge { white-space: nowrap; }
 
 @media (max-width: 760px) {
-  main { padding: 1.5rem 1rem 3rem; }
+  .site-header { padding: 1.5rem 1rem 0; }
+  main { padding: 0 1rem 3rem; }
   .col-optional { display: none; }
   /* ⚠ `.col-trust` IS DELIBERATELY ABSENT FROM THE LIST ABOVE, AND MUST STAY
      ABSENT. Confidence used to carry `.col-optional`, so below 760px a phone
@@ -732,6 +801,15 @@ body:has(.ld) { background: var(--ld-paper); }
   min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
 }
+
+/* ⚠ QA-25: THE LANDING PAGE HAD NO `<main>` LANDMARK AT ALL. Its sections are
+   full-bleed, each centring its own content via `.ld-wrap` — so wrapping them
+   in a bare `<main>` would collide with the generic `main { max-width: … }`
+   rule above and force the WHOLE landing page, backgrounds included, into
+   the same 1080px column the tool pages use. `.ld-content` cancels that rule out
+   (a class beats an element selector) so the new landmark changes nothing
+   visually. */
+.ld-content { max-width: none; margin: 0; padding: 0; }
 
 .ld h1, .ld h2, .ld h3 {
   font-family: var(--font-display), Georgia, "Times New Roman", serif;
@@ -907,7 +985,8 @@ body:has(.ld) { background: var(--ld-paper); }
   transform: translateY(-1px); box-shadow: var(--ld-shadow);
 }
 .ld-btn-quiet {
-  background: transparent; color: var(--ld-ink); border: 1px solid var(--ld-rule);
+  /* QA-26: was --ld-rule (--border-strong, 1.57:1 against the page). */
+  background: transparent; color: var(--ld-ink); border: 1px solid var(--ld-rule-control);
 }
 .ld-btn-quiet:hover {
   background: transparent; border-color: var(--ld-ink-soft); color: var(--ld-ink);
@@ -1286,8 +1365,10 @@ a.cg-score:hover { text-decoration: underline; }
   position: relative;
   cursor: help;
   /* The dotted rule is the affordance a reader recognises from a dictionary,
-     and it survives at any font size — an icon next to a word does not. */
-  border-bottom: 1px dotted var(--border-strong);
+     and it survives at any font size — an icon next to a word does not.
+     QA-26: was --border-strong (1.44–2.16:1 depending on theme and what is
+     behind it) for the SOLE visual affordance marking a word as interactive. */
+  border-bottom: 1px dotted var(--border-control);
   color: inherit;
   font: inherit;
 }

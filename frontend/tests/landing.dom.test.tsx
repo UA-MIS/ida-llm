@@ -264,3 +264,32 @@ describe("the front door's exits", () => {
     }
   });
 });
+
+/**
+ * QA-25: the landing page had no `<main>` landmark at all and no skip link —
+ * every keyboard user had to tab through the whole page with no way to jump
+ * past it.
+ */
+describe("the landing page's landmarks", () => {
+  it("wraps its content in a <main> that the skip link actually reaches", async () => {
+    getLeaderboard.mockResolvedValue(board([task()]));
+    await renderLanding();
+
+    const main = document.querySelector("main");
+    expect(main, "no <main> landmark on the landing page").not.toBeNull();
+    expect(main!.id).toBe("main-content");
+
+    const skipLink = document.querySelector("a.skip-link");
+    expect(skipLink, "no skip link on the landing page").not.toBeNull();
+    expect(skipLink!.getAttribute("href")).toBe("#main-content");
+  });
+
+  it("keeps the header and footer outside <main>", async () => {
+    getLeaderboard.mockResolvedValue(board([task()]));
+    await renderLanding();
+
+    const main = document.querySelector("main")!;
+    expect(main.querySelector("header")).toBeNull();
+    expect(main.querySelector("footer")).toBeNull();
+  });
+});
