@@ -39,6 +39,7 @@ import { GlossaryPanel, Term } from "@/components/glossary";
 import { HowToRead, ReadStep } from "@/components/how-to-read";
 import { ModelResultCard } from "@/components/model-result-card";
 import { PlainSummary } from "@/components/plain-summary";
+import { ResultsUnavailable } from "@/components/service-unavailable";
 import { ScoreBar } from "@/components/score-bar";
 import { ConfidenceTell, ResidencyBadge, TrustLegend } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
@@ -580,7 +581,28 @@ export default async function ResultsPage({
   // ONE fetch, unfiltered. The model rollup needs the whole board anyway, and
   // the filters below are the same field equality the API applies — a second
   // round trip would buy latency and a chance to disagree with itself.
-  const board = await getLeaderboard();
+  //
+  // ⚠ CAUGHT, NOT THROWN, AND THE REASON IS THE READER RATHER THAN THE UPTIME.
+  // Letting this reject reaches `app/error.tsx`, and what a professor gets is a
+  // page that reads as "this whole thing is broken" — from which they do not
+  // come back. `components/service-unavailable.tsx` sets out the full argument;
+  // the short version is that an outage should cost us ten minutes of a
+  // reader's patience, not the reader.
+  //
+  // The landing page has degraded this way since it shipped. This is the same
+  // move, on the page the front door's primary button actually points at.
+  let board: LeaderboardResponse;
+  try {
+    board = await getLeaderboard();
+  } catch (cause) {
+    return (
+      <ResultsUnavailable
+        what="the benchmark results"
+        retryHref="/leaderboard"
+        cause={cause}
+      />
+    );
+  }
 
   const rollups = rollupByModel(board);
   const outcomeCount = board.curriculum.available

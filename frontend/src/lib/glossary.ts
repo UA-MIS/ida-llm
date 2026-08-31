@@ -144,6 +144,14 @@ const ENTRIES: GlossaryEntry[] = [
       "Most of this benchmark is in this state today, and we show the gaps rather than filling them. A blank here is an honest blank; it is never shown as a score of nought.",
   },
   {
+    id: "not-benchmarkable",
+    term: "Cannot be measured this way",
+    plain:
+      "Some of your programme's outcomes cannot honestly be tested by asking an AI to write something — teamwork and speaking aloud are the usual two.",
+    more:
+      "Those outcomes are still shown, marked with a diamond rather than left out. A benchmark that silently covered seven of your nine outcomes would read as though your programme has seven.",
+  },
+  {
     id: "sample",
     term: "Attempt",
     plain:
@@ -376,6 +384,21 @@ export const RECOMMEND_TERMS = [
   "token",
   "lms",
   "api",
+  "receipt",
+] as const;
+
+export const COMPARE_TERMS = [
+  "learning-outcome",
+  "score",
+  "overall-score",
+  "confidence",
+  "verifiable",
+  "judged",
+  "not-measured",
+  "not-benchmarkable",
+  "model",
+  "task",
+  "sample",
   "receipt",
 ] as const;
 

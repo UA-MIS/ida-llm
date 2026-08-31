@@ -24,6 +24,7 @@ import { describe, expect, it } from "vitest";
 import {
   GLOSSARY,
   GLOSSARY_IDS,
+  COMPARE_TERMS,
   LEADERBOARD_TERMS,
   RECOMMEND_TERMS,
   REPORT_CARD_TERMS,
@@ -186,6 +187,7 @@ describe("the per-page word lists", () => {
     REPORT_CARD_TERMS,
     RECOMMEND_TERMS,
     RUNS_TERMS,
+    COMPARE_TERMS,
   };
 
   for (const [name, ids] of Object.entries(LISTS)) {
@@ -211,7 +213,7 @@ describe("the per-page word lists", () => {
    * layer exists for.
    */
   it("explains the load-bearing words wherever numbers appear", () => {
-    for (const ids of [LEADERBOARD_TERMS, REPORT_CARD_TERMS]) {
+    for (const ids of [LEADERBOARD_TERMS, REPORT_CARD_TERMS, COMPARE_TERMS]) {
       for (const required of ["score", "confidence", "verifiable", "judged", "not-measured"]) {
         expect(ids).toContain(required);
       }
