@@ -83,7 +83,10 @@ SEED_HARNESS_VERSION = "0.0.0-synthetic"
 # invented and mean nothing beyond producing a plausible SHAPE.
 PROFILES: dict[str, dict] = {
     "luna": {"base": 0.86, "bias": {"SLO2": +0.12, "SLO9": +0.10, "SLO7": -0.06, "SLO6": -0.04}},
-    "sparks-local": {"base": 0.71, "bias": {"SLO1": +0.10, "SLO3": +0.08, "SLO2": -0.09, "SLO9": -0.05}},
+    "sparks-local": {
+        "base": 0.71,
+        "bias": {"SLO1": +0.10, "SLO3": +0.08, "SLO2": -0.09, "SLO9": -0.05},
+    },
     "mock": {"base": 0.52, "bias": {}},
 }
 
@@ -168,9 +171,11 @@ def _preflight(runs: list, results: list) -> None:
         ScorerKind(scorer)
     for cfg in {r[5] for r in results}:
         ServingConfig.model_validate(json.loads(cfg))
-    print(f"  preflight OK: {len({r[1] for r in runs})} status, "
-          f"{len({r[6] for r in results})} scorer, "
-          f"{len({r[5] for r in results})} serving_config distinct values validated")
+    print(
+        f"  preflight OK: {len({r[1] for r in runs})} status, "
+        f"{len({r[6] for r in results})} scorer, "
+        f"{len({r[5] for r in results})} serving_config distinct values validated"
+    )
 
 
 def build_rows(specs, serving: dict[str, dict], now: dt.datetime) -> tuple[list, list]:
@@ -194,18 +199,52 @@ def build_rows(specs, serving: dict[str, dict], now: dt.datetime) -> tuple[list,
                 jitter = (det(model, spec.id, sample.id) - 0.5) * 0.18
                 value = max(0.0, min(1.0, raw + jitter))
                 scores.append(value)
-                rows.append([
-                    new_result_id(), rid, spec.id, sample.id, model, cfg,
-                    scorer, value, value >= 0.6, True,
-                    420, 260, 0.0, 900.0 + det("l", model, sample.id) * 2600.0,
-                    fin, 0, False, 0, 0, 0.0, 0,
-                ])
+                rows.append(
+                    [
+                        new_result_id(),
+                        rid,
+                        spec.id,
+                        sample.id,
+                        model,
+                        cfg,
+                        scorer,
+                        value,
+                        value >= 0.6,
+                        True,
+                        420,
+                        260,
+                        0.0,
+                        900.0 + det("l", model, sample.id) * 2600.0,
+                        fin,
+                        0,
+                        False,
+                        0,
+                        0,
+                        0.0,
+                        0,
+                    ]
+                )
             mean = sum(scores) / len(scores) if scores else None
-            runs.append((
-                rid, "succeeded", spec.id, model, SEED_LABEL, SEED_HARNESS_VERSION, cfg,
-                len(spec.samples), len(scores), mean,
-                420 * len(scores), 260 * len(scores), 0.0, fin, fin, 0,
-            ))
+            runs.append(
+                (
+                    rid,
+                    "succeeded",
+                    spec.id,
+                    model,
+                    SEED_LABEL,
+                    SEED_HARNESS_VERSION,
+                    cfg,
+                    len(spec.samples),
+                    len(scores),
+                    mean,
+                    420 * len(scores),
+                    260 * len(scores),
+                    0.0,
+                    fin,
+                    fin,
+                    0,
+                )
+            )
             results.extend(rows)
     return runs, results
 
@@ -213,12 +252,14 @@ def build_rows(specs, serving: dict[str, dict], now: dt.datetime) -> tuple[list,
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--yes", action="store_true", help="required; confirms this is a dev database")
-    ap.add_argument("--tasks", default=None, help="task directory (default: <repo>/tasks or /app/tasks)")
+    ap.add_argument(
+        "--tasks", default=None, help="task directory (default: <repo>/tasks or /app/tasks)"
+    )
     ap.add_argument(
         "--repo",
         default=None,
         help="directory holding models.yaml (default: the script's parent repo). Needed when "
-             "running from a container where this file was copied outside the source tree.",
+        "running from a container where this file was copied outside the source tree.",
     )
     args = ap.parse_args()
 
@@ -232,8 +273,10 @@ def main() -> int:
     repo = pathlib.Path(args.repo) if args.repo else pathlib.Path(__file__).resolve().parent.parent
     if not (repo / "models.yaml").is_file():
         _fail(f"no models.yaml under {repo} -- pass --repo pointing at the tree that has it.")
-    tasks_dir = pathlib.Path(args.tasks) if args.tasks else (
-        pathlib.Path("/app/tasks") if pathlib.Path("/app/tasks").exists() else repo / "tasks"
+    tasks_dir = (
+        pathlib.Path(args.tasks)
+        if args.tasks
+        else (pathlib.Path("/app/tasks") if pathlib.Path("/app/tasks").exists() else repo / "tasks")
     )
     serving = load_serving_configs(repo)
     specs = list(TaskCatalog.from_directory(tasks_dir).all())
@@ -276,12 +319,15 @@ def main() -> int:
         )
         conn.commit()
 
-        print(f"  seeded {len(runs)} runs / {len(results)} results "
-              f"across {len(PROFILES)} models and {len(specs)} tasks")
+        print(
+            f"  seeded {len(runs)} runs / {len(results)} results "
+            f"across {len(PROFILES)} models and {len(specs)} tasks"
+        )
         for model in PROFILES:
             n, sc, mn = cur.execute(
                 "select count(*), count(score_value), round(avg(score_value)::numeric,3) "
-                "from results where model_key = %s", (model,)
+                "from results where model_key = %s",
+                (model,),
             ).fetchone()
             print(f"    {model:<14} results={n:<5} scored={sc:<5} mean={mn}")
     return 0
