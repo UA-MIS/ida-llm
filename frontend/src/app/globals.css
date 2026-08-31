@@ -84,6 +84,18 @@
   --radius: 8px;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
+  /* ⚠ ONE PAGE WIDTH, DECLARED ONCE. There used to be three `main { max-width }`
+     rules in this sheet — 1080px in the skeleton, 1140px in Dashboard v1, 1180px
+     in the redesign — each added by a later section without removing the one
+     above it. Only the last had any effect, so the two comments explaining the
+     first two were describing a width the browser never used.
+
+     1180px was also simply too narrow. It was chosen when the widest thing on
+     the site was a result card; the site is now mostly TABLES, which want every
+     pixel they can get, and on a 2560px display the app was using a middle
+     third of the screen with the rest empty. */
+  --page-max: 90rem;
+
   /* -----------------------------------------------------------------------
      THE LANDING TOKENS ARE NOW ALIASES, NOT A SECOND PALETTE.
 
@@ -111,6 +123,10 @@
      a surface that sits ABOVE the page rather than below it (the two doors),
      a pressed state for the one filled button, its foreground, and the single
      second hue used on exactly one mark. */
+  /* The landing's own maximum. Wider than the tool pages' --page-max would be
+     too wide for an editorial page; narrower is what caused the skinny look. */
+  --ld-max: 84rem;
+
   --ld-raise: #fdfeff;
   --ld-accent-deep: #82132a;
   --ld-on-accent: #fbfcfd;
@@ -164,7 +180,7 @@ body {
   line-height: 1.55;
 }
 
-main { max-width: 1080px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+main { max-width: var(--page-max); margin: 0 auto; padding: 2rem 1.5rem 4rem; }
 
 h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
 h2 { font-size: 1.1rem; margin: 2rem 0 0.75rem; }
@@ -245,11 +261,13 @@ pre {
 
    Still no framework: the skeleton's rule ("do not commit the project to a
    design system before there is a design") holds, and everything below is
-   plain CSS on the same four variables. Wider than 1080px is deliberate for
-   the result cards, which carry a score, three badges and a link on one row.
-   =========================================================================== */
+   plain CSS on the same four variables.
 
-main { max-width: 1140px; }
+   ⚠ THE `main { max-width: 1140px }` THAT USED TO SIT HERE IS GONE, and so is
+   the 1180px one further down. Both were overrides of the skeleton's 1080px that
+   only the last-declared of them ever won. The width is `--page-max`, set once
+   at the top of this file.
+   =========================================================================== */
 
 .nav {
   display: flex; flex-wrap: wrap; gap: 1.25rem;
@@ -454,8 +472,6 @@ button.secondary { background: transparent; color: var(--accent); border-color: 
    already carried by the confidence meter. Colour says "how sure", never "how
    good".
    =========================================================================== */
-
-main { max-width: 1180px; }
 
 h2 { font-size: 1.15rem; }
 
@@ -717,21 +733,63 @@ body:has(.ld) { background: var(--ld-paper); }
   border-radius: 2px;
 }
 
-/* --- layout ------------------------------------------------------------- */
-.ld-wrap { width: min(100% - 2.5rem, 66rem); margin-inline: auto; }
+/* --- layout ---------------------------------------------------------------
+   ⚠ THIS USED TO READ AS A SKINNY MIDDLE THIRD, and the cause was not the
+   reading measure — it was the COMPOSITION around it. The wrap capped at 66rem,
+   the grid inside it was `justify-content: start`, and the content came to about
+   47rem. So roughly 19rem of the wrap sat empty on the right, every section,
+   all the way down, with the whole thing centred in a much wider viewport. The
+   dead space was asymmetric, which is what made it read as broken rather than
+   as margin.
+
+   Three things fix it, and only the third touches the measure:
+
+     1. The wrap widens to `--ld-max` (84rem).
+     2. The grid CENTRES. Balanced margins read as intentional; a column dumped
+        against the left edge of its own container does not.
+     3. Prose goes to 66ch and the rail to 15rem. 66ch is still inside the
+        readable band — this is the one number that must NOT be solved by making
+        it as wide as the screen, because a 200-character line is unreadable no
+        matter how much of the viewport it fills.
+
+   What actually fills the screen is `.ld-col-wide` below: the sections that are
+   NOT running prose — the readings, the steps, the doors, the trust list — stop
+   being pinned to the prose measure and lay out across the full width instead.
+   Those are lists and cards, and lists and cards have no measure to respect.
+   -------------------------------------------------------------------------- */
+.ld-wrap { width: min(100% - 3rem, var(--ld-max)); margin-inline: auto; }
 
 .ld-grid {
   display: grid;
-  grid-template-columns: minmax(0, 62ch);
+  grid-template-columns: minmax(0, 66ch);
   gap: 1.15rem;
   align-items: start;
+  justify-content: center;
 }
 @media (min-width: 62rem) {
   .ld-grid {
-    grid-template-columns: 13rem minmax(0, 62ch);
-    gap: 0 3.25rem;
-    justify-content: start;
+    grid-template-columns: 15rem minmax(0, 66ch);
+    gap: 0 3.5rem;
   }
+}
+
+/* The wide variant: content stops respecting the prose measure and fills the
+   wrap. Applied per-section in the markup, never globally — the prose sections
+   genuinely do want the narrow column. */
+@media (min-width: 76rem) {
+  .ld-grid-wide { grid-template-columns: 15rem minmax(0, 1fr); }
+}
+
+/* Heading left, prose right — a magazine two-column for the one section that is
+   pure argument. It fills the width without ever widening a line of text. */
+@media (min-width: 76rem) {
+  .ld-split {
+    display: grid;
+    grid-template-columns: minmax(0, 22rem) minmax(0, 60ch);
+    gap: 0 4rem;
+    align-items: start;
+  }
+  .ld-split > .ld-h2 { margin-bottom: 0; }
 }
 
 .ld-rail {
@@ -798,9 +856,12 @@ body:has(.ld) { background: var(--ld-paper); }
 @media (min-width: 62rem) { .ld-hero { padding-block: 5.5rem 4.5rem; } }
 
 .ld h1 {
-  font-size: clamp(2.35rem, 1.05rem + 4.6vw, 4.05rem);
+  /* The ceiling rose with the column. At 4.05rem in a 62ch box the headline
+     wrapped to four cramped lines on a large display and looked timid; the
+     measure is what caps it now, not the font size. */
+  font-size: clamp(2.35rem, 1rem + 5.2vw, 4.9rem);
   font-variation-settings: "SOFT" 34, "WONK" 1, "opsz" 144;
-  font-weight: 400; line-height: 1.06; letter-spacing: -0.025em; max-width: 19ch;
+  font-weight: 400; line-height: 1.05; letter-spacing: -0.026em; max-width: 17ch;
 }
 /* The turn in the argument, and the only place the headline changes colour. */
 .ld-turn {
@@ -808,7 +869,7 @@ body:has(.ld) { background: var(--ld-paper); }
   font-variation-settings: "SOFT" 48, "WONK" 1, "opsz" 144;
   color: var(--ld-accent); margin-top: 0.12em;
 }
-.ld-hero .ld-lede { margin-top: 1.9rem; font-size: 1.24rem; }
+.ld-hero .ld-lede { margin-top: 1.9rem; font-size: 1.24rem; max-width: 56ch; }
 
 .ld-cta-row {
   display: flex; flex-wrap: wrap; align-items: center; gap: 1.5rem; margin-top: 2.4rem;
@@ -867,6 +928,18 @@ body:has(.ld) { background: var(--ld-paper); }
 @keyframes ld-draw { to { stroke-dashoffset: 0; } }
 
 .ld-readings { display: grid; margin-top: 2.75rem; border-top: 1px solid var(--ld-rule-soft); }
+/* Three questions about one outcome are a SET, not a sequence — so on a wide
+   screen they sit side by side and can be compared in one look, which is what
+   they are for. Stacked rows made the reader scroll between two things that
+   only mean anything next to each other. */
+@media (min-width: 76rem) {
+  .ld-grid-wide .ld-readings {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 2.5rem;
+    border-bottom: 1px solid var(--ld-rule-soft);
+  }
+  .ld-grid-wide .ld-reading { border-bottom: 0; padding: 1.6rem 0; }
+}
 .ld-reading {
   display: grid; grid-template-columns: 1.9rem minmax(0, 1fr); gap: 0 1rem;
   padding: 1.35rem 0; border-bottom: 1px solid var(--ld-rule-soft); align-items: start;
@@ -900,6 +973,19 @@ body:has(.ld) { background: var(--ld-paper); }
 
 /* --- how it works ------------------------------------------------------- */
 .ld-steps { display: grid; margin-top: 0.5rem; }
+/* Still numbered, still a sequence — reading order across three columns is the
+   same left-to-right the numbers already assert. */
+@media (min-width: 76rem) {
+  .ld-grid-wide .ld-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 2.75rem;
+    border-bottom: 1px solid var(--ld-rule);
+  }
+  .ld-grid-wide .ld-step {
+    border-bottom: 0; padding: 1.9rem 0 2.1rem;
+    grid-template-columns: minmax(0, 1fr); gap: 0.55rem 0;
+  }
+}
 .ld-step {
   display: grid; grid-template-columns: 2.6rem minmax(0, 1fr); gap: 0 1.15rem;
   padding: 1.65rem 0; border-bottom: 1px solid var(--ld-rule); align-items: baseline;
@@ -925,6 +1011,10 @@ body:has(.ld) { background: var(--ld-paper); }
   /* The primary door is wider as well as tinted — weight, not just colour, so
      the choice still reads as a choice in a monochrome or high-contrast mode. */
   .ld-doors { grid-template-columns: 1.08fr 1fr; gap: 1.4rem; }
+}
+@media (min-width: 76rem) {
+  .ld-grid-wide .ld-doors { gap: 2rem; }
+  .ld-grid-wide .ld-door { padding: 2.25rem 2.1rem 2rem; }
 }
 .ld-door {
   display: flex; flex-direction: column; gap: 0.7rem;
@@ -955,6 +1045,14 @@ body:has(.ld) { background: var(--ld-paper); }
 
 /* --- trust -------------------------------------------------------------- */
 .ld-trust { display: grid; margin-top: 0.25rem; }
+@media (min-width: 76rem) {
+  .ld-grid-wide .ld-trust {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 3.5rem;
+  }
+  /* With two columns the first item in each is a top edge, not just the first. */
+  .ld-grid-wide .ld-trust-item:nth-child(2) { border-top: 1px solid var(--ld-rule-soft); }
+}
 .ld-trust-item { padding: 1.3rem 0; border-bottom: 1px solid var(--ld-rule-soft); }
 .ld-trust-item:first-child { border-top: 1px solid var(--ld-rule-soft); }
 .ld-trust-item b {

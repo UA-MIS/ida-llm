@@ -201,10 +201,20 @@ describe("one palette, not two", () => {
     "ld-shadow",       // a deeper cast than the tool pages' subtle lift
   ]);
 
+  /**
+   * ⚠ A LENGTH IS NOT A COLOUR. `--ld-max` is the landing's maximum width; it
+   * has no business in a palette assertion, and adding it to LANDING_OWN would
+   * have quietly changed that set's meaning from "allowed to carry its own
+   * colour" to "allowed to be anything" — which is the loophole a hex would
+   * eventually walk through. Dimensional values are skipped by SHAPE instead,
+   * so a colour can never take this exit.
+   */
+  const DIMENSION = /^-?[\d.]+(rem|px|em|ch|vw|vh|%)$/;
+
   function landingDeclarations(block: string): [string, string][] {
-    return [...block.matchAll(/--(ld-[a-z0-9-]+):\s*([^;]+);/g)].map(
-      (m) => [m[1]!, m[2]!.trim()],
-    );
+    return [...block.matchAll(/--(ld-[a-z0-9-]+):\s*([^;]+);/g)]
+      .map((m): [string, string] => [m[1]!, m[2]!.trim()])
+      .filter(([, value]) => !DIMENSION.test(value));
   }
 
   it.each([
@@ -217,6 +227,13 @@ describe("one palette, not two", () => {
         /^var\(--[a-z0-9-]+\)$/,
       );
     }
+  });
+
+  it("does not let a colour escape through the dimension exemption", () => {
+    // The detector, checked against the mistake it must not permit.
+    expect(DIMENSION.test("84rem")).toBe(true);
+    expect(DIMENSION.test("#fbfcfd")).toBe(false);
+    expect(DIMENSION.test("rgba(0, 0, 0, 0.5)")).toBe(false);
   });
 
   it("keeps the landing's own tokens to the documented few", () => {
