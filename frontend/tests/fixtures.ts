@@ -44,6 +44,19 @@ export function result(overrides: Partial<ModelResult> = {}): ModelResult {
     sample_count: 10,
     error_count: 0,
     total_cost_usd: 0.5,
+    // ⚠ THE DEFAULT IS "PRICED BUT UNSIZED", NOT "FREE". A fixture defaulting
+    // to a zero rate card would let a value bug pass every test that did not
+    // set the field explicitly, and "free" is the exact wrong direction for a
+    // default on an axis whose failure mode is calling paid models free.
+    price: {
+      tier: "paid",
+      label: "$0.20 in / $1.20 out per million tokens",
+      detail: "A million tokens is roughly 700,000 words.",
+      input_usd_per_mtok: 0.2,
+      output_usd_per_mtok: 1.2,
+    },
+    usage: { prompt_tokens: 0, completion_tokens: 0 },
+    demonstration: false,
     trust: trust(),
     run_id: "run_1",
     run_status: "succeeded",

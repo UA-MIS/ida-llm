@@ -69,6 +69,35 @@ describe("the route map after the landing-page move", () => {
     }
   });
 
+  it("serves the candidate front door at /overview, beside / rather than over it", () => {
+    // ⚠ IT IS A CANDIDATE, AND THE POINT IS THAT BOTH EXIST AT ONCE. `/overview`
+    // is a second front door offered for review next to `/`; a change that
+    // quietly made it THE front door, or dropped it, would end the comparison
+    // it was built for without failing anything else.
+    expect(ROUTES).toContain("/overview");
+    expect(ROUTES).toContain("/");
+  });
+
+  it("keeps the overview outside the (site) chrome", () => {
+    // It brings its own masthead, exactly as `/` does. Inside the route group
+    // it would render under a second header, in the tool pages' column, and
+    // stop being a front door at all.
+    const overview = SOURCES.find(([path]) => path === "overview/page.tsx");
+    expect(overview, "overview/page.tsx is not where the route map expects it").toBeDefined();
+    expect(overview![1]).toContain("ld-mast");
+  });
+
+  it("points each of the overview's three doors at a route that exists", () => {
+    // ⚠ THE FAILURE THIS CATCHES IS SILENT. A door promising "see your exact
+    // field" and landing on a 404 is worse than not offering the door, and
+    // nothing else in the suite would notice a renamed target.
+    const overview = SOURCES.find(([path]) => path === "overview/page.tsx")![1];
+    for (const target of ["/recommend", "/leaderboard", "/compare"]) {
+      expect(overview, `overview lost its door to ${target}`).toContain(`href="${target}"`);
+      expect(ROUTES, `overview links to ${target}, which is not a route`).toContain(target);
+    }
+  });
+
   it("adds no path segment for the (site) route group", () => {
     expect(ROUTES.some((route) => route.includes("(site)"))).toBe(false);
   });

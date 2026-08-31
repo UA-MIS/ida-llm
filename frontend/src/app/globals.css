@@ -1756,3 +1756,297 @@ a.cg-score:hover { text-decoration: underline; }
   color: var(--faint);
   overflow-wrap: anywhere;
 }
+
+/* =========================================================================
+   THE OVERVIEW — the candidate front door at /overview.
+
+   ⚠ IT REUSES THE LANDING'S SHELL AND ADDS ITS OWN CONTENT, WHICH IS THE
+   POINT. `.ov` sits alongside `.ld` on the same element, so the masthead,
+   the rail/column grid, the section rhythm, the doors and the footer are
+   LITERALLY the landing's — one wordmark, one measure, one set of type
+   ramps. Only the parts that do not exist anywhere else in the product get
+   new class names: the standout cards, the price block and the trade-off
+   strip. A second copy of the shell would let the two front doors drift
+   apart cosmetically while we are trying to compare them on substance.
+
+   ⚠ EVERY COLOUR IS A TOKEN, WITH NO EXCEPTIONS AND NO LITERALS. Not a house
+   preference — `tests/palette.test.ts` parses this file and fails on any hex
+   or rgba() below the token blocks, because a literal is a colour the palette
+   does not actually control. `color-mix()` is how a tint is derived here.
+   ========================================================================= */
+
+.ov-section-tight { padding-top: 0; }
+
+/* --- the one sentence --------------------------------------------------- */
+.ov-headline {
+  font-family: var(--font-display), Georgia, serif;
+  font-variation-settings: "SOFT" 40, "WONK" 0, "opsz" 30;
+  font-size: 1.42rem;
+  line-height: 1.42;
+  font-weight: 400;
+  color: var(--ld-ink);
+  margin: 0 0 2rem;
+  max-width: 46ch;
+}
+@media (min-width: 62rem) {
+  .ov-headline { font-size: 1.62rem; }
+}
+/* The API-is-down version is the same sentence slot, set quieter: it is a
+   statement about us, not a finding about a model. */
+.ov-headline-down { color: var(--ld-ink-soft); font-size: 1.15rem; }
+
+/* --- the demonstration-data tell ---------------------------------------- */
+
+/* ⚠ AMBER, NOT RED, AND ON THE SAME LEFT-RULE DEVICE AS `.notice`. This is a
+   statement about how finished the work is, not a failure — `--fail` would
+   tell a reader the page is broken. It is also deliberately NOT a dismissible
+   banner: a disclosure a reader can close before reading the numbers has not
+   disclosed anything. */
+.ov-demo-notice {
+  margin: 0;
+  padding: 1.1rem 1.3rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--pending);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ld-ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  max-width: 72ch;
+}
+/* When EVERYTHING is illustrative the tell carries more weight, because the
+   reader is about to read a page of numbers none of which are measurements. */
+.ov-demo-notice-all {
+  border-left-width: 5px;
+  color: var(--ld-ink);
+  font-weight: 500;
+}
+
+/* --- the standout cards -------------------------------------------------- */
+.ov-cards { display: grid; gap: 1.15rem; margin: 0 0 2.4rem; }
+@media (min-width: 62rem) {
+  .ov-cards { grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1.4rem; }
+}
+
+.ov-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1.5rem 1.45rem 1.35rem;
+  background: var(--ld-raise);
+  border: 1px solid var(--ld-rule);
+  border-top: 3px solid var(--ld-rule);
+  border-radius: 4px;
+}
+/* The role is marked by the top edge rather than by a coloured background, so
+   the cards stay equally legible and none of them reads as a "winner" panel.
+   --brand is IDENTITY here (this is the headline card), never a status. */
+.ov-card-strongest { border-top-color: var(--ld-accent); }
+.ov-card-only_measured { border-top-color: var(--ld-accent); }
+.ov-card-value { border-top-color: var(--accent); }
+.ov-card-free_on_campus { border-top-color: var(--ld-pine); }
+
+.ov-role {
+  margin: 0;
+  font-size: 0.715rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ld-ink-faint);
+}
+.ov-name {
+  margin: 0;
+  font-family: var(--font-display), Georgia, serif;
+  font-variation-settings: "SOFT" 32, "WONK" 0, "opsz" 34;
+  font-size: 1.34rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ld-ink);
+}
+
+.ov-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.1rem 1.8rem;
+  margin: 0.55rem 0 0.35rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--ld-rule-soft);
+}
+.ov-score, .ov-price { display: flex; flex-direction: column; gap: 0.1rem; }
+
+.ov-score-figure, .ov-price-figure {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ld-ink);
+}
+.ov-score-unit, .ov-price-unit {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--ld-ink-faint);
+  max-width: 22ch;
+}
+/* Free is a genuine advantage, so it is allowed the one positive colour on the
+   page. "Not priced" is an ABSENCE and stays neutral — colouring it would read
+   as a verdict on a model we simply have no rate card for. */
+.ov-price-free .ov-price-figure { color: var(--pass); }
+.ov-price-unknown .ov-price-figure { font-size: 1.15rem; color: var(--ld-ink-soft); }
+
+/* ⚠ NEVER HIDDEN, AT ANY WIDTH. The score above it is meaningless without it —
+   see `tests/breakpoints.test.ts` for the phone-vs-desktop bug this prevents.
+   It is a block rather than an inline run so it cannot be dropped by a
+   flex-wrap rule either. */
+.ov-confidence { display: block; margin-top: 0.4rem; }
+
+.ov-reading {
+  margin: 0;
+  font-size: 0.97rem;
+  line-height: 1.6;
+  color: var(--ld-ink-soft);
+}
+.ov-card-demo {
+  margin: 0.15rem 0 0;
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--pending);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--ld-ink-faint);
+}
+.ov-card-link {
+  margin-top: auto;
+  padding-top: 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: none;
+}
+.ov-card-link:hover { text-decoration: underline; }
+.ov-card-link:hover .ov-arrow { transform: translateX(3px); }
+.ov-arrow { transition: transform 0.2s ease; }
+
+/* --- the trade-off strip -------------------------------------------------- */
+
+/* Two honest columns — capability and price — rather than one invented
+   "value" index. Weighing quality against money is the reader's call, and a
+   single composite number would make it for them silently. */
+.ov-tradeoff {
+  margin: 0 0 2.2rem;
+  border-top: 1px solid var(--ld-rule);
+}
+.ov-tradeoff-head {
+  display: none;
+  padding: 0.7rem 0 0.5rem;
+  font-size: 0.715rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ld-ink-faint);
+  border-bottom: 1px solid var(--ld-rule-soft);
+}
+.ov-tradeoff-rows { list-style: none; margin: 0; padding: 0; }
+.ov-tradeoff-row {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.95rem 0;
+  border-bottom: 1px solid var(--ld-rule-soft);
+}
+@media (min-width: 46rem) {
+  .ov-tradeoff-head,
+  .ov-tradeoff-row {
+    display: grid;
+    grid-template-columns: minmax(7rem, 1fr) minmax(0, 2fr) minmax(7rem, auto);
+    gap: 1.4rem;
+    align-items: center;
+  }
+}
+.ov-tradeoff-name { font-weight: 600; color: var(--ld-ink); font-size: 0.97rem; }
+.ov-tradeoff-bar { display: flex; align-items: center; gap: 0.8rem; }
+.ov-bar-track {
+  flex: 1 1 auto;
+  min-width: 4rem;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+/* ⚠ ONE HUE, NOT A RED-TO-GREEN RAMP. The grid at /compare made the same call
+   for the same reason: a ramp encodes a pass/fail judgement on a scale where
+   we have not defined one, and it reads as a verdict rather than a reading. */
+.ov-bar-fill { display: block; height: 100%; background: var(--accent); }
+.ov-tradeoff-figure {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  color: var(--ld-ink);
+  white-space: nowrap;
+}
+/* ⚠ NOT `.col-optional`, AND NOT DROPPABLE. It wraps rather than disappears at
+   a narrow width; the number must never outlive the word that qualifies it. */
+.ov-tradeoff-conf { color: var(--ld-ink-faint); font-size: 0.8rem; }
+.ov-tradeoff-cost {
+  display: flex;
+  flex-direction: column;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ld-ink);
+}
+.ov-tradeoff-cost-unit { font-size: 0.72rem; font-weight: 400; color: var(--ld-ink-faint); }
+
+/* --- the nudge and the caveats -------------------------------------------- */
+
+/* The "your field may differ" line. Set as a pulled-aside remark rather than
+   body copy so it is not skimmed past — it is the sentence that stops an
+   average being read as an answer. */
+.ov-nudge {
+  margin: 0;
+  padding: 1rem 0 0 1.1rem;
+  border-left: 2px solid var(--ld-accent);
+  font-size: 0.95rem;
+  line-height: 1.62;
+  color: var(--ld-ink-soft);
+  max-width: 66ch;
+}
+
+.ov-caveats { margin: 0 0 1.5rem; padding: 0; list-style: none; }
+.ov-caveats li {
+  padding: 0.75rem 0 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--ld-rule-soft);
+  font-size: 0.94rem;
+  line-height: 1.6;
+  color: var(--ld-ink-soft);
+  max-width: 74ch;
+  position: relative;
+}
+.ov-caveats li::before {
+  content: "—";
+  position: absolute;
+  left: 0;
+  color: var(--ld-ink-faint);
+}
+.ov-coverage {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--ld-ink-soft);
+  max-width: 70ch;
+}
+
+/* --- the three doors ------------------------------------------------------ */
+
+/* Three, where the landing has two. Below 62rem they stack; above it they sit
+   in one row so the choice reads as a choice rather than as a list with a
+   preferred first item. */
+.ov-doors { display: grid; gap: 1.15rem; margin-top: 0.35rem; }
+@media (min-width: 62rem) {
+  .ov-doors { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.3rem; }
+}
+@media (min-width: 76rem) {
+  .ov-doors { gap: 1.7rem; }
+  .ov-doors .ld-door { padding: 2rem 1.85rem 1.8rem; }
+}
+.ov-doors .ld-door h3 { font-size: 1.22rem; }
+.ov-doors .ld-door p { font-size: 0.92rem; }

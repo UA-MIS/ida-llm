@@ -264,7 +264,39 @@ export interface ModelResult {
   scored_count: number;
   sample_count: number;
   error_count: number;
+  /**
+   * What WE spent measuring this pair — **not** what a reader would pay.
+   *
+   * ⚠ NOT A PRICE. It scales with how many samples we chose to run, it is `0`
+   * on a cache hit, and it is `0` for every row the dev seeder writes. Dividing
+   * it by `scored_count` describes our benchmark, not the model — and on a
+   * seeded environment it reports every model as free. Use `price` for anything
+   * a reader is meant to budget against; see `lib/value.ts`.
+   */
   total_cost_usd: number;
+  /**
+   * The registry's published rate card, or `null` for an unregistered key.
+   *
+   * `null` is not "free" — it means the model is not in `models.yaml`, so we
+   * have nothing to quote.
+   */
+  price: CostNote | null;
+  /**
+   * Tokens behind `total_cost_usd`, so a per-million rate card can become a
+   * figure a person can hold. All-zero means no token accounting was recorded,
+   * which is not the same as a free run.
+   */
+  usage: TokenUsage;
+  /**
+   * True when this row was seeded for illustration and never actually measured.
+   *
+   * ⚠ PER ROW, NOT PER DEPLOYMENT. A dev database holds both kinds the moment
+   * anyone runs a real model against a seeded catalogue, so a page-level
+   * "this is demo data" banner would be false about half of it. It is also
+   * self-clearing: the flag stops appearing when the row becomes real, so
+   * nobody has to remember to take a disclaimer down.
+   */
+  demonstration: boolean;
   trust: TrustTell;
   /** THE receipt (D-3): one click to the transcripts, scorer and serving config. */
   run_id: string;
