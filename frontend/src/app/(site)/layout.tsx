@@ -24,6 +24,10 @@ import { resolveVersion } from "@/lib/version";
  */
 const NAV = [
   { href: "/leaderboard", label: "Leaderboard" },
+  /* A top-level destination rather than a view-switch on the leaderboard: it
+     answers "best at WHAT", which is a different question from "best", and the
+     two do not share a filter bar sensibly. */
+  { href: "/compare", label: "Compare by outcome" },
   { href: "/recommend", label: "Recommend a model" },
   { href: "/runs", label: "All runs" },
 ];

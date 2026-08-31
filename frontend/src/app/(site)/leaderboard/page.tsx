@@ -689,7 +689,11 @@ export default async function ResultsPage({
                 {board.task_count} <Term id="task">tasks</Term> in the catalogue,
                 grouped by the{" "}
                 <Term id="learning-outcome">learning outcome</Term> each one
-                measures. Pick a task to see every model ranked on it.
+                measures. Pick a task to see every model ranked on it — or{" "}
+                <Link href="/compare">
+                  compare every model by outcome in one grid
+                </Link>
+                .
               </p>
             </div>
 
