@@ -55,8 +55,14 @@ export function ModelResultCard({
         <div className="result-identity">
           <div className="result-name">
             {isBest ? (
+              // QA-33: `title` is unreachable by keyboard and by touch, and
+              // this glyph carried NO other accessible text — a non-focusable
+              // span whose entire content was "★", meaning the site's one
+              // crown was reachable to a mouse-hovering, sighted reader only.
+              // Same pattern `compare/page.tsx`'s `Cell` already uses.
               <span className="star" title="Best measured score on this task">
-                ★
+                <span aria-hidden="true">★</span>
+                <span className="sr-only">Best measured score on this task</span>
               </span>
             ) : (
               <span className="rank muted">{rank}</span>

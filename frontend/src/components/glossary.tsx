@@ -19,12 +19,17 @@
  * keyboard, and — the one that matters on a tablet — a tap, which focuses the
  * button and shows the card with no script running. Blur closes it.
  *
- * ⚠ THE `title` IS THE FLOOR, NOT THE DECORATION. Native `title` is what every
- * existing badge on this site uses, it is announced by screen readers as the
- * button's description, and it survives everywhere the drawn card cannot — most
- * importantly inside `.table-scroll`, whose `overflow-x: auto` would clip an
- * absolutely-positioned card. Inside a scrolling table, use the `title` alone
- * (that is what `plain` is sized for); the card is the enhancement.
+ * ⚠ `title` IS A BONUS, NOT THE FLOOR. It used to be described here as the
+ * floor — announced by screen readers as the button's description, and
+ * surviving everywhere the drawn `.term-card` cannot, including inside
+ * `.table-scroll`'s `overflow-x: auto`, which clips an absolutely-positioned
+ * card. That reasoning has a hole: `title` itself is not exposed to touch
+ * screen readers or voice control AT ALL, so it cannot be the only way in —
+ * see QA-24. The actual floor is the `.sr-only` span below. It survives
+ * `.table-scroll` for the same reason the drawn card does not: an
+ * `overflow-x: auto` container clips what is PAINTED, and an `.sr-only`
+ * element is never painted in the first place, so it is unaffected either
+ * way. `title` stays as the fast path for a sighted mouse user.
  */
 
 import { glossaryFor, lookup, tooltip } from "@/lib/glossary";
@@ -57,20 +62,28 @@ export function Term({
       type="button"
       className={`term${className ? ` ${className}` : ""}`}
       title={tooltip(id)}
-      // The button opens a definition and changes nothing. Saying so keeps a
-      // screen-reader user from expecting a navigation or a submit.
-      aria-haspopup="true"
     >
       <span className="term-word">{children ?? entry.term}</span>
       <span className="term-cue" aria-hidden="true">
         ?
       </span>
-      {/* aria-hidden because the `title` already carries this text as the
-          button's description; announcing both reads the definition twice. */}
+      {/* aria-hidden: this is the drawn, `:hover`/`:focus` CSS card. Its text
+          is repeated below in `.sr-only` form, which is what AT actually
+          reads — announcing both here would read the definition twice. */}
       <span className="term-card" aria-hidden="true">
         <span className="term-card-title">{entry.term}</span>
         <span className="term-card-body">{entry.plain}</span>
         {entry.more ? <span className="term-card-more">{entry.more}</span> : null}
+      </span>
+      {/* ⚠ NOT `aria-hidden`. This is the one copy of the definition every
+          assistive technology can reach — desktop screen readers get it from
+          the button's accessible name same as `title` would give them, and
+          touch screen readers and voice control, which cannot see `title` at
+          all, get it here for the first time. */}
+      <span className="sr-only">
+        {" "}
+        — {entry.plain}
+        {entry.more ? ` ${entry.more}` : ""}
       </span>
     </button>
   );

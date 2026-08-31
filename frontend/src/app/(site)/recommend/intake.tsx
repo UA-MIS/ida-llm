@@ -21,7 +21,7 @@
  */
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 // ⚠ A SERVER COMPONENT IMPORTED INTO A CLIENT ONE, WHICH IS FINE HERE AND IS
 // WORTH SAYING WHY. `Term` uses no hooks, no async and no server-only API — it
@@ -358,7 +358,13 @@ function Result({ result }: { result: RecommendationResponse }) {
           <RecommendationCard recommendation={result.primary} primary />
           {result.alternatives.length > 0 ? (
             <>
-              <h2>Alternatives</h2>
+              {/* ⚠ `<h3>`, NOT `<h2>`. This flow has no page-level `<h2>` for a
+                  `<h3>` to nest under — "What we understood", "What narrowed
+                  the field" and each recommendation's headline are already
+                  `<h3>`s at this same depth, so "Alternatives" sits beside
+                  them instead of jumping a level above headings that precede
+                  it in the document. */}
+              <h3 style={{ fontSize: "1.1rem", marginTop: "2rem" }}>Alternatives</h3>
               {result.alternatives.map((alternative) => (
                 <RecommendationCard
                   key={alternative.model_key}
@@ -388,6 +394,18 @@ export function Intake({ questions }: { questions: IntakeQuestion[] }) {
   const [result, setResult] = useState<RecommendationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  // ⚠ QA-25: pressing "Recommend something" swaps the entire question form
+  // out for the result, with nothing telling a screen-reader user it
+  // happened — they press the button and hear silence. Moving focus onto the
+  // result container is the same move `error.tsx`'s heading makes on a route
+  // error; a live region would also work but would announce the whole
+  // (often long) result as one interruption rather than letting the reader
+  // land at its start and read forward normally.
+  const resultRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (result) resultRef.current?.focus();
+  }, [result]);
 
   const applicable = useMemo(
     () => applicableQuestions(questions, answers),
@@ -439,7 +457,9 @@ export function Intake({ questions }: { questions: IntakeQuestion[] }) {
   if (result) {
     return (
       <>
-        <Result result={result} />
+        <div ref={resultRef} tabIndex={-1} role="region" aria-label="Recommendation result">
+          <Result result={result} />
+        </div>
         <p>
           <button
             type="button"
@@ -497,7 +517,9 @@ export function Intake({ questions }: { questions: IntakeQuestion[] }) {
       ) : null}
 
       {error ? (
-        <div className="notice notice-error">
+        // role="alert": a screen-reader user who just pressed "Recommend
+        // something" heard nothing when this could fail silently off-screen.
+        <div className="notice notice-error" role="alert">
           <p className="mono">{error}</p>
         </div>
       ) : null}

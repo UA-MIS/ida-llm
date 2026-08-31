@@ -191,6 +191,25 @@ function OverallLeaderboard({
           </summary>
           <div className="table-scroll">
             <table className="leaderboard leaderboard-muted">
+              {/* ⚠ QA-24: THIS TABLE USED TO HAVE NO `<thead>` AT ALL — nine
+                  columns of numbers with zero header association, reachable
+                  only by sight. Same columns as the ranked table above, so
+                  the same headers, each with `scope="col"` so a screen
+                  reader can announce which column a cell belongs to when
+                  navigating cell-by-cell rather than row-by-row. */}
+              <thead>
+                <tr>
+                  <th scope="col" className="col-rank">#</th>
+                  <th scope="col">Model</th>
+                  <th scope="col" className="col-score">Overall</th>
+                  <th scope="col" className="num col-optional">Outcomes</th>
+                  <th scope="col" className="num col-optional">Tasks</th>
+                  <th scope="col" className="num col-optional">Samples</th>
+                  <th scope="col" className="col-trust">Confidence</th>
+                  <th scope="col" className="num col-optional">Cost</th>
+                  <th scope="col" className="col-go" aria-label="Report card" />
+                </tr>
+              </thead>
               <tbody>
                 {unranked.map((rollup) => (
                   <ModelRow
@@ -284,19 +303,36 @@ function ModelRow({
  */
 function FilterBar({
   board,
+  task,
   slo,
+  useMode,
+  benchmarkOnly,
   query,
   includeUnmeasured,
   active,
 }: {
   board: LeaderboardResponse;
+  task?: string;
   slo?: string;
+  useMode?: string;
+  benchmarkOnly: boolean;
   query?: string;
   includeUnmeasured: boolean;
   active: boolean;
 }) {
   return (
     <form className="filter-bar" method="get" action="/leaderboard">
+      {/* ⚠ HIDDEN INPUTS FOR PARAMS THIS FORM DOES NOT OWN. The form only
+          exposes three controls (outcome, search, "include unmeasured"), but
+          a GET submit replaces the ENTIRE query string — so without these, a
+          reader who arrived via a task deep link (`?task=…`) or a future
+          `use_mode`/`benchmark` link and then touches any control here would
+          silently lose that selection. `use_mode` and `benchmark` are read by
+          this page but not yet produced by any link in the app; they are
+          carried forward anyway so a future entry point does not regress. */}
+      {task ? <input type="hidden" name="task" value={task} /> : null}
+      {useMode ? <input type="hidden" name="use_mode" value={useMode} /> : null}
+      {benchmarkOnly ? <input type="hidden" name="benchmark" value="1" /> : null}
       <div className="field">
         <label htmlFor="slo">Learning outcome</label>
         <select id="slo" name="slo" defaultValue={slo ?? ""}>
@@ -424,7 +460,12 @@ function TaskSection({
 }) {
   return (
     <section className="task-section">
-      <h3 className="task-title">{task.title}</h3>
+      {/* ⚠ `<h4>`, NOT `<h3>`. This section always renders inside
+          `<OutcomeHeading>`, whose heading is an `<h3>` — a task title one
+          level deeper than its outcome keeps heading navigation (one of the
+          two ways a screen-reader user skims a long page) a real hierarchy
+          instead of a sibling-shaped nesting. */}
+      <h4 className="task-title">{task.title}</h4>
       <p className="muted task-description">{task.description}</p>
       <FacetRow task={task} curriculum={curriculum} />
 
@@ -744,7 +785,10 @@ export default async function ResultsPage({
 
             <FilterBar
               board={board}
+              task={selected}
               slo={selectedSlo}
+              useMode={selectedUseMode}
+              benchmarkOnly={benchmarkOnly}
               query={query}
               includeUnmeasured={includeUnmeasured}
               active={filterActive || Boolean(selected)}

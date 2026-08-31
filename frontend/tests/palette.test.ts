@@ -113,6 +113,16 @@ describe.each([
     expect(contrastRatio(theme[key]!, theme.surface!)).toBeGreaterThanOrEqual(AA_NORMAL);
   });
 
+  /**
+   * QA-17. `.row-muted`/`.result-card-muted` moved off `opacity` (which
+   * dragged every colour below AA together) and onto `background:
+   * var(--surface-2)` plus real text tokens — every text token in the
+   * palette needs to stay readable there too, not just on `--bg`/`--surface`.
+   */
+  it.each(TEXT_TOKENS)("--%s meets WCAG AA against the muted-row surface too", (key) => {
+    expect(contrastRatio(theme[key]!, theme["surface-2"]!)).toBeGreaterThanOrEqual(AA_NORMAL);
+  });
+
   it("separates the raised surfaces from the background by tone", () => {
     // Not a contrast requirement — a legibility one. If surface === bg, every
     // card on the site loses its edge and the page reads as one flat sheet.
@@ -131,6 +141,23 @@ describe.each([
     // page of boxes. AA_LARGE is the non-text floor.
     expect(contrastRatio(theme["border-strong"]!, theme.bg!)).toBeGreaterThanOrEqual(1.2);
     expect(contrastRatio(theme["border-strong"]!, theme.bg!)).toBeLessThan(AA_NORMAL);
+  });
+
+  /**
+   * QA-26. `--border`/`--border-strong` sit at 1.15–2.16:1 against the page
+   * and against a raised `--surface` card — nowhere near WCAG 1.4.11's 3:1
+   * floor for a UI component boundary. `--border-control` is the token
+   * reserved for a boundary that is the ONLY affordance marking a control (a
+   * form input, a button, the glossary term's underline), and it has to clear
+   * 3:1 against both backgrounds a bordered control might sit on: the bare
+   * page and a card raised above it.
+   */
+  it("--border-control clears the WCAG 1.4.11 UI-component floor against both the page and a raised surface", () => {
+    expect(theme["border-control"], "missing --border-control").toBeDefined();
+    expect(contrastRatio(theme["border-control"]!, theme.bg!)).toBeGreaterThanOrEqual(AA_LARGE);
+    expect(contrastRatio(theme["border-control"]!, theme.surface!)).toBeGreaterThanOrEqual(
+      AA_LARGE,
+    );
   });
 
   it("uses no pure black and no pure white anywhere", () => {
@@ -176,6 +203,59 @@ describe.each([
     // being claimed, so hue is what is measured.
     expect(hueDistance(theme.accent!, theme.fail!)).toBeGreaterThan(90);
     expect(hueDistance(theme.brand!, theme.accent!)).toBeGreaterThan(90);
+  });
+});
+
+/**
+ * QA-26, continued: the token clearing 3:1 does nothing for a reader unless
+ * the controls the audit actually named are wired to it. This pins the wiring
+ * itself so a future edit cannot quietly revert one of them back onto
+ * `--border`/`--border-strong`, which look identical in a diff that only
+ * changes surrounding rules.
+ */
+describe("controls named in the QA-26 audit use --border-control", () => {
+  /** The sheet with comments stripped — a rule quoted in prose is not a rule. */
+  const RULES = CSS.replace(/\/\*[\s\S]*?\*\//g, " ");
+
+  const cases: [name: string, pattern: RegExp][] = [
+    [".card", /\.card\s*\{[^}]*border:\s*1px solid var\(--border-control\)/],
+    [
+      ".filter-bar select / input[type=search]",
+      /\.filter-bar select,\s*\.filter-bar input\[type="search"\]\s*\{[^}]*border:\s*1px solid var\(--border-control\)/,
+    ],
+    [".option", /\.option\s*\{[^}]*border:\s*1px solid var\(--border-control\)/],
+    [".term (the glossary underline)", /\.term\s*\{[^}]*border-bottom:\s*1px dotted var\(--border-control\)/],
+    [".ld-btn-quiet", /\.ld-btn-quiet\s*\{[^}]*border:\s*1px solid var\(--ld-rule-control\)/],
+  ];
+
+  it.each(cases)("%s", (_name, pattern) => {
+    expect(RULES).toMatch(pattern);
+  });
+});
+
+/**
+ * QA-17. `.row-muted`/`.result-card-muted` used to be one `opacity` line
+ * each — the ratios above prove a token-based replacement CAN pass AA, but
+ * only wiring the actual rules to it proves it DOES.
+ */
+describe("the muted-row treatment (QA-17)", () => {
+  const RULES = CSS.replace(/\/\*[\s\S]*?\*\//g, " ");
+
+  it("no longer dims muted rows or cards with opacity", () => {
+    for (const selector of [".row-muted", ".result-card-muted"]) {
+      const match = RULES.match(new RegExp(`${selector.replace(".", "\\.")}\\s*\\{([^}]*)\\}`));
+      expect(match, `no ${selector} rule found`).not.toBeNull();
+      expect(match![1], `${selector} still uses opacity`).not.toMatch(/opacity\s*:/);
+    }
+  });
+
+  it("gives both a tone step off the surface and an explicit text colour", () => {
+    for (const selector of [".row-muted", ".result-card-muted"]) {
+      const pattern = new RegExp(
+        `${selector.replace(".", "\\.")}\\s*\\{[^}]*background:\\s*var\\(--surface-2\\)[^}]*color:\\s*var\\(--muted\\)`,
+      );
+      expect(RULES, `${selector} is missing the surface-2/--muted treatment`).toMatch(pattern);
+    }
   });
 });
 

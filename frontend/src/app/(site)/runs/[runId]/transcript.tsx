@@ -63,8 +63,14 @@ export function Transcript({
 
   return (
     <div>
+      {/* ⚠ QA-25: STATE BELONGS ON `aria-expanded`, NOT IN THE GLYPH. The
+          glyph flipping between "▾" and "▸" carried the open/closed state
+          only visually — a screen reader has no way to read a change of
+          character shape, so it announced "transcript" every time with no
+          way to tell open from closed. */}
       <button
         onClick={toggle}
+        aria-expanded={open}
         style={{
           background: "none",
           border: "none",
@@ -75,7 +81,7 @@ export function Transcript({
           fontSize: "0.85rem",
         }}
       >
-        {open ? "▾" : "▸"} transcript
+        <span aria-hidden="true">{open ? "▾" : "▸"}</span> transcript
       </button>
 
       {open ? (
