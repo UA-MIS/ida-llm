@@ -121,6 +121,25 @@ def slo_of(tags) -> str | None:
     return None
 
 
+def load_cost_rates(repo: pathlib.Path) -> dict[str, tuple[float, float]]:
+    """Per-model (input, output) USD per MILLION tokens, from the registry.
+
+    Read rather than invented, so a seeded cost cannot contradict what the model
+    actually charges. `sparks-local` and `mock` are genuinely 0.0 -- self-hosted
+    and a stub -- and stay 0.0; that is a real fact about them, not a placeholder.
+    """
+    registry = yaml.safe_load((repo / "models.yaml").read_text())
+    entries = {e["key"]: e for e in registry["models"]}
+    rates: dict[str, tuple[float, float]] = {}
+    for key in PROFILES:
+        cost = entries[key].get("cost") or {}
+        rates[key] = (
+            float(cost.get("input_usd_per_mtok", 0.0)),
+            float(cost.get("output_usd_per_mtok", 0.0)),
+        )
+    return rates
+
+
 def load_serving_configs(repo: pathlib.Path) -> dict[str, dict]:
     """Read each seeded model's serving config from models.yaml and VALIDATE it.
 
@@ -178,11 +197,14 @@ def _preflight(runs: list, results: list) -> None:
     )
 
 
-def build_rows(specs, serving: dict[str, dict], now: dt.datetime) -> tuple[list, list]:
+def build_rows(
+    specs, serving: dict[str, dict], rates: dict[str, tuple[float, float]], now: dt.datetime
+) -> tuple[list, list]:
     """Build the (runs, results) tuples. Pure -- no database, so it is testable."""
     runs, results = [], []
     for model, profile in PROFILES.items():
         cfg = json.dumps(serving[model])
+        in_rate, out_rate = rates[model]
         for spec in specs:
             slo = slo_of(getattr(spec, "tags", ()))
             # The task's OWN declared scorer, not an invented label. `scorer` is
@@ -194,11 +216,25 @@ def build_rows(specs, serving: dict[str, dict], now: dt.datetime) -> tuple[list,
             # shape to render rather than one flat timestamp.
             fin = now - dt.timedelta(hours=det("t", model, spec.id) * 336)
             rows, scores = [], []
+            prompt_total = completion_total = 0
+            cost_total = 0.0
             for sample in spec.samples:
                 raw = profile["base"] + profile["bias"].get(slo, 0.0)
                 jitter = (det(model, spec.id, sample.id) - 0.5) * 0.18
                 value = max(0.0, min(1.0, raw + jitter))
                 scores.append(value)
+                # Token counts VARY per sample. A flat constant would make
+                # cost-per-answer an artifact of the row count rather than a
+                # number that means anything.
+                prompt_tokens = int(300 + det("pt", model, spec.id, sample.id) * 420)
+                completion_tokens = int(120 + det("ct", model, spec.id, sample.id) * 380)
+                # Cost from the REGISTRY's real rates, never a constant. This is
+                # what makes total_cost_usd / scored_count meaningful, and it is
+                # why a paid model can no longer render as free.
+                cost_usd = (prompt_tokens / 1e6) * in_rate + (completion_tokens / 1e6) * out_rate
+                prompt_total += prompt_tokens
+                completion_total += completion_tokens
+                cost_total += cost_usd
                 rows.append(
                     [
                         new_result_id(),
@@ -211,9 +247,9 @@ def build_rows(specs, serving: dict[str, dict], now: dt.datetime) -> tuple[list,
                         value,
                         value >= 0.6,
                         True,
-                        420,
-                        260,
-                        0.0,
+                        prompt_tokens,
+                        completion_tokens,
+                        cost_usd,
                         900.0 + det("l", model, sample.id) * 2600.0,
                         fin,
                         0,
@@ -237,9 +273,12 @@ def build_rows(specs, serving: dict[str, dict], now: dt.datetime) -> tuple[list,
                     len(spec.samples),
                     len(scores),
                     mean,
-                    420 * len(scores),
-                    260 * len(scores),
-                    0.0,
+                    prompt_total,
+                    completion_total,
+                    # The SAME rule the runner uses (worker.py: the sum of the
+                    # results' cost_usd). judge_cost_usd is a separate column and
+                    # is deliberately not folded in here.
+                    cost_total,
                     fin,
                     fin,
                     0,
@@ -283,7 +322,8 @@ def main() -> int:
     if not specs:
         _fail(f"no tasks found under {tasks_dir}")
 
-    runs, results = build_rows(specs, serving, dt.datetime.now(dt.UTC))
+    rates = load_cost_rates(repo)
+    runs, results = build_rows(specs, serving, rates, dt.datetime.now(dt.UTC))
 
     # Fail loudly HERE rather than as a 500 on every receipt page later.
     _preflight(runs, results)
