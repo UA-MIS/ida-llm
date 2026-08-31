@@ -44,6 +44,8 @@ def seed_run(
     created_offset_minutes: int = 0,
     with_results: bool = True,
     scorer: ScorerKind = ScorerKind.NUMERIC_MATCH,
+    harness_version: str = "0.1.0",
+    serving_extra: dict[str, object] | None = None,
 ) -> str:
     """Write one run (and, by default, one result) and return its id."""
     run_id = new_run_id()
@@ -51,6 +53,7 @@ def seed_run(
         model_id=f"{model_key}-under-test",
         registry_key=model_key,
         serving_stack=ServingStack.MOCK,
+        extra=dict(serving_extra or {}),
     )
     created = BASE_TIME + timedelta(minutes=created_offset_minutes)
     with session_scope(context.session_factory) as session:
@@ -61,7 +64,7 @@ def seed_run(
                 status=status,
                 task_id=task_id,
                 model_key=model_key,
-                harness_version="0.1.0",
+                harness_version=harness_version,
                 serving_config=serving,
                 sample_count=sample_count,
                 scored_count=scored_count,

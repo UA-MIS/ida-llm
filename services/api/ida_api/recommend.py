@@ -53,6 +53,7 @@ from ida_api.leaderboard import (
     TaskLeaderboard,
     data_residency,
 )
+from ida_api.pricing import CostNote, cost_note
 from ida_api.trust import Confidence
 from ida_core.contracts import ModelEntry, TaskKind
 
@@ -807,16 +808,6 @@ class Receipt(BaseModel):
     trust_label: str
 
 
-class CostNote(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    tier: Literal["free", "campus_hosted", "paid"]
-    label: str
-    detail: str
-    input_usd_per_mtok: float
-    output_usd_per_mtok: float
-
-
 class Constraint(BaseModel):
     """Something the professor told us that narrowed the field, said out loud."""
 
@@ -934,41 +925,6 @@ class _Candidate:
     @property
     def scored_results(self) -> list[tuple[TaskLeaderboard, ModelResult]]:
         return [(b, r) for b, r in self.results if r.mean_score is not None]
-
-
-def _cost_note(entry: ModelEntry, residency: str) -> CostNote:
-    rates = entry.cost
-    if rates.input_usd_per_mtok == 0 and rates.output_usd_per_mtok == 0:
-        if residency == "on_campus":
-            return CostNote(
-                tier="campus_hosted",
-                label="Free to you — runs on campus hardware",
-                detail=(
-                    "No per-use charge. The cost is the hardware the university already "
-                    "owns, not a bill you receive."
-                ),
-                input_usd_per_mtok=0.0,
-                output_usd_per_mtok=0.0,
-            )
-        return CostNote(
-            tier="free",
-            label="No per-token cost recorded",
-            detail="The registry records no rates for this model.",
-            input_usd_per_mtok=0.0,
-            output_usd_per_mtok=0.0,
-        )
-    return CostNote(
-        tier="paid",
-        label=f"${rates.input_usd_per_mtok:.2f} in / ${rates.output_usd_per_mtok:.2f} out per million tokens",
-        detail=(
-            "A million tokens is roughly 700,000 words. For typical grading or item "
-            "writing a professor's whole semester lands well inside a single-digit "
-            "dollar figure — but check with your department before putting anything "
-            "recurring on a card."
-        ),
-        input_usd_per_mtok=rates.input_usd_per_mtok,
-        output_usd_per_mtok=rates.output_usd_per_mtok,
-    )
 
 
 def _resolve_surface(answers: dict[str, str], area: TaskArea, residency: str) -> tuple[str, str]:
@@ -1529,7 +1485,7 @@ def _package(
         surface=surface,
         surface_label=SURFACE_LABEL.get(surface, surface),
         surface_rationale=surface_rationale,
-        cost=_cost_note(entry, residency),
+        cost=cost_note(entry, residency),
         data_residency=residency,
         data_residency_label=RESIDENCY_LABEL[residency],
         prompt_template=area.prompt_template.format(level=level, subject=subject, n=5),

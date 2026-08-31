@@ -27,7 +27,13 @@ from ida_api.leaderboard import (
 )
 from ida_api.slo import CurriculumView, OutcomeView, load_curriculum_view
 from ida_api.trust import assess
-from ida_core.contracts import RunStatus, ScorerKind, TaskKind
+from ida_core.contracts import (
+    SYNTHETIC_HARNESS_VERSION,
+    SYNTHETIC_MARKER,
+    RunStatus,
+    ScorerKind,
+    TaskKind,
+)
 
 
 def board_for(body: dict, task_id: str) -> dict:
@@ -480,3 +486,114 @@ class TestCurriculum:
         view = load_curriculum_view(tmp_path)
         assert view.available is False
         assert view.unavailable_reason
+
+
+class TestPublishedPrice:
+    """The value axis: what a reader would PAY, not what our benchmark SPENT.
+
+    ⚠ THESE TWO NUMBERS ARE DIFFERENT AND THE DIFFERENCE IS THE WHOLE POINT.
+    ``total_cost_usd`` is our measurement spend on this task -- it reflects our
+    prompt lengths, our sample counts, and it is ``0`` on a cache hit and ``0``
+    for every row the dev seeder writes. A front door that turned it into "this
+    model is cheap" would be reading our own invoice back to a professor as if
+    it were their quote.
+
+    ``price`` is the registry's published rate card, which is what a professor
+    would actually be billed. It is carried here so the value reading is a
+    property of the model rather than an artefact of how much of the benchmark
+    happened to run.
+    """
+
+    def test_carries_the_registry_rate_card_for_a_paid_model(
+        self, client: TestClient, context: AppContext
+    ) -> None:
+        seed_run(context, task_id=VERIFIABLE_TASK, model_key="luna", mean_score=0.8)
+        row = board_for(client.get("/leaderboard").json(), VERIFIABLE_TASK)["results"][0]
+
+        assert row["price"] is not None, "no published price on a registered model"
+        assert row["price"]["tier"] == "paid"
+        # Read from models.yaml, never typed into the API.
+        assert row["price"]["input_usd_per_mtok"] > 0
+
+    def test_price_is_not_the_measurement_spend(
+        self, client: TestClient, context: AppContext
+    ) -> None:
+        # The seeded run records no spend at all -- exactly the shape the dev
+        # seeder writes. The published price must survive it.
+        seed_run(context, task_id=VERIFIABLE_TASK, model_key="luna", mean_score=0.8)
+        row = board_for(client.get("/leaderboard").json(), VERIFIABLE_TASK)["results"][0]
+
+        assert row["total_cost_usd"] == 0.0
+        assert row["price"]["input_usd_per_mtok"] > 0, (
+            "a model with no recorded spend read as having no price -- "
+            "this is how a $0 seed turns every model into 'free'"
+        )
+
+    def test_a_free_stub_is_not_described_as_a_bargain(
+        self, client: TestClient, context: AppContext
+    ) -> None:
+        seed_run(context, task_id=VERIFIABLE_TASK, model_key="mock", mean_score=1.0)
+        row = board_for(client.get("/leaderboard").json(), VERIFIABLE_TASK)["results"][0]
+
+        # The mock costs nothing and scores perfectly. `recommendable` is what
+        # stops that becoming "the best value model we measured".
+        assert row["recommendable"] is False
+        assert row["price"]["tier"] != "paid"
+
+    def test_carries_the_token_accounting_behind_the_spend(
+        self, client: TestClient, context: AppContext
+    ) -> None:
+        seed_run(context, task_id=VERIFIABLE_TASK, model_key="luna", mean_score=0.8)
+        row = board_for(client.get("/leaderboard").json(), VERIFIABLE_TASK)["results"][0]
+
+        # Needed to turn a rate card into "what one answer costs": price is per
+        # million tokens, so a reader-facing figure needs the token count too.
+        assert "usage" in row
+        assert set(row["usage"]) == {"prompt_tokens", "completion_tokens"}
+
+
+class TestDemonstrationData:
+    """Synthetic rows must be able to say so, in the data rather than in a banner.
+
+    ⚠ THE ALTERNATIVE IS A HARDCODED DISCLAIMER, AND IT ROTS IN THE DANGEROUS
+    DIRECTION. A front door that carries the sentence "illustrative data" as
+    static prose keeps carrying it after real measurements land -- and a page
+    that cries wolf about its own numbers teaches readers to ignore the warning
+    exactly when it stops being true. Worse, a deployment that mixes seeded and
+    measured rows would need the disclaimer to be true of some rows and false of
+    others, which no page-level constant can express.
+
+    So the flag is per-row and derived from the marker the seeder itself writes.
+    It disappears on its own when the row it describes is real.
+    """
+
+    def test_a_measured_run_is_not_flagged(self, client: TestClient, context: AppContext) -> None:
+        seed_run(context, task_id=VERIFIABLE_TASK, model_key="luna", mean_score=0.8)
+        row = board_for(client.get("/leaderboard").json(), VERIFIABLE_TASK)["results"][0]
+        assert row["demonstration"] is False
+
+    def test_a_synthetic_run_is_flagged(self, client: TestClient, context: AppContext) -> None:
+        seed_run(
+            context,
+            task_id=VERIFIABLE_TASK,
+            model_key="luna",
+            mean_score=0.8,
+            harness_version=SYNTHETIC_HARNESS_VERSION,
+        )
+        row = board_for(client.get("/leaderboard").json(), VERIFIABLE_TASK)["results"][0]
+        assert row["demonstration"] is True
+
+    def test_the_serving_config_marker_also_flags_it(
+        self, client: TestClient, context: AppContext
+    ) -> None:
+        # The seeder writes BOTH markers. Either one alone must be enough, or a
+        # future seeder that drops one would silently un-flag its own rows.
+        seed_run(
+            context,
+            task_id=VERIFIABLE_TASK,
+            model_key="luna",
+            mean_score=0.8,
+            serving_extra={SYNTHETIC_MARKER: True},
+        )
+        row = board_for(client.get("/leaderboard").json(), VERIFIABLE_TASK)["results"][0]
+        assert row["demonstration"] is True
