@@ -240,6 +240,72 @@ describe("the honesty layer", () => {
   });
 });
 
+/* ------------------------------------------------------- the copy itself */
+
+describe("the words, as a professor meets them", () => {
+  it("names the model in the report-card link with no stray punctuation seam", async () => {
+    // ⚠ REPORTED FROM A REAL RENDER AS "Luna (…) 's full report card". The link
+    // used to read `See {display_name}&rsquo;s …`, gluing an apostrophe onto an
+    // interpolated name — one reflow of that JSX puts the name and the
+    // apostrophe on separate lines and JSX inserts a space between them. The
+    // possessive is gone, so the seam cannot reopen; this fails if it returns.
+    await renderWith(boardOf([model("luna", 0.9, { display_name: "Luna (Llama 3.1 8B)" })]));
+
+    const link = document.querySelector(".ov-card-link")!;
+    const text = link.textContent!;
+    expect(text).toContain("Luna (Llama 3.1 8B)");
+    expect(text, "a space landed before punctuation").not.toMatch(/\s+['\u2019,.]/);
+    expect(text, "doubled whitespace in the link").not.toMatch(/\s\s/);
+  });
+
+  it("counts the coverage claim rather than asserting one that rots", async () => {
+    // ⚠ THE PAGE USED TO SAY "Most of this benchmark has not been run yet" in
+    // fixed text — true the day it was written and false the day coverage
+    // passes half, with nothing to catch the turn. The claim now comes from the
+    // same counts the coverage line renders.
+    await renderWith(boardOf([model("luna", 0.9), model("vega", 0.7)]));
+
+    const trust = document.querySelector(".ld-trust")!;
+    expect(trust.textContent).not.toMatch(/most of this benchmark/i);
+
+    const coverage = document.querySelector(".ov-coverage")!.textContent!;
+    const counts = coverage.match(/(\d+) of the (\d+)/);
+    expect(counts, "coverage line no longer states a count").not.toBeNull();
+    expect(trust.textContent).toContain(`${counts![1]} of the ${counts![2]} outcomes`);
+  });
+
+  it("still states the coverage rule when there is no reading to count", async () => {
+    // The trust block renders with the API down, so the dynamic sentence needs
+    // a branch that claims nothing rather than printing "undefined of the".
+    getLeaderboard.mockRejectedValue(new Error("connection refused"));
+    render(await OverviewPage());
+
+    const trust = document.querySelector(".ld-trust")!;
+    expect(trust.textContent).not.toMatch(/undefined|NaN/);
+    expect(trust.textContent).toContain("Nothing unmeasured is counted as a zero");
+  });
+
+  it("does not narrate itself to the reader", async () => {
+    // The register is a colleague handing over findings, not a guide explaining
+    // what the page is about to do. These are the tics that were cut; a
+    // regression would be someone adding them back one sentence at a time.
+    await renderWith(boardOf([model("luna", 0.9), model("vega", 0.7)]));
+
+    const body = document.body.textContent!;
+    for (const tic of [
+      /here is the short version/i,
+      /the short version/i,
+      /read this first/i,
+      /only if you want to/i,
+      /they are not small print/i,
+      /rather than fill this page/i,
+      /where would you like to go/i,
+    ]) {
+      expect(body, `meta-narration is back: ${tic}`).not.toMatch(tic);
+    }
+  });
+});
+
 /* ------------------------------------------------------------ the doors */
 
 describe("the three doors", () => {
