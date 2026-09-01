@@ -255,10 +255,9 @@ export function summariseValue(board: LeaderboardResponse): ValueSummary {
 
   if (readings.length === 0) {
     return {
-      headline:
-        "We cannot say anything about cost yet, because nothing has been measured that we would stand behind.",
+      headline: "Nothing has been measured yet, so there is nothing to say about cost.",
       caveats: [
-        "When results land, every price here will come from the provider's own published rates rather than from what our testing happened to spend.",
+        "Prices will come from each provider's published rates, not from what our testing spent.",
       ],
       readings: [],
       valuePick: null,
@@ -286,8 +285,8 @@ export function summariseValue(board: LeaderboardResponse): ValueSummary {
   const anyQuoted = readings.some((r) => r.price.kind === "priced");
   if (anyQuoted) {
     caveats.push(
-      "These prices use each provider's published rates and the answer lengths we actually saw in our own testing. " +
-        "Your prompts and your answers will be a different length, so treat these as the right order of magnitude rather than a quote.",
+      "Prices use each provider's published rates against the answer lengths we observed. Your prompts " +
+        "will differ — treat these as orders of magnitude, not quotes.",
     );
   }
 
@@ -348,37 +347,32 @@ export function summariseValue(board: LeaderboardResponse): ValueSummary {
     const only = leader.price;
     headline =
       only.kind === "priced"
-        ? `We have only priced one model so far. ${leader.display_name} works out at about ` +
-          `${formatQuote(only.usdPerHundredAnswers)} for ${ANSWERS_PER_QUOTE} answers of the length we measured — ` +
-          `a figure to sanity-check against, not a comparison.`
+        ? `${leader.display_name} is the one model priced so far: about ` +
+          `${formatQuote(only.usdPerHundredAnswers)} for ${ANSWERS_PER_QUOTE} answers of the length we measured.`
         : only.kind === "free_on_campus"
-          ? `The one model we have measured, ${leader.display_name}, runs on campus hardware and costs you nothing per use. ` +
-            `With nothing to compare it against, that is a fact rather than a recommendation.`
+          ? `${leader.display_name} is the one model measured. It runs on campus hardware and costs nothing per use.`
           : `We have measured one model, ${leader.display_name}, but cannot yet put a per-answer price on it.`;
-    caveats.push(
-      "Only one model has been measured, so there is no cheaper or dearer alternative to set it against yet.",
-    );
+    caveats.push("Only one model has been measured, so there is nothing to set it against.");
   } else if (leaderIsAlsoCheapest) {
     headline =
       `${leader.display_name} is both the strongest of the ${readings.length} models we measured ` +
-      `(${formatScoreValue(leader.score)} out of 1.00) and the cheapest to run. ` +
-      `On this evidence there is no trade-off to make between the two.`;
+      `(${formatScoreValue(leader.score)} out of 1.00) and the cheapest to run. No trade-off to make here.`;
   } else if (valuePick !== null && leaderQuote !== null) {
     const pickQuote = quoteOf(valuePick) ?? 0;
     const times = pickQuote > 0 ? Math.round(leaderQuote / pickQuote) : null;
     headline =
       `${leader.display_name} scores highest of the ${readings.length} models we measured ` +
-      `(${formatScoreValue(leader.score)} out of 1.00), but ${valuePick.display_name} is within a whisker of it ` +
+      `(${formatScoreValue(leader.score)} out of 1.00), but ${valuePick.display_name} is within a whisker ` +
       `at ${formatScoreValue(valuePick.score)} ` +
       (pickQuote === 0
-        ? "and costs nothing per use, because it runs on campus hardware. "
+        ? "and costs nothing per use — it runs on campus hardware. "
         : `for about ${times !== null && times > 1 ? `a ${times}th of ` : "a fraction of "}the price. `) +
-      `If cost matters at all, ${valuePick.display_name} is the one to look at first.`;
+      `If cost matters, start with ${valuePick.display_name}.`;
   } else {
     headline =
       `${leader.display_name} scores highest of the ${readings.length} models we measured ` +
       `(${formatScoreValue(leader.score)} out of 1.00). ` +
-      `Nothing else we have priced is both cheaper and close enough on quality for us to call it a better buy.`;
+      `Nothing cheaper comes close enough on quality to call a better buy.`;
   }
 
   /* ----------------------------------------------------------- the caveats */
@@ -387,15 +381,13 @@ export function summariseValue(board: LeaderboardResponse): ValueSummary {
   );
   if (unpriced.length > 0) {
     caveats.push(
-      `${unpriced.length === 1 ? "One model has" : `${unpriced.length} models have`} no per-answer price here — ` +
-        `either the registry records no rates for ${unpriced.length === 1 ? "it" : "them"}, or we have not run ` +
-        `${unpriced.length === 1 ? "it" : "them"} enough to know what an answer costs. That is a gap in what we know, not a zero.`,
+      `${unpriced.length === 1 ? "One model has" : `${unpriced.length} models have`} no per-answer price: ` +
+        `no rates in the registry, or too few runs to size one. That is a gap, not a zero.`,
     );
   }
 
   caveats.push(
-    "Price is only half of the decision. A cheaper model that gets your subject wrong is not a saving — " +
-      "check how each one does on the outcomes you actually teach before choosing on cost.",
+    "Price is half the decision. A cheaper model that gets your subject wrong is not a saving.",
   );
 
   return { headline, caveats, readings, valuePick, leaderIsAlsoCheapest, comparable };

@@ -192,11 +192,11 @@ function isSeeded(rollup: ModelRollup): boolean {
 function costClause(price: PriceReading): string {
   switch (price.kind) {
     case "free_on_campus":
-      return "and it costs you nothing per use, because it runs on campus hardware";
+      return "and costs nothing per use — it runs on campus hardware";
     case "priced":
-      return `and running a hundred answers through it costs about ${formatQuoteInline(price.usdPerHundredAnswers)}`;
+      return `and a hundred answers cost about ${formatQuoteInline(price.usdPerHundredAnswers)}`;
     case "priced_unsized":
-      return "though we have not run it enough to say what an answer costs";
+      return "though we cannot yet say what an answer costs";
     case "unpriced":
       return "though we have no published price for it";
   }
@@ -238,9 +238,7 @@ export function buildOverview(board: LeaderboardResponse): Overview {
   let notice = "";
   if (allSeeded) {
     notice =
-      "Everything on this page is illustrative. These results were generated to show what the " +
-      "finished benchmark looks like — no model has actually been measured in this deployment yet. " +
-      "The full benchmark is in progress, and these numbers will be replaced by real ones.";
+      "Every figure here is illustrative — no model has been measured in this deployment yet.";
   } else if (anySeeded) {
     // ⚠ AGREEMENT, NOT PEDANTRY. "1 of the 2 models here have been measured"
     // is the sentence that shipped, and it reads as machine-generated on the one
@@ -248,9 +246,8 @@ export function buildOverview(board: LeaderboardResponse): Overview {
     const verb = measuredModels === 1 ? "has" : "have";
     const rest = ranked.length - measuredModels === 1 ? "the other is an" : "the rest are";
     notice =
-      `Some of this is illustrative. ${measuredModels} of the ${ranked.length} models here ${verb} been ` +
-      `genuinely measured; ${rest} example ${rest.endsWith("an") ? "result" : "results"}, generated to show the shape of ` +
-      `the finished benchmark. Each card says which kind it is.`;
+      `Some figures here are illustrative. ${measuredModels} of the ${ranked.length} models here ${verb} been ` +
+      `measured; ${rest} example ${rest.endsWith("an") ? "result" : "results"}. Each card says which.`;
   }
 
   const demonstration: DemonstrationTell = {
@@ -264,13 +261,10 @@ export function buildOverview(board: LeaderboardResponse): Overview {
   /* ------------------------------------------------------------- no data yet */
   if (ranked.length === 0) {
     return {
-      headline:
-        "We have not measured anything we would stand behind yet — so rather than fill this page " +
-        "with a placeholder, it says so.",
+      headline: "Nothing has been measured yet that we would stand behind.",
       standouts: [],
       scopeNudge:
-        "When results do land, they will be an average across the outcomes we tested. Your own " +
-        "subject may look different, which is what the recommendation walkthrough is for.",
+        "Results will be averages across the outcomes we tested. Your own subject may look different.",
       demonstration,
       findings,
       value,
@@ -308,13 +302,13 @@ export function buildOverview(board: LeaderboardResponse): Overview {
       confidence: rollup.overall.confidence,
       confidenceLabel: confidenceLabel(rollup.overall.confidence),
       confidenceReason:
-        `Based on ${rollup.overall.scored_samples} scored ` +
+        `${rollup.overall.scored_samples} scored ` +
         `${rollup.overall.scored_samples === 1 ? "answer" : "answers"} across ` +
         `${rollup.overall.measured_tasks} of the ${rollup.overall.covered_tasks} ` +
-        `${rollup.overall.covered_tasks === 1 ? "task" : "tasks"} we set it. ` +
+        `${rollup.overall.covered_tasks === 1 ? "task" : "tasks"} we set it, ` +
         (rollup.overall.verifiable_share < 0.5
-          ? "Most of it was marked by another AI against a written guide, not checked by a program."
-          : "Most of it was checked by a program against a known answer."),
+          ? "mostly marked by another AI against a written guide."
+          : "mostly checked by a program against a known answer."),
       scored_samples: rollup.overall.scored_samples,
       price,
       bestAt,
@@ -328,9 +322,9 @@ export function buildOverview(board: LeaderboardResponse): Overview {
     // contest, so nothing may imply one was won; with several, the claim is
     // still only about the outcomes we measured.
     if (ranked.length === 1) {
-      push(leader, "only_measured", "The one model we have measured so far");
+      push(leader, "only_measured", "The only model measured so far");
     } else {
-      push(leader, "strongest", "Strongest overall on what we have measured");
+      push(leader, "strongest", "Strongest on what we have measured");
     }
   }
 
@@ -345,7 +339,7 @@ export function buildOverview(board: LeaderboardResponse): Overview {
       push(
         pickRollup,
         free ? "free_on_campus" : "value",
-        free ? "Free to you, and keeps up" : "The better buy, if cost matters",
+        free ? "Free, and keeps up" : "The better buy",
       );
     }
   }
@@ -365,11 +359,9 @@ export function buildOverview(board: LeaderboardResponse): Overview {
 
   const scopeNudge =
     ranked.length === 1
-      ? "This is an average across the outcomes we have tested so far, in one programme. Your own " +
-        "course may look very different — the recommendation walkthrough asks what you teach before it answers."
-      : "These are averages across the outcomes we have tested. A model that leads overall can still be " +
-        "the wrong pick for your subject — a strong result in accounting says nothing about marketing. " +
-        "If your own field is what you care about, start there instead.";
+      ? "An average across the outcomes tested so far, in one programme. Your own course may look different."
+      : "These are averages across the outcomes we tested. A strong result in accounting says nothing " +
+        "about marketing — if your own field is the question, start with the per-outcome view.";
 
   return {
     headline,

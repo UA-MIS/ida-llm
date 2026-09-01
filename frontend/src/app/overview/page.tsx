@@ -50,7 +50,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Which AI is worth it — and what it costs — Capstone-IDA",
   description:
-    "A plain-language read on which AI models actually do academic work well, what each one costs to run, and how much of that we have genuinely measured.",
+    "Which AI models do academic work well, what each costs to run, and how much of it we have measured.",
 };
 
 /* ------------------------------------------------------------------------ */
@@ -89,7 +89,7 @@ function Price({ price }: { price: PriceReading }) {
     return (
       <div className="ov-price ov-price-free">
         <span className="ov-price-figure">Free</span>
-        <span className="ov-price-unit">to you — runs on campus hardware</span>
+        <span className="ov-price-unit">runs on campus hardware</span>
       </div>
     );
   }
@@ -97,9 +97,7 @@ function Price({ price }: { price: PriceReading }) {
     return (
       <div className="ov-price">
         <span className="ov-price-figure">{formatQuote(price.usdPerHundredAnswers)}</span>
-        <span className="ov-price-unit">
-          per 100 answers, at the length we measured
-        </span>
+        <span className="ov-price-unit">per 100 answers, at the length we measured</span>
       </div>
     );
   }
@@ -110,8 +108,8 @@ function Price({ price }: { price: PriceReading }) {
       <span className="ov-price-figure">Not priced</span>
       <span className="ov-price-unit">
         {price.kind === "priced_unsized"
-          ? "this model bills per use, but we have not run it enough to say how much"
-          : "no published rate for this model"}
+          ? "bills per use; too few runs to size it"
+          : "no published rate"}
       </span>
     </div>
   );
@@ -151,13 +149,12 @@ function StandoutCard({ standout }: { standout: Standout }) {
 
       {standout.demonstration ? (
         <p className="ov-card-demo">
-          Illustrative — these figures were generated to show the shape of the
-          finished benchmark. This model has not actually been measured here yet.
+          Illustrative figures. This model has not been measured yet.
         </p>
       ) : null}
 
       <Link className="ov-card-link" href={standout.reportHref}>
-        See {standout.display_name}&rsquo;s full report card
+        Full results for {standout.display_name}
         <Arrow className="ov-arrow" />
       </Link>
     </article>
@@ -271,8 +268,7 @@ export default async function OverviewPage() {
 
                 <p className="ld-lede ld-reveal ld-d2">
                   We run AI models against the learning outcomes this programme
-                  already publishes, and report what we find — including how much
-                  of it we have genuinely measured. Here is the short version.
+                  already publishes, and report what we find.
                 </p>
               </div>
             </div>
@@ -288,7 +284,7 @@ export default async function OverviewPage() {
           <section className="ld-section ov-section-tight">
             <div className="ld-wrap">
               <div className="ld-grid ld-grid-wide">
-                <div className="ld-rail">Read this first</div>
+                <div className="ld-rail">About this data</div>
                 <div className="ld-col">
                   <p
                     className={`ov-demo-notice${overview.demonstration.all ? " ov-demo-notice-all" : ""}`}
@@ -305,20 +301,12 @@ export default async function OverviewPage() {
         <section className="ld-section ov-section-tight">
           <div className="ld-wrap">
             <div className="ld-grid ld-grid-wide">
-              <div className="ld-rail">
-                The short version
-                <span className="ld-note">
-                  One sentence, then the models it is about. Everything under it
-                  is one click away.
-                </span>
-              </div>
+              <div className="ld-rail">The read</div>
               <div className="ld-col">
                 {overview === null ? (
                   <p className="ov-headline ov-headline-down">
-                    We cannot reach the benchmark service from this page right
-                    now, so the findings are missing rather than stale.
-                    Everything else here still stands, and the results
-                    themselves are one click away below.
+                    The benchmark service is unreachable, so there are no
+                    findings to show right now.
                   </p>
                 ) : (
                   <>
@@ -351,15 +339,9 @@ export default async function OverviewPage() {
           <section className="ld-section ld-band">
             <div className="ld-wrap">
               <div className="ld-grid ld-grid-wide">
-                <div className="ld-rail">
-                  What this does not say
-                  <span className="ld-note">
-                    The qualifiers travel with the claim. They are not
-                    small print.
-                  </span>
-                </div>
+                <div className="ld-rail">Caveats</div>
                 <div className="ld-col">
-                  <h2 className="ld-h2">Before you repeat any of this.</h2>
+                  <h2 className="ld-h2">What these numbers do not cover.</h2>
                   <ul className="ov-caveats">
                     {[...overview.value.caveats, ...overview.findings.caveats].map(
                       (caveat, index) => (
@@ -368,12 +350,12 @@ export default async function OverviewPage() {
                     )}
                   </ul>
                   <p className="ov-coverage">
-                    So far this covers{" "}
+                    Covers{" "}
                     <strong>
                       {overview.outcomesMeasured} of the {overview.outcomeCount}
                     </strong>{" "}
-                    learning outcomes the programme publishes. The rest is not a
-                    poor result — it has not been run yet.
+                    learning outcomes this programme publishes. The rest has not
+                    been run.
                   </p>
                 </div>
               </div>
@@ -385,25 +367,17 @@ export default async function OverviewPage() {
         <section className="ld-section" id="doors">
           <div className="ld-wrap">
             <div className="ld-grid ld-grid-wide">
-              <div className="ld-rail">
-                Three ways deeper
-                <span className="ld-note">
-                  Only if you want to. The reading above is the whole story at
-                  the level most people need it.
-                </span>
-              </div>
+              <div className="ld-rail">Go deeper</div>
               <div className="ld-col">
-                <h2 className="ld-h2">Where would you like to go next?</h2>
+                <h2 className="ld-h2">Three ways in.</h2>
 
                 <div className="ov-doors">
                   <Link className="ld-door ld-door-primary" href="/recommend">
                     <span className="ld-eyebrow">For your situation</span>
                     <h3>Get a recommendation for what you actually do</h3>
                     <p>
-                      A few questions about what you teach or research, and
-                      whether you are asking for yourself or for your students —
-                      then a specific answer, with what it is based on and what
-                      to watch out for.
+                      A few questions about what you teach and who will use it,
+                      then a specific answer with its evidence and its caveats.
                     </p>
                     <span className="ld-go">
                       Start the questions
@@ -415,10 +389,9 @@ export default async function OverviewPage() {
                     <span className="ld-eyebrow">The method</span>
                     <h3>See what we actually tested</h3>
                     <p>
-                      Every task we wrote, what it asks, how it was marked, and
-                      which of those were checked by a program rather than
-                      judged by another AI. Every number opens onto the run
-                      behind it.
+                      Every task, what it asks, and how it was marked — including
+                      which were checked by a program rather than judged by
+                      another AI. Every number opens onto its run.
                     </p>
                     <span className="ld-go">
                       Open the evidence
@@ -436,12 +409,11 @@ export default async function OverviewPage() {
                       afford. */}
                   <Link className="ld-door" href="/compare">
                     <span className="ld-eyebrow">Your field</span>
-                    <h3>See the outcome you care about, on its own</h3>
+                    <h3>The outcome you care about, on its own</h3>
                     <p>
-                      An overall winner can be the wrong pick for your subject.
-                      This breaks every model down outcome by outcome, so you
-                      can look at the one you teach instead of the average
-                      across all of them.
+                      Every model broken down outcome by outcome, so you can read
+                      the one you teach rather than the average across all of
+                      them.
                     </p>
                     <span className="ld-go">
                       Compare by outcome
@@ -458,53 +430,54 @@ export default async function OverviewPage() {
         <section className="ld-section ld-band">
           <div className="ld-wrap">
             <div className="ld-grid ld-grid-wide">
-              <div className="ld-rail">How to trust this</div>
+              <div className="ld-rail">Method</div>
               <div className="ld-col">
-                <h2 className="ld-h2">What we will and will not claim.</h2>
+                <h2 className="ld-h2">How these numbers are made.</h2>
                 <div className="ld-trust">
                   <div className="ld-trust-item">
-                    <b>There is no overall winner, and we will not invent one.</b>
+                    <b>No overall winner.</b>
                     <span>
                       A model that leads on quantitative work can be mediocre at
-                      ethical reasoning. Every strength above is named with the
-                      outcome it belongs to, because a single ranking across a
-                      whole degree is not a fact about your course.
+                      ethical reasoning. Every strength here is named with the
+                      outcome it belongs to.
                     </span>
                   </div>
                   <div className="ld-trust-item">
                     <b>Prices are the provider&rsquo;s, not our bill.</b>
                     <span>
-                      The figures above come from each provider&rsquo;s published
-                      rates applied to the answer lengths we actually observed —
-                      not from what our own testing happened to spend, which
-                      would tell you about our benchmark rather than about the
-                      model.
+                      Published rate cards applied to the answer lengths we
+                      observed — not what our own testing spent, which would
+                      measure the benchmark rather than the model.
                     </span>
                   </div>
                   <div className="ld-trust-item">
-                    <b>We say how much each number is worth.</b>
+                    <b>Every score carries its evidence.</b>
                     <span>
-                      A score a program checked against a known answer and one
-                      another AI judged against a written guide are different
-                      kinds of evidence. Every figure here carries which one it
-                      is, and a judged score is never called high confidence.
+                      A program checking against a known answer and an AI marking
+                      against a written guide are different kinds of evidence. A
+                      judged score is never called high confidence.
                     </span>
                   </div>
                   <div className="ld-trust-item">
-                    <b>Gaps are shown as loudly as findings.</b>
+                    <b>Gaps are shown, not filled.</b>
+                    {/* ⚠ COUNTED, NOT ASSERTED. This read "Most of this
+                        benchmark has not been run yet" — true on the day it was
+                        written and a lie the moment coverage passes half. The
+                        claim now comes from the same counts the coverage line
+                        above renders, so it cannot rot; with no reading at all
+                        it states the rule instead of a quantity. */}
                     <span>
-                      Most of this benchmark has not been run yet, and the page
-                      says so where it is true rather than filling the space.
-                      Nothing unmeasured is quietly counted as a zero.
+                      {overview
+                        ? `${overview.outcomesMeasured} of the ${overview.outcomeCount} outcomes have been run so far.`
+                        : "Outcomes we have not run are shown as gaps."}{" "}
+                      Nothing unmeasured is counted as a zero.
                     </span>
                   </div>
                   <div className="ld-trust-item">
                     <b>Every number opens up.</b>
                     <span>
-                      Each result links to the run behind it — what we asked,
-                      what the model answered, how it was marked, and when. If
-                      you disagree with a score, you can see exactly what
-                      produced it.
+                      Each result links to the run behind it: what we asked, what
+                      the model answered, how it was marked, and when.
                     </span>
                   </div>
                 </div>
