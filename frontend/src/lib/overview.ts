@@ -39,8 +39,11 @@ import { formatScoreValue } from "./format";
 import {
   confidenceLabel,
   isRanked,
+  isSeeded,
   rollupByModel,
   rollupByOutcome,
+  summariseDemonstration,
+  type DemonstrationTell,
   type ModelRollup,
 } from "./rollup";
 import type { Confidence, LeaderboardResponse } from "./types";
@@ -111,16 +114,9 @@ export interface Standout {
   demonstration: boolean;
 }
 
-export interface DemonstrationTell {
-  /** At least one measurement on this board was seeded rather than measured. */
-  any: boolean;
-  /** EVERY measurement on this board was seeded. */
-  all: boolean;
-  seededModels: number;
-  measuredModels: number;
-  /** Reader-facing; empty string when there is nothing to disclose. */
-  notice: string;
-}
+// `DemonstrationTell` moved to `lib/rollup.ts` (D-92, imported above) so every
+// page that reads a rollup — not just this one — can disclose seeded rows in
+// the same words.
 
 export interface Overview {
   /** The one sentence at the top. Always finished, always safe to quote alone. */
@@ -180,14 +176,6 @@ function bestOutcomeFor(rollup: ModelRollup, board: LeaderboardResponse): BestAt
   return best;
 }
 
-/** Whether every scored row behind a model was seeded. */
-function isSeeded(rollup: ModelRollup): boolean {
-  const scored = rollup.entries.filter(
-    (e) => e.result.mean_score !== null && e.result.scored_count > 0,
-  );
-  return scored.length > 0 && scored.every((e) => e.result.demonstration);
-}
-
 /** How a model's cost reads in a sentence, without ever inventing a figure. */
 function costClause(price: PriceReading): string {
   switch (price.kind) {
@@ -230,33 +218,7 @@ export function buildOverview(board: LeaderboardResponse): Overview {
     : board.slos.length;
 
   /* ------------------------------------------------- the demonstration tell */
-  const seededModels = ranked.filter(isSeeded).length;
-  const measuredModels = ranked.length - seededModels;
-  const anySeeded = seededModels > 0;
-  const allSeeded = anySeeded && measuredModels === 0;
-
-  let notice = "";
-  if (allSeeded) {
-    notice =
-      "Every figure here is illustrative — no model has been measured in this deployment yet.";
-  } else if (anySeeded) {
-    // ⚠ AGREEMENT, NOT PEDANTRY. "1 of the 2 models here have been measured"
-    // is the sentence that shipped, and it reads as machine-generated on the one
-    // paragraph whose entire job is to be believed.
-    const verb = measuredModels === 1 ? "has" : "have";
-    const rest = ranked.length - measuredModels === 1 ? "the other is an" : "the rest are";
-    notice =
-      `Some figures here are illustrative. ${measuredModels} of the ${ranked.length} models here ${verb} been ` +
-      `measured; ${rest} example ${rest.endsWith("an") ? "result" : "results"}. Each card says which.`;
-  }
-
-  const demonstration: DemonstrationTell = {
-    any: anySeeded,
-    all: allSeeded,
-    seededModels,
-    measuredModels,
-    notice,
-  };
+  const demonstration = summariseDemonstration(ranked, "card");
 
   /* ------------------------------------------------------------- no data yet */
   if (ranked.length === 0) {

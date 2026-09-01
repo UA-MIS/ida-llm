@@ -39,3 +39,31 @@ describe("the best-on-task star", () => {
     expect(container.querySelector(".rank")?.textContent).toBe("2");
   });
 });
+
+/**
+ * D-92: this card is the finest-grained place `ModelResult.demonstration`
+ * ever reaches a reader — a single task, a single model, a single row. It is
+ * reached by drilling into a task on `/leaderboard`, where the seeded number
+ * used to render exactly like a real one.
+ */
+describe("the demonstration-data tell", () => {
+  it("flags a seeded result", () => {
+    const { container } = render(
+      <ModelResultCard result={result({ demonstration: true })} rank={1} isBest={false} />,
+    );
+    expect(
+      container.querySelector(".badge-demo"),
+      "a seeded result carries no demonstration tell",
+    ).not.toBeNull();
+  });
+
+  it("never flags a result that was actually measured", () => {
+    const { container } = render(
+      <ModelResultCard result={result({ demonstration: false })} rank={1} isBest={false} />,
+    );
+    expect(
+      container.querySelector(".badge-demo"),
+      "a real measurement was labelled illustrative",
+    ).toBeNull();
+  });
+});

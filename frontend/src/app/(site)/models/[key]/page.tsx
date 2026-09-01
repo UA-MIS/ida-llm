@@ -30,6 +30,7 @@ import {
   Caveats,
   ConfidenceMeter,
   ConfidenceTell,
+  DemonstrationBadge,
   ResidencyBadge,
   TrustBadge,
 } from "@/components/trust-badges";
@@ -38,7 +39,9 @@ import { formatCost, formatTimestamp } from "@/lib/format";
 import { REPORT_CARD_TERMS } from "@/lib/glossary";
 import {
   confidenceLabel,
+  DEMONSTRATION_ROW_NOTE,
   findRollup,
+  isSeeded,
   rollupByOutcome,
   WEIGHTING_NOTE,
   type ModelRollup,
@@ -88,6 +91,11 @@ function ReportHead({
               {exclusionLabel(exclusion)}
             </span>
           ) : null}
+          {/* ⚠ THE HONESTY FIX (D-92). This report card presented seeded rows
+              as a finished measurement with no caveat anywhere on the page —
+              see `isSeeded`. Self-clears the moment a real run replaces every
+              seeded row behind this model. */}
+          {isSeeded(rollup) ? <DemonstrationBadge /> : null}
           {!rollup.enabled ? (
             <span
               className="badge"
@@ -300,6 +308,11 @@ function TaskBreakdown({
                 <div className="stacked-badges">
                   <TrustBadge trust={entry.result.trust} />
                   <ConfidenceMeter trust={entry.result.trust} />
+                  {/* Finest grain the API carries: this one task result, not
+                      the model as a whole. A model report card can be mostly
+                      real with one seeded task filling a gap, and this is the
+                      row that says so without over- or under-claiming. */}
+                  {entry.result.demonstration ? <DemonstrationBadge /> : null}
                 </div>
               </td>
               <td>
@@ -359,6 +372,14 @@ export default async function ModelReportPage({
       <Link href="/leaderboard" className="back">
         ← All models
       </Link>
+
+      {/* ⚠ HIGH ON THE PAGE, BEFORE THE SCORE IT QUALIFIES — same rule as
+          `/overview`'s per-card note and `/leaderboard`'s and `/compare`'s
+          page-level notice, one component over. Scoped to THIS model only
+          (unlike the shared `summariseDemonstration` sentence, which claims
+          things about the whole deployment); another model's report card can
+          be fully measured while this one is still seeded. */}
+      {isSeeded(rollup) ? <div className="notice">{DEMONSTRATION_ROW_NOTE}</div> : null}
 
       <ReportHead rollup={rollup} outcomeCount={outcomeCount} />
 

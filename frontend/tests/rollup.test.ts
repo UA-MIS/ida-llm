@@ -13,9 +13,11 @@ import {
   filterTasks,
   findRollup,
   isRanked,
+  isSeeded,
   podiumLabel,
   rollupByModel,
   rollupByOutcome,
+  summariseDemonstration,
   weakestConfidence,
   type ModelTaskEntry,
 } from "@/lib/rollup";
@@ -506,5 +508,103 @@ describe("podiumLabel", () => {
 
   it("says nothing rankable rather than labelling an empty list", () => {
     expect(podiumLabel(0, 0, 0)).toMatch(/no model has a rankable score/i);
+  });
+});
+
+/**
+ * ⚠ D-92: `isSeeded` AND `summariseDemonstration` USED TO LIVE ONLY IN
+ * `lib/overview.ts`, PRIVATE TO THAT PAGE. `/leaderboard`, `/compare` and
+ * `/models/[key]` regroup the exact same `ModelResult.demonstration` flag
+ * through this same rollup and had no way to ask the same question — so they
+ * rendered every seeded row as a flat, unqualified finding. These now live
+ * beside the rollup every page reads, so the four pages cannot disagree about
+ * what is real.
+ */
+describe("isSeeded", () => {
+  it("is true when every scored row behind a model was seeded", () => {
+    const [rollup] = rollupByModel(
+      board([task({ results: [result({ demonstration: true })] })]),
+    );
+    expect(isSeeded(rollup!)).toBe(true);
+  });
+
+  it("is false when even one scored row was a real measurement", () => {
+    const [rollup] = rollupByModel(
+      board([
+        task({
+          task_id: "fam/t1",
+          results: [result({ demonstration: true })],
+        }),
+        task({
+          task_id: "fam/t2",
+          results: [result({ demonstration: false })],
+        }),
+      ]),
+    );
+    // ⚠ THE CASE A MODEL-LEVEL BADGE MUST NOT MISS. A model with one real
+    // task and one seeded one is not "illustrative" — labelling its whole row
+    // that way would be its own dishonesty in the other direction.
+    expect(isSeeded(rollup!)).toBe(false);
+  });
+
+  it("is false for a model with nothing scored at all", () => {
+    const [rollup] = rollupByModel(
+      board([task({ results: [result({ mean_score: null, scored_count: 0 })] })]),
+    );
+    expect(isSeeded(rollup!)).toBe(false);
+  });
+});
+
+describe("summariseDemonstration", () => {
+  function rollupsFor(results: ModelResult[]): ReturnType<typeof rollupByModel> {
+    return rollupByModel(
+      board(
+        results.map((r, index) =>
+          task({ task_id: `fam/t${index}`, best_model_key: r.model_key, results: [r] }),
+        ),
+      ),
+    );
+  }
+
+  it("reports a wholly seeded set as illustrative", () => {
+    const tell = summariseDemonstration(
+      rollupsFor([result({ model_key: "luna", demonstration: true })]),
+    );
+    expect(tell.any).toBe(true);
+    expect(tell.all).toBe(true);
+    expect(tell.notice.toLowerCase()).toMatch(/illustrat/);
+  });
+
+  it("distinguishes a partly seeded set from a wholly seeded one", () => {
+    const tell = summariseDemonstration(
+      rollupsFor([
+        result({ model_key: "luna", demonstration: true }),
+        result({ model_key: "vega", demonstration: false }),
+      ]),
+    );
+    expect(tell.any).toBe(true);
+    expect(tell.all).toBe(false);
+    expect(tell.notice).toContain("1 of the 2 models here has been");
+    expect(tell.notice).not.toMatch(/models here have been/);
+  });
+
+  it("says nothing when nothing was seeded", () => {
+    const tell = summariseDemonstration(rollupsFor([result({ model_key: "luna" })]));
+    expect(tell.any).toBe(false);
+    expect(tell.all).toBe(false);
+    expect(tell.notice).toBe("");
+  });
+
+  it("names the unit ('row' vs 'card') in the mixed-set sentence, for the page reading it", () => {
+    const mixed = [
+      result({ model_key: "luna", demonstration: true }),
+      result({ model_key: "vega", demonstration: false }),
+    ];
+    expect(summariseDemonstration(rollupsFor(mixed), "row").notice).toContain(
+      "Each row says which.",
+    );
+    expect(summariseDemonstration(rollupsFor(mixed), "card").notice).toContain(
+      "Each card says which.",
+    );
   });
 });

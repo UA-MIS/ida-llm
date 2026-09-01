@@ -258,6 +258,10 @@ tbody tr:hover { background: var(--surface); }
 .badge-partial   { color: var(--pending); border-color: currentColor; }
 .badge-running,
 .badge-queued    { color: var(--pending); border-color: currentColor; }
+/* The demonstration-data tell, row-shaped — see `components/trust-badges.tsx`.
+   Same amber as `.badge-partial` and `.ov-demo-notice`: a statement about how
+   finished the work is, not a failure. */
+.badge-demo      { color: var(--pending); border-color: currentColor; }
 
 .card {
   /* QA-26: was --border (1.15:1 against this card's own --surface). */

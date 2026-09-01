@@ -8,7 +8,13 @@
 
 import Link from "next/link";
 
-import { Caveats, ConfidenceMeter, ResidencyBadge, TrustBadge } from "@/components/trust-badges";
+import {
+  Caveats,
+  ConfidenceMeter,
+  DemonstrationBadge,
+  ResidencyBadge,
+  TrustBadge,
+} from "@/components/trust-badges";
 import { formatScore, formatTimestamp } from "@/lib/format";
 import { plainLanguage } from "@/lib/plain";
 import { isDeEmphasised } from "@/lib/trust";
@@ -77,6 +83,9 @@ export function ModelResultCard({
               residency={result.data_residency}
               label={result.data_residency_label}
             />
+            {/* Per-row, straight off the API — see `types.ts`'s own field
+                comment on why this can never be a page-level claim. */}
+            {result.demonstration ? <DemonstrationBadge /> : null}
             {!result.enabled ? (
               <span
                 className="badge"

@@ -41,7 +41,13 @@ import { ModelResultCard } from "@/components/model-result-card";
 import { PlainSummary } from "@/components/plain-summary";
 import { ResultsUnavailable } from "@/components/service-unavailable";
 import { ScoreBar } from "@/components/score-bar";
-import { ConfidenceMeter, ConfidenceTell, ResidencyBadge, TrustLegend } from "@/components/trust-badges";
+import {
+  ConfidenceMeter,
+  ConfidenceTell,
+  DemonstrationBadge,
+  ResidencyBadge,
+  TrustLegend,
+} from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
 import { exclusionReason, exclusionSummary } from "@/lib/exclusion";
 import { summariseBoard } from "@/lib/findings";
@@ -51,7 +57,9 @@ import {
   confidenceLabel,
   filterTasks,
   isRanked,
+  isSeeded,
   rollupByModel,
+  summariseDemonstration,
   WEIGHTING_NOTE,
   type ModelRollup,
 } from "@/lib/rollup";
@@ -251,6 +259,12 @@ function ModelRow({
             residency={rollup.data_residency}
             label={rollup.data_residency_label}
           />
+          {/* ⚠ THE HONESTY FIX (D-92). Every seeded row already carries
+              `demonstration: true`; this page rendered every one of them as a
+              flat, unqualified finding — "Luna comes out ahead" with no
+              caveat. Per model, not per page, so it self-clears the instant a
+              real measurement replaces the seeded one. See `isSeeded`. */}
+          {isSeeded(rollup) ? <DemonstrationBadge /> : null}
           {!rollup.enabled ? (
             <span className="badge" title="These measurements stand, but the registry has since disabled the model.">
               not currently runnable
@@ -585,6 +599,11 @@ function TaskTable({
                         <div className="score-trust">
                           <ConfidenceMeter trust={best.trust} />
                         </div>
+                        {best.demonstration ? (
+                          <div className="score-trust">
+                            <DemonstrationBadge />
+                          </div>
+                        ) : null}
                       </>
                     ) : (
                       <span className="muted">—</span>
@@ -671,6 +690,11 @@ export default async function ResultsPage({
   const outcomeCount = board.curriculum.available
     ? board.curriculum.outcomes.length
     : board.slos.length;
+  // ⚠ THE HONESTY FIX (D-92), PAGE LEVEL. `/overview` already disclosed seeded
+  // rows; this page — the nav target, and the source of the "Luna comes out
+  // ahead" sentence `PlainSummary` renders below — did not. Same rollups, same
+  // wording as `/overview`, so the two pages cannot disagree about what is real.
+  const demonstration = summariseDemonstration(rollups.filter(isRanked));
 
   const filtered = selected
     ? board.tasks.filter((task) => task.task_id === selected)
@@ -720,6 +744,16 @@ export default async function ResultsPage({
         <NothingMeasuredYet taskCount={board.task_count} />
       ) : (
         <>
+          {/* ⚠ HIGH ON THE PAGE, BEFORE THE SENTENCE IT QUALIFIES. This is the
+              nav target, and `PlainSummary` below is where "Of the 2 AI models
+              measured, Luna comes out ahead" gets written in the largest type
+              on the page. A reader who meets that claim before this notice has
+              already formed the wrong impression — see `/overview`'s identical
+              rule, one component over. */}
+          {demonstration.any ? (
+            <div className="notice">{demonstration.notice}</div>
+          ) : null}
+
           {/* ⚠ SHORT → VISUAL → DETAIL, IN THAT ORDER, AND THE ORDER IS THE
               FEATURE. This page's own header comment sets the rule — LEAD WITH
               THE ANSWER — and until now the answer it led with was a ranked
