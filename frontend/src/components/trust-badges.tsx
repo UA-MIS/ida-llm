@@ -164,23 +164,29 @@ export function Caveats({ caveats }: { caveats: string[] }) {
 export function TrustLegend() {
   return (
     <div className="legend">
+      {/* ⚠ THE HEADINGS ARE THE BADGES' OWN WORDS, NOT OUR TAXONOMY. These
+          read "Verifiable" and "Subjective" — the two raw `TaskKind` values
+          that `plainTaskKind` exists to keep off the page, and that this file's
+          own `TrustBadge` comment above spends a paragraph explaining we do not
+          print. Neither word appears on a single badge, so the standing legend
+          was a key to a vocabulary the product had already removed. */}
       <div>
         <strong>
-          <span aria-hidden="true">✓</span> Verifiable
+          <span aria-hidden="true">✓</span> Checked by a program
         </strong>
         <p className="muted">
           The work had one right answer, and a program compared what the model
-          said to it. No AI judged it — this is the strongest evidence here.
+          said to it. No AI judged it — the strongest evidence here.
         </p>
       </div>
       <div>
         <strong>
-          <span aria-hidden="true">⚖</span> Subjective
+          <span aria-hidden="true">⚖</span> Marked by another AI
         </strong>
         <p className="muted">
           No single right answer, so a second AI marked it against a written
-          marking guide. An informed second opinion, not a measurement — and
-          never labelled high confidence.
+          guide. An informed second opinion, not a measurement, and never
+          labelled high confidence.
         </p>
       </div>
       <div>

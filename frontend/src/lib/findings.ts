@@ -175,16 +175,16 @@ export function summariseBoard(board: LeaderboardResponse): Findings {
     // the second one is the more confusing of the two to meet unexplained.
     const stubsMeasured = rollups.some((r) => !r.recommendable && r.overall.score !== null);
     const headline = stubsMeasured
-      ? "Nothing here is ready to rank yet. The only finished measurements so far come from a stand-in we use to test our own plumbing, and it is not an AI — so there is no honest ranking to show you."
+      ? "Nothing here is ready to rank yet. The only finished measurements come from a stand-in we use to test our own plumbing — not an AI, and not a ranking."
       : board.has_any_results
         ? "Nothing here is ready to rank yet. Work has been run, but none of it produced a score we would stand behind."
-        : "We have not measured anything yet. Rather than show you a placeholder, this page stays empty until real results land.";
+        : "Nothing has been measured yet, so this page stays empty until real results land.";
 
     return {
       headline,
       caveats: [
         `${ofThe(coverage.measuredTasks, coverage.taskCount, "piece of work", "pieces of work")} in the catalogue ${coverage.measuredTasks === 1 ? "has" : "have"} been measured so far.`,
-        "When results do land, every number on this page will link to the full record behind it.",
+        "When results land, every number will link to the full record behind it.",
       ],
       leader: null,
       comparable: false,
@@ -218,19 +218,19 @@ export function summariseBoard(board: LeaderboardResponse): Findings {
     // ⚠ NO COMPARATIVE. One model is not a ranking, and "best" here would be
     // read as "we tried several and this won".
     headline =
-      `So far we have measured one AI model, ${top.display_name}, which scored ${scoreText} out of 1.00 ` +
+      `${top.display_name} is the one AI model measured so far: ${scoreText} out of 1.00 ` +
       `across ${pluralise(top.overall.measured_tasks, "piece of work", "pieces of work")}. ` +
-      `That is a starting point, not a comparison.`;
+      `A starting point, not a comparison.`;
   } else if (tooCloseToCall && runnerUp && runnerUpScore !== null) {
     headline =
-      `${top.display_name} and ${runnerUp.display_name} come out about level at the top — ` +
+      `${top.display_name} and ${runnerUp.display_name} come out level — ` +
       `${scoreText} and ${formatScoreValue(runnerUpScore)} out of 1.00 — ` +
-      `which on this much evidence is close enough that we would not pick between them.`;
+      `close enough on this much evidence that we would not pick between them.`;
   } else {
     headline =
-      `Of the ${pluralise(ranked.length, "AI model")} we have measured, ${top.display_name} comes out ahead overall, ` +
-      `scoring ${scoreText} out of 1.00 across ${pluralise(top.overall.measured_tasks, "piece of work", "pieces of work")}. ` +
-      `That is an average, not a guarantee on any single one.`;
+      `Of the ${pluralise(ranked.length, "AI model")} measured, ${top.display_name} comes out ahead overall: ` +
+      `${scoreText} out of 1.00 across ${pluralise(top.overall.measured_tasks, "piece of work", "pieces of work")}. ` +
+      `An average, not a guarantee on any single one.`;
   }
 
   // ------------------------------------------------------------ the caveats
@@ -238,32 +238,32 @@ export function summariseBoard(board: LeaderboardResponse): Findings {
 
   if (!comparable) {
     caveats.push(
-      "Only one model has been measured, so there is nothing to compare it against yet — treat this as a first reading rather than a ranking.",
+      "Only one model has been measured, so there is nothing to compare it against.",
     );
   }
 
   caveats.push(
-    `This covers ${ofThe(coverage.measuredTasks, coverage.taskCount, "piece of work", "pieces of work")} we have written, ` +
+    `Covers ${ofThe(coverage.measuredTasks, coverage.taskCount, "piece of work", "pieces of work")} we have written, ` +
       `against ${coverage.outcomesMeasured} of your programme's ${coverage.outcomeCount} published outcomes. ` +
-      `The rest is not a poor result — it simply has not been run yet.`,
+      `The rest has not been run.`,
   );
 
   if (top.overall.scored_samples < THIN_EVIDENCE) {
     caveats.push(
       `The ranking rests on a handful of attempts — ${pluralise(top.overall.scored_samples, "scored attempt")} for the model above. ` +
-        `A few more could move these numbers, so hold them loosely.`,
+        `A few more could move these numbers.`,
     );
   }
 
   if (coverage.verifiableShare < MOSTLY_JUDGED) {
     caveats.push(
-      `Most of this was marked by another AI against a written marking guide rather than checked by a program, ` +
-        `because the work has no single right answer. That is an informed second opinion, not a measurement.`,
+      `Most of this was marked by another AI against a written guide rather than checked by a program, ` +
+        `because the work has no single right answer — an informed second opinion, not a measurement.`,
     );
   }
 
   caveats.push(
-    "Every number below opens onto the full record behind it — what we asked, what the model answered, and how it was marked.",
+    "Every number below opens onto the full record behind it: what we asked, what the model answered, and how it was marked.",
   );
 
   return { headline, caveats, leader, comparable, tooCloseToCall, rankedCount: ranked.length, coverage };

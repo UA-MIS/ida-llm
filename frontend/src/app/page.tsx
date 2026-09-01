@@ -30,9 +30,9 @@ import { buildSpecimen, type SpecimenReading, type SpecimenResult } from "@/lib/
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Which AI actually helps in your course — Capstone-IDA",
+  title: "Which AI helps in your course — Capstone-IDA",
   description:
-    "We measure AI models against your programme's own published learning outcomes, on real coursework, and report honestly — with the evidence behind every claim — what each one is good for in your class.",
+    "We measure AI models against the learning outcomes your programme publishes, on real coursework, and report what each is good for in your class — with the evidence behind every claim.",
 };
 
 /* ------------------------------------------------------------------------ */
@@ -167,8 +167,8 @@ function Specimen({ specimen }: { specimen: SpecimenResult }) {
       <div className="ld-specimen">
         <p className="ld-slo-src">The example, unavailable</p>
         <p className="ld-lede">
-          This page normally quotes one of the programme&rsquo;s published
-          outcomes here, with what we have measured against it.
+          One of the programme&rsquo;s published outcomes normally sits here,
+          with what we have measured against it.
         </p>
         <p className="ld-specimen-foot">{specimen.reason}</p>
       </div>
@@ -198,14 +198,13 @@ function Specimen({ specimen }: { specimen: SpecimenResult }) {
       <p className="ld-specimen-foot">
         {specimen.anyMeasured ? (
           <>
-            Three questions, one outcome, and we only answer the ones we have
-            actually measured. We run this for every outcome in the programme.
+            Three questions, one outcome, answered only where we have measured.
+            This runs for every outcome in the programme.
           </>
         ) : (
           <>
-            Nothing has finished running against this outcome in this deployment
-            yet, so all three read the same. They will not stay that way — and
-            when they change, the numbers will arrive with their receipts.
+            Nothing has finished running against this outcome yet, so all three
+            read the same.
           </>
         )}
       </p>
@@ -230,9 +229,8 @@ export default async function LandingPage() {
     specimen = {
       available: false,
       reason:
-        "The benchmark service is not reachable from this page right now, so the " +
-        "measured findings are missing rather than stale. Everything else on this " +
-        "page still stands — and the results themselves are one click away.",
+        "The benchmark service is not reachable from this page right now, so " +
+        "there are no measured findings to show.",
     };
   }
 
@@ -273,8 +271,7 @@ export default async function LandingPage() {
               <p className="ld-lede ld-reveal ld-d2">
                 We measure AI models against the learning outcomes your own
                 programme publishes — on real coursework, not trivia — and report
-                honestly, with the evidence attached, what each model is
-                genuinely good for in your class.
+                what each is good for in your class, with the evidence attached.
               </p>
 
               <div className="ld-cta-row ld-reveal ld-d3">
@@ -295,13 +292,7 @@ export default async function LandingPage() {
       <section className="ld-section" style={{ paddingTop: 0 }}>
         <div className="ld-wrap">
           <div className="ld-grid ld-grid-wide">
-            <div className="ld-rail ld-reveal ld-d4">
-              One outcome
-              <span className="ld-note">
-                This is the whole idea, in one example. The rest of the site is
-                this, repeated for every outcome.
-              </span>
-            </div>
+            <div className="ld-rail ld-reveal ld-d4">One outcome</div>
             <div className="ld-col ld-reveal ld-d4">
               <p className="ld-lede" style={{ marginBottom: "1.75rem" }}>
                 One outcome, quoted from the programme&rsquo;s own map — and
@@ -335,26 +326,24 @@ export default async function LandingPage() {
               </h2>
               <div className="ld-stack">
               <p>
-                The advice available right now is mostly two slogans —{" "}
+                The advice on offer is mostly two slogans —{" "}
                 <strong>ban it</strong> or <strong>embrace it</strong> — and
-                neither one knows anything about what you teach. The benchmarks
-                that do exist mostly measure whether a model can write software.
-                Almost none of them measure whether it can explain a concept,
-                mark a short answer fairly, or coach a student who is stuck.
+                neither knows anything about what you teach. The benchmarks that
+                exist mostly measure whether a model can write software, not
+                whether it can explain a concept, mark a short answer fairly, or
+                coach a student who is stuck.
               </p>
               <p>
-                So faculty are left guessing. Some quietly assume every
-                assignment is compromised. Some assume none are. Both are working
-                from impressions, and students can tell.
+                So faculty guess. Some assume every assignment is compromised;
+                some assume none are. Both are working from impressions, and
+                students can tell.
               </p>
               <p>
-                <strong>We think the honest version is measurable.</strong> Your
-                programme already publishes, in plain language, what a student who
-                passes should be able to do. That list is the fairest yardstick
-                anyone could hold a model to — it is not our opinion of what
-                matters, it is yours, already written down. So we test against it,
-                and we publish what we find, including the parts that are
-                inconvenient.
+                <strong>The honest version is measurable.</strong> Your programme
+                already publishes, in plain language, what a student who passes
+                should be able to do. That list is not our opinion of what
+                matters — it is yours, already written down. So we test against
+                it and publish what we find, including the inconvenient parts.
               </p>
               </div>
             </div>
@@ -366,13 +355,7 @@ export default async function LandingPage() {
       <section className="ld-section ld-band" id="how">
         <div className="ld-wrap">
           <div className="ld-grid ld-grid-wide">
-            <div className="ld-rail">
-              How it works
-              <span className="ld-note">
-                Three steps, in order. Only the first one needs anything from
-                you.
-              </span>
-            </div>
+            <div className="ld-rail">How it works</div>
             <div className="ld-col">
               <h2 className="ld-h2">Three steps, and only the first needs you.</h2>
               <div className="ld-steps">
@@ -383,9 +366,8 @@ export default async function LandingPage() {
                     <p>
                       We take the learning outcomes your department already
                       publishes — the &ldquo;students will be able to…&rdquo;
-                      list — and treat each one as a separate question to answer.
-                      Nothing is invented, and nothing is graded against our
-                      taste.
+                      list — and treat each as a separate question. Nothing is
+                      invented, and nothing is marked against our taste.
                     </p>
                   </div>
                 </div>
@@ -394,11 +376,11 @@ export default async function LandingPage() {
                   <div>
                     <h3>We test the models on real work</h3>
                     <p>
-                      Each outcome becomes a set of genuine academic tasks — the
-                      kind of thing you would actually assign. Models run them
-                      under recorded conditions. Where an answer is objectively
-                      checkable we check it programmatically; where it takes
-                      judgement, we use anchored rubrics and say so.
+                      Each outcome becomes a set of real academic tasks — the
+                      kind of thing you would assign. Models run them under
+                      recorded conditions. Where an answer is checkable, a
+                      program checks it; where it takes judgement, we use
+                      anchored rubrics and say so.
                     </p>
                   </div>
                 </div>
@@ -407,10 +389,9 @@ export default async function LandingPage() {
                   <div>
                     <h3>You get an answer for your situation</h3>
                     <p>
-                      Not a leaderboard to interpret. A plain recommendation: for
-                      this course, this outcome, and the way you want to use it —
-                      here is what we would suggest, here is what to watch for,
-                      and here is every result it rests on.
+                      Not a leaderboard to interpret. For this course, this
+                      outcome, and the way you want to use it: what we suggest,
+                      what to watch for, and every result it rests on.
                     </p>
                   </div>
                 </div>
@@ -426,20 +407,18 @@ export default async function LandingPage() {
           <div className="ld-grid ld-grid-wide">
             <div className="ld-rail">Two ways in</div>
             <div className="ld-col">
-              <h2 className="ld-h2">Where would you like to start?</h2>
-              <p className="ld-lede" style={{ marginBottom: "2.1rem" }}>
-                Browse the evidence yourself, or skip to the part where we just
-                tell you what we would do.
-              </p>
+              <h2 className="ld-h2" style={{ marginBottom: "2.1rem" }}>
+                Start with the evidence, or with the answer.
+              </h2>
 
               <div className="ld-doors">
                 <Link className="ld-door ld-door-primary" href="/leaderboard">
                   <span className="ld-eyebrow">The results</span>
-                  <h3>See how AI does on your outcomes</h3>
+                  <h3>How AI does on your outcomes</h3>
                   <p>
-                    Every outcome we have tested, model by model, with the
-                    evidence behind each number one click away — including the
-                    outcomes nothing has measured yet.
+                    Every outcome tested, model by model, with the evidence
+                    behind each number one click away — including the outcomes
+                    nothing has measured yet.
                   </p>
                   <span className="ld-go">
                     Open the results
@@ -448,12 +427,11 @@ export default async function LandingPage() {
                 </Link>
 
                 <Link className="ld-door" href="/recommend">
-                  <span className="ld-eyebrow">The short way</span>
+                  <span className="ld-eyebrow">A recommendation</span>
                   <h3>Get a recommendation for my class</h3>
                   <p>
-                    Tell us what you teach, and whether you are asking for
-                    yourself or for your students. A few questions, and an answer
-                    that says what it is based on.
+                    A few questions about what you teach and who will use it,
+                    then an answer that says what it rests on.
                   </p>
                   <span className="ld-go">
                     Start the questions
@@ -470,56 +448,55 @@ export default async function LandingPage() {
       <section className="ld-section ld-band">
         <div className="ld-wrap">
           <div className="ld-grid ld-grid-wide">
-            <div className="ld-rail">
-              How to trust this
-              <span className="ld-note">
-                The short version: we would rather tell you we do not know than
-                give you a number we cannot defend.
-              </span>
-            </div>
+            <div className="ld-rail">Method</div>
             <div className="ld-col">
-              <h2 className="ld-h2">What we will and will not claim.</h2>
+              <h2 className="ld-h2">How these numbers are made.</h2>
 
               <div className="ld-trust">
                 <div className="ld-trust-item">
-                  <b>Every number opens up.</b>
+                  <b>Every number opens.</b>
                   <span>
-                    Each result links to the run behind it — the prompts, the
-                    model settings, the date it ran, and the raw output. If you
-                    disagree with a score, you can see exactly what produced it.
+                    Each result links to the run behind it: the prompts, the
+                    model settings, the date it ran, and the raw output.
                   </span>
                 </div>
+                {/* ⚠ THE RULE, NOT A QUANTITY. This read "Most of this benchmark
+                    is not measured yet" and "Two of the three questions … have
+                    no data at all today" — both true the day they were written
+                    and both false the day a run lands, with nothing to catch
+                    the turn. This page renders no counts by design (see the
+                    header comment: exactly one number anywhere, and only behind
+                    a finished run), so the version that cannot rot states the
+                    rule the specimen above already demonstrates. */}
                 <div className="ld-trust-item">
-                  <b>We show the gaps as loudly as the findings.</b>
+                  <b>Gaps are shown, not filled.</b>
                   <span>
-                    Most of this benchmark is not measured yet, and the page above
-                    says so where it is true rather than filling the space. Two of
-                    the three questions we ask about each outcome have no data at
-                    all today.
+                    Outcomes we have not run are shown as gaps. Nothing
+                    unmeasured is counted as a zero.
                   </span>
                 </div>
                 <div className="ld-trust-item">
                   <b>A failed run is not a wrong answer.</b>
                   <span>
-                    Errored samples are excluded from a score, never counted as
-                    zero. An outage must never be able to make a model look
+                    Failed attempts are excluded from a score, never counted as
+                    zero. An outage must not be able to make a model look
                     incompetent.
                   </span>
                 </div>
                 <div className="ld-trust-item">
-                  <b>We say how much to trust each number.</b>
+                  <b>Every score carries its evidence.</b>
                   <span>
-                    A programmatically checked answer and an AI-judged one are not
-                    the same kind of evidence, and every result carries which one
-                    it is. A judged score is never labelled high confidence.
+                    A program checking against a known answer and an AI marking
+                    against a written guide are different kinds of evidence. A
+                    judged score is never labelled high confidence.
                   </span>
                 </div>
                 <div className="ld-trust-item">
                   <b>The yardstick is yours, not ours.</b>
                   <span>
-                    We measure against published programme outcomes. When we say a
-                    model falls short, we mean it falls short of something your
-                    own department wrote down.
+                    We measure against published programme outcomes. A model
+                    that falls short falls short of something your own
+                    department wrote down.
                   </span>
                 </div>
               </div>
@@ -532,10 +509,10 @@ export default async function LandingPage() {
                   is useless to them.
                 </p>
                 <p>
-                  The same method points at research work too: literature review,
-                  drafting, analysis, and the question nobody enjoys asking — which
-                  models can safely be shown unpublished data. Choose your hat
-                  when you start; the evidence underneath is the same.
+                  The same method covers research: literature review, drafting,
+                  analysis, and the question nobody enjoys asking — which models
+                  can safely be shown unpublished data. Choose your hat when you
+                  start; the evidence underneath is the same.
                 </p>
               </div>
             </div>
@@ -550,11 +527,11 @@ export default async function LandingPage() {
             <div className="ld-rail">Start anywhere</div>
             <div className="ld-col">
               <h2 className="ld-h2" style={{ maxWidth: "20ch" }}>
-                You do not need to know anything about AI to use this.
+                Nothing here assumes you work with AI.
               </h2>
               <p className="ld-lede">
-                That is rather the point. Bring a course; leave with a position
-                you can defend to a colleague, a dean, or a room full of students.
+                Bring a course; leave with a position you can defend to a
+                colleague, a dean, or a room full of students.
               </p>
               <div className="ld-cta-row">
                 <Link className="ld-btn" href="/leaderboard">

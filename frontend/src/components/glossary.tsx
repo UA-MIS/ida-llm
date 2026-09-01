@@ -104,7 +104,7 @@ export function Term({
  */
 export function GlossaryPanel({
   terms,
-  title = "What do these words mean?",
+  title = "Glossary",
   intro,
 }: {
   terms: readonly string[];
@@ -123,13 +123,12 @@ export function GlossaryPanel({
         {title}
         <span className="glossary-summary-hint muted">
           {" "}
-          — {entries.length} terms, in plain English
+          — {entries.length} terms
         </span>
       </summary>
       <div className="glossary-body">
         <p className="glossary-intro muted">
-          {intro ??
-            "This project had to invent some vocabulary. None of it is difficult, and none of it is meant to keep anyone out — here is all of it in one place."}
+          {intro ?? "Every term this site uses, defined."}
         </p>
         <dl className="glossary-list">
           {entries.map((entry) => (

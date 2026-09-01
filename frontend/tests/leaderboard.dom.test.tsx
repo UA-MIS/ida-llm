@@ -25,6 +25,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { LEADERBOARD_TERMS, lookup } from "@/lib/glossary";
 
 import { board, result, task } from "./fixtures";
+import { expectPeerVoice } from "./voice";
 
 const getLeaderboard = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", () => ({
@@ -398,5 +399,73 @@ describe("the filter bar preserves params it does not own", () => {
     expect((form.querySelector('input[name="task"]') as HTMLInputElement).value).toBe(
       "slo4/ethics",
     );
+  });
+});
+
+/* --------------------------------------------------------- the copy itself */
+
+describe("the leaderboard, written to a peer", () => {
+  it("does not narrate itself, plead its case, or date itself", async () => {
+    await renderBoard(twoRankedModels());
+
+    // ⚠ SWEEPS THE WHOLE BODY, WHICH INCLUDES THE SHARED COMPONENTS. The
+    // orientation panel, the standing trust legend and the glossary all render
+    // here, so this is the one place their copy is measured against a real
+    // page rather than in isolation.
+    expectPeerVoice(document.body.textContent!, expect);
+  });
+
+  /**
+   * ⚠ THE SAME SEAM PR #67 CLOSED ON `/overview`, ONE COMPONENT OVER. The
+   * summary's link read `Open {display_name}&rsquo;s report card` — an
+   * apostrophe glued onto an interpolated name. One reflow of that JSX puts the
+   * name and the apostrophe on separate lines and JSX inserts a space between
+   * them, which is how the overview shipped "Luna (…) 's full report card". The
+   * possessive is gone here too, so the seam cannot reopen.
+   */
+  it("names the model in the summary link with no punctuation seam", async () => {
+    await renderBoard(
+      board([
+        task({
+          has_results: true,
+          best_model_key: "luna",
+          results: [
+            result({
+              model_key: "luna",
+              display_name: "Luna (Llama 3.1 8B)",
+              mean_score: 0.86,
+            }),
+            result({ model_key: "atlas", display_name: "Atlas", mean_score: 0.41 }),
+          ],
+        }),
+      ]),
+    );
+
+    const next = document.querySelector(".plain-summary-next")!;
+    const link = next.querySelector("a")!;
+    expect(link.textContent).toContain("Luna (Llama 3.1 8B)");
+    expect(link.textContent, "a space landed before punctuation").not.toMatch(
+      /\s+['’,.]/,
+    );
+    expect(next.textContent, "a space landed before the comma").not.toMatch(/\s+,/);
+    expect(next.textContent, "doubled whitespace in the follow-on").not.toMatch(/\s\s/);
+  });
+
+  /**
+   * The standing legend is a key to the labels a reader actually sees. It used
+   * to head its two columns "Verifiable" and "Subjective" — the raw `TaskKind`
+   * values that `plainTaskKind` exists to keep off the page, and that appear on
+   * no badge anywhere. `honesty.dom.test.tsx` already proves the badges never
+   * say "subjective"; this proves the legend explaining them does not either.
+   */
+  it("keys the legend to the words on the badges, not to the raw task kinds", async () => {
+    await renderBoard(twoRankedModels());
+
+    const legend = document.querySelector(".legend")!;
+    expect(legend.textContent, "the legend still prints our taxonomy").not.toMatch(
+      /subjective/i,
+    );
+    expect(legend.textContent).toMatch(/Checked by a program/);
+    expect(legend.textContent).toMatch(/Marked by another AI/);
   });
 });

@@ -209,10 +209,7 @@ export function readingFor(
       ...base,
       status: "not_authored",
       headline: "Not measured yet",
-      detail:
-        `The curriculum defines this question, but no task has been written ` +
-        `against it yet — so there is nothing measured, and nothing here to ` +
-        `report. We would rather leave it blank than guess at it.`,
+      detail: `The curriculum defines this question, but no task has been written against it yet.`,
       best: null,
     };
   }
@@ -227,8 +224,7 @@ export function readingFor(
         tasks.length === 0
           ? `No task tied to this outcome asks this question yet.`
           : `${tasks.length} task${tasks.length === 1 ? " asks" : "s ask"} this ` +
-            `question, but no model has a finished, scored run against ${tasks.length === 1 ? "it" : "them"} ` +
-            `yet — so there is no number to show.`,
+            `question, but no model has a finished, scored run against ${tasks.length === 1 ? "it" : "them"} yet.`,
       best: null,
     };
   }
@@ -272,9 +268,7 @@ export function buildSpecimen(board: LeaderboardResponse): SpecimenResult {
       available: false,
       reason:
         board.curriculum?.unavailable_reason ??
-        "This deployment has no curriculum map loaded, so there is no published " +
-          "outcome to quote. The outcome statements are the registrar's words, " +
-          "and inventing one here would defeat the point of quoting them.",
+        "This deployment has no curriculum map loaded, so there is no published outcome to quote.",
     };
   }
 

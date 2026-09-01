@@ -315,7 +315,7 @@ export default async function ComparePage() {
           reader who does not know which axis is which, or that a blank cell is
           not a nought, cannot get anything out of it — and a grid of mostly
           empty squares read as zeros is actively worse than no page at all. */}
-      <HowToRead title="A grid of models against your outcomes. Here is how to read it.">
+      <HowToRead title="A grid of models against your outcomes.">
         <ReadStep n={1} heading="Rows are models, columns are your outcomes">
           Read across a row for one <Term id="model">model</Term>&rsquo;s
           profile — what it is good and bad at. Read down a column to see which
