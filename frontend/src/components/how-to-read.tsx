@@ -36,7 +36,7 @@ export function HowToRead({
   return (
     <details className="how-to-read" open>
       <summary className="how-to-read-summary">
-        <span className="how-to-read-eyebrow">New here?</span>
+        <span className="how-to-read-eyebrow">How to read this</span>
         <span className="how-to-read-title">{title}</span>
         <span className="how-to-read-toggle muted" aria-hidden="true" />
       </summary>

@@ -52,7 +52,7 @@ const ENTRIES: GlossaryEntry[] = [
     plain:
       "A sentence your own department has already published saying what a student who passes should be able to do.",
     more:
-      "You may see these abbreviated to SLO, for Student Learning Outcome. We did not write them and we cannot edit them — they are quoted from your programme's own map, which is what makes them a fair yardstick rather than our opinion of what matters.",
+      "You may see these abbreviated to SLO, for Student Learning Outcome. We did not write them and cannot edit them — they are quoted from your programme's own map.",
   },
   {
     id: "benchmark",
@@ -110,13 +110,13 @@ const ENTRIES: GlossaryEntry[] = [
     plain:
       "How much weight the number beside it can bear — how it was marked, over how many attempts, and whether anything went wrong.",
     more:
-      "⚠ This is about the MEASUREMENT, never about the model. A high score with low confidence does not mean the model is good; it means we have not yet earned the right to tell you either way. Treat it as a promising sign that needs more evidence, not as a verdict.",
+      "This is about the measurement, never about the model. A high score with low confidence does not mean the model is good; it means we have not yet earned the right to tell you either way.",
   },
   {
     id: "verifiable",
     term: "Checked by a program",
     plain:
-      "The answer had one right answer, and ordinary software compared what the model said to it. No AI was involved in the marking.",
+      "The work had one right answer, and ordinary software compared what the model said to it. No AI was involved in the marking.",
     more:
       "This is the strongest evidence on the site. It is also only available where the work genuinely has a right answer — a break-even calculation does, an essay does not.",
   },
@@ -126,7 +126,7 @@ const ENTRIES: GlossaryEntry[] = [
     plain:
       "The work had no single right answer, so a second AI system marked it against a written marking guide.",
     more:
-      "We treat this as an informed second opinion rather than a measurement, and we never label it high confidence. The marking guide and the reasoning are both on the page behind the number, so you can disagree with it specifically.",
+      "We treat this as an informed second opinion rather than a measurement, and never label it high confidence. The marking guide and the reasoning are both on the page behind the number.",
   },
   {
     id: "rubric",
@@ -141,7 +141,7 @@ const ENTRIES: GlossaryEntry[] = [
     plain:
       "Nobody has run this test yet, so we have nothing to report — which is different from having tested it and found it wanting.",
     more:
-      "Most of this benchmark is in this state today, and we show the gaps rather than filling them. A blank here is an honest blank; it is never shown as a score of nought.",
+      "We show these gaps rather than filling them. A blank is never shown as a score of nought.",
   },
   {
     id: "not-benchmarkable",
@@ -189,7 +189,7 @@ const ENTRIES: GlossaryEntry[] = [
     plain:
       "A stand-in that returns a fixed answer, used to check our own plumbing works. It is not an AI and it is never recommended.",
     more:
-      "It appears on this site because it produced real rows in our records, and quietly deleting inconvenient rows is the habit this project exists to replace. It is always shown outside the ranking.",
+      "It appears here because it produced real rows in our records. It is always shown outside the ranking.",
   },
 
   // ----------------------------------------------------------------- the risk

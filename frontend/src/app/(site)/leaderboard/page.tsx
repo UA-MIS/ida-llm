@@ -135,7 +135,7 @@ function OverallLeaderboard({
         <div className="notice">
           <strong>No model has a rankable score yet.</strong> Every measured
           pairing so far is either a test stub or produced no score, so there is
-          nothing honest to rank.
+          nothing to rank.
         </div>
       ) : (
         <div className="table-scroll">
@@ -485,7 +485,7 @@ function TaskSection({
         <div className="notice">
           <strong>Nothing measured on this task yet.</strong>{" "}
           {task.scorable
-            ? "No model has a finished run against it, so there is no number to show — and we would rather show none than invent one."
+            ? "No model has a finished run against it, so there is no number to show."
             : (task.unscorable_reason ??
               "This task cannot be scored yet, so a run against it would produce no number.")}
         </div>
@@ -607,8 +607,8 @@ function NothingMeasuredYet({ taskCount }: { taskCount: number }) {
       <h2>No benchmark results yet</h2>
       <p className="muted">
         {taskCount} task{taskCount === 1 ? " is" : "s are"} authored and ready to
-        run, but nothing has been measured against them. Rather than show you a
-        placeholder number, this page will stay empty until a run finishes.
+        run, but nothing has been measured against them. This page stays empty
+        until a run finishes.
       </p>
       <p className="muted">
         Start one with:
@@ -621,9 +621,8 @@ function NothingMeasuredYet({ taskCount }: { taskCount: number }) {
         </code>
       </p>
       <p className="muted">
-        In the meantime, the{" "}
-        <Link href="/recommend">recommendation flow</Link> still works — and it
-        will tell you, honestly, that it has no evidence to recommend on.
+        The <Link href="/recommend">recommendation flow</Link> still works, and
+        will say it has no evidence to recommend on.
       </p>
     </div>
   );
@@ -706,7 +705,7 @@ export default async function ResultsPage({
         </p>
         <div className="cta-row">
           <Link href="/recommend" className="cta">
-            Not sure what you need? Answer a few questions ▸
+            Get a recommendation instead ▸
           </Link>
           <span className="muted hero-meta">
             {board.measured_task_count} of {board.task_count} tasks measured ·{" "}
@@ -729,34 +728,32 @@ export default async function ResultsPage({
               unchanged, one scroll down, for the reader who wants it. */}
           <PlainSummary findings={summariseBoard(board)} rollups={rollups} />
 
-          <HowToRead title="This page is evidence, not advice. Here is how to read it.">
+          <HowToRead title="This page is evidence, not advice.">
             <ReadStep n={1} heading="Start with the paragraph above">
-              It is the honest summary of everything measured so far, caveats
-              included. If you read nothing else on this page, that is the part
-              to read.
+              The summary of everything measured so far, caveats included.
             </ReadStep>
             <ReadStep n={2} heading="Scores run from 0.00 to 1.00">
-              They are averages over several attempts, not marks out of a
-              hundred. Beside each one is a{" "}
-              <Term id="confidence">confidence</Term> — how much weight that
-              average can bear. A high score with low confidence is a promising
-              sign, not a verdict.
+              Averages over several attempts, not marks out of a hundred. Beside
+              each is a <Term id="confidence">confidence</Term> — how much weight
+              that average can bear. A high score with low confidence is a
+              promising sign, not a verdict.
             </ReadStep>
+            {/* ⚠ THE RULE, NOT A QUANTITY. This step opened "Most of this
+                benchmark is not measured yet" — the same claim with a shelf
+                life PR #67 removed from the overview trust block, true when
+                written and false the moment coverage passes half. The hero
+                above already renders the live count. */}
             <ReadStep n={3} heading="A blank is a blank, never a nought">
-              Most of this benchmark is{" "}
-              <Term id="not-measured">not measured yet</Term>, and we show the
-              gaps rather than filling them. Nothing here is scored zero for
-              having gone untested.
+              A blank means <Term id="not-measured">not measured yet</Term>. We
+              show the gaps rather than filling them.
             </ReadStep>
             <ReadStep n={4} heading="Every number opens">
-              Follow any &ldquo;see the proof&rdquo; link to the full record —
-              what we asked, what the model answered, and how it was marked. If
-              you disagree with a score, that is where to look.
+              Follow any &ldquo;see the proof&rdquo; link to the full record:
+              what we asked, what the model answered, and how it was marked.
             </ReadStep>
-            <ReadStep n={5} heading="If you would rather just be told">
+            <ReadStep n={5} heading="For an answer rather than a table">
               The <Link href="/recommend">recommendation questions</Link> ask
-              about your actual situation and give you an answer for it, rather
-              than a table to interpret.
+              about your situation and answer for it.
             </ReadStep>
           </HowToRead>
 

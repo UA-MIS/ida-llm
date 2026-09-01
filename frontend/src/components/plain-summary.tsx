@@ -124,13 +124,19 @@ export function PlainSummary({
 
       {findings.leader ? (
         <p className="plain-summary-next">
-          Want the detail?{" "}
+          {/* ⚠ NO POSSESSIVE ON AN INTERPOLATED NAME. This read `Open
+              {display_name}&rsquo;s report card` — the identical construction
+              PR #67 removed from the overview card link, where one reflow of
+              the JSX puts the name and the apostrophe on separate lines and
+              JSX inserts a space between them ("Luna (Llama 3.1 8B) 's report
+              card"). "Full results for {name}" has no punctuation seam to
+              reopen. */}
           <Link href={`/models/${encodeURIComponent(findings.leader.model_key)}`}>
-            Open {findings.leader.display_name}&rsquo;s report card
-          </Link>{" "}
-          to see it outcome by outcome, or read the full ranking below.{" "}
+            Full results for {findings.leader.display_name}
+          </Link>
+          , outcome by outcome. The whole ranking is below.{" "}
           <Link href="/recommend">
-            If you would rather just be told what to use, answer a few questions instead
+            Or answer a few questions for a recommendation
           </Link>
           .
         </p>
@@ -139,8 +145,7 @@ export function PlainSummary({
           <Link href="/recommend">
             The recommendation questions still work
           </Link>{" "}
-          — and with nothing measured, they will tell you so honestly rather than
-          guess.
+          — with nothing measured, they will say so rather than guess.
         </p>
       )}
     </section>

@@ -16,6 +16,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { expectPeerVoice } from "./voice";
 import type {
   CurriculumView,
   LeaderboardResponse,
@@ -303,5 +304,71 @@ describe("the landing page's landmarks", () => {
     const main = document.querySelector("main")!;
     expect(main.querySelector("header")).toBeNull();
     expect(main.querySelector("footer")).toBeNull();
+  });
+});
+
+/* --------------------------------------------------------- the copy itself */
+
+/**
+ * ⚠ THE FRONT DOOR IS THE PAGE MOST LIKELY TO DRIFT BACK. It is the one surface
+ * whose job is persuasion, which makes "add a reassuring sentence" the obvious
+ * edit at all times — and this reader is the one for whom reassurance reads as
+ * doubt. See `tests/voice.ts` for what each pattern was.
+ */
+describe("the landing page, written to a peer", () => {
+  it("does not narrate itself, plead its case, or date itself", async () => {
+    getLeaderboard.mockResolvedValue(board([task()]));
+    await renderLanding();
+
+    expectPeerVoice(document.body.textContent!, expect);
+  });
+
+  /**
+   * ⚠ THE COMPANION TO THE SWEEP ABOVE, AND THE MORE IMPORTANT HALF. A voice
+   * pass cuts sentences, and every honesty commitment on this page lives in one
+   * — so the cheapest way to make the page read beautifully is to delete the
+   * guarantees, and nothing else in this directory would notice. The wording is
+   * allowed to change; the commitment is not.
+   */
+  it("still makes all five method commitments after the cuts", async () => {
+    getLeaderboard.mockResolvedValue(board([task()]));
+    await renderLanding();
+
+    const trust = document.querySelector(".ld-trust");
+    expect(trust, "the method block is gone entirely").not.toBeNull();
+    const text = trust!.textContent!;
+
+    // Receipts on every number.
+    expect(text, "no receipt commitment").toMatch(/links to the run behind it/i);
+    // Gaps shown, never filled, never a zero.
+    expect(text, "no gap commitment").toMatch(/gaps/i);
+    expect(text, "unmeasured work no longer promised a non-zero").toMatch(
+      /counted as a zero/i,
+    );
+    // A failed run is excluded, not scored.
+    expect(text, "no errored-sample commitment").toMatch(/never counted as zero/i);
+    // The evidence kind travels with the score.
+    expect(text, "no confidence-ceiling commitment").toMatch(
+      /never labelled high confidence/i,
+    );
+    // The yardstick is the programme's, not ours.
+    expect(text, "no yardstick commitment").toMatch(/published programme outcomes/i);
+  });
+
+  /**
+   * The page's own header comment promises exactly one number anywhere, and
+   * only behind a finished run. The trust block used to break that in prose
+   * ("Two of the three questions … have no data at all today") — a hardcoded
+   * count, which is the same defect as a rendered one plus the inability to
+   * ever be right again.
+   */
+  it("states the coverage rule in the method block rather than counting in prose", async () => {
+    getLeaderboard.mockResolvedValue(board([task()]));
+    await renderLanding();
+
+    const trust = document.querySelector(".ld-trust")!.textContent!;
+    expect(trust, "the method block counts something it cannot keep current").not.toMatch(
+      /\b(two|three|four|five|six|seven|eight|nine|most|half)\b of (the|your)/i,
+    );
   });
 });
