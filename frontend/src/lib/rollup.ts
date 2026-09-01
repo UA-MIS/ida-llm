@@ -421,6 +421,83 @@ export const WEIGHTING_NOTE =
  * Two separate counts, because they answer two separate questions: how many
  * models have a number at all, and how many of those this list is showing.
  */
+// ---------------------------------------------------------------------------
+// The demonstration-data tell, shared by every page that reads a rollup
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether every scored row behind a model was seeded, never measured.
+ *
+ * ⚠ MOVED HERE FROM `lib/overview.ts` (D-92) SO EVERY PAGE READS THE SAME
+ * ANSWER. `/overview` was the only page that disclosed the per-row
+ * `demonstration` flag on `ModelResult` — `/leaderboard`, `/compare` and
+ * `/models/[key]` rendered the identical seeded rows as flat findings with no
+ * caveat at all. A rollup is the shared shape all four pages already read, so
+ * the check belongs beside it rather than duplicated (and possibly
+ * re-diverged) in each page.
+ */
+export function isSeeded(rollup: ModelRollup): boolean {
+  const scored = rollup.entries.filter(
+    (e) => e.result.mean_score !== null && e.result.scored_count > 0,
+  );
+  return scored.length > 0 && scored.every((e) => e.result.demonstration);
+}
+
+/** The compact, peer-voice tag for one demonstration row — never a paragraph. */
+export const DEMONSTRATION_ROW_LABEL = "Illustrative — not yet measured";
+
+/** The fuller sentence, for a hover title or a standalone note. */
+export const DEMONSTRATION_ROW_NOTE =
+  "Illustrative figures. This model has not been measured yet.";
+
+export interface DemonstrationTell {
+  /** At least one model in the set was seeded rather than measured. */
+  any: boolean;
+  /** EVERY model in the set was seeded. */
+  all: boolean;
+  seededModels: number;
+  measuredModels: number;
+  /** Reader-facing; empty string when there is nothing to disclose. */
+  notice: string;
+}
+
+/**
+ * Read a set of ranked rollups for the seeded/measured split, and the one
+ * sentence that discloses it.
+ *
+ * ⚠ THE ONLY PLACE THAT SENTENCE IS WRITTEN. `/overview`, `/leaderboard` and
+ * `/compare` all show a page-level version of this disclosure above their
+ * ranking; they must say the same thing in the same words, or a reader moving
+ * between pages would reasonably wonder which one is right.
+ */
+export function summariseDemonstration(
+  ranked: ModelRollup[],
+  /** What each model is drawn as on this page — only changes the last clause. */
+  unit: "card" | "row" = "row",
+): DemonstrationTell {
+  const seededModels = ranked.filter(isSeeded).length;
+  const measuredModels = ranked.length - seededModels;
+  const any = seededModels > 0;
+  const all = any && measuredModels === 0;
+
+  let notice = "";
+  if (all) {
+    notice =
+      "Every figure here is illustrative — no model has been measured in this deployment yet.";
+  } else if (any) {
+    // ⚠ AGREEMENT, NOT PEDANTRY. "1 of the 2 models here have been measured"
+    // reads as machine-generated on the one paragraph whose entire job is to
+    // be believed — see `overview.test.ts` for the exact case that shipped.
+    const verb = measuredModels === 1 ? "has" : "have";
+    const rest = ranked.length - measuredModels === 1 ? "the other is an" : "the rest are";
+    notice =
+      `Some figures here are illustrative. ${measuredModels} of the ${ranked.length} models here ${verb} been ` +
+      `measured; ${rest} example ${rest.endsWith("an") ? "result" : "results"}. Each ${unit} says which.`;
+  }
+
+  return { any, all, seededModels, measuredModels, notice };
+}
+
 export function podiumLabel(shown: number, ranked: number, measured: number): string {
   if (shown === 0) return "No model has a rankable score yet";
   if (shown === measured) return "Every model we have measured, by overall score";

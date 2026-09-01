@@ -402,6 +402,78 @@ describe("the filter bar preserves params it does not own", () => {
   });
 });
 
+/**
+ * D-92: the demonstration-data tell.
+ *
+ * ⚠ THE PAGE THE BUG REPORT NAMED. `/overview` already disclosed seeded rows;
+ * this is the nav target — the page `PlainSummary` renders "Of the 2 AI
+ * models measured, Luna comes out ahead: 0.88…" on, with the same seeded
+ * numbers and, until this fix, no caveat anywhere on the page. Both
+ * directions matter: a seeded model must be flagged, and a real one must
+ * never be.
+ */
+describe("the demonstration-data tell", () => {
+  function mixedBoard() {
+    return board([
+      task({
+        has_results: true,
+        best_model_key: "vega",
+        results: [
+          result({ model_key: "luna", display_name: "Luna", mean_score: 0.9, demonstration: true }),
+          result({ model_key: "vega", display_name: "Vega", mean_score: 0.86, demonstration: false }),
+        ],
+      }),
+    ]);
+  }
+
+  it("flags a seeded model's row in the ranked table", async () => {
+    await renderBoard(mixedBoard());
+
+    const rows = document.querySelectorAll("table.leaderboard tbody tr");
+    const lunaRow = Array.from(rows).find((tr) => tr.textContent?.includes("Luna"))!;
+    expect(
+      lunaRow.querySelector(".badge-demo"),
+      "a seeded model's row carries no demonstration tell",
+    ).not.toBeNull();
+  });
+
+  it("never flags a model that was actually measured", async () => {
+    await renderBoard(mixedBoard());
+
+    const rows = document.querySelectorAll("table.leaderboard tbody tr");
+    const vegaRow = Array.from(rows).find((tr) => tr.textContent?.includes("Vega"))!;
+    expect(
+      vegaRow.querySelector(".badge-demo"),
+      "a real measurement was labelled illustrative",
+    ).toBeNull();
+  });
+
+  it("shows a page-level notice above the plain-language summary when any row is seeded", async () => {
+    await renderBoard(mixedBoard());
+
+    const notice = document.querySelector(".notice");
+    expect(notice, "no page-level demonstration notice rendered").not.toBeNull();
+    expect(notice!.textContent!.toLowerCase()).toMatch(/illustrat/);
+
+    // ⚠ HIGH ON THE PAGE, NOT BELOW THE CLAIM IT QUALIFIES. `PlainSummary` is
+    // where "Luna comes out ahead" gets written in the largest type on the
+    // page; a disclosure a reader meets after that sentence has disclosed
+    // nothing.
+    const summary = document.querySelector(".plain-summary")!;
+    expect(
+      notice!.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "the notice must sit above the plain-language summary, not below it",
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("stays silent — no notice, no badge — when nothing is seeded", async () => {
+    await renderBoard(twoRankedModels());
+
+    expect(document.querySelector(".notice")).toBeNull();
+    expect(document.querySelector(".badge-demo")).toBeNull();
+  });
+});
+
 /* --------------------------------------------------------- the copy itself */
 
 describe("the leaderboard, written to a peer", () => {

@@ -15,6 +15,7 @@
 import { plainTaskKind } from "@/lib/glossary";
 import { plainCaveats, plainLanguage } from "@/lib/plain";
 import { confidenceColorVar, confidencePips, residencyGlyph, trustGlyph } from "@/lib/trust";
+import { DEMONSTRATION_ROW_LABEL } from "@/lib/rollup";
 import type { Confidence, DataResidency, TrustTell } from "@/lib/types";
 
 /**
@@ -128,6 +129,30 @@ export function ResidencyBadge({
   return (
     <span className={`badge badge-residency badge-residency-${residency}`} title={title}>
       <span aria-hidden="true">{residencyGlyph(residency)}</span> {label}
+    </span>
+  );
+}
+
+/**
+ * The demonstration-data tell, for the pages that render results as rows
+ * rather than as `/overview`'s cards.
+ *
+ * ⚠ SAME FLAG, SAME REGISTER, DIFFERENT SHELL. `/overview` disclosed the
+ * per-row `demonstration` flag on `ModelResult` with a note beneath its
+ * cards; `/leaderboard`, `/compare` and `/models/[key]` show the identical
+ * flag as a badge instead, so it sits beside the residency and status badges
+ * a reader on those pages already knows to check. It is per row wherever the
+ * data is — a model rollup, a single task result — so it self-clears the
+ * moment a real measurement replaces the seeded one; nothing here asserts a
+ * page-wide claim that could rot.
+ */
+export function DemonstrationBadge() {
+  return (
+    <span
+      className="badge badge-demo"
+      title="Seeded for illustration, not a real measurement — this has not been measured yet."
+    >
+      {DEMONSTRATION_ROW_LABEL}
     </span>
   );
 }

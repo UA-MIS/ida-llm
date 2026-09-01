@@ -26,7 +26,7 @@ import Link from "next/link";
 import { GlossaryPanel, Term } from "@/components/glossary";
 import { HowToRead, ReadStep } from "@/components/how-to-read";
 import { ResultsUnavailable } from "@/components/service-unavailable";
-import { ConfidenceTell } from "@/components/trust-badges";
+import { ConfidenceTell, DemonstrationBadge } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
 import { formatScore } from "@/lib/format";
 import {
@@ -39,7 +39,7 @@ import {
 } from "@/lib/matrix";
 import { COMPARE_TERMS } from "@/lib/glossary";
 import { exclusionLabel, exclusionReason } from "@/lib/exclusion";
-import { confidenceLabel } from "@/lib/rollup";
+import { confidenceLabel, isSeeded, summariseDemonstration } from "@/lib/rollup";
 import type { LeaderboardResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -171,6 +171,15 @@ function Grid({ matrix }: { matrix: Matrix }) {
                     ? ` · ${exclusionLabel(exclusionReason(row.model)!)}`
                     : ""}
                 </span>
+                {/* ⚠ THE HONESTY FIX (D-92). This grid rendered a seeded
+                    model's whole row — every cell, every confidence pip — as a
+                    flat comparison with no caveat. Per model, so it self-clears
+                    the moment a real measurement replaces the seeded one. */}
+                {isSeeded(row.model) ? (
+                  <span className="cg-model-sub">
+                    <DemonstrationBadge />
+                  </span>
+                ) : null}
               </th>
               {row.cells.map((cell, index) => (
                 <Cell
@@ -299,6 +308,9 @@ export default async function ComparePage() {
     0,
   );
   const possibleCells = matrix.ranked.length * matrix.benchmarkableCount;
+  // ⚠ THE HONESTY FIX (D-92), PAGE LEVEL. Same rollups, same wording as
+  // `/overview` and `/leaderboard` — see `lib/rollup.ts`.
+  const demonstration = summariseDemonstration(matrix.ranked.map((row) => row.model));
 
   return (
     <>
@@ -309,6 +321,13 @@ export default async function ComparePage() {
           thing.
         </p>
       </section>
+
+      {/* ⚠ HIGH ON THE PAGE, BEFORE THE GRID IT QUALIFIES. A reader forms an
+          impression from the first row they read; the disclosure has to be
+          above that, not folded into a column note nobody scans first. */}
+      {demonstration.any ? (
+        <div className="notice">{demonstration.notice}</div>
+      ) : null}
 
       {/* ⚠ ORIENTATION BEFORE A GRID, NOT AFTER IT. A matrix is the densest
           thing on this site and it is now one click from the front door. A
