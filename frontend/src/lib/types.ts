@@ -432,6 +432,14 @@ export interface MajorView {
   name: string;
   /** The department that owns it — one department owns four of the eleven. */
   department: string;
+  /**
+   * The course-prefix codes this major's classes carry, e.g. `["MIS"]`.
+   *
+   * The catalog's own abbreviation, not one this client invents. Empty for a
+   * major whose coursework is filed under another major's prefix, or that has
+   * none catalogued yet — a real absence, not a bug.
+   */
+  subject_codes: string[];
   catalog: string | null;
   /** `catalog` / `core-only` / `none` — how far the class list got. */
   class_source: string;

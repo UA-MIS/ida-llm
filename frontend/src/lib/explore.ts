@@ -228,6 +228,11 @@ export interface MajorTile {
   /** The authored id from `majors.yaml`. The URL segment, and the React key. */
   slug: string;
   name: string;
+  /**
+   * The department's own short code — `"MIS"`, `"AC"`, `"GBA"` — for a column
+   * that has no room for the full name. See `codeForMajor`.
+   */
+  code: string;
   department: string;
   catalog: string | null;
   /** `catalog` / `core-only` / `none` — how far the class list got. */
@@ -573,6 +578,22 @@ export function findOutcome(tile: ClassTile, slo: string): OutcomeTile | undefin
 // Level 1 — the majors
 // ---------------------------------------------------------------------------
 
+/**
+ * The short label a column-width space actually has room for.
+ *
+ * ⚠ THE CATALOG'S OWN CODE, NEVER A DERIVED ONE. `major.subject_codes` is
+ * `curriculum/majors.yaml`'s own `subject_codes` field — the prefixes the
+ * registrar prints on the course, e.g. `["MIS"]`. Joining rather than picking
+ * one covers a major with more than one prefix without deciding which wins.
+ * Falling back to the full `name` for an empty list (Business Cyber Security,
+ * Real Estate — neither has a catalogued prefix of its own) is a real
+ * admission that no code exists, not a bug: inventing one would be exactly
+ * the kind of transcription this file's provenance rule forbids.
+ */
+export function codeForMajor(view: MajorView): string {
+  return view.subject_codes.length > 0 ? view.subject_codes.join("/") : view.name;
+}
+
 function buildMajorTile(
   view: MajorView,
   board: LeaderboardResponse,
@@ -607,6 +628,7 @@ function buildMajorTile(
   const shared = {
     slug: view.id,
     name: view.name,
+    code: codeForMajor(view),
     department: view.department,
     catalog: view.catalog,
     class_source: view.class_source,
