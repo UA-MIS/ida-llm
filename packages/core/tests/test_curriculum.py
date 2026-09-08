@@ -238,6 +238,63 @@ class TestCheckTaskTags:
         )
         assert check_task_tags(spec, curriculum) == []
 
+    def test_a_task_that_lost_its_tags_under_an_slo_family_is_rejected(
+        self, curriculum: CurriculumMap
+    ) -> None:
+        """THE bug this guard closes: a task can lose its whole ``tags:`` block
+        (not just mistype one value inside it) and used to pass clean, because
+        "carries none of the three tags" was read the same way for every task --
+        "predates SLO tagging, not this benchmark's business". That is true for
+        ``conceptual-grading``/``demo``/etc, and false for a task filed under a
+        family the benchmark convention already claims (``mis200-*``): there, an
+        empty tag block is a task that lost its tags, and it must fail loudly --
+        exactly like the mistyped-``slo:`` case above -- rather than vanish from
+        every per-outcome view uncomplained-about.
+        """
+        spec = _task(
+            id="mis200-is-problem-solving/l1-technology-initiative-appraisal",
+            tags=[],
+            samples=[{"id": "s1", "input": "q", "target": "a"}],
+        )
+        problems = check_task_tags(spec, curriculum)
+        assert problems, "an untagged task under an SLO-benchmark family must not pass clean"
+        assert any("lost its tags" in p for p in problems)
+        assert any("carries no 'slo:' tag" in p for p in problems)
+        assert any("carries no 'use-mode:' tag" in p for p in problems)
+
+    def test_the_same_task_passes_once_its_tags_are_restored(
+        self, curriculum: CurriculumMap
+    ) -> None:
+        """The other direction of the case above: correct tags on the same id
+        under the same family clear every problem."""
+        spec = _task(
+            id="mis200-is-problem-solving/l1-technology-initiative-appraisal",
+            tags=[BENCHMARK_TAG, "slo:SLO1", "use-mode:capability", "mis200-is-problem-solving"],
+            samples=[
+                {
+                    "id": "s1",
+                    "input": "q",
+                    "target": "a",
+                    "metadata": {"slo": "SLO1", "use_mode": "capability"},
+                }
+            ],
+        )
+        assert check_task_tags(spec, curriculum) == []
+
+    def test_the_dash_spelled_slo_family_prefix_is_also_recognised(
+        self, curriculum: CurriculumMap
+    ) -> None:
+        """Both spellings are in use across the tree -- ``slo1-problem-solving``
+        and ``slo-6-ethical-reasoning`` -- and an untagged task must trip the
+        guard under either one."""
+        spec = _task(
+            id="slo-6-ethical-reasoning/l1-principle-identification",
+            tags=[],
+            samples=[{"id": "s1", "input": "q", "target": "a"}],
+        )
+        problems = check_task_tags(spec, curriculum)
+        assert any("lost its tags" in p for p in problems)
+
     def test_a_misspelled_outcome_is_rejected(self, curriculum: CurriculumMap) -> None:
         """THE test this module exists for. `SL02` is a zero, not an O."""
         spec = _task(
