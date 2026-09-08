@@ -75,6 +75,14 @@ jobs:
   # need the test matrix, and running it costs four to six minutes of runner
   # time per docs PR -- of which this repo merges a lot.
   #
+  # ⚠ IT FAILS CLOSED. Every gated job reads `docs_only != 'true'`, so if this
+  # job errors, is skipped, or reports nothing, the output is empty, the
+  # comparison is true, and the FULL MATRIX RUNS. The first version was the
+  # other way round -- `needs: changes` alone meant a failure here skipped all
+  # six checks, and the very first run proved it by failing and leaving the PR
+  # with nothing tested at all. A detector that silently disables the tests it
+  # guards is worse than no detector.
+  #
   # ⚠ THE PATTERN MATCHES EXTENSIONS, NOT DIRECTORIES. An earlier draft allowed
   # everything under `docs/`, which let `docs/anything.py` read as documentation
   # and skip the matrix -- caught by testing the pattern against that exact case
@@ -106,20 +114,28 @@ jobs:
     outputs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          fetch-depth: 0
       - name: Detect a documentation-only diff
         id: detect
+        # ⚠ THE FILE LIST COMES FROM THE API, NOT `git diff`. The first version
+        # diffed base..head after a checkout and failed with "Could not access
+        # <base sha>": actions/checkout on these runners falls back to a REST
+        # tarball because git is not on the container PATH, so there is no
+        # history to diff. Asking the API for the PR's files needs no checkout
+        # at all, which is why this job no longer does one.
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
         run: |
           set -eu
-          FILES="$(git diff --name-only "${BASE}" "${HEAD}")"
+          FILES="$(
+            curl -sSf -H "Authorization: Bearer ${GH_TOKEN}" \
+                 -H "Accept: application/vnd.github+json" \
+                 "https://api.github.com/repos/${REPO}/pulls/${PR}/files?per_page=100" \
+              | sed -n 's/.*"filename": "\([^"]*\)".*/\1/p'
+          )"
           if [ -z "${FILES}" ]; then
-            echo "empty diff -- running everything"
+            echo "no files reported -- running everything"
             echo "docs_only=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -136,7 +152,7 @@ jobs:
 
   python:
     needs: changes
-    if: ${{ needs.changes.outputs.docs_only != 'true' }}
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
       image: harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
@@ -206,7 +222,7 @@ jobs:
 
   frontend:
     needs: changes
-    if: ${{ needs.changes.outputs.docs_only != 'true' }}
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
       # ⚠ 24.16 PINNED. Node 24.17 shipped a keepAlive regression that broke
@@ -272,7 +288,7 @@ jobs:
     # build-and-push.yaml, but no workflow ever executed its 280 assertions. A
     # test suite that never runs in CI is documentation, not a gate.
     needs: changes
-    if: ${{ needs.changes.outputs.docs_only != 'true' }}
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
       # Same 24.16 pin and the same reason as `frontend` above.
@@ -346,7 +362,7 @@ jobs:
     # result cites the git SHA of the task that produced it, and that citation is
     # worthless if the file was malformed. Cheap, fast, and it fails the PR.
     needs: changes
-    if: ${{ needs.changes.outputs.docs_only != 'true' }}
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
       image: harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
@@ -408,7 +424,7 @@ jobs:
     # platform's tenant DB tier runs, so a dialect incompatibility is caught here
     # instead of at first ArgoCD sync.
     needs: changes
-    if: ${{ needs.changes.outputs.docs_only != 'true' }}
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
       image: harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
@@ -488,7 +504,7 @@ jobs:
     # hosts matching rule hosts, and the mock-model safety switch being ON in
     # dev/preview and OFF in staging/prod.
     needs: changes
-    if: ${{ needs.changes.outputs.docs_only != 'true' }}
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
       image: harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
