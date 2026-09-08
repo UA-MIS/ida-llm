@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://capstone-ida.dev/schemas/majors.schema.json",
+  "title": "curriculum/majors.yaml -- the college's majors and the classes each one owns",
+  "description": "The taxonomy the drill-down's top two levels are built from. Structural layer only; the cross-FILE rules (a class with no title and no coverage row, a coverage course no major claims, a course claimed twice) are enforced by ida_core.majors and tools/validate_tasks.py, because none of them can be seen from this file alone.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "institution", "college", "source", "retrieved", "majors"],
+  "properties": {
+    "version": { "const": 1 },
+    "institution": { "type": "string", "minLength": 1 },
+    "college": { "type": "string", "minLength": 1 },
+    "degree": {
+      "type": "string",
+      "description": "The single undergraduate degree every major here sits under, as the catalog names it."
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Where the list of majors was read from. Required for the same reason curriculum/slo.yaml requires one: a list of a college's majors with no cited source is an assertion, not a record."
+    },
+    "source_title": { "type": "string" },
+    "retrieved": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "The date the catalog was read. A catalog is edited in place, so a later disagreement should be attributable to a moved goalpost rather than blamed on the transcription."
+    },
+    "majors": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/major" }
+    },
+    "unassigned_core": {
+      "type": "array",
+      "description": "Courses in curriculum/slo.yaml's coverage grid that no single major owns. Each needs a reason: the list is the escape hatch from the 'every coverage course is claimed' gate, and an escape hatch with no reason required is just a place to hide.",
+      "items": { "$ref": "#/$defs/unassignedCourse" }
+    }
+  },
+  "$defs": {
+    "courseCode": {
+      "type": "string",
+      "pattern": "^[A-Z]{2,4} [0-9]{3}$",
+      "description": "Course code as the catalog prints it, e.g. 'MIS 200'. Same spelling as curriculum/slo.yaml's coverage rows -- it is the join key between the two files."
+    },
+    "major": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "department", "class_source", "classes"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "The URL segment. Written out rather than derived from `name` so that a catalog rename does not silently break every link to the major."
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "department": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The department that owns the major, as the catalog names it. Not the same string as the major -- 'Information Systems, Statistics and Management Science' owns four of the eleven."
+        },
+        "subject_codes": {
+          "type": "array",
+          "description": "The course prefixes this major's classes carry. Recorded for the reader, not used to derive class lists: a class belongs to a major because it is listed, never because a regex matched.",
+          "items": { "type": "string", "pattern": "^[A-Z]{2,4}$" }
+        },
+        "catalog": { "type": "string", "minLength": 1 },
+        "class_source": {
+          "type": "string",
+          "enum": ["catalog", "core-only", "none"],
+          "description": "How far the class list got: transcribed from the catalog's course listing; only the classes this major owns in the shared business core; or nothing evidenced yet. Recorded so a short list can be shown as an incomplete transcription rather than read as a small department."
+        },
+        "classes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/majorClass" }
+        }
+      }
+    },
+    "majorClass": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["course"],
+      "properties": {
+        "course": { "$ref": "#/$defs/courseCode" },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "OPTIONAL, and usually omitted. When absent the title comes from curriculum/slo.yaml's coverage row for the same code, so the two files cannot disagree about a course they both name. When present it is because the course catalog is the authority on titles and the curriculum map abbreviates. A class with neither is a hard error in ida_core.majors -- it would render as a nameless column."
+        },
+        "credit_hours": { "type": "number", "exclusiveMinimum": 0 },
+        "task_families": {
+          "type": "array",
+          "description": "Task families whose results are ABOUT this class's own material, e.g. 'mis200-spreadsheet-formulas'. This is what makes a class's score a claim about THAT CLASS rather than about the outcomes it happens to teach. A class that lists none can never show a score, which is the correct and deliberate default: results are filed by outcome, and an outcome-filed score reaching every class that teaches the outcome would put one exam's number under a dozen courses nobody measured.",
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
+        }
+      }
+    },
+    "unassignedCourse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["course", "reason"],
+      "properties": {
+        "course": { "$ref": "#/$defs/courseCode" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

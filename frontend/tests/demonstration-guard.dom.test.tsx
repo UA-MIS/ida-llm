@@ -126,19 +126,29 @@ const { default: LeaderboardPage } = await import("@/app/(site)/leaderboard/page
 const { default: ComparePage } = await import("@/app/(site)/compare/page");
 const { default: ModelReportPage } = await import("@/app/(site)/models/[key]/page");
 const { default: ExplorePage } = await import("@/app/(site)/explore/page");
-const { default: CoursesPage } = await import("@/app/(site)/explore/[major]/page");
+const { default: ClassesPage } = await import("@/app/(site)/explore/[major]/page");
 const { default: OutcomesPage } = await import("@/app/(site)/explore/[major]/[course]/page");
 const { default: EvidencePage } = await import(
   "@/app/(site)/explore/[major]/[course]/[slo]/page"
 );
 
-const MAJOR = "bscba-general-business-core";
+// The major that owns MIS 200 in `fixtures.ts`, and the class that claims the
+// `slo2` family the seeded board below files its one result under. Both halves
+// matter: a class that claimed no family would render an honest grid of dashes,
+// the page would have no seeded score to disclose, and this guard would go
+// green having proved nothing.
+const MAJOR = "management-information-systems";
+const CLASS = "mis-200";
 
 /** One model, one task, entirely seeded — the shape every route must disclose. */
 function seededBoard() {
   return board([
     task({
       task_id: "slo2/break-even",
+      // ⚠ THE FAMILY MIS 200 CLAIMS. `/explore` attributes a result to a class
+      // by task family, so a fixture whose family nothing claims would render
+      // every level empty and make this whole guard vacuous.
+      family: "slo2",
       slo: "SLO2",
       has_results: true,
       best_model_key: "luna",
@@ -208,20 +218,20 @@ const REGISTRY: {
   { route: "/explore", render: () => ExplorePage(), assert: assertIllustrative },
   {
     route: "/explore/[major]",
-    render: () => CoursesPage({ params: Promise.resolve({ major: MAJOR }) }),
+    render: () => ClassesPage({ params: Promise.resolve({ major: MAJOR }) }),
     assert: assertIllustrative,
   },
   {
     route: "/explore/[major]/[course]",
     render: () =>
-      OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
+      OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: CLASS }) }),
     assert: assertIllustrative,
   },
   {
     route: "/explore/[major]/[course]/[slo]",
     render: () =>
       EvidencePage({
-        params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: "slo2" }),
+        params: Promise.resolve({ major: MAJOR, course: CLASS, slo: "slo2" }),
       }),
     assert: assertIllustrative,
   },

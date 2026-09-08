@@ -1,27 +1,46 @@
 /**
- * The guided drill-down: programme → course → outcome → evidence.
+ * The guided drill-down: major → class → outcome → evidence.
  *
- * ⚠ WHY THIS EXISTS ALONGSIDE `lib/matrix.ts` RATHER THAN INSTEAD OF IT. The
- * comparison grid answers "which model is best at what" and shows every model
- * against every outcome at once — which is the right shape for a reader who
- * already knows what they are looking at, and the wrong shape for the one the
- * client described: a professor who teaches MIS 200, wants to know how the
- * models do on the outcomes MIS 200 is responsible for, and should not have to
- * read a nine-column matrix to find out. That reader drills; they do not scan.
+ * ⚠ WHY THE TOP LEVEL IS MAJORS AND NOT A PROGRAMME. This flow used to open on
+ * one row: "BScBA General Business (core)", the single `program` string in
+ * `curriculum/slo.yaml`. That is what the curriculum map describes, so that is
+ * what got rendered — and it is the wrong first screen. Nobody is a professor
+ * OF THE CORE. They teach Management Information Systems, and the flow has to
+ * start where the reader already stands, in their own major, or the first thing
+ * it asks them to do is locate themselves inside somebody else's list.
  *
- * So this module regroups the SAME response along the axis the curriculum
- * already publishes: the coverage grid. One level per question:
+ * So the top level reads `curriculum/majors.yaml` — the college's eleven
+ * undergraduate majors, from the course catalog — and the level below it is
+ * that major's classes. Two files, two publishers, one join key:
  *
- *   1. programme   which programmes are on this platform, and how do they read
- *   2. course      which courses does this programme have, and how do they read
- *   3. outcome     which outcomes does this course teach, and how do they read
- *   4. evidence    for one (course, outcome) pair: which model, on what, from
- *                  which run — the receipts
+ *   majors.yaml   which classes exist and whose they are      (course catalog)
+ *   slo.yaml      which outcomes a class teaches, at what level (curriculum map)
+ *
+ * ⚠ WHAT MAKES A CLASS "MEASURED", AND WHY IT IS NOT THE OUTCOMES IT TEACHES.
+ * Results are filed by OUTCOME — a task carries `slo:SLO2`, never
+ * `course:MIS 200`. So a class scored from "the outcomes it teaches" gets a
+ * number that is IDENTICAL for every other class the map marks against those
+ * outcomes. Run the three MIS 200 exam families and AC 210, ST 260, GBA 300,
+ * OM 300 and FI 302 would each display a score from a course none of them is —
+ * a dozen fabricated measurements, each individually plausible, produced by
+ * arithmetic rather than by anybody lying. A class therefore counts only the
+ * entries whose task FAMILY it claims (`MajorClassView.task_families`), and a
+ * class that claims none can never show a number. Today exactly one class in
+ * the college claims any: MIS 200.
+ *
+ * One level per question:
+ *
+ *   1. major      which majors this college has, and how each reads
+ *   2. class      which classes this major has, and how each reads
+ *   3. outcome    which outcomes this class teaches, and how each reads — the
+ *                 "why" behind the class's number
+ *   4. evidence   for one (class, outcome) pair: which model, on what, from
+ *                 which run — the receipts
  *
  * ⚠ THIS FILE INVENTS NO NUMBER. Every score comes from `aggregate()` in
  * lib/rollup.ts — the sample-weighted mean, with the weakest-constituent
  * confidence rule and the null-is-not-zero rule already in it. What this module
- * adds is grouping and four honest empty states, not arithmetic.
+ * adds is grouping and honest empty states, not arithmetic.
  *
  * ⚠ THE THREE EMPTIES ARE THREE DIFFERENT CLAIMS, and a grid is where they are
  * easiest to confuse:
@@ -34,8 +53,16 @@
  *
  * The third is the one that has to survive every refactor. `curriculum/slo.yaml`
  * calls scoring SLO5 from a single-turn prompt "the most misleading thing in
- * this repository"; a course tile that showed MIS 200 or GBA 300 as simply
- * *empty* on teamwork would be making that claim with whitespace.
+ * this repository"; a class that showed MIS 200 or GBA 300 as simply *empty* on
+ * teamwork would be making that claim with whitespace.
+ *
+ * ⚠ AND THERE IS NO FOURTH STATE FOR "THE MAP DOES NOT MARK THIS CLASS", which
+ * is now a common case: the catalog lists fourteen MIS classes and the core
+ * curriculum map marks exactly one of them. That class is `not_measured` — the
+ * honest status — and its REASON says why it is empty. Adding a fourth status
+ * would have meant a fourth glyph in `classifyCell`, which `/compare` shares,
+ * so a change about the majors taxonomy would have altered a page that has
+ * nothing to do with it.
  */
 
 import {
@@ -50,8 +77,9 @@ import {
   type ScoreAggregate,
 } from "./rollup";
 import type {
-  CourseCoverageView,
   LeaderboardResponse,
+  MajorClassView,
+  MajorView,
   OutcomeView,
   TaskLeaderboard,
 } from "./types";
@@ -63,13 +91,12 @@ import type {
 /**
  * A URL segment for a name the curriculum owns.
  *
- * ⚠ DERIVED, NOT STORED, AND THAT IS A DELIBERATE TRADE. `curriculum/slo.yaml`
- * has no id for a programme or a course — it has the registrar's display
- * strings — and adding one would mean editing the published map to serve a
- * route. So the slug is computed, and every lookup goes back through the same
- * function rather than comparing a slug to a slug stored somewhere else. The
- * cost is that renaming a course in the map changes its URL; the alternative
- * was a second spelling of the course code that could disagree with the first.
+ * ⚠ USED FOR CLASSES, NOT FOR MAJORS, AND THAT ASYMMETRY IS THE POINT. A major
+ * carries an authored `id` in `majors.yaml` precisely so that renaming it in
+ * the catalog does not silently break every link to it. A class has no id — the
+ * course code IS its identity in both files — so its segment is derived, and
+ * every lookup goes back through this same function rather than comparing a
+ * slug to a slug stored somewhere else.
  */
 export function slugify(value: string): string {
   return value
@@ -86,7 +113,7 @@ export function slugify(value: string): string {
  * The published map's legend, spelled out.
  *
  * ⚠ NOT AN ORDERING. `M+A` is not "more than" `A`: they are a different pair of
- * claims (this course masters the outcome, AND the programme measures it here).
+ * claims (this class masters the outcome, AND the programme measures it here).
  * `ida_core.curriculum` says so about the enum and it stays true on the wire, so
  * nothing here sorts on these.
  */
@@ -115,27 +142,38 @@ export function isAssessmentPoint(level: string): boolean {
 
 export type ExploreStatus = "measured" | "not_measured" | "not_benchmarkable";
 
-/** The wording for an unmeasured pair. One string, so four surfaces agree. */
+/** The wording for an unmeasured pair. One string, so every surface agrees. */
 export const NOT_MEASURED = "Not measured yet";
 
 /** The wording for an outcome a text benchmark cannot reach at all. */
 export const NOT_TEXT_MEASURABLE = "Not text-measurable";
 
-/** One outcome as one course teaches it. Level 3's tile, and level 4's subject. */
+/**
+ * Why a class has nothing filed against it. One string, four surfaces.
+ *
+ * The commonest state in the product and the one most likely to be misread: the
+ * catalog lists fourteen MIS classes, the exam ingest produced tasks for one of
+ * them, so thirteen of fourteen say this. It is a statement about what has been
+ * authored, never about the class or the models.
+ */
+export const NO_TASKS_FOR_CLASS =
+  "No task in the catalogue is about this class yet, so nothing has been run for it.";
+
+/** One outcome as one class teaches it. Level 3's row, and level 4's subject. */
 export interface OutcomeTile {
   slo: string;
   title: string;
   statement: string;
   /** The curriculum's own words on how (or whether) this outcome is scored. */
   note: string;
-  /** The published level for THIS course. */
+  /** The published level for THIS class. */
   level: string;
   level_label: string;
   assessment_point: boolean;
   benchmarkable: boolean;
   status: ExploreStatus;
   aggregate: ScoreAggregate;
-  /** Tasks the catalogue files under this outcome, whoever has run them. */
+  /** Tasks ABOUT THIS CLASS that the catalogue files under this outcome. */
   tasks_available: number;
   /** How many models have a real score here. Coverage, stated not implied. */
   models_measured: number;
@@ -150,37 +188,57 @@ export interface OutcomeTile {
   reason: string;
 }
 
-/** One course of a programme. Level 2's tile, and level 3's subject. */
-export interface CourseTile {
+/** One class of a major. Level 2's column, and level 3's subject. */
+export interface ClassTile {
   slug: string;
   code: string;
   title: string;
-  /** Every outcome this course teaches, in curriculum order. */
+  credit_hours: number | null;
+  /**
+   * Task families whose results are about this class's own material.
+   *
+   * The filter every number on this tile is built through. Empty means no
+   * result can be attributed to this class — see the module docstring.
+   */
+  task_families: string[];
+  /** Every outcome the map marks for this class, in curriculum order. */
   outcomes: OutcomeTile[];
-  /** Outcomes this course teaches that a text benchmark can reach. */
+  /** True when the published coverage grid has a row for this class at all. */
+  in_curriculum_map: boolean;
+  /** Outcomes this class teaches that a text benchmark can reach. */
   benchmarkable_count: number;
   /** Of those, how many have a score. */
   measured_count: number;
-  /** Outcomes this course is an assessment point for — what the department grades. */
+  /** Outcomes this class is an assessment point for — what the department grades. */
   assessment_count: number;
   status: ExploreStatus;
   aggregate: ScoreAggregate;
   reason: string;
   /**
-   * Whether the models measured on this course's outcomes are seeded, real, or
-   * a mix — same rule and same words as every other level, scoped to the
-   * models that actually contributed to THIS course rather than the whole
-   * board. See `summariseDemonstration`.
+   * Whether the models measured on this class are seeded, real, or a mix — same
+   * rule and same words as every other level, scoped to the models that
+   * actually contributed to THIS class rather than the whole board. See
+   * `summariseDemonstration`.
    */
   demonstration: DemonstrationTell;
 }
 
-/** One programme. Level 1's tile, and level 2's subject. */
+/** One major. Level 1's column, and level 2's subject. */
 export interface MajorTile {
+  /** The authored id from `majors.yaml`. The URL segment, and the React key. */
   slug: string;
   name: string;
-  source: string | null;
-  course_count: number;
+  department: string;
+  catalog: string | null;
+  /** `catalog` / `core-only` / `none` — how far the class list got. */
+  class_source: string;
+  class_source_label: string;
+  class_count: number;
+  /** Classes with at least one task family claimed — the ones that CAN score. */
+  measurable_class_count: number;
+  /** Of those, how many have a score. */
+  measured_class_count: number;
+  /** Distinct outcomes the map marks across this major's classes. */
   outcome_count: number;
   benchmarkable_count: number;
   measured_count: number;
@@ -190,11 +248,13 @@ export interface MajorTile {
   reason: string;
 }
 
-/** What every level needs to render, plus the honest reason it might be empty. */
+/** What level 1 needs to render, plus the honest reason it might be empty. */
 export interface ExploreIndex {
   available: boolean;
   unavailable_reason: string | null;
   majors: MajorTile[];
+  /** Core courses no major owns. Shown as a footnote, never as a major. */
+  unassigned: { course: string; reason: string }[];
   demonstration: DemonstrationTell;
 }
 
@@ -207,7 +267,7 @@ export interface ExploreIndex {
  *
  * ⚠ TEST STUBS ARE EXCLUDED, AS THEY ARE EVERYWHERE ELSE. `isRanked` keeps a
  * deterministic mock off the leaderboard's podium for the reason `best_model_key`
- * gives — "so the winner is never a fixture" — and a mock folded into a course's
+ * gives — "so the winner is never a fixture" — and a mock folded into a class's
  * headline number is the same lie with fewer places to notice it. They are still
  * reachable: level 4 lists every model that has a row, stub or not.
  */
@@ -219,11 +279,25 @@ function outcomeIndex(board: LeaderboardResponse): Map<string, OutcomeView> {
   return new Map(board.curriculum.outcomes.map((o) => [o.id, o]));
 }
 
-/** How many tasks the catalogue files under each outcome, measured or not. */
-function tasksPerOutcome(board: LeaderboardResponse): Map<string, number> {
+/**
+ * Does this entry belong to this class?
+ *
+ * ⚠ THE ONE PREDICATE THE HONESTY OF THIS WHOLE SCREEN RESTS ON. See the module
+ * docstring: without it, one exam's score appears under every class that
+ * teaches the same outcome.
+ */
+export function entryIsAboutClass(entry: ModelTaskEntry, families: Set<string>): boolean {
+  return families.has(entry.family);
+}
+
+/** Tasks ABOUT one class, per outcome. The denominator of "nothing ran". */
+function classTasksPerOutcome(
+  board: LeaderboardResponse,
+  families: Set<string>,
+): Map<string, number> {
   const counts = new Map<string, number>();
   for (const task of board.tasks) {
-    if (task.slo === null) continue;
+    if (task.slo === null || !families.has(task.family)) continue;
     counts.set(task.slo, (counts.get(task.slo) ?? 0) + 1);
   }
   return counts;
@@ -248,17 +322,18 @@ function measuredReason(agg: ScoreAggregate, unit: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Level 3 — the outcomes one course teaches
+// Level 3 — the outcomes one class teaches
 // ---------------------------------------------------------------------------
 
 function buildOutcomeTile(
   slo: string,
   level: string,
   outcome: OutcomeView | undefined,
-  entries: ModelTaskEntry[],
+  classEntries: ModelTaskEntry[],
   tasksAvailable: number,
+  hasFamilies: boolean,
 ): OutcomeTile {
-  const mine = entries.filter((entry) => entry.slo === slo);
+  const mine = classEntries.filter((entry) => entry.slo === slo);
   const agg = aggregate(mine);
   const modelsMeasured = new Set(
     mine
@@ -305,10 +380,11 @@ function buildOutcomeTile(
     return {
       ...base,
       status: "not_measured",
-      reason:
-        tasksAvailable === 0
-          ? "No task in the catalogue measures this outcome yet."
-          : `${tasksAvailable} ${tasksAvailable === 1 ? "task measures" : "tasks measure"} ` +
+      reason: !hasFamilies
+        ? NO_TASKS_FOR_CLASS
+        : tasksAvailable === 0
+          ? "No task about this class measures this outcome yet."
+          : `${tasksAvailable} ${tasksAvailable === 1 ? "task about this class measures" : "tasks about this class measure"} ` +
             "this outcome; none has a finished, scored run.",
     };
   }
@@ -324,61 +400,90 @@ function buildOutcomeTile(
 }
 
 // ---------------------------------------------------------------------------
-// Level 2 — the courses of one programme
+// Level 2 — the classes of one major
 // ---------------------------------------------------------------------------
 
-function buildCourseTile(
-  row: CourseCoverageView,
+function buildClassTile(
+  entry: MajorClassView,
+  board: LeaderboardResponse,
   outcomes: Map<string, OutcomeView>,
   order: string[],
-  entries: ModelTaskEntry[],
-  taskCounts: Map<string, number>,
+  allEntries: ModelTaskEntry[],
   models: ModelRollup[],
-): CourseTile {
-  // Curriculum order, not the YAML mapping's insertion order: SLO10 must not
-  // sort before SLO2, and a course page that ordered outcomes differently from
-  // every other surface would look like a different list.
-  const taught = order.filter((id) => id in row.outcomes);
-  const tiles = taught.map((slo) =>
+): ClassTile {
+  const coverage = board.curriculum.coverage.find((row) => row.course === entry.course);
+  const families = new Set(entry.task_families);
+  const hasFamilies = families.size > 0;
+
+  // ⚠ FILTERED BEFORE ANYTHING IS COUNTED, not after. Every number on this tile
+  // and every number in the grid beside it is built from this one list, so
+  // there is no path by which a class's headline can include a result its rows
+  // do not — see the module docstring for what that path used to produce.
+  const classEntries = allEntries.filter((e) => entryIsAboutClass(e, families));
+  const taskCounts = classTasksPerOutcome(board, families);
+
+  // Curriculum order, not the map's insertion order: SLO10 must not sort before
+  // SLO2, and a class page that ordered outcomes differently from every other
+  // surface would look like a different list.
+  const marked = coverage ? order.filter((id) => id in coverage.outcomes) : [];
+  const tiles = marked.map((slo) =>
     buildOutcomeTile(
       slo,
-      row.outcomes[slo]!,
+      coverage!.outcomes[slo]!,
       outcomes.get(slo),
-      entries,
+      classEntries,
       taskCounts.get(slo) ?? 0,
+      hasFamilies,
     ),
   );
 
   const benchmarkable = tiles.filter((t) => t.benchmarkable);
   const measured = tiles.filter((t) => t.status === "measured");
-  // The course's own read: every entry filed under any outcome it teaches.
-  // Sample-weighted through the shared `aggregate`, so a three-sample outcome
-  // cannot outvote a sixty-sample one on the course's headline number.
-  const taughtSet = new Set(taught);
-  const agg = aggregate(entries.filter((e) => e.slo !== null && taughtSet.has(e.slo)));
+  const markedSet = new Set(marked);
 
-  // Models with a real, rankable contribution to any outcome THIS course
-  // teaches — the same scoping `buildEvidence` uses for one outcome, one level
-  // up. Not the whole board's demonstration split: a course whose own outcomes
-  // are all measured must not be told "some figures here are illustrative"
-  // because a different course somewhere else is still seeded.
+  // ⚠ THE SAME ENTRIES ITS ROWS ARE BUILT FROM, so the headline and the rows
+  // cannot disagree — the rule this whole module is organised around.
+  const counted = classEntries.filter((e) => e.slo !== null && markedSet.has(e.slo));
+  const agg = aggregate(counted);
+
+  // A result about this class filed under an outcome the map does not mark for
+  // it. Rare, and reported rather than dropped in silence: it means either the
+  // map or a task tag is wrong, and a number that vanishes from a page without
+  // saying so is the failure mode this codebase keeps writing tests against.
+  const unmarked = classEntries.filter(
+    (e) => e.slo !== null && !markedSet.has(e.slo) && e.result.scored_count > 0,
+  ).length;
+  const stray =
+    unmarked > 0
+      ? ` ${unmarked} scored ${unmarked === 1 ? "result is" : "results are"} filed under ` +
+        "an outcome the map does not mark for this class, so they are not counted here."
+      : "";
+
+  // Models with a real, rankable contribution to THIS class — not the whole
+  // board's demonstration split: a class whose own results are all measured
+  // must not be told "some figures here are illustrative" because a different
+  // class somewhere else is still seeded.
   const contributing = models.filter(
     (m) =>
       m.recommendable &&
       m.entries.some(
         (e) =>
+          entryIsAboutClass(e, families) &&
           e.slo !== null &&
-          taughtSet.has(e.slo) &&
+          markedSet.has(e.slo) &&
           e.result.mean_score !== null &&
           e.result.scored_count > 0,
       ),
   );
 
   const shared = {
-    slug: slugify(row.course),
-    code: row.course,
-    title: row.title,
+    slug: slugify(entry.course),
+    code: entry.course,
+    title: entry.title,
+    credit_hours: entry.credit_hours,
+    task_families: [...entry.task_families],
     outcomes: tiles,
+    in_curriculum_map: coverage !== undefined,
     benchmarkable_count: benchmarkable.length,
     measured_count: measured.length,
     assessment_count: tiles.filter((t) => t.assessment_point).length,
@@ -386,146 +491,210 @@ function buildCourseTile(
     demonstration: summariseDemonstration(contributing),
   };
 
+  if (tiles.length === 0) {
+    // The commonest case in the product: the catalog lists fourteen MIS classes
+    // and the core curriculum map marks exactly one of them. Not an error, and
+    // emphatically not a class that failed — the map simply does not go there.
+    return {
+      ...shared,
+      status: "not_measured",
+      reason:
+        "The published curriculum map does not mark this class against any outcome, " +
+        "so there is nothing yet to measure it on." + stray,
+    };
+  }
   if (benchmarkable.length === 0) {
     return {
       ...shared,
       status: "not_benchmarkable",
       reason:
-        "Every outcome this course teaches is one a text benchmark cannot " +
-        "measure, so nothing was run for it.",
+        "Every outcome this class teaches is one a text benchmark cannot " +
+        "measure, so nothing was run for it." + stray,
     };
   }
   if (agg.score === null) {
     return {
       ...shared,
       status: "not_measured",
-      reason: `${benchmarkable.length} of its ${tiles.length} outcomes can be measured this way; none has been.`,
+      reason:
+        (hasFamilies
+          ? `${benchmarkable.length} of its ${tiles.length} outcomes can be measured this way; none has been.`
+          : NO_TASKS_FOR_CLASS) + stray,
     };
   }
   return {
     ...shared,
     status: "measured",
-    reason: `${measured.length} of ${benchmarkable.length} measurable outcomes have a score.`,
+    reason:
+      `${measured.length} of ${benchmarkable.length} measurable outcomes have a score.` + stray,
   };
 }
 
 /**
- * Every course of one programme, in the published map's order.
+ * Every class of one major, in the catalog's order.
  *
- * Map order, not score order. The coverage grid is a curriculum read top to
- * bottom — GBA 146 before GBA 490 — and re-sorting it by how the models happen
- * to do turns a programme into a ranking of its own courses, which is a claim
- * about the department that this benchmark has no business making.
+ * Catalog order, not score order. The class list is a catalog read top to
+ * bottom — MIS 200 before MIS 466 — and re-sorting it by how the models happen
+ * to do turns a major into a ranking of its own classes, which is a claim about
+ * the department that this benchmark has no business making. It is also why the
+ * FLIPPED grid puts classes on the horizontal axis: model order is a rank and is
+ * meant to be read as one; class order is not, and a vertical list of classes
+ * would imply the top one matters most.
  */
-export function buildCourses(board: LeaderboardResponse): CourseTile[] {
+export function buildClasses(board: LeaderboardResponse, major: MajorTile): ClassTile[] {
+  const view = board.curriculum.majors.find((m) => m.id === major.slug);
+  if (!view) return [];
+  return buildClassesFor(board, view);
+}
+
+function buildClassesFor(board: LeaderboardResponse, view: MajorView): ClassTile[] {
   const outcomes = outcomeIndex(board);
   const order = board.curriculum.available
     ? board.curriculum.outcomes.map((o) => o.id)
     : board.slos;
   const models = rollupByModel(board);
   const entries = benchmarkEntries(models);
-  const taskCounts = tasksPerOutcome(board);
-  return board.curriculum.coverage.map((row) =>
-    buildCourseTile(row, outcomes, order, entries, taskCounts, models),
+  return view.classes.map((entry) =>
+    buildClassTile(entry, board, outcomes, order, entries, models),
   );
 }
 
-export function findCourse(
-  courses: CourseTile[],
-  slug: string,
-): CourseTile | undefined {
-  return courses.find((course) => course.slug === slug);
+export function findClass(classes: ClassTile[], slug: string): ClassTile | undefined {
+  return classes.find((row) => row.slug === slug);
 }
 
-export function findOutcome(
-  course: CourseTile,
-  slo: string,
-): OutcomeTile | undefined {
+export function findOutcome(tile: ClassTile, slo: string): OutcomeTile | undefined {
   // Case-insensitive: `SLO2` in the curriculum, `slo2` in a hand-typed URL.
   const wanted = slo.toUpperCase();
-  return course.outcomes.find((tile) => tile.slo.toUpperCase() === wanted);
+  return tile.outcomes.find((row) => row.slo.toUpperCase() === wanted);
 }
 
 // ---------------------------------------------------------------------------
-// Level 1 — the programmes
+// Level 1 — the majors
 // ---------------------------------------------------------------------------
 
+function buildMajorTile(
+  view: MajorView,
+  board: LeaderboardResponse,
+  entries: ModelTaskEntry[],
+): MajorTile {
+  const classes = buildClassesFor(board, view);
+
+  // Every family any of this major's classes claims, and every outcome the map
+  // marks across them. The major's headline is the union of its classes' own
+  // numbers — same entries, so the two levels cannot disagree.
+  const families = new Set(classes.flatMap((c) => c.task_families));
+  const marked = new Set(classes.flatMap((c) => c.outcomes.map((o) => o.slo)));
+  const counted = entries.filter(
+    (e) => entryIsAboutClass(e, families) && e.slo !== null && marked.has(e.slo),
+  );
+  const agg = aggregate(counted);
+
+  const benchmarkableOutcomes = new Set(
+    classes.flatMap((c) => c.outcomes.filter((o) => o.benchmarkable).map((o) => o.slo)),
+  );
+  const measuredOutcomes = new Set(
+    classes.flatMap((c) => c.outcomes.filter((o) => o.status === "measured").map((o) => o.slo)),
+  );
+  const modelsMeasured = new Set(
+    counted
+      .filter((e) => e.result.mean_score !== null && e.result.scored_count > 0)
+      .map((e) => e.result.model_key),
+  ).size;
+
+  const measurable = classes.filter((c) => c.task_families.length > 0);
+
+  const shared = {
+    slug: view.id,
+    name: view.name,
+    department: view.department,
+    catalog: view.catalog,
+    class_source: view.class_source,
+    class_source_label: view.class_source_label,
+    class_count: classes.length,
+    measurable_class_count: measurable.length,
+    measured_class_count: classes.filter((c) => c.status === "measured").length,
+    outcome_count: marked.size,
+    benchmarkable_count: benchmarkableOutcomes.size,
+    measured_count: measuredOutcomes.size,
+    models_measured: modelsMeasured,
+    aggregate: agg,
+  };
+
+  if (classes.length === 0) {
+    return {
+      ...shared,
+      status: "not_measured",
+      // The catalog list for this major has not been transcribed. Said plainly:
+      // a major showing no classes must not read as a major with no classes.
+      reason: `${view.class_source_label}, so there is nothing here to measure yet.`,
+    };
+  }
+  if (measurable.length === 0) {
+    return {
+      ...shared,
+      status: "not_measured",
+      reason:
+        `${classes.length} ${classes.length === 1 ? "class" : "classes"}; no task in the ` +
+        "catalogue is about any of them yet, so none has been run.",
+    };
+  }
+  if (agg.score === null) {
+    return {
+      ...shared,
+      status: "not_measured",
+      reason:
+        `${measurable.length} of its ${classes.length} classes ${measurable.length === 1 ? "has" : "have"} ` +
+        "tasks written about it; none has a finished, scored run.",
+    };
+  }
+  return {
+    ...shared,
+    status: "measured",
+    reason: measuredReason(
+      agg,
+      `, ${modelsMeasured} ${modelsMeasured === 1 ? "model" : "models"}`,
+    ),
+  };
+}
+
 /**
- * The programmes on this platform, each with one overall read.
+ * The majors this college offers, each with one overall read.
  *
- * ⚠ ONE PROGRAMME TODAY, AND THE LIST SHAPE IS NOT PREMATURE. The curriculum
- * map holds a single `program` string, so this returns one tile — but the level
- * exists in the flow the client asked for, a second programme is a second
- * `slo.yaml`, and a grid that has to be rewritten from a scalar into a list the
- * day that lands is a grid nobody will rewrite. It is also the only level that
- * can state the programme's coverage honestly: 7 of 9 outcomes measurable, and
- * how many of those have a number.
+ * ⚠ ELEVEN COLUMNS, ONE OF WHICH HAS A PATH THROUGH IT, AND THAT IS THE POINT.
+ * MIS is the only major with a benchmarked class today. The other ten are not
+ * padding and they are not placeholders: they are the real catalog, showing
+ * honestly that nothing has been measured there — which is what makes the one
+ * that IS measured mean something, and what makes "a second major just fills
+ * in" a data change rather than a rebuild.
  */
 export function buildIndex(board: LeaderboardResponse): ExploreIndex {
   const models = rollupByModel(board);
   const ranked = models.filter((m) => m.recommendable && m.overall.score !== null);
   const demonstration = summariseDemonstration(ranked);
 
-  if (!board.curriculum.available || board.curriculum.coverage.length === 0) {
+  const views = board.curriculum.majors;
+  if (views.length === 0) {
     return {
       available: false,
       unavailable_reason:
-        board.curriculum.unavailable_reason ??
-        "This deployment has no curriculum map, so it has no programme or course " +
-          "to drill into. Results still group by outcome id on the leaderboard.",
+        "This deployment has no majors taxonomy (curriculum/majors.yaml), so it has no " +
+        "major or class to drill into. Results still group by outcome id on the leaderboard.",
       majors: [],
+      unassigned: [],
       demonstration,
     };
   }
 
-  const courses = buildCourses(board);
   const entries = benchmarkEntries(models);
-  const agg = aggregate(entries.filter((e) => e.slo !== null));
-
-  const outcomes = board.curriculum.outcomes;
-  const benchmarkable = outcomes.filter((o) => o.text_benchmarkable);
-  const measuredOutcomes = new Set(
-    courses.flatMap((c) => c.outcomes.filter((o) => o.status === "measured").map((o) => o.slo)),
-  );
-  const modelsMeasured = new Set(
-    entries
-      .filter((e) => e.slo !== null && e.result.mean_score !== null && e.result.scored_count > 0)
-      .map((e) => e.result.model_key),
-  ).size;
-
-  const name = board.curriculum.program ?? "This programme";
-  const shared = {
-    slug: slugify(name),
-    name,
-    source: board.curriculum.source,
-    course_count: courses.length,
-    outcome_count: outcomes.length,
-    benchmarkable_count: benchmarkable.length,
-    measured_count: measuredOutcomes.size,
-    models_measured: modelsMeasured,
-    aggregate: agg,
-  };
-
-  const major: MajorTile =
-    agg.score === null
-      ? {
-          ...shared,
-          status: "not_measured",
-          reason: `${benchmarkable.length} of ${outcomes.length} outcomes can be measured by a text benchmark; none has a score yet.`,
-        }
-      : {
-          ...shared,
-          status: "measured",
-          reason: measuredReason(
-            agg,
-            `, ${modelsMeasured} ${modelsMeasured === 1 ? "model" : "models"}`,
-          ),
-        };
-
   return {
     available: true,
     unavailable_reason: null,
-    majors: [major],
+    majors: views.map((view) => buildMajorTile(view, board, entries)),
+    unassigned: board.curriculum.unassigned_core.map((row) => ({
+      course: row.course,
+      reason: row.reason,
+    })),
     demonstration,
   };
 }
@@ -535,10 +704,10 @@ export function findMajor(index: ExploreIndex, slug: string): MajorTile | undefi
 }
 
 // ---------------------------------------------------------------------------
-// Level 4 — the evidence behind one (course, outcome) pair
+// Level 4 — the evidence behind one (class, outcome) pair
 // ---------------------------------------------------------------------------
 
-/** One model's read on one outcome, with the receipt to check it. */
+/** One model's read on one outcome of one class, with the receipt to check it. */
 export interface EvidenceRow {
   model_key: string;
   display_name: string;
@@ -552,19 +721,23 @@ export interface EvidenceRow {
 }
 
 export interface EvidenceView {
-  course: CourseTile;
+  klass: ClassTile;
   outcome: OutcomeTile;
   /** Models with a real score here, strongest first. */
   ranked: EvidenceRow[];
   /** Models with a row but no score, plus test stubs. Shown, never ranked. */
   unranked: EvidenceRow[];
-  /** The tasks the catalogue files under this outcome — the "on what". */
+  /** The tasks about THIS CLASS filed under this outcome — the "on what". */
   tasks: TaskLeaderboard[];
   demonstration: DemonstrationTell;
 }
 
 /**
- * Everything the "why" level shows for one (course, outcome) pair.
+ * Everything the "why" level shows for one (class, outcome) pair.
+ *
+ * ⚠ SCOPED TO THE CLASS'S OWN TASKS, like every level above it. An evidence
+ * page that listed every SLO2 task would show a professor of MIS 200 a set of
+ * receipts from courses they do not teach, under a heading that says MIS 200.
  *
  * ⚠ THE UNRANKED HALF IS NOT PADDING. A reader who drills this far is checking
  * a number, and "three models scored, two more were run and produced nothing" is
@@ -573,12 +746,17 @@ export interface EvidenceView {
  */
 export function buildEvidence(
   board: LeaderboardResponse,
-  course: CourseTile,
+  klass: ClassTile,
   outcome: OutcomeTile,
 ): EvidenceView {
-  const rows: EvidenceRow[] = rollupByModel(board)
+  const families = new Set(klass.task_families);
+  const mine = (entry: ModelTaskEntry) =>
+    entry.slo === outcome.slo && entryIsAboutClass(entry, families);
+
+  const models = rollupByModel(board);
+  const rows: EvidenceRow[] = models
     .map((model) => {
-      const entries = model.entries.filter((entry) => entry.slo === outcome.slo);
+      const entries = model.entries.filter(mine);
       return {
         model_key: model.model_key,
         display_name: model.display_name,
@@ -596,20 +774,19 @@ export function buildEvidence(
     .sort((a, b) => (b.aggregate.score ?? 0) - (a.aggregate.score ?? 0));
 
   return {
-    course,
+    klass,
     outcome,
     ranked,
     unranked: rows.filter((row) => !ranked.includes(row)),
-    tasks: board.tasks.filter((task) => task.slo === outcome.slo),
+    tasks: board.tasks.filter(
+      (task) => task.slo === outcome.slo && families.has(task.family),
+    ),
     demonstration: summariseDemonstration(
-      rollupByModel(board).filter(
+      models.filter(
         (m) =>
           m.recommendable &&
           m.entries.some(
-            (e) =>
-              e.slo === outcome.slo &&
-              e.result.mean_score !== null &&
-              e.result.scored_count > 0,
+            (e) => mine(e) && e.result.mean_score !== null && e.result.scored_count > 0,
           ),
       ),
     ),

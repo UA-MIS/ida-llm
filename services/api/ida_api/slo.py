@@ -81,6 +81,20 @@ except ImportError:  # pragma: no cover - see the merge-order note above
     _core_slo_of = None  # type: ignore[assignment]
     _core_use_mode_of = None  # type: ignore[assignment]
 
+try:  # pragma: no cover - exercised by whichever branch is checked out
+    from ida_core.majors import (  # type: ignore[import-not-found]
+        default_majors_path as _core_default_majors_path,
+    )
+    from ida_core.majors import (
+        load_majors as _core_load_majors,
+    )
+
+    MAJORS_MODULE_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    MAJORS_MODULE_AVAILABLE = False
+    _core_load_majors = None  # type: ignore[assignment]
+    _core_default_majors_path = None  # type: ignore[assignment]
+
 
 def _values_for(tags: list[str], prefix: str) -> list[str]:
     """Every value carried under a ``prefix:`` tag, in file order.
@@ -198,6 +212,88 @@ class CourseCoverageView(BaseModel):
     """Outcome id to level code. Only the cells the published map fills in."""
 
 
+class MajorClassView(BaseModel):
+    """One class a major owns, as the dashboard reads it.
+
+    ``title`` is already RESOLVED here -- catalog first, curriculum map second --
+    so no client re-implements the precedence rule and no client can get it
+    wrong.  ``ida_core.majors.resolve_title`` is the one implementation.
+
+    ⚠ NO OUTCOMES ON THIS OBJECT, DELIBERATELY.  Which outcomes a class teaches
+    is the coverage grid's answer, and the grid is already served beside this on
+    the same response.  Copying the levels onto the class too would be two
+    spellings of one fact on one payload, and the drift would be invisible: the
+    client joins the two on ``course``, exactly as the two files do.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    course: str
+    """The course code as the catalog prints it -- the join key into ``coverage``."""
+
+    title: str
+    credit_hours: float | None = None
+
+    task_families: list[str] = Field(default_factory=list)
+    """Task families whose results are ABOUT this class's own material.
+
+    ⚠ WHAT STOPS ONE EXAM'S SCORE APPEARING UNDER A DOZEN COURSES.  Results are
+    filed by OUTCOME -- a task carries ``slo:SLO2``, never ``course:MIS 200`` --
+    so a class scored from "the outcomes it teaches" gets a number identical to
+    every other class the map marks against those outcomes.  A client that
+    aggregated that way would show AC 210, ST 260, GBA 300, OM 300 and FI 302
+    each displaying a score from an MIS 200 exam.  An empty list means no result
+    can be attributed to this class, and that is the correct default.
+    """
+
+
+class MajorView(BaseModel):
+    """One undergraduate major, and the classes it owns.
+
+    ⚠ SERVED BECAUSE THE READER IS A PROFESSOR OF A MAJOR.  The drill-down used
+    to open on a single programme -- the shared business core -- because that is
+    all ``curriculum/slo.yaml`` describes.  Nobody is a professor of "the core":
+    they teach Management Information Systems, and the flow has to start where
+    they already stand.  The list of majors and their classes lives in the
+    course catalog, a different document from the curriculum map, and it is
+    served for the same reason the coverage grid is: so a client can answer
+    "which classes does this major have" without shipping its own transcription
+    of a registrar's list.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    """The URL segment.  Authored in the file, not slugified from ``name``."""
+
+    name: str
+    department: str
+    catalog: str | None = None
+    class_source: str
+    """``catalog`` / ``core-only`` / ``none`` -- how far the class list got.
+
+    Served so a short list can be shown as an incomplete transcription rather
+    than read as a small department.  ``class_source_label`` is the wording.
+    """
+
+    class_source_label: str
+    classes: list[MajorClassView] = Field(default_factory=list)
+
+
+class UnassignedCourseView(BaseModel):
+    """A course in the coverage grid that no single major owns, and why.
+
+    Surfaced rather than dropped: a course that is in the core but reachable
+    from no major is a fact about the college, and a drill-down that silently
+    omitted it would be quietly shortening the curriculum.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    course: str
+    reason: str
+
+
 class CurriculumView(BaseModel):
     """``curriculum/slo.yaml``, projected for the dashboard.
 
@@ -223,6 +319,20 @@ class CurriculumView(BaseModel):
     inventing a curriculum.
     """
 
+    majors: list[MajorView] = Field(default_factory=list)
+    """``curriculum/majors.yaml``, in the file's own order.
+
+    ⚠ INDEPENDENTLY OPTIONAL FROM THE REST OF THIS OBJECT.  ``available`` is
+    about the curriculum MAP; the majors taxonomy is a second file with a second
+    source, and either can be absent without the other being.  Empty here means
+    "no taxonomy in this deployment", which the drill-down states plainly and
+    degrades to the outcome views over -- it never means the college has no
+    majors, and no consumer may render it as such.
+    """
+
+    unassigned_core: list[UnassignedCourseView] = Field(default_factory=list)
+    """Coverage courses no major owns.  Reachable, just not drillable-into."""
+
     def outcome(self, outcome_id: str) -> OutcomeView | None:
         return next((o for o in self.outcomes if o.id == outcome_id), None)
 
@@ -238,6 +348,16 @@ class CurriculumView(BaseModel):
         page for it.
         """
         return next((c for c in self.coverage if c.course == course_code), None)
+
+    def major(self, major_id: str) -> MajorView | None:
+        """One major, or ``None`` for an id this taxonomy does not list.
+
+        ``None`` rather than an empty major, for the reason :meth:`course`
+        gives one level up: "this college has no such major" and "this major
+        has no classes" are different answers, and a caller handed a blank
+        major for an id that does not exist would render a page for it.
+        """
+        return next((m for m in self.majors if m.id == major_id), None)
 
 
 UNAVAILABLE_NO_MODULE = (
@@ -279,6 +399,8 @@ def load_curriculum_view(root: Path | str) -> CurriculumView:
             ),
         )
 
+    majors, unassigned = _load_majors(root, curriculum)
+
     return CurriculumView(
         available=True,
         program=curriculum.program,
@@ -313,4 +435,86 @@ def load_curriculum_view(root: Path | str) -> CurriculumView:
             )
             for row in curriculum.coverage
         ],
+        majors=majors,
+        unassigned_core=unassigned,
     )
+
+
+def _load_majors(
+    root: Path | str, curriculum: Any
+) -> tuple[list[MajorView], list[UnassignedCourseView]]:
+    """``curriculum/majors.yaml``, or two empty lists and a log line.
+
+    Never raises, and degrades to EMPTY rather than to anything invented -- the
+    same contract :func:`load_curriculum_view` has, for the sharper version of
+    the same reason.  A malformed taxonomy is the task validator's problem
+    (``make lint-tasks`` fails the pull request over it); taking the results
+    page down for it would replace a visible data error with an invisible
+    outage.  And an empty list is a state the drill-down renders honestly, while
+    a guessed list of majors would be a page confidently naming departments this
+    college may not have.
+
+    ⚠ THE TITLE PRECEDENCE IS APPLIED HERE, ONCE.  ``resolve_title`` is the
+    single implementation of "catalog first, curriculum map second"; resolving
+    it on the wire means no client re-derives it and no two clients disagree. A
+    class that can be named by neither file is DROPPED with a log line rather
+    than served titleless -- ``check_against_curriculum`` already fails CI over
+    it, so reaching this branch means the deployment is running a taxonomy that
+    never passed the gate, and a nameless column is the one thing a grid built
+    on "an empty square is still a statement" cannot render.
+    """
+    if not MAJORS_MODULE_AVAILABLE or _core_load_majors is None:
+        return [], []
+
+    path = (
+        _core_default_majors_path(root)
+        if _core_default_majors_path
+        else Path(root) / "curriculum" / "majors.yaml"
+    )
+    if not Path(path).is_file():
+        return [], []
+
+    try:
+        taxonomy = _core_load_majors(path)
+    except Exception:
+        log.exception("could not load the majors taxonomy at %s", path)
+        return [], []
+
+    majors: list[MajorView] = []
+    for major in taxonomy.majors:
+        classes: list[MajorClassView] = []
+        for entry in major.classes:
+            title = taxonomy.resolve_title(entry, curriculum)
+            if title is None:
+                log.warning(
+                    "majors.yaml: class %r under major %r can be named by neither file; "
+                    "dropping it rather than serving a nameless column",
+                    entry.course,
+                    major.id,
+                )
+                continue
+            classes.append(
+                MajorClassView(
+                    course=entry.course,
+                    title=title,
+                    credit_hours=entry.credit_hours,
+                    task_families=list(entry.task_families),
+                )
+            )
+        majors.append(
+            MajorView(
+                id=major.id,
+                name=major.name,
+                department=major.department,
+                catalog=major.catalog,
+                class_source=major.class_source,
+                class_source_label=major.class_source_label,
+                classes=classes,
+            )
+        )
+
+    unassigned = [
+        UnassignedCourseView(course=row.course, reason=row.reason)
+        for row in taxonomy.unassigned_core
+    ]
+    return majors, unassigned

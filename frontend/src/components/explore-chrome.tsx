@@ -49,6 +49,39 @@ export function Breadcrumbs({ trail, here }: { trail: Crumb[]; here: string }) {
 }
 
 /**
+ * "You clicked a score, and we kept hold of which model it was."
+ *
+ * ⚠ THE HALF OF A CELL CLICK THAT WOULD OTHERWISE BE THROWN AWAY. A cell is the
+ * crossing of a model and an entity. Its link drills into the entity — and
+ * without this, the model half of what the reader just clicked evaporates on
+ * arrival, dropping them into the full field they had already narrowed. So the
+ * level below opens with that model marked in the grid and says so here, with a
+ * way back to the whole field one click away.
+ *
+ * Rendered only when a `?model=` names a model that is actually on this level.
+ * A focus note for a model the grid does not contain would be a caption
+ * describing a different page.
+ */
+export function ModelFocus({
+  displayName,
+  clearHref,
+}: {
+  displayName: string;
+  clearHref: string;
+}) {
+  return (
+    <p className="xp-focus">
+      <span className="xp-focus-mark" aria-hidden="true">
+        ●
+      </span>{" "}
+      Following <strong>{displayName}</strong> down from the level above — its
+      row is marked below.{" "}
+      <Link href={clearHref}>Show every model equally</Link>
+    </p>
+  );
+}
+
+/**
  * The escape hatch, on every level.
  *
  * `explain` is the one sentence this particular grid would need if a reader

@@ -30,6 +30,7 @@ SCHEMA_DIR = Path(__file__).parent / "schemas"
 TASK_SCHEMA_PATH = SCHEMA_DIR / "task.schema.json"
 MODELS_SCHEMA_PATH = SCHEMA_DIR / "models.schema.json"
 CURRICULUM_SCHEMA_PATH = SCHEMA_DIR / "curriculum.schema.json"
+MAJORS_SCHEMA_PATH = SCHEMA_DIR / "majors.schema.json"
 
 
 class ValidationError(ValueError):
@@ -66,6 +67,11 @@ def curriculum_schema() -> dict[str, Any]:
     return _load_schema(str(CURRICULUM_SCHEMA_PATH))
 
 
+def majors_schema() -> dict[str, Any]:
+    """The curriculum/majors.yaml JSON Schema as a dict."""
+    return _load_schema(str(MAJORS_SCHEMA_PATH))
+
+
 def _validate(document: Any, schema: dict[str, Any], source: Path | str) -> None:
     validator = jsonschema.Draft202012Validator(schema)
     errors = sorted(validator.iter_errors(document), key=lambda e: list(e.absolute_path))
@@ -97,6 +103,18 @@ def validate_curriculum_document(document: Any, source: Path | str = "<memory>")
     badly.
     """
     _validate(document, curriculum_schema(), source)
+
+
+def validate_majors_document(document: Any, source: Path | str = "<memory>") -> None:
+    """Structurally validate a parsed ``curriculum/majors.yaml``.
+
+    The fourth authored format.  Same two layers as the other three, and it is
+    the one where the split matters most: the majors file's hardest rules are
+    *cross-file* -- a class that neither file can name, a coverage course no
+    major claims -- and a JSON Schema cannot see a second document at all.  So
+    this layer is deliberately thin and :mod:`ida_core.majors` carries the rest.
+    """
+    _validate(document, majors_schema(), source)
 
 
 def load_yaml(path: Path | str) -> Any:

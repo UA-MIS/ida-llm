@@ -1,15 +1,61 @@
-# `curriculum/` — the Student Learning Outcomes, as data
+# `curriculum/` — the outcomes and the course taxonomy, as data
 
-[`slo.yaml`](slo.yaml) holds the nine BScBA Student Learning Outcomes, the two
-axes every SLO-anchored benchmark task is filed under, and the published
-course-by-outcome coverage grid.
+Two files, two publishers, one join key — **the course code**:
 
-It is **data, not documentation**. It has a JSON Schema
-([`curriculum.schema.json`](../packages/core/ida_core/schemas/curriculum.schema.json)),
+| file | authority | answers |
+|---|---|---|
+| [`slo.yaml`](slo.yaml) | the programme's curriculum map | which outcomes a course teaches, and at what level |
+| [`majors.yaml`](majors.yaml) | the university course catalog | which majors exist, which classes each one owns |
+
+They are kept apart rather than merged because they are transcriptions of
+**different published documents** with different revision dates. One `source:`
+field per file is what makes a later disagreement attributable to a moved
+goalpost rather than to us.
+
+Both are **data, not documentation**. Each has a JSON Schema
+([`curriculum.schema.json`](../packages/core/ida_core/schemas/curriculum.schema.json),
+[`majors.schema.json`](../packages/core/ida_core/schemas/majors.schema.json)),
 a loader with cross-field validation
-([`ida_core.curriculum`](../packages/core/ida_core/curriculum.py)), and it is
+([`ida_core.curriculum`](../packages/core/ida_core/curriculum.py),
+[`ida_core.majors`](../packages/core/ida_core/majors.py)), and both are
 validated by `make lint-tasks` — which is the `task-schema` CI gate — alongside
 `tasks/**` and `models.yaml`.
+
+## `majors.yaml` — and the one field the drill-down's honesty rests on
+
+`/explore` opens on the college's majors, because a professor is a professor **of
+a major**, not of the shared core. Major → class → the outcomes behind it → the
+evidence.
+
+The load-bearing field is **`task_families`** on a class. Results are filed by
+*outcome* — a task carries `slo:SLO2`, never `course:MIS 200` — so a class scored
+from "the outcomes it teaches" gets a number that is *identical* for every other
+class the map marks against those outcomes. Run the three MIS 200 exam families
+without it and AC 210, ST 260, GBA 300, OM 300 and FI 302 each display a score
+from a course none of them is: a dozen fabricated measurements, each
+individually plausible, produced by arithmetic rather than by anybody lying.
+
+So a class counts only the results whose task family it claims, and **a class
+that claims none can never show a number**. That is the default, and it is
+correct. Today exactly one class in the college claims any: MIS 200.
+
+Three cross-file rules are gated in CI, because none of them is visible from
+either file alone:
+
+1. **Every class can name itself** — it carries a `title`, or the coverage grid
+   has a row for its code. A class with neither would render as a nameless column.
+2. **Every coverage course is claimed exactly once** — by one major, or by
+   `unassigned_core` with a reason. An edit that dropped `MIS 200` from every
+   class list would empty the only populated path in the product, silently.
+3. **Every `task_families` entry names a family the catalogue has** — a
+   misspelled family makes a class read "not measured yet" forever, which looks
+   exactly like a class nobody has got round to running.
+
+Title precedence is **catalog first, curriculum map second** (the map abbreviates:
+"Fundamentals of MIS" against the catalog's "Fundamentals of Management
+Information Systems"). Differences are *printed* by the validator, never gated —
+gating would force a transcription of one published document to be edited to
+agree with another.
 
 ## Why it exists
 

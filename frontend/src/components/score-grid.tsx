@@ -64,18 +64,34 @@ export function ScoreCell({
   cell,
   rowLabel,
   columnLabel,
+  href,
 }: {
   cell: MatrixCell;
   rowLabel: string;
   columnLabel: string;
+  /**
+   * Where the score links, when it should not link to its run.
+   *
+   * ⚠ AN OVERRIDE, AND THE DEFAULT IS STILL THE RECEIPT. `/compare` is a
+   * terminal grid — there is no level below it — so a cell there links to the
+   * run that produced the number, which is the most useful thing a cell can
+   * do when nothing is deeper. `/explore` is a drill-down, and a cell is the
+   * crossing of a model and a thing you can open; its link carries both halves
+   * one level down, and the run stays reachable from the evidence page at the
+   * bottom. Passing the override rather than branching on a page name is what
+   * keeps this one component instead of two that agree until somebody edits
+   * one of them.
+   */
+  href?: string;
 }) {
   const label = `${rowLabel} on ${columnLabel}: ${cell.reason}`;
+  const target = href ?? (cell.runId ? `/runs/${encodeURIComponent(cell.runId)}` : null);
 
   if (cell.status === "measured") {
     return (
       <td className={`cg-cell cg-measured cg-step-${cell.step}`} title={label}>
-        {cell.runId ? (
-          <Link href={`/runs/${encodeURIComponent(cell.runId)}`} className="cg-score">
+        {target ? (
+          <Link href={target} className="cg-score">
             {formatScore(cell.score)}
           </Link>
         ) : (

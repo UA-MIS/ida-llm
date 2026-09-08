@@ -1,43 +1,57 @@
 /**
- * The drill-down, as a matrix: every entity on this level against every model.
+ * The drill-down, as a matrix: every model on this level against every entity.
  *
- * ⚠ WHAT CHANGED, AND WHY IT IS NOT A RESTYLE. The first `/explore` drew each
- * level as a column of paragraph tiles — one entity, one headline number, one
- * sentence of caption. The client asked for a GRID and meant the one on
- * `/compare`: every entity × every model, one score per cell, the whole level
- * legible in a single glance without scrolling through prose. A tile grid
- * answers "how does this course do overall"; a matrix answers "how does each
- * model do on this course", which is the question a professor choosing a model
- * actually has. The three levels are now the same object at three scopes:
+ * ⚠ MODELS ARE ROWS AND ENTITIES ARE COLUMNS, WHICH IS THE ORIENTATION
+ * `/compare` USES — and the flip is a claim, not a layout preference. A vertical
+ * list is read as a ranking whether or not you meant one, so the axis that runs
+ * down the page has to be the axis where order MEANS something. Model order
+ * does: these rows are sorted, and the best model is meant to read as best
+ * because it is at the top. Entity order does not: majors are the catalog's
+ * eleven and classes are a course listing, and standing them in a column would
+ * quietly assert that Accounting outranks Marketing, or that MIS 200 matters
+ * more than MIS 466. It does not, and this benchmark has no business saying so.
  *
- *   1. programme   majors × models
- *   2. course      the programme's courses × models
- *   3. outcome     the course's outcomes × models  (= `/compare`, scoped)
+ * The consequence worth stating: the grid is now WIDE and SHORT — a handful of
+ * models against as many as fourteen classes — where it used to be tall and
+ * narrow. That is why the per-entity prose moved off the header and under the
+ * grid (see `components/explore-matrix.tsx`): a sentence does not fit in a
+ * column header, and truncating it to a tooltip would break the rule this
+ * codebase keeps writing tests about — an empty square must still say something,
+ * on the page, at every width.
  *
- * Level 4 — the evidence behind one (course, outcome) pair — is unchanged. It
+ * The three grid levels are the same object at three scopes:
+ *
+ *   1. major      majors × models
+ *   2. class      one major's classes × models
+ *   3. outcome    one class's outcomes × models   (= `/compare`, scoped)
+ *
+ * Level 4 — the evidence behind one (class, outcome) pair — is unchanged. It
  * was never a grid and should not become one: it is where the receipts live.
  *
- * ⚠ ENTITIES ARE ROWS, MODELS ARE COLUMNS, WHICH IS `/compare` TRANSPOSED. On
- * `/compare` the reader has come to compare models, so a model is a row and a
- * row is a profile. Here the reader has come to drill, so the ROW is the thing
- * you open — a major, a course, an outcome — and every row header is a link to
- * the level below it. Making the drillable thing the row rather than a column
- * header is the difference between an affordance and a puzzle. The cells, the
- * ramp, the three empty states and the confidence tells are literally the same
- * components either way (`components/score-grid.tsx`).
+ * ⚠ THREE CLICK TARGETS, THREE DIFFERENT QUESTIONS, AND NONE OF THEM IS A DEAD
+ * END. A dense grid where only one thing is clickable teaches the reader to
+ * stop looking:
  *
- * ⚠ THIS FILE INVENTS NO NUMBER, AND ITS ROW HEADLINE IS NOT A SECOND OPINION.
- * Every cell is `aggregate()` from lib/rollup.ts over one model's entries under
- * one entity, and every row's "All models" figure is `aggregate()` over the
- * same entries across every ranked model — the identical function the leaderboard
- * and `/compare` use, with the sample-weighted mean, the weakest-constituent
- * confidence rule and the null-is-not-zero rule already in it. A course
- * headline therefore cannot disagree with the cells beside it, because it is
- * not computed by different code.
+ *   a column header   the entity. Drills into it — the level below, all models.
+ *   a row header      the model. Opens its report card, across everything.
+ *   a score cell      the (model, entity) crossing. Drills into the entity AND
+ *                     carries the model, so the level below opens focused on
+ *                     the model whose number you just clicked, rather than
+ *                     dropping you back into the full field.
+ *
+ * ⚠ THIS FILE INVENTS NO NUMBER, AND ITS SUMMARY CELLS ARE NOT A SECOND
+ * OPINION. Every cell is `aggregate()` from lib/rollup.ts over one model's
+ * entries under one entity; the "All models" row is `aggregate()` over the same
+ * entries across every ranked model, and a model's trailing cell is
+ * `aggregate()` over that model's entries across every entity on the level. The
+ * identical function the leaderboard and `/compare` use, with the
+ * sample-weighted mean, the weakest-constituent confidence rule and the
+ * null-is-not-zero rule already in it. A summary therefore cannot disagree with
+ * the cells it summarises, because it is not computed by different code.
  *
  * ⚠ THE THREE EMPTIES STAY THREE DIFFERENT CLAIMS, and a dense grid is where
  * they are easiest to confuse. Classification runs through `classifyCell` in
- * lib/matrix.ts — one implementation, shared with `/compare` — so a course grid
+ * lib/matrix.ts — one implementation, shared with `/compare` — so a class grid
  * physically cannot decide that "nothing ran" and "cannot be measured" are the
  * same square.
  */
@@ -45,7 +59,6 @@
 import {
   aggregate,
   entriesAreSeeded,
-  isRanked,
   rollupByModel,
   summariseDemonstration,
   type DemonstrationTell,
@@ -55,9 +68,10 @@ import {
 } from "./rollup";
 import { classifyCell, type MatrixCell } from "./matrix";
 import {
-  buildCourses,
+  buildClasses,
   buildIndex,
-  type CourseTile,
+  entryIsAboutClass,
+  type ClassTile,
   type ExploreStatus,
   type MajorTile,
   type OutcomeTile,
@@ -68,77 +82,86 @@ import type { LeaderboardResponse } from "./types";
 // Shapes
 // ---------------------------------------------------------------------------
 
-/** One column: a model, as it appears across every row of this level. */
-export interface MatrixModelColumn {
+/** One column: a thing you can open, and how it reads across every model. */
+export interface MatrixEntityColumn {
+  /** URL segment, and the column's React key. */
+  key: string;
+  /** The small line above the name — "Major", a course code, an outcome id. */
+  eyebrow: string;
+  heading: string;
+  /** The level below. Every column header is a link; that is the drill. */
+  href: string;
+  /**
+   * The column's own read across every ranked model — the "All models" row.
+   *
+   * Not a second computation: the same `aggregate()` over the same entries the
+   * cells above it are built from, so the summary and the column cannot
+   * disagree.
+   */
+  overall: ScoreAggregate;
+  /**
+   * That same summary as a cell, classified by the same function as every other
+   * cell in the column.
+   *
+   * ⚠ THE POINT OF THE MATRIX REBUILD, IN ONE FIELD. A tile grid computed an
+   * entity's headline in one place and its evidence in another, and nothing
+   * structural stopped the two from drifting. Here the headline is the same
+   * `classifyCell` verdict over the union of the entries its neighbours are
+   * built from, rendered by the same `ScoreCell` — it cannot say "measured"
+   * above a column of dashes, because it is not separate code.
+   */
+  overallCell: MatrixCell;
+  status: ExploreStatus;
+  /** Why there is (or is not) a number. On the page, never a tooltip only. */
+  reason: string;
+  /** Every score behind this column was seeded — the per-entity disclosure. */
+  seeded: boolean;
+  /** Whether a text benchmark can reach this entity at all. */
+  benchmarkable: boolean;
+  /** Extra context — a level badge, a coverage count, a credit line. */
+  footnote: string;
+}
+
+/** One row: a model, as it reads across every entity on this level. */
+export interface MatrixModelRow {
   model_key: string;
   display_name: string;
   /** False for test stubs. Shown — they are real rows — but never ranked. */
   recommendable: boolean;
   /** Every score this model contributed to this level was seeded, not measured. */
   seeded: boolean;
-}
-
-/** One row: a thing you can open, and how each model reads on it. */
-export interface MatrixEntityRow {
-  /** URL segment, and the row's React key. */
-  key: string;
-  /** The small line above the name — "Programme", a course code, an outcome id. */
-  eyebrow: string;
-  heading: string;
-  /** The level below. Every row header is a link; that is the drill. */
+  /** The model's own report card. Every row header is a link. */
   href: string;
   /** One cell per column, in column order. */
   cells: MatrixCell[];
-  /**
-   * The row's own read across every ranked model — the "All models" column.
-   *
-   * Not a second computation: the same `aggregate()` over the same entries the
-   * cells are built from, so the headline and the cells cannot disagree.
-   */
+  /** This model across every entity on the level — the trailing column. */
   overall: ScoreAggregate;
-  /**
-   * That same headline as a cell, classified by the same function as every
-   * other cell in the row.
-   *
-   * ⚠ THE POINT OF THE WHOLE REBUILD, IN ONE FIELD. A tile grid computed a
-   * course's headline in one place and its evidence in another, and nothing
-   * structural stopped the two from drifting. Here the headline is the same
-   * `classifyCell` verdict over the union of the entries its neighbours are
-   * built from, rendered by the same `ScoreCell` — it cannot say "measured"
-   * beside a row of dashes, because it is not separate code.
-   */
   overallCell: MatrixCell;
-  status: ExploreStatus;
-  /** Why there is (or is not) a number. Always shown, never a tooltip only. */
-  reason: string;
-  /** Every score behind this row was seeded — the per-row disclosure. */
-  seeded: boolean;
-  /** Whether a text benchmark can reach this row at all. */
-  benchmarkable: boolean;
-  /** Extra context for the row header — a level badge, a coverage count. */
-  footnote: string;
+  /** Entities where this model has a real score. Coverage, stated not implied. */
+  measuredCount: number;
 }
 
 export interface ExploreMatrix {
   /** False when there is nothing to draw, with `unavailable_reason` saying why. */
   available: boolean;
   unavailable_reason: string | null;
-  columns: MatrixModelColumn[];
-  rows: MatrixEntityRow[];
+  entities: MatrixEntityColumn[];
+  /** Widest real coverage first, then strongest score. Order is a rank. */
+  models: MatrixModelRow[];
   /** Seeded-vs-measured across the models that actually appear on this level. */
   demonstration: DemonstrationTell;
   /**
-   * Rows a text benchmark can reach — the denominator for a coverage line.
+   * Entities a text benchmark can reach — the denominator for a coverage line.
    *
-   * ⚠ ROWS, WHICH IS ONLY THE SAME AS OUTCOMES ON LEVEL 3. Levels 1 and 2 count
-   * programmes and courses here, while their subtitles count OUTCOMES across
-   * them — a different number, correctly, so those pages keep reading it off
-   * the tiles in lib/explore.ts. Level 3's rows ARE its outcomes, so it counts
-   * these instead and its prose is guaranteed to describe the grid under it.
+   * ⚠ ENTITIES, WHICH IS ONLY THE SAME AS OUTCOMES ON LEVEL 3. Levels 1 and 2
+   * count majors and classes here, while their subtitles count OUTCOMES across
+   * them — a different number, correctly, so those pages keep reading that off
+   * the tiles in lib/explore.ts. Level 3's columns ARE its outcomes, so it
+   * counts these instead and its prose is guaranteed to describe the grid.
    */
-  benchmarkable_rows: number;
+  benchmarkable_entities: number;
   /** Of those, how many have a score from at least one model. */
-  measured_rows: number;
+  measured_entities: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -146,7 +169,7 @@ export interface ExploreMatrix {
 // ---------------------------------------------------------------------------
 
 /**
- * What one row is, stripped to what the matrix needs to build its cells.
+ * What one column IS, stripped to what the matrix needs to build its cells.
  *
  * The three levels differ only in how they answer these questions, so each page
  * hands over a list of these and gets the same grid back.
@@ -159,114 +182,181 @@ interface EntitySpec {
   benchmarkable: boolean;
   /** The curriculum's own words on why it is or is not measurable. */
   note: string;
-  /** How a not-measured cell should name this row: "MIS 200's outcomes". */
+  /** How a not-measured cell should name this column: "MIS 200's outcomes". */
   noun: string;
   pronoun: { singular: string; plural: string };
-  /** Outcome ids this row covers. The cell filter, and nothing else. */
+  /**
+   * The filter every cell in this column is built from.
+   *
+   * ⚠ TWO HALVES, AND BOTH ARE LOAD-BEARING. `slos` alone was the old filter,
+   * and it is what made a class's score a claim about the OUTCOMES it teaches
+   * rather than about the class — so one exam's number would surface under
+   * every class the map marks against the same outcome. `families` narrows it
+   * to results that are about this entity's own material. An empty `families`
+   * means nothing can be attributed here, which is the honest default for the
+   * thirteen of fourteen MIS classes nobody has authored tasks about.
+   */
   slos: string[];
-  /** Tasks the catalogue files under any of `slos`. */
+  families: string[];
+  /** Tasks about THIS entity that the catalogue files under any of `slos`. */
   tasksAvailable: number;
   status: ExploreStatus;
   reason: string;
   footnote: string;
 }
 
-/** How many tasks the catalogue files under each outcome, measured or not. */
-function tasksPerOutcome(board: LeaderboardResponse): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const task of board.tasks) {
-    if (task.slo === null) continue;
-    counts.set(task.slo, (counts.get(task.slo) ?? 0) + 1);
-  }
-  return counts;
+function entriesUnder(model: ModelRollup, spec: MatchSpec): ModelTaskEntry[] {
+  return model.entries.filter(
+    (entry) =>
+      entry.slo !== null && spec.slos.has(entry.slo) && entryIsAboutClass(entry, spec.families),
+  );
 }
 
-function tasksUnder(slos: string[], counts: Map<string, number>): number {
-  return slos.reduce((n, slo) => n + (counts.get(slo) ?? 0), 0);
+interface MatchSpec {
+  slos: Set<string>;
+  families: Set<string>;
 }
 
-/** One model's entries under one row. The only filter a cell is built from. */
-function entriesUnder(model: ModelRollup, slos: Set<string>): ModelTaskEntry[] {
-  return model.entries.filter((entry) => entry.slo !== null && slos.has(entry.slo));
+function matchOf(spec: EntitySpec): MatchSpec {
+  return { slos: new Set(spec.slos), families: new Set(spec.families) };
+}
+
+/** Tasks about a set of families, filed under a set of outcomes. */
+function tasksFor(board: LeaderboardResponse, slos: string[], families: string[]): number {
+  const wantSlo = new Set(slos);
+  const wantFamily = new Set(families);
+  return board.tasks.filter(
+    (task) => task.slo !== null && wantSlo.has(task.slo) && wantFamily.has(task.family),
+  ).length;
+}
+
+function cellFor(
+  spec: EntitySpec,
+  key: string,
+  entries: ModelTaskEntry[],
+  absence: string,
+  tasksAvailable: number,
+): MatrixCell {
+  return classifyCell(
+    {
+      key,
+      benchmarkable: spec.benchmarkable,
+      note: spec.note,
+      noun: spec.noun,
+      pronoun: spec.pronoun,
+      absence,
+      tasksAvailable,
+    },
+    entries.length === 0 ? undefined : aggregate(entries),
+  );
 }
 
 /**
- * The columns: every model on the board, ranked ones first.
+ * The rows: every model on the board, ranked ones first, strongest first.
+ *
+ * ⚠ ORDER IS A CLAIM HERE IN A WAY IT WAS NOT WHEN MODELS WERE COLUMNS. A
+ * column order is read as a list; a ROW order is read as a ranking, which is
+ * exactly why the flip put models on this axis. So the sort has to be the one
+ * the rest of the site already defends: widest real COVERAGE first, then the
+ * strongest score — the same rule `buildMatrix` uses on `/compare`, and for the
+ * same reason. A model measured on one class out of fourteen has not answered
+ * "which model should I use", however well it did on that one.
+ *
+ * ⚠ AND IT IS SCOPED TO THIS LEVEL, not to the whole board. The reader is
+ * looking at one major; "best" has to mean best HERE, or the top row is a
+ * ranking of a different page.
  *
  * ⚠ TEST STUBS ARE SHOWN BUT NEVER RANKED FIRST, the same rule the leaderboard
  * and `/compare` apply. `best_model_key` excludes stubs "so the winner is never
- * a fixture", and a grid whose leftmost column is a deterministic mock is the
- * same lie in a different shape. They keep their column — they are real rows —
- * they just do not lead.
+ * a fixture", and a grid whose top row is a deterministic mock is the same lie
+ * in a different shape. They keep their row — they are real rows — they just do
+ * not lead.
  */
-function columnsOf(models: ModelRollup[], slos: Set<string>): MatrixModelColumn[] {
-  return [...models]
-    .sort((a, b) => {
-      const rank = Number(isRanked(b)) - Number(isRanked(a));
-      if (rank !== 0) return rank;
-      return (b.overall.score ?? 0) - (a.overall.score ?? 0);
-    })
-    .map((model) => ({
+function buildModelRows(
+  models: ModelRollup[],
+  specs: EntitySpec[],
+  levelMatch: MatchSpec,
+  levelTasksAvailable: number,
+): MatrixModelRow[] {
+  const matches = specs.map(matchOf);
+
+  const rows = models.map((model) => {
+    const cells = specs.map((spec, index) =>
+      cellFor(
+        spec,
+        `${spec.key}:${model.model_key}`,
+        entriesUnder(model, matches[index]!),
+        "this model has no",
+        spec.tasksAvailable,
+      ),
+    );
+    const mine = entriesUnder(model, levelMatch);
+    const overall = aggregate(mine);
+    return {
       model_key: model.model_key,
       display_name: model.display_name,
       recommendable: model.recommendable,
       // Scoped to THIS level, not the whole board: a model measured for real
       // here must not carry an "illustrative" badge because something it was
       // seeded for sits on a different page.
-      seeded: entriesAreSeeded(entriesUnder(model, slos)),
-    }));
-}
-
-function buildRow(
-  spec: EntitySpec,
-  models: ModelRollup[],
-  columns: MatrixModelColumn[],
-): MatrixEntityRow {
-  const slos = new Set(spec.slos);
-  const byKey = new Map(models.map((m) => [m.model_key, m]));
-
-  const cells = columns.map((column) => {
-    const model = byKey.get(column.model_key);
-    const entries = model ? entriesUnder(model, slos) : [];
-    return classifyCell(
-      {
-        key: `${spec.key}:${column.model_key}`,
-        benchmarkable: spec.benchmarkable,
-        note: spec.note,
-        noun: spec.noun,
-        pronoun: spec.pronoun,
-        absence: "this model has no",
-        tasksAvailable: spec.tasksAvailable,
-      },
-      entries.length === 0 ? undefined : aggregate(entries),
-    );
+      seeded: entriesAreSeeded(mine),
+      href: `/models/${encodeURIComponent(model.model_key)}`,
+      cells,
+      overall,
+      overallCell: classifyCell(
+        {
+          key: `${model.model_key}:all`,
+          // A model is never itself "out of scope"; only an entity can be.
+          benchmarkable: true,
+          note: "",
+          noun: "this level",
+          pronoun: { singular: "it", plural: "them" },
+          absence: "this model has no",
+          tasksAvailable: levelTasksAvailable,
+        },
+        mine.length === 0 ? undefined : overall,
+      ),
+      measuredCount: cells.filter((cell) => cell.status === "measured").length,
+    };
   });
 
-  // ⚠ THE SAME ENTRIES THE CELLS ARE BUILT FROM. Ranked models only — a stub
-  // has a column because it is a real row, but folding it into the row's
-  // headline would put a fixture inside the number a professor reads first.
+  return rows.sort((a, b) => {
+    // Stubs last, whatever they scored — `best_model_key`'s rule, restated on
+    // the axis that now reads as a ranking.
+    const stub = Number(b.recommendable) - Number(a.recommendable);
+    if (stub !== 0) return stub;
+    const coverage = b.measuredCount - a.measuredCount;
+    if (coverage !== 0) return coverage;
+    return (b.overall.score ?? 0) - (a.overall.score ?? 0);
+  });
+}
+
+function buildEntityColumn(
+  spec: EntitySpec,
+  models: ModelRollup[],
+): MatrixEntityColumn {
+  const match = matchOf(spec);
+  // ⚠ RANKED MODELS ONLY. A stub has a row because it is a real row, but
+  // folding it into the summary would put a fixture inside the number a
+  // professor reads first.
   const ranked = models.filter((m) => m.recommendable);
-  const contributing = ranked.flatMap((model) => entriesUnder(model, slos));
+  const contributing = ranked.flatMap((model) => entriesUnder(model, match));
+
   const overall = aggregate(contributing);
-  const overallCell = classifyCell(
-    {
-      key: `${spec.key}:all`,
-      benchmarkable: spec.benchmarkable,
-      note: spec.note,
-      noun: spec.noun,
-      pronoun: spec.pronoun,
-      // ⚠ NOT A MODEL, SO NOT "THIS MODEL". This square is about all of them.
-      absence: "no model has a",
-      // ⚠ PAIRINGS, NOT TASKS, AND THE FRACTION IS WHY. `aggregate()` counts a
-      // measured (model, task) PAIR, so summing across every ranked model made
-      // the numerator count pairings while the denominator still counted tasks
-      // — a one-task course with two models rendered "2/1", a fraction above
-      // one, in the cell a reader takes as the course's headline. The
-      // denominator has to be the same unit the numerator is: every task, once
-      // per model that could have run it.
-      tasksAvailable: spec.tasksAvailable * ranked.length,
-    },
-    contributing.length === 0 ? undefined : overall,
+  const overallCell = cellFor(
+    spec,
+    `${spec.key}:all`,
+    contributing,
+    // ⚠ NOT A MODEL, SO NOT "THIS MODEL". This square is about all of them.
+    "no model has a",
+    // ⚠ PAIRINGS, NOT TASKS, AND THE FRACTION IS WHY. `aggregate()` counts a
+    // measured (model, task) PAIR, so summing across every ranked model made
+    // the numerator count pairings while the denominator still counted tasks —
+    // a one-task class with two models rendered "2/1", a fraction above one, in
+    // the cell a reader takes as the class's headline. The denominator has to
+    // be the same unit the numerator is: every task, once per model that could
+    // have run it.
+    spec.tasksAvailable * ranked.length,
   );
 
   return {
@@ -274,12 +364,11 @@ function buildRow(
     eyebrow: spec.eyebrow,
     heading: spec.heading,
     href: spec.href,
-    cells,
     overall,
     overallCell,
     // ⚠ ONE SOURCE OF TRUTH FOR THE STATUS. Taken from the cell rather than
-    // from the tile that supplied the caption, so the badge on a row and the
-    // square beside it are the same verdict by construction.
+    // from the tile that supplied the caption, so the marker on a column and
+    // the square beneath it are the same verdict by construction.
     status: overallCell.status,
     reason: spec.reason,
     seeded: entriesAreSeeded(contributing),
@@ -294,90 +383,97 @@ function assemble(
   unavailableReason: string | null,
 ): ExploreMatrix {
   const models = rollupByModel(board);
-  // Every outcome anything on this level touches — the scope the columns'
-  // seeded flags and the page's demonstration notice are measured against.
-  const levelSlos = new Set(specs.flatMap((spec) => spec.slos));
-  const columns = columnsOf(models, levelSlos);
-  const rows = specs.map((spec) => buildRow(spec, models, columns));
+  // Everything anything on this level touches — the scope the rows' seeded
+  // flags, their trailing summary and the page's demonstration notice are all
+  // measured against.
+  const levelMatch: MatchSpec = {
+    slos: new Set(specs.flatMap((spec) => spec.slos)),
+    families: new Set(specs.flatMap((spec) => spec.families)),
+  };
+  const levelTasks = specs.reduce((n, spec) => n + spec.tasksAvailable, 0);
+
+  const entities = specs.map((spec) => buildEntityColumn(spec, models));
+  const rows = buildModelRows(models, specs, levelMatch, levelTasks);
 
   // Models with a real, rankable contribution to THIS level — the same scoping
-  // `buildEvidence` uses one level down. Not the whole board's split: a course
-  // whose own outcomes are all measured must not be told "some figures here are
-  // illustrative" because a different course somewhere else is still seeded.
+  // `buildEvidence` uses one level down. Not the whole board's split: a major
+  // whose own classes are all measured must not be told "some figures here are
+  // illustrative" because a different major somewhere else is still seeded.
   //
   // ⚠ AND THEIR ENTRIES ARE NARROWED TO THE LEVEL BEFORE THE SPLIT IS TAKEN,
-  // which is the half that is easy to miss and was wrong. `summariseDemonstration`
-  // asks `isSeeded` of each model, and `isSeeded` reads the model's WHOLE entry
-  // set — so a model seeded on every outcome one course teaches, but measured
-  // for real on a different course, came back "measured" and the page rendered
-  // a grid of entirely illustrative numbers under no banner at all. That is
-  // gap #69 and #73 exactly, one scope down: the flag was right per row and per
-  // column, and the sentence a reader meets FIRST was silent. Filtering here
-  // makes the notice mean what it says — "here" is this level.
+  // which is the half that is easy to miss and was wrong once already.
+  // `summariseDemonstration` asks `isSeeded` of each model, and `isSeeded`
+  // reads the model's WHOLE entry set — so a model seeded on everything one
+  // major covers, but measured for real on a different major, came back
+  // "measured" and the page rendered a grid of entirely illustrative numbers
+  // under no banner at all. That is gap #69 and #73 exactly, one scope down:
+  // the flag was right per column and per row, and the sentence a reader meets
+  // FIRST was silent. Filtering here makes the notice mean what it says.
   const contributing = models
     .filter((model) => model.recommendable)
-    .map((model) => ({ ...model, entries: entriesUnder(model, levelSlos) }))
+    .map((model) => ({ ...model, entries: entriesUnder(model, levelMatch) }))
     .filter((model) =>
       model.entries.some(
         (entry) => entry.result.mean_score !== null && entry.result.scored_count > 0,
       ),
     );
 
-  const benchmarkable = rows.filter((row) => row.benchmarkable);
+  const benchmarkable = entities.filter((entity) => entity.benchmarkable);
   return {
-    available: rows.length > 0,
-    unavailable_reason: rows.length > 0 ? null : unavailableReason,
-    columns,
-    rows,
+    available: entities.length > 0,
+    unavailable_reason: entities.length > 0 ? null : unavailableReason,
+    entities,
+    models: rows,
     demonstration: summariseDemonstration(contributing),
-    benchmarkable_rows: benchmarkable.length,
-    measured_rows: benchmarkable.filter((row) => row.status === "measured").length,
+    benchmarkable_entities: benchmarkable.length,
+    measured_entities: benchmarkable.filter((entity) => entity.status === "measured").length,
   };
 }
 
 // ---------------------------------------------------------------------------
-// Level 1 — programmes × models
+// Level 1 — majors × models
 // ---------------------------------------------------------------------------
 
-function majorSpec(major: MajorTile, board: LeaderboardResponse): EntitySpec {
-  // ⚠ EVERY OUTCOME, NOT ONLY THE MEASURABLE ONES. `MajorTile.aggregate`
-  // averages every entry filed under any outcome, so narrowing the set here
-  // would make the row's headline a DIFFERENT number from the one level 1's
-  // own tile computes — the precise disagreement this rebuild exists to make
-  // impossible. Nothing is ever run for an unmeasurable outcome, so in
-  // practice the two sets are equal; matching them by construction is what
-  // keeps that true after somebody files a task badly.
-  const slos = board.curriculum.outcomes.map((outcome) => outcome.id);
+function majorSpec(
+  major: MajorTile,
+  board: LeaderboardResponse,
+  classes: ClassTile[],
+): EntitySpec {
+  const slos = [...new Set(classes.flatMap((c) => c.outcomes.map((o) => o.slo)))];
+  const families = [...new Set(classes.flatMap((c) => c.task_families))];
   return {
     key: major.slug,
-    eyebrow: "Programme",
+    eyebrow: "Major",
     heading: major.name,
     href: `/explore/${major.slug}`,
-    // A programme is not a single outcome, so it is never "out of scope" as a
-    // whole: it is reachable if any outcome it publishes is.
+    // A major is not a single outcome, so it is never "out of scope" as a
+    // whole: it is reachable if any outcome its classes publish is.
     benchmarkable: true,
     note: "",
-    noun: "this programme's outcomes",
+    noun: `${major.name}'s classes`,
     pronoun: { singular: "it", plural: "them" },
     slos,
-    tasksAvailable: tasksUnder(slos, tasksPerOutcome(board)),
+    families,
+    tasksAvailable: tasksFor(board, slos, families),
     status: major.status,
     reason: major.reason,
     footnote:
-      `${major.course_count} ${major.course_count === 1 ? "course" : "courses"} · ` +
-      `${major.measured_count} of ${major.benchmarkable_count} measurable outcomes have a score`,
+      `${major.class_count} ${major.class_count === 1 ? "class" : "classes"}` +
+      (major.measurable_class_count > 0
+        ? ` · ${major.measurable_class_count} with tasks written about ${major.measurable_class_count === 1 ? "it" : "them"}`
+        : " · none with tasks yet"),
   };
 }
 
 /**
- * Level 1: the programmes on this platform, each a row against every model.
+ * Level 1: the majors this college offers, each a column against every model.
  *
- * ⚠ ONE PROGRAMME TODAY, AND A ONE-ROW MATRIX IS STILL THE RIGHT SHAPE. The
- * curriculum map holds a single `program` string, so this returns one row — but
- * a second programme is a second `slo.yaml`, and a level built as a special
- * case for one is a level nobody rewrites the day the second lands. It is also
- * the only place a reader can see, in one line, which models have been measured
- * against the programme at all.
+ * ⚠ ELEVEN COLUMNS, ONE OF WHICH HAS A PATH THROUGH IT. MIS is the only major
+ * with a benchmarked class today; the other ten show honestly that nothing has
+ * been measured there. That is not scaffolding waiting to be replaced — it is
+ * the shape of the claim. A grid that showed only the measured major would be
+ * telling a professor of Marketing that this benchmark has nothing to say,
+ * without ever admitting that the reason is us and not them.
  */
 export function buildMajorMatrix(board: LeaderboardResponse): ExploreMatrix {
   const index = buildIndex(board);
@@ -390,118 +486,132 @@ export function buildMajorMatrix(board: LeaderboardResponse): ExploreMatrix {
   }
   return assemble(
     board,
-    index.majors.map((major) => majorSpec(major, board)),
+    index.majors.map((major) => majorSpec(major, board, buildClasses(board, major))),
     null,
   );
 }
 
 // ---------------------------------------------------------------------------
-// Level 2 — courses × models
+// Level 2 — classes × models
 // ---------------------------------------------------------------------------
 
-function courseSpec(course: CourseTile, majorSlug: string): EntitySpec {
-  // Every outcome the course teaches, measurable or not — `CourseTile.aggregate`
-  // does the same, and the row headline must be that number, not a near-miss.
-  const slos = course.outcomes.map((o) => o.slo);
+function classSpec(tile: ClassTile, board: LeaderboardResponse, majorSlug: string): EntitySpec {
+  const slos = tile.outcomes.map((o) => o.slo);
   return {
-    key: course.slug,
-    eyebrow: course.code,
-    heading: course.title,
-    href: `/explore/${majorSlug}/${course.slug}`,
-    // A course is out of scope only when EVERY outcome it teaches is — which
-    // is a real case (`buildCourseTile` has the same branch) and must read as
-    // the published boundary it is, never as a course the models failed.
-    benchmarkable: course.benchmarkable_count > 0,
+    key: tile.slug,
+    eyebrow: tile.code,
+    heading: tile.title,
+    href: `/explore/${majorSlug}/${tile.slug}`,
+    // A class is out of scope only when EVERY outcome it teaches is — which is
+    // a real case (`buildClassTile` has the same branch) and must read as the
+    // published boundary it is, never as a class the models failed. A class the
+    // map does not mark at all is NOT out of scope: it is unmeasured, and its
+    // reason says which.
+    benchmarkable: tile.outcomes.length === 0 || tile.benchmarkable_count > 0,
     note:
-      course.benchmarkable_count > 0
-        ? ""
-        : "Every outcome this course teaches is one a text benchmark cannot reach.",
-    noun: `${course.code}'s outcomes`,
+      tile.outcomes.length > 0 && tile.benchmarkable_count === 0
+        ? "Every outcome this class teaches is one a text benchmark cannot reach."
+        : "",
+    noun: `${tile.code}'s outcomes`,
     pronoun: { singular: "it", plural: "them" },
     slos,
-    tasksAvailable: 0, // filled in by `buildCourseMatrix`, which has the counts
-    status: course.status,
-    reason: course.reason,
-    footnote:
-      `Teaches ${course.outcomes.length} ${course.outcomes.length === 1 ? "outcome" : "outcomes"}` +
-      (course.assessment_count > 0
-        ? ` · ${course.assessment_count} assessment ${course.assessment_count === 1 ? "point" : "points"}`
-        : ""),
+    families: tile.task_families,
+    tasksAvailable: tasksFor(board, slos, tile.task_families),
+    status: tile.status,
+    reason: tile.reason,
+    footnote: tile.in_curriculum_map
+      ? `Teaches ${tile.outcomes.length} ${tile.outcomes.length === 1 ? "outcome" : "outcomes"}` +
+        (tile.assessment_count > 0
+          ? ` · ${tile.assessment_count} assessment ${tile.assessment_count === 1 ? "point" : "points"}`
+          : "")
+      : "Not in the published curriculum map",
   };
 }
 
-/** Level 2: the courses of one programme, in the published map's order. */
-export function buildCourseMatrix(
+/** Level 2: the classes of one major, in the catalog's order. */
+export function buildClassMatrix(
   board: LeaderboardResponse,
-  majorSlug: string,
+  major: MajorTile,
 ): ExploreMatrix {
-  const counts = tasksPerOutcome(board);
-  // Map order, not score order. Re-sorting a coverage grid by how the models
-  // happen to do turns a programme into a ranking of its own courses, which is
-  // a claim about the department this benchmark has no business making.
-  const specs = buildCourses(board).map((course) => {
-    const spec = courseSpec(course, majorSlug);
-    return { ...spec, tasksAvailable: tasksUnder(spec.slos, counts) };
-  });
+  // Catalog order, not score order. Re-sorting a class list by how the models
+  // happen to do turns a major into a ranking of its own classes, which is a
+  // claim about the department this benchmark has no business making.
+  const specs = buildClasses(board, major).map((tile) => classSpec(tile, board, major.slug));
   return assemble(
     board,
     specs,
-    "The curriculum map has no coverage grid for this programme, so it has no " +
-      "courses to drill into.",
+    `${major.class_source_label}, so this major has no classes to drill into yet.`,
   );
 }
 
 // ---------------------------------------------------------------------------
-// Level 3 — outcomes × models  (this is `/compare`, scoped to one course)
+// Level 3 — outcomes × models  (this is `/compare`, scoped to one class)
 // ---------------------------------------------------------------------------
 
 function outcomeSpec(
   outcome: OutcomeTile,
+  tile: ClassTile,
   majorSlug: string,
-  courseSlug: string,
-  counts: Map<string, number>,
 ): EntitySpec {
   return {
     key: outcome.slo,
     eyebrow: outcome.slo,
     heading: outcome.title,
-    href: `/explore/${majorSlug}/${courseSlug}/${outcome.slo.toLowerCase()}`,
+    href: `/explore/${majorSlug}/${tile.slug}/${outcome.slo.toLowerCase()}`,
     benchmarkable: outcome.benchmarkable,
     note: outcome.note,
     noun: "this outcome",
     pronoun: { singular: "it", plural: "them" },
     slos: [outcome.slo],
-    tasksAvailable: counts.get(outcome.slo) ?? 0,
+    families: tile.task_families,
+    tasksAvailable: outcome.tasks_available,
     status: outcome.status,
     reason: outcome.reason,
-    // The outcome's own statement, in the curriculum's words. The published
-    // LEVEL rides on the badge instead — see the page — because a badge is
-    // scannable down a column of rows and a sentence is not.
-    footnote: outcome.statement,
+    // The published LEVEL, which is what makes the number worth anything: a
+    // benchmark aimed at a pair the department already grades is aimed at
+    // something with a human number to compare against later.
+    footnote: outcome.level_label,
   };
 }
 
 /**
- * Level 3: the outcomes one course teaches, against every model.
+ * Level 3: the outcomes one class teaches, against every model — the "why".
  *
- * ⚠ EVERY OUTCOME THE MAP MARKS FOR THIS COURSE GETS A ROW, including the ones
- * a text benchmark cannot reach. Showing only the measurable ones would make
- * MIS 200 look like a three-outcome course and GBA 300 like a five-outcome one,
- * which is a claim about the curriculum rather than about us — and it is the
- * exact edit `curriculum/slo.yaml` warns against.
+ * ⚠ EVERY OUTCOME THE MAP MARKS FOR THIS CLASS GETS A COLUMN, including the
+ * ones a text benchmark cannot reach. Showing only the measurable ones would
+ * make MIS 200 look like a three-outcome class and GBA 300 like a five-outcome
+ * one, which is a claim about the curriculum rather than about us — and it is
+ * the exact edit `curriculum/slo.yaml` warns against.
  */
 export function buildOutcomeMatrix(
   board: LeaderboardResponse,
-  course: CourseTile,
+  tile: ClassTile,
   majorSlug: string,
 ): ExploreMatrix {
-  const counts = tasksPerOutcome(board);
   return assemble(
     board,
-    course.outcomes.map((outcome) =>
-      outcomeSpec(outcome, majorSlug, course.slug, counts),
-    ),
-    `The published coverage grid marks ${course.code} against no outcome. That ` +
-      "means the map does not mark it — not that it teaches none.",
+    tile.outcomes.map((outcome) => outcomeSpec(outcome, tile, majorSlug)),
+    tile.in_curriculum_map
+      ? `The published coverage grid marks ${tile.code} against no outcome. That means ` +
+          "the map does not mark it — not that it teaches none."
+      : `The published curriculum map has no row for ${tile.code}, so there is no ` +
+          "outcome breakdown to show. That is a gap in the map, not in the class.",
   );
+}
+
+// ---------------------------------------------------------------------------
+// The cell link
+// ---------------------------------------------------------------------------
+
+/**
+ * Where a score cell goes: one level down, carrying the model it was about.
+ *
+ * ⚠ A CELL IS A CROSSING, SO ITS LINK HAS TO CARRY BOTH HALVES. The column
+ * header drills into the entity across every model; a cell is about ONE model
+ * on that entity, and dropping the reader back into the full field would throw
+ * away the specific thing they clicked. The level below reads `?model=` and
+ * opens focused on it.
+ */
+export function cellHref(entity: MatrixEntityColumn, modelKey: string): string {
+  return `${entity.href}?model=${encodeURIComponent(modelKey)}`;
 }

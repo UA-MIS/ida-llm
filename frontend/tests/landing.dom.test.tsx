@@ -130,6 +130,8 @@ const CURRICULUM: CurriculumView = {
     { id: "instructional", title: "Instructional", statement: "Can it do the instructor's side?", in_use: false },
   ],
   coverage: [],
+  majors: [],
+  unassigned_core: [],
 };
 
 function board(tasks: TaskLeaderboard[]): LeaderboardResponse {
