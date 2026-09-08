@@ -1,0 +1,184 @@
+# mis200-spreadsheet-formulas, rung 2 of 2 in the first batch.
+#
+# WHAT THIS RUNG ADDS: a FUNCTION and a RANGE. Rung 1 asks for an expression
+# over cells in one row, which a model can assemble by substituting column
+# letters into a sentence. This rung asks for the right function AND the right
+# range, and the two fail independently -- SUM over the wrong column and
+# AVERAGE over the right one are different errors with different diagnoses.
+# The course's own Excel items score this pair with partial credit for exactly
+# that reason.
+#
+# WHY THE RANGE IS THE HARDER HALF. Every wrong range in this file is wrong in
+# a way a spreadsheet will not complain about. Including the header row
+# (`g1:g13`) silently returns the same number for SUM, because a text header
+# contributes zero -- and a DIFFERENT number for AVERAGE and COUNT, because the
+# divisor changes. Running the range to `g2:g14` picks up the summary row a
+# model may assume exists. Neither error raises anything; both just move the
+# answer. This is the failure mode worth measuring and it is why the layout
+# states the row range explicitly rather than leaving it to be inferred.
+#
+# ONE SUMMARY BLOCK, RESTATED IN EVERY ITEM. All five items describe the same
+# worksheet as rung 1 -- deliberately, so the two rungs are comparable on the
+# same layout and a reviewer verifies one column map once.
+#
+# WHY count AND NOT counta. `count` tallies numeric entries and `counta` tallies
+# non-empty ones; over column B they return the same twelve, so an item that
+# accepted either would be measuring nothing. The stem therefore asks for the
+# count of NUMERIC entries, which makes `count` the only defensible answer, and
+# the comment on that sample says so.
+version: 1
+id: mis200-spreadsheet-formulas/l2-aggregate-functions
+title: SLO2 -- choosing an aggregate function and its range
+description: >
+  Five items over the same twelve-row layout as rung 1, each asking for the
+  single formula that fills one cell of a summary block: a total, a mean, a
+  maximum, a minimum and a count. Each answer is one function name and one
+  range, and the two are independently wrong-able -- the distractor analysis in
+  the comments is mostly about ranges that a spreadsheet would accept without
+  complaint.
+
+  Provenance: the layout and its business setting are synthetic, authored for
+  this file. The SKILL TARGETS were derived from the published blueprint of a
+  real MIS 200 Exam 1 -- name the aggregate function and give its range -- but
+  no exam wording, column name, scenario or answer key is reproduced, and no
+  exam asset is committed to this repository.
+kind: verifiable
+domain: business-analytics
+system_prompt: >-
+  You are producing the answer key for an undergraduate business spreadsheet
+  assessment. Answer with a single Excel formula, not a number, and not an
+  explanation of what the formula does.
+
+  Format the formula exactly as follows, because it is compared literally:
+  begin it with an equals sign; use one function call whose argument is one
+  range written with a colon; use relative cell references only, with no dollar
+  signs; and write no spaces anywhere in the formula. You may reason briefly
+  first, but the formula must then appear alone on the last line with no other
+  text, no trailing full stop and no surrounding backticks or quotation marks.
+scorer:
+  kind: exact_match
+  # lowercase absorbs `=SUM(G2:G13)` against `=sum(g2:g13)`, which is the only
+  # variation this format leaves that is not an error. strip_punctuation is off
+  # and must stay off: `=`, `(`, `)` and `:` are ASCII punctuation and carry
+  # the whole structure of the answer.
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    lowercase: true
+    strip_punctuation: false
+    take_last_line: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", mis200-spreadsheet-formulas, ladder-l2, quantitative-literacy, spreadsheet-formula]
+samples:
+  - id: total-profit
+    input: >-
+      A worksheet records one row per product line for a campus print shop. Row
+      1 is the header row and the twelve product lines occupy rows 2 to 13.
+      Rows 15 to 19 hold a summary block and are otherwise empty. The columns
+      are: A Product, B UnitsSold, C UnitPrice, D UnitCost, E Revenue, F
+      TotalCost, G Profit, H UnitsReturned, I ReturnRate, J MarginRate, K
+      NetUnitsSold, L UnitProfit. Columns E to L have already been filled in
+      for every product line. Write the formula for cell G15, which should hold
+      the combined profit of all twelve product lines.
+    # =sum(g2:g13)
+    # Wrong ranges that a spreadsheet accepts silently: g1:g13 includes the
+    # text header, which SUM treats as zero and so returns the SAME total --
+    # correct by luck, and the same mistake returns a wrong mean two items
+    # below. g2:g14 reaches into the empty gap before the summary block.
+    # g2:g19 would include the summary cell itself and produce a circular
+    # reference, which is the one wrong range Excel does complain about.
+    # Wrong column: f2:f13 totals cost rather than profit.
+    target: "=sum(g2:g13)"
+    metadata: { skill: sum-over-range, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: average-revenue
+    input: >-
+      A worksheet records one row per product line for a campus print shop. Row
+      1 is the header row and the twelve product lines occupy rows 2 to 13.
+      Rows 15 to 19 hold a summary block and are otherwise empty. The columns
+      are: A Product, B UnitsSold, C UnitPrice, D UnitCost, E Revenue, F
+      TotalCost, G Profit, H UnitsReturned, I ReturnRate, J MarginRate, K
+      NetUnitsSold, L UnitProfit. Columns E to L have already been filled in
+      for every product line. Write the formula for cell E16, which should hold
+      the mean revenue across the twelve product lines.
+    # =average(e2:e13)
+    # This is where the header-row error stops being harmless. AVERAGE over
+    # e1:e13 skips the text header when counting, so it returns the same mean
+    # as the correct range -- but AVERAGE over e2:e14, one row too far, divides
+    # by twelve and not thirteen because the blank is ignored, and so ALSO
+    # returns the right answer. The range errors this item actually catches are
+    # the ones that change the SET of values, not its size -- and e2:e19 is not
+    # one of them either: it spans E16, the target cell, so Excel rejects it as
+    # circular rather than returning a wrong mean. A range error on THIS item
+    # is mostly loud, which is why the substantive failure below is the
+    # function and not the range.
+    # The substantive wrong answer is the function: =sum(e2:e13)/12 is a mean
+    # but not the one asked for, and the stem's "single function call" rules it
+    # out. A model that writes it has answered a different question.
+    target: "=average(e2:e13)"
+    metadata: { skill: mean-over-range, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: highest-revenue
+    input: >-
+      A worksheet records one row per product line for a campus print shop. Row
+      1 is the header row and the twelve product lines occupy rows 2 to 13.
+      Rows 15 to 19 hold a summary block and are otherwise empty. The columns
+      are: A Product, B UnitsSold, C UnitPrice, D UnitCost, E Revenue, F
+      TotalCost, G Profit, H UnitsReturned, I ReturnRate, J MarginRate, K
+      NetUnitsSold, L UnitProfit. Columns E to L have already been filled in
+      for every product line. Write the formula for cell E17, which should hold
+      the revenue of whichever product line earned the most revenue.
+    # =max(e2:e13)
+    # The item is phrased around the ROW that earned the most, and asks for the
+    # revenue of that row. The distractor it exists to catch is a model that
+    # answers the question it expects rather than the one asked, and returns
+    # the product NAME -- an index/match over column A. That is a good answer
+    # to a different item; here the target cell sits in column E and holds a
+    # revenue.
+    target: "=max(e2:e13)"
+    metadata: { skill: maximum-over-range, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: lowest-return-rate
+    input: >-
+      A worksheet records one row per product line for a campus print shop. Row
+      1 is the header row and the twelve product lines occupy rows 2 to 13.
+      Rows 15 to 19 hold a summary block and are otherwise empty. The columns
+      are: A Product, B UnitsSold, C UnitPrice, D UnitCost, E Revenue, F
+      TotalCost, G Profit, H UnitsReturned, I ReturnRate, J MarginRate, K
+      NetUnitsSold, L UnitProfit. Columns E to L have already been filled in
+      for every product line. Write the formula for cell I18, which should hold
+      the return rate of whichever product line was returned least often as a
+      proportion of its sales.
+    # =min(i2:i13)
+    # Paired with the item above so that MAX and MIN are asked over different
+    # columns: a model that has settled into a column-E groove has to leave it.
+    # The phrase that does the work is "as a proportion of its sales", which
+    # points at the RATE column I and away from the COUNT column H. min(h2:h13)
+    # is the fewest units returned in absolute terms, which is a different
+    # product line whenever the smallest seller is not the cleanest seller --
+    # and is the wrong answer this item is built around.
+    target: "=min(i2:i13)"
+    metadata: { skill: minimum-over-rate-column, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: line-count
+    input: >-
+      A worksheet records one row per product line for a campus print shop. Row
+      1 is the header row and the twelve product lines occupy rows 2 to 13.
+      Rows 15 to 19 hold a summary block and are otherwise empty. The columns
+      are: A Product, B UnitsSold, C UnitPrice, D UnitCost, E Revenue, F
+      TotalCost, G Profit, H UnitsReturned, I ReturnRate, J MarginRate, K
+      NetUnitsSold, L UnitProfit. Columns E to L have already been filled in
+      for every product line. Write the formula for cell B19, which should hold
+      how many entries in the units-sold column are numeric.
+    # =count(b2:b13)
+    # The stem asks for NUMERIC entries, which is what makes count and not
+    # counta the answer -- over column B the two agree, so without that word
+    # the item would accept either and measure nothing. Stating the property
+    # the function selects on, rather than the number it returns, is the whole
+    # design of the item.
+    # The range error here is the one that bites: count over b1:b13 excludes
+    # the text header anyway and still returns twelve, so it is invisible --
+    # but counta over b1:b13 returns thirteen. The two functions differ only
+    # once the header is wrongly included, which is a neat illustration of why
+    # the range and the function cannot be graded as one answer.
+    target: "=count(b2:b13)"
+    metadata: { skill: count-numeric-entries, provenance: synthetic, slo: SLO2, use_mode: capability }

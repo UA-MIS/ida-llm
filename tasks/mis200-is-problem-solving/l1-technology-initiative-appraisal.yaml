@@ -1,0 +1,278 @@
+# mis200-is-problem-solving -- one task, and a caveat that matters more than
+# the task does.
+#
+# READ THIS BEFORE TREATING THIS FILE AS "THE SLO1 ITEMS FROM EXAM 1".
+# It is not, and it cannot be. MIS 200's published map marks SLO1 Reinforced,
+# so the course does teach toward it -- but Exam 1 does not MEASURE it. Every
+# item on that paper is forced-choice or a fill-in blank, including the ones
+# whose stems are dressed as business scenarios. `curriculum/slo.yaml` states
+# that SLO1 is "judged, not checked", because the outcome is about tool CHOICE
+# and the fit between a diagnosis and a recommendation, which a single-best-
+# answer item cannot show. A scenario-flavoured multiple-choice item measures
+# whether the student recognises the intended concept. It does not measure
+# whether they can assess a problem and propose a solution.
+#
+# So the honest description of this file is: the SUBJECT MATTER is the course's
+# -- appraising a technology initiative, which the exam touches in two of its
+# forced-choice items -- and the COGNITIVE LEVEL is SLO1's, which the exam does
+# not reach. It is an extension of the course material to the outcome, not an
+# ingest of an instrument that measured the outcome.
+#
+# WHAT FOLLOWS FROM THAT. A score on this task is not comparable to a student
+# cohort's Exam 1 SLO1 performance, because no such performance exists. If the
+# department wants that comparison, the instrument it needs is the course's
+# later case or project work, not this exam. That is a finding about the
+# curriculum map's assessment coverage, and it is reported with this batch
+# rather than buried in a rubric.
+#
+# WHY IT IS AUTHORED ANYWAY. MIS 200 is the target course for the first live
+# run and SLO1 is one of its three outcomes; a batch that returned only SLO2
+# and SLO9 would leave the third silently empty, which reads as "not measured
+# yet" rather than "not measurable from this instrument". One task, clearly
+# labelled, says the second thing.
+#
+# HOW THIS DIFFERS FROM `slo1-problem-solving/`. That family is the general
+# SLO1 ladder and its rungs separate the outcome's verbs -- define, choose,
+# apply, recommend -- one per rung. This task holds all of them at once inside
+# one domain, information-technology investment, which is the MIS 200 setting.
+# It is a domain instance of the ladder, not a new rung of it.
+#
+# THE DEGENERATE STRATEGY THE RUBRIC EXISTS TO CATCH is the balanced non-answer:
+# a response that lays out considerations on both sides, recommends nothing,
+# and cannot be called wrong. It is the highest-scoring output against a naive
+# rubric and it is worthless to the decision-maker who asked. Hence the first
+# criterion is weighted heaviest and scores 0.0 for a recommendation that does
+# not name one course of action.
+version: 1
+id: mis200-is-problem-solving/l1-technology-initiative-appraisal
+title: SLO1 -- appraising a proposed technology initiative and recommending
+description: >
+  Four items, each stating a proposed technology investment, the figures
+  available, and one or two constraints, and asking for an appraisal under
+  fixed headings: RECOMMENDATION, WHY, WHAT WOULD CHANGE IT. Every item is
+  built so that the supplied figures decide the question and a generic
+  answer -- align technology with strategy, consider total cost of ownership --
+  fits all four equally and therefore earns nothing.
+
+  Scope caveat, stated because it changes how a score here may be read: MIS 200
+  reinforces SLO1 but its Exam 1 does not assess it, every item on that paper
+  being forced-choice. This task extends the course's subject matter to the
+  cognitive level SLO1 names; it is not a benchmark counterpart of an exam
+  section, and a score here is not comparable to cohort performance on Exam 1.
+
+  Provenance: every firm, figure, constraint and scenario is synthetic,
+  authored for this file. No exam wording or answer key is reproduced, no
+  course material, no textbook content, no real firm's data, and no exam asset
+  is committed to this repository.
+kind: subjective
+domain: information-systems
+system_prompt: >-
+  You are advising a manager who has ten minutes and must leave the
+  conversation knowing what to do. Work only from the figures and constraints
+  the item supplies; where something you would need is missing, say that it is
+  missing rather than assuming a value for it.
+
+  Use exactly these three headings, in this order, and write nothing outside
+  them:
+
+  RECOMMENDATION -- one course of action, in one or two sentences.
+  WHY -- the reasoning, resting on the figures the item gave you.
+  WHAT WOULD CHANGE IT -- the specific fact or threshold that would make you
+  recommend something else.
+
+  Do not invent figures, firms or events the item did not give you. Do not
+  hedge to the point of recommending nothing: if the information is thin, say
+  what you would do given what is known.
+scorer:
+  kind: llm_judge
+  rubric_id: mis200-technology-initiative-appraisal-v1
+rubric:
+  id: mis200-technology-initiative-appraisal-v1
+  scale_min: 0
+  scale_max: 1
+  criteria:
+    - name: a-recommendation-is-actually-made
+      description: |-
+        Does RECOMMENDATION name one course of action that the manager could
+        act on when the conversation ends?
+
+        The test to apply: could the manager, having read only this heading,
+        say out loud what they are going to do? "Consider the trade-offs
+        carefully" and "it depends on the organisation's priorities" fail that
+        test. So does recommending two things without saying which comes first.
+
+        1.0 -- one course of action is named, unambiguously, and it is
+               something the manager can do (proceed, decline, defer pending a
+               named piece of information, proceed with a stated change of
+               scope).
+        0.5 -- a direction is discernible but hedged so heavily that the
+               manager would have to guess at it, or two options are offered
+               without a choice between them.
+        0.0 -- no course of action is named; the response surveys
+               considerations and stops.
+      weight: 3.0
+
+    - name: the-reasoning-uses-the-supplied-figures
+      description: |-
+        Does WHY turn on the specific numbers and constraints this item gave,
+        rather than on general principles about technology investment?
+
+        The test to apply: could this WHY section be moved unchanged onto a
+        different item in this task? If yes, it is a principle, not an
+        analysis. Every item here supplies figures that decide the question,
+        so a response that never touches them has not done the work whatever
+        it concluded.
+
+        Arithmetic slips are judged here too, but leniently: a correct method
+        applied to the right figures with a small error scores above a
+        rhetorically fluent answer that used no figures at all.
+
+        1.0 -- at least two supplied figures or constraints are used, and the
+               reasoning shows how they bear on the recommendation (a
+               comparison, a payback period, a capacity check, a ratio).
+        0.5 -- figures are quoted but not used -- restated as background while
+               the conclusion rests on general principle; or exactly one
+               figure does real work where the item supplies several that
+               matter.
+        0.0 -- no supplied figure enters the reasoning, or the reasoning rests
+               on numbers the item did not provide.
+      weight: 3.0
+
+    - name: the-recommendation-follows-from-the-reasoning
+      description: |-
+        Do RECOMMENDATION and WHY agree? This is scored separately from either
+        because a response can analyse well and then recommend something its
+        own analysis does not support, and a rubric that grades the halves
+        independently would score that highly twice.
+
+        1.0 -- the reasoning supports the stated course of action, and if the
+               figures point somewhere uncomfortable the recommendation goes
+               there.
+        0.5 -- broadly consistent, but the reasoning also establishes something
+               the recommendation ignores, or the recommendation is weaker
+               than the reasoning warrants.
+        0.0 -- the recommendation contradicts the reasoning, or does not follow
+               from it at all.
+      weight: 2.0
+
+    - name: what-would-change-it-is-specific-and-decisive
+      description: |-
+        Does WHAT WOULD CHANGE IT name a fact or a threshold that would
+        actually flip the recommendation, rather than listing risks?
+
+        The test to apply: is it checkable, and would learning it change the
+        answer? "If the vendor turns out to be unreliable" is a risk, not a
+        threshold, and it is the most common way this heading is filled without
+        being answered. "If the licence renews above about fourteen thousand a
+        year the payback exceeds the three-year horizon and I would decline" is
+        a threshold.
+
+        1.0 -- a specific fact or a numeric threshold is named, and it is
+               plausibly the thing the decision hinges on.
+        0.5 -- a relevant factor is named but left qualitative where the item's
+               figures would have supported a threshold.
+        0.0 -- generic risks are listed, or the heading restates the
+               recommendation, or nothing would change it.
+      weight: 2.0
+samples:
+  - id: loyalty-app-car-wash
+    input: >-
+      A chain of forty car washes is considering a customer loyalty app. Build
+      and launch would cost 180,000 dollars, with 26,000 dollars a year to run
+      it. The chain serves about 900,000 washes a year at an average price of
+      12 dollars. A pilot at three sites raised repeat-visit rates enough to
+      lift revenue at those sites by 1.4 per cent. The chain's owner wants
+      anything of this size to pay for itself within three years, and the
+      marketing manager who ran the pilot is asking to proceed. Give your
+      appraisal.
+      # Headings: RECOMMENDATION, WHY, WHAT WOULD CHANGE IT.
+    # The figures decide it and they decide it narrowly, which is the point.
+    # Revenue is about 900,000 x 12 = 10.8m; a 1.4% lift is about 151,000 a
+    # year, less 26,000 running cost leaves about 125,000 net, against 180,000
+    # to build -- roughly an 18-month payback, inside the owner's three-year
+    # bar. So the figures support proceeding.
+    # The trap is that the 1.4% came from THREE sites out of forty and is a
+    # revenue lift, not a margin lift; a strong answer notices at least one of
+    # those. The threshold worth naming is how far the chain-wide lift could
+    # fall before payback passes three years. Three years of net benefit must
+    # cover the 180,000 build, so annual net must clear 60,000, so annual gross
+    # must clear 86,000 once the 26,000 running cost is added back -- a
+    # chain-wide lift of about 0.80%, against the 1.4% the pilot saw. Dropping
+    # the running cost from that sum gives 0.55% and understates the bar.
+    # A response recommending "proceed, aligning with strategy" without
+    # touching any of this scores 0.0 on the second criterion and cannot pass.
+    metadata: { skill: payback-against-a-stated-bar, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  - id: scheduling-system-replacement
+    input: >-
+      A 90-bed community hospital runs an outpatient scheduling system that is
+      fifteen years old. Its vendor will stop issuing security patches in
+      eleven months. Replacing it costs 340,000 dollars over two years and
+      would occupy the hospital's four-person IT team almost fully for six
+      months, during which a planned patient-portal project would not start.
+      Staying put costs nothing new. The hospital handles about 60,000
+      outpatient appointments a year and is subject to health-data breach
+      notification rules. Give your appraisal.
+      # Headings: RECOMMENDATION, WHY, WHAT WOULD CHANGE IT.
+    # The item is built so that the cheapest option is not available: "staying
+    # put costs nothing new" is true and irrelevant, because an unpatched
+    # system holding health data past its support date is a regulatory and
+    # breach exposure, not a saving. A response that treats this as a cost
+    # comparison and defers has missed the deciding constraint, and the
+    # eleven-month clock is in the stem so that the deadline is decidable.
+    # The real content of a good answer is the SEQUENCING: the portal project
+    # is the thing being given up, and saying so is what makes the
+    # recommendation a choice rather than an assertion.
+    # This is the item where "defer pending X" is a legitimate top answer only
+    # if X is named and lands inside eleven months.
+    metadata: { skill: deadline-and-opportunity-cost, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  - id: self-service-lanes-hardware-coop
+    input: >-
+      A single-store hardware co-operative with 5,200 member households is
+      considering four self-service checkout lanes at 21,000 dollars each installed,
+      plus 7,000 dollars a year in total maintenance. They would replace two of
+      the store's seven staffed lanes. The store employs its cashiers on a
+      policy, written into its member charter, of no redundancies from
+      automation; staff displaced from lanes would move to other roles at the
+      same hours and pay. Peak-hour queueing is the members' most common
+      complaint in the annual survey. Give your appraisal.
+      # Headings: RECOMMENDATION, WHY, WHAT WOULD CHANGE IT.
+    # The item exists to break the reflex that self-service checkout is a labour-cost
+    # play. The charter removes the labour saving entirely -- staff are
+    # redeployed at the same hours and pay -- so the ONLY benefit left on the
+    # table is throughput against the members' stated complaint, and the only
+    # cost is 84,000 up front plus 7,000 a year.
+    # A response that justifies the investment by labour savings has
+    # contradicted a constraint it was given, which the third criterion
+    # penalises even where the recommendation itself is defensible.
+    # There is no payback bar in this stem, deliberately: the decision is
+    # whether a member-owned co-op should spend 84,000 of members' money to fix
+    # the thing members complain about most, and a good WHAT WOULD CHANGE IT
+    # names what it would need to know about queue length or peak volume.
+    metadata: { skill: constraint-that-removes-the-obvious-benefit, provenance: synthetic, slo: SLO1, use_mode: capability }
+
+  - id: route-optimisation-logistics
+    input: >-
+      A regional logistics firm runs 62 delivery vans. A route-optimisation
+      package is quoted at 1,100 dollars per van per year on a three-year
+      commitment. The vendor claims a 9 per cent reduction in miles driven. The
+      firm's vans cover 2.4 million miles a year at a running cost of 0.61
+      dollars a mile. The operations director notes that the firm's two largest
+      customers require fixed delivery windows that the current routes are
+      built around, and that about 40 per cent of stops fall under those
+      contracts. Give your appraisal.
+      # Headings: RECOMMENDATION, WHY, WHAT WOULD CHANGE IT.
+    # Cost is 62 x 1,100 = 68,200 a year. The vendor's headline saving is
+    # 2.4m x 0.09 x 0.61 = about 131,800 a year, comfortably positive -- which
+    # is exactly why the item supplies the constraint that undercuts it: 40% of
+    # stops are locked to fixed windows, so the optimiser cannot reorder them,
+    # and the achievable saving is nearer the 60% of stops that are free.
+    # 9% applied to 60% of the miles is about 79,000, still above 68,200 but
+    # thin enough that the recommendation turns on it. A response that takes
+    # the vendor's 9% at face value reaches the same "proceed" as a response
+    # that discounts it, so the first criterion cannot separate them and the
+    # second and fourth must -- which is the design.
+    # The threshold worth naming: the break-even discount on the vendor claim,
+    # around 4.7% chain-wide.
+    metadata: { skill: discounting-a-vendor-claim-against-a-constraint, provenance: synthetic, slo: SLO1, use_mode: capability }
