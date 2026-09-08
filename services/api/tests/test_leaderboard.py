@@ -8,6 +8,7 @@ leaderboard is never a test stub.
 
 from __future__ import annotations
 
+import pytest
 from _dashboard_helpers import (
     GRADING_TASK,
     QUIZ_TASK,
@@ -27,6 +28,7 @@ from ida_api.leaderboard import (
 )
 from ida_api.slo import CurriculumView, OutcomeView, load_curriculum_view
 from ida_api.trust import assess
+from ida_core.config import repo_root
 from ida_core.contracts import (
     SYNTHETIC_HARNESS_VERSION,
     SYNTHETIC_MARKER,
@@ -474,10 +476,65 @@ class TestCurriculum:
         body = client.get("/leaderboard").json()
         assert body["curriculum"] == client.get("/curriculum").json()
 
+    def test_the_coverage_grid_is_served_so_a_course_view_needs_no_second_copy(
+        self, client: TestClient
+    ) -> None:
+        """The drill-down's two middle levels exist only in the coverage grid.
+
+        Programme -> course -> outcome -> evidence: the course level and the
+        "which outcomes does this course teach" level are readable from nothing
+        else. Without this on the wire a client would have to retype the
+        registrar's map, which is the failure this module exists to prevent.
+        """
+        body = client.get("/curriculum").json()
+        if not body["available"]:
+            assert body["coverage"] == []
+            return
+
+        assert body["coverage"], "an available map has courses"
+        known = {o["id"] for o in body["outcomes"]}
+        for row in body["coverage"]:
+            assert row["course"] and row["title"]
+            assert set(row["outcomes"]) <= known, (
+                f"{row['course']} names an outcome the map does not declare"
+            )
+            assert all(
+                level in {"I", "R", "M", "A", "M+A"} for level in row["outcomes"].values()
+            ), "a level outside the published legend"
+
+    def test_a_course_the_map_does_not_list_is_none_not_an_empty_row(
+        self, client: TestClient
+    ) -> None:
+        """ "No such course" and "this course teaches nothing" are different answers."""
+        view = load_curriculum_view(repo_root())
+        if not view.available:
+            pytest.skip("no curriculum map in this checkout")
+        assert view.course("MIS 999") is None
+        mis200 = view.course("MIS 200")
+        assert mis200 is not None
+        assert mis200.outcomes == {"SLO1": "R", "SLO2": "A", "SLO9": "I"}
+
+    def test_an_absent_cell_is_omitted_rather_than_levelled_zero(self, client: TestClient) -> None:
+        """A blank cell in the published map means "not marked", never a level.
+
+        Emitting every outcome for every course with a falsy level would let a
+        UI draw a full grid where the registrar drew a sparse one.
+        """
+        view = load_curriculum_view(repo_root())
+        if not view.available:
+            pytest.skip("no curriculum map in this checkout")
+        mis200 = view.course("MIS 200")
+        assert mis200 is not None
+        assert "SLO5" not in mis200.outcomes
+
     def test_a_missing_curriculum_never_invents_statements(self) -> None:
         view = CurriculumView(available=False, unavailable_reason="not here")
         assert view.outcomes == []
         assert view.outcome("SLO2") is None
+        # And it names no courses either -- a deployment with no map has no
+        # curriculum to draw a course grid from.
+        assert view.coverage == []
+        assert view.course("MIS 200") is None
 
     def test_the_loader_degrades_rather_than_raising_on_a_bad_path(self, tmp_path) -> None:
         """A malformed or missing map is `make lint-tasks`'s problem to fail a PR

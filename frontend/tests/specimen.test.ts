@@ -157,6 +157,7 @@ const CURRICULUM: CurriculumView = {
     },
   ],
   use_modes: MODES,
+  coverage: [],
 };
 
 function board(

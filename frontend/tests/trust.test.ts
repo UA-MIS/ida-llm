@@ -178,6 +178,7 @@ const CURRICULUM: CurriculumView = {
     { id: "capability", title: "Capability", statement: "Can it do this?", in_use: true },
     { id: "assistive", title: "Assistive", statement: "Can it help?", in_use: false },
   ],
+  coverage: [],
 };
 
 const NO_CURRICULUM: CurriculumView = {
@@ -187,6 +188,7 @@ const NO_CURRICULUM: CurriculumView = {
   source: null,
   outcomes: [],
   use_modes: [],
+  coverage: [],
 };
 
 function task(overrides: Partial<TaskLeaderboard> = {}): TaskLeaderboard {

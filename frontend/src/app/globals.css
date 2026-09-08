@@ -2054,3 +2054,153 @@ a.cg-score:hover { text-decoration: underline; }
 }
 .ov-doors .ld-door h3 { font-size: 1.22rem; }
 .ov-doors .ld-door p { font-size: 0.92rem; }
+
+/* ===========================================================================
+   THE GUIDED DRILL-DOWN (`/explore`).
+
+   One grid per level: programmes, then courses, then outcomes, then the
+   evidence. The client's verdict on everything above was "too much
+   information, too many clicks, and you shouldn't have to explain what's on
+   the screen", so this section's whole discipline is subtraction — a tile is a
+   name, one number, and the reason there is or is not a number, and nothing
+   else competes with those three.
+
+   ⚠ NO NEW COLOURS. Same tokens as the rest of the sheet, same two accents
+   doing the same two jobs (--accent interactive, --brand identity). A new flow
+   that arrived with its own palette would be a second design system wearing
+   the first one's chrome.
+
+   ⚠ NO RED-TO-GREEN, HERE EITHER. Tiles are not tinted by score at all. The
+   rule the score bars and the comparison ramp already follow — magnitude is
+   allowed to be visible, verdict is not — is easiest to break on a grid of
+   large numbers, so this grid simply does not encode the score in colour.
+   =========================================================================== */
+
+/* --- breadcrumbs ---------------------------------------------------------- */
+
+.xp-crumbs { margin: 0 0 0.9rem; font-size: 0.85rem; }
+.xp-crumbs ol {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem;
+}
+.xp-crumbs li { display: flex; align-items: center; gap: 0.35rem; }
+/* The last crumb is where you are. Muted and unlinked: a link to the current
+   page is a dead control, and on a drill-down it reads as another level. */
+.xp-crumbs li[aria-current="page"] { color: var(--muted); font-weight: 600; }
+.xp-crumb-sep { color: var(--faint); }
+
+/* --- the escape hatch ----------------------------------------------------- */
+
+/* ⚠ AT THE TOP OF ALL FOUR LEVELS, ABOVE THE GRID. The client asked for this
+   button to be present at every level and never buried; a footer, a drawer or
+   a "see also" is buried. It is deliberately the second-loudest thing on the
+   page after the grid itself. */
+.xp-help {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 0.9rem 1.25rem;
+  margin: 0 0 1.5rem;
+  padding: 0.85rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--brand);
+  border-radius: var(--radius);
+}
+.xp-help-cta {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  font-weight: 650; font-size: 0.95rem;
+  text-decoration: none;
+  color: var(--accent);
+}
+.xp-help-cta:hover, .xp-help-cta:focus-visible { text-decoration: underline; }
+.xp-help-arrow { transition: transform 0.15s ease; }
+.xp-help-cta:hover .xp-help-arrow { transform: translateX(2px); }
+.xp-help-more { font-size: 0.85rem; color: var(--muted); }
+.xp-help-summary { cursor: pointer; }
+.xp-help-summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.xp-help-body { margin: 0.5rem 0 0; max-width: 68ch; line-height: 1.55; }
+
+@media (prefers-reduced-motion: reduce) {
+  .xp-help-arrow { transition: none; }
+  .xp-help-cta:hover .xp-help-arrow { transform: none; }
+}
+
+/* --- the grids ------------------------------------------------------------ */
+
+/* One column on a phone, two from tablet, three on a wide screen. Never more
+   than three: the point of a level is that its options fit in one look, and a
+   four-up grid of fifteen courses is the wall of everything again. */
+.xp-grid {
+  list-style: none; margin: 1.25rem 0 0; padding: 0;
+  display: grid; gap: 1rem;
+}
+@media (min-width: 46rem) { .xp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 76rem) { .xp-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* The programme level has one tile today and would look abandoned in a third
+   of the column, so it gets a wider track of its own. */
+.xp-grid-wide { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 46rem) { .xp-grid-wide { grid-template-columns: minmax(0, 1fr); } }
+@media (min-width: 76rem) { .xp-grid-wide { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.xp-tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+/* The top edge marks the KIND of tile, not its quality: measured, nothing run
+   yet, or out of scope by the curriculum's own account. --accent is used here
+   because it is the interactive/attention token and a measured tile is the one
+   with something to open; it is not a "good" colour. */
+.xp-tile-measured { border-top-color: var(--accent); }
+.xp-tile-not_measured { border-top-color: var(--border-strong); }
+.xp-tile-not_benchmarkable { border-top-color: var(--faint); }
+
+.xp-tile-link {
+  display: grid; gap: 0.45rem;
+  padding: 1.15rem 1.2rem 1.1rem;
+  color: inherit; text-decoration: none;
+  height: 100%;
+}
+.xp-tile-link:hover, .xp-tile-link:focus-visible { background: var(--surface-2); }
+.xp-tile-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.xp-tile-head { display: block; }
+.xp-tile-eyebrow {
+  display: block;
+  font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.xp-tile-heading { display: block; font-size: 1.08rem; font-weight: 650; line-height: 1.3; }
+
+.xp-tile-read { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.55rem; }
+.xp-tile-score { font-size: 2.1rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+/* ⚠ NEVER HIDDEN AT ANY WIDTH. `tests/breakpoints.test.ts` states the rule for
+   the leaderboard's trust column and it is the same rule here: confidence is
+   not detail a narrow screen may drop, it is the difference between a reading
+   and a verdict. */
+.xp-tile-confidence { display: inline-flex; align-items: center; }
+
+/* An unmeasured tile is drawn at the same weight as a measured one, on purpose:
+   a grid where the empties recede reads as a grid of results with some gaps,
+   when what it actually is is a grid of mostly-unrun pairings. */
+.xp-tile-empty { display: flex; align-items: baseline; gap: 0.5rem; color: var(--muted); }
+.xp-tile-dash { font-size: 2.1rem; font-weight: 700; line-height: 1.1; }
+.xp-tile-empty-label { font-size: 0.92rem; font-weight: 600; }
+
+.xp-tile-reason { font-size: 0.83rem; line-height: 1.5; }
+.xp-tile-foot { font-size: 0.8rem; line-height: 1.5; }
+.xp-tile-badges { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+/* An assessment point is where the department already reports a human number,
+   which is what makes a benchmark aimed at it comparable to anything. --brand
+   is identity, not status: it marks a kind of cell, not a good one. */
+.xp-badge-assessed { border-color: var(--brand); color: var(--brand); }
+
+.xp-tile-go { color: var(--muted); justify-self: end; }
+.xp-tile-link:hover .xp-tile-go { color: var(--accent); }
+
+/* --- the level headings and the evidence page ----------------------------- */
+
+.xp-title { margin: 0 0 0.35rem; font-size: 1.5rem; line-height: 1.25; }
+.xp-title-code { font-family: var(--mono); color: var(--muted); }
+.xp-source { font-size: 0.85rem; }
+.xp-level { font-size: 0.88rem; margin: 0.4rem 0 0; max-width: 74ch; line-height: 1.55; }
