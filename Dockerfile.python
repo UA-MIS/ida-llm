@@ -59,14 +59,35 @@ COPY migrations/ migrations/
 # stage as one self-contained directory with no path surprises.
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
-RUN pip install --upgrade pip setuptools wheel \
- && pip install --only-binary=:all: \
-      ./packages/core \
-      ./packages/harness \
-      ./services/api \
-      ./services/runner \
-      ./services/mock-model \
-      alembic==1.16.5
+# ⚠ RETRIED. This is the LAST install layer on the flaky path, and the one
+# that has actually been costing deploys: it failed twice in consecutive runs
+# with `No matching distribution found for sqlalchemy~=2.0 (from versions:
+# none)` and `... for setuptools>=68` -- neither a real resolution problem, both
+# pip reporting an unreachable index in the vocabulary of a missing package.
+# That shape is worth knowing: on this egress a network failure does not
+# announce itself as a timeout here, it announces itself as "that package does
+# not exist", which reads like a broken dependency and is not one.
+#
+# A failure here fails the BUILD, which fails the push, which skips the dev
+# bump -- so dev silently keeps serving the previous commit behind a green
+# merge. `PIP_RETRIES`/`PIP_TIMEOUT` are set for the whole workflow, but they
+# do not reach inside the image build, and pip's own retry does not cover an
+# index it cannot resolve against at all.
+#
+# Four attempts, 15s/30s/45s. A genuinely missing package still fails, four
+# times slower and clearly labelled.
+RUN n=1; until pip install --upgrade pip setuptools wheel \
+     && pip install --only-binary=:all: \
+          ./packages/core \
+          ./packages/harness \
+          ./services/api \
+          ./services/runner \
+          ./services/mock-model \
+          alembic==1.16.5; do \
+      if [ "$n" -ge 4 ]; then echo "pip install failed 4 times -- not a blip" >&2; exit 1; fi; \
+      echo "pip install failed (attempt $n/4) -- retrying in $((n * 15))s" >&2; \
+      sleep $((n * 15)); n=$((n + 1)); \
+    done
 
 # ---- runtime ---------------------------------------------------------------
 FROM ${PYTHON_IMAGE} AS runtime
