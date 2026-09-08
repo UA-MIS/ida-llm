@@ -26,6 +26,7 @@ import Link from "next/link";
 import { GlossaryPanel, Term } from "@/components/glossary";
 import { HowToRead, ReadStep } from "@/components/how-to-read";
 import { ResultsUnavailable } from "@/components/service-unavailable";
+import { RampLegend, ScoreCell } from "@/components/score-grid";
 import { ConfidenceTell, DemonstrationBadge } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
 import { formatScore } from "@/lib/format";
@@ -33,8 +34,6 @@ import {
   buildMatrix,
   columnVerdict,
   MEANINGFUL_GAP,
-  RAMP_STEPS,
-  type MatrixCell,
   type Matrix,
 } from "@/lib/matrix";
 import { COMPARE_TERMS } from "@/lib/glossary";
@@ -49,83 +48,6 @@ export const metadata: Metadata = {
   description:
     "Every model against every published learning outcome, in one grid, with the evidence behind each cell.",
 };
-
-/** The ramp legend. Also the only place the step boundaries are stated. */
-function Legend() {
-  return (
-    <div className="cg-legend">
-      <span className="cg-legend-label">Score</span>
-      <span className="cg-legend-ramp" aria-hidden="true">
-        {Array.from({ length: RAMP_STEPS }, (_, i) => (
-          <span key={i} className={`cg-swatch cg-step-${i + 1}`} />
-        ))}
-      </span>
-      <span className="muted cg-legend-ends">
-        <span>0.0</span>
-        <span>1.0</span>
-      </span>
-      <span className="muted cg-legend-note">
-        Stronger colour means a higher score, not a better model — how much to
-        trust a number is the confidence pips, which are a separate thing.
-      </span>
-    </div>
-  );
-}
-
-function Cell({ cell, modelName, columnHeading }: { cell: MatrixCell; modelName: string; columnHeading: string }) {
-  const label = `${modelName} on ${columnHeading}: ${cell.reason}`;
-
-  if (cell.status === "measured") {
-    return (
-      <td className={`cg-cell cg-measured cg-step-${cell.step}`} title={label}>
-        {cell.runId ? (
-          <Link href={`/runs/${encodeURIComponent(cell.runId)}`} className="cg-score">
-            {formatScore(cell.score)}
-          </Link>
-        ) : (
-          <span className="cg-score">{formatScore(cell.score)}</span>
-        )}
-        <span className="cg-sub">
-          {cell.measuredTasks}/{cell.tasksAvailable}
-        </span>
-        {/* ⚠ THE PIPS THE PAGE TELLS YOU TO LOOK FOR. Three separate pieces of
-            copy — the legend, step 2 of the how-to-read panel, and the
-            stylesheet's own comment — point the reader at a confidence tell
-            beside each number, and the cell drew the score and nothing else.
-            `MatrixCell.confidence` was declared, populated, and never read. A
-            reader who follows the instructions and finds nothing concludes they
-            have misread the page, which is the one thing this page cannot
-            afford. Compact here (`cg-confidence` drops the word, keeps the
-            pips) because the grid is dense and the label would wrap every
-            cell — the full wording stays in the title and the sr-only
-            sentence, which already carry it. */}
-        <span className="cg-confidence">
-          <ConfidenceTell
-            confidence={cell.confidence}
-            label={confidenceLabel(cell.confidence)}
-            reason={`${confidenceLabel(cell.confidence)}. How much weight this number can bear — how it was marked, over how many attempts, and whether anything failed. It is about the measurement, not about the model.`}
-          />
-        </span>
-        <span className="sr-only">{label}</span>
-      </td>
-    );
-  }
-
-  /* ⚠ AN EMPTY CELL IS STILL A STATEMENT, so it is drawn as one. A blank square
-     in a grid reads as zero to almost everyone; a dash with a reason behind it
-     does not. The two empty kinds get different glyphs because they are
-     different claims — see lib/matrix.ts. */
-  const notBenchmarkable = cell.status === "not_benchmarkable";
-  return (
-    <td
-      className={`cg-cell ${notBenchmarkable ? "cg-out-of-scope" : "cg-unmeasured"}`}
-      title={label}
-    >
-      <span aria-hidden="true">{notBenchmarkable ? "◇" : "–"}</span>
-      <span className="sr-only">{label}</span>
-    </td>
-  );
-}
 
 function Grid({ matrix }: { matrix: Matrix }) {
   const rows = [...matrix.ranked, ...matrix.unranked];
@@ -182,11 +104,11 @@ function Grid({ matrix }: { matrix: Matrix }) {
                 ) : null}
               </th>
               {row.cells.map((cell, index) => (
-                <Cell
+                <ScoreCell
                   key={cell.slo}
                   cell={cell}
-                  modelName={row.model.display_name}
-                  columnHeading={matrix.columns[index]!.heading}
+                  rowLabel={row.model.display_name}
+                  columnLabel={matrix.columns[index]!.heading}
                 />
               ))}
               <td className="cg-cell cg-overall">
@@ -373,7 +295,7 @@ export default async function ComparePage() {
           </p>
         </div>
 
-        <Legend />
+        <RampLegend />
         <Grid matrix={matrix} />
 
         <p className="muted results-meta">

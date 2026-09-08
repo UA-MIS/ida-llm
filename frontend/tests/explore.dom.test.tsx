@@ -8,6 +8,13 @@
  * scored zero on their course. The honest empty states are the product, so they
  * are asserted where a reader would actually meet them.
  *
+ * ⚠ THE THREE GRID LEVELS ARE THE COMPARISON MATRIX, AND THESE TESTS ASSERT
+ * THAT SHAPE. Each of levels 1-3 renders `table.cg-grid` — literally the table
+ * `/compare` renders, from the same components — with entities down the rows
+ * and models across the columns. A test that only checked "some score appears
+ * somewhere" would pass against a wall of cards again, which is the thing the
+ * client rejected; so the assertions below are about cells, columns and rows.
+ *
  * ⚠ THE PERSISTENT ESCAPE HATCH IS TESTED AT EVERY LEVEL, INDIVIDUALLY. The
  * client asked for it on every screen and never buried, which is exactly the
  * kind of requirement that survives review, ships on three of four pages, and
@@ -134,7 +141,12 @@ describe("the escape hatch is on every level", () => {
       // Above the grid it belongs to, not below it: a reader who has to scroll
       // past the wall of tiles to find the escape hatch has already met the
       // wall of tiles.
-      const grid = document.querySelector(".xp-grid, table.leaderboard, .empty");
+      // `table.cg-grid` is the drill-down's grid now (levels 1-3), `table.
+      // leaderboard` is level 4's evidence table, `.empty` is the honest
+      // nothing-to-show state. A stale selector here would silently stop
+      // checking the position and the test would still pass — which is how a
+      // requirement ships on three levels out of four.
+      const grid = document.querySelector("table.cg-grid, table.leaderboard, .empty");
       if (grid) {
         expect(
           cta!.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -155,9 +167,29 @@ describe("the escape hatch is on every level", () => {
 describe("level 1 — the programmes", () => {
   it("names the programme and links into its courses", async () => {
     await renderLevel(() => ExplorePage(), measuredBoard());
-    const link = document.querySelector<HTMLAnchorElement>(".xp-tile-link");
+    const link = document.querySelector<HTMLAnchorElement>(".xp-row-link");
     expect(link!.getAttribute("href")).toBe(`/explore/${MAJOR}`);
     expect(document.body.textContent).toContain("BScBA General Business (core)");
+  });
+
+  it("draws the comparison matrix, not a wall of cards", async () => {
+    await renderLevel(() => ExplorePage(), measuredBoard());
+    // The same table `/compare` renders, from the same components — see
+    // `components/score-grid.tsx`. A restyled tile grid would not have it.
+    const grid = document.querySelector("table.cg-grid.xp-matrix");
+    expect(grid, "the programme level is not drawn as a matrix").not.toBeNull();
+
+    // One column per model, plus the row's own "All models" headline.
+    const headers = Array.from(grid!.querySelectorAll("thead th")).map((th) =>
+      th.textContent?.trim(),
+    );
+    expect(headers[0]).toBe("Programme");
+    expect(headers.some((h) => h?.includes("Luna"))).toBe(true);
+    expect(headers.at(-1)).toBe("All models");
+
+    // Every model column carries a real cell on the one programme row.
+    const row = grid!.querySelector("tbody tr")!;
+    expect(row.querySelectorAll("td.cg-cell")).toHaveLength(headers.length - 1);
   });
 
   it("says so, with the reason, when the deployment has no curriculum map", async () => {
@@ -198,15 +230,32 @@ describe("level 1 — the programmes", () => {
 });
 
 describe("level 2 — the courses", () => {
-  it("draws one tile per course, in the published map's order", async () => {
+  it("draws one matrix row per course, in the published map's order", async () => {
     await renderLevel(
       () => CoursesPage({ params: Promise.resolve({ major: MAJOR }) }),
       measuredBoard({ curriculum: WITH_TEAMWORK }),
     );
-    const headings = Array.from(document.querySelectorAll(".xp-tile-eyebrow")).map(
+    const headings = Array.from(document.querySelectorAll(".xp-row-eyebrow")).map(
       (n) => n.textContent,
     );
+    // ⚠ MAP ORDER, NEVER SCORE ORDER. A matrix makes sorting by the headline
+    // column tempting, and doing it would turn a coverage grid into a ranking
+    // of a department's own courses — a claim about them, not about us.
     expect(headings).toEqual(["MIS 200", "GBA 300"]);
+  });
+
+  it("opens each course row into that course's outcomes", async () => {
+    await renderLevel(
+      () => CoursesPage({ params: Promise.resolve({ major: MAJOR }) }),
+      measuredBoard({ curriculum: WITH_TEAMWORK }),
+    );
+    const hrefs = Array.from(
+      document.querySelectorAll<HTMLAnchorElement>(".xp-row-link"),
+    ).map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual([
+      `/explore/${MAJOR}/mis-200`,
+      `/explore/${MAJOR}/gba-300`,
+    ]);
   });
 
   it("404s on a programme this platform does not have", async () => {
@@ -234,11 +283,26 @@ describe("level 3 — the outcomes one course teaches", () => {
       () => OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "gba-300" }) }),
       measuredBoard({ curriculum: WITH_TEAMWORK }),
     );
-    const tiles = Array.from(document.querySelectorAll(".xp-tile"));
-    expect(tiles).toHaveLength(3);
-    const teamwork = tiles.find((t) => t.textContent?.includes("Teamwork"))!;
-    expect(teamwork.className).toContain("xp-tile-not_benchmarkable");
-    expect(teamwork.textContent).toContain("Not text-measurable");
+    const rows = Array.from(document.querySelectorAll("table.cg-grid tbody tr"));
+    expect(rows).toHaveLength(3);
+
+    const teamwork = rows.find((r) => r.textContent?.includes("Teamwork"))!;
+    expect(teamwork.querySelector(".xp-row")!.className).toContain(
+      "xp-row-not_benchmarkable",
+    );
+    // ⚠ EVERY CELL ON THE ROW, THE HEADLINE INCLUDED. A grid where the
+    // per-model cells said "out of scope" and the summary column said "not
+    // measured" would be making two different claims about one row — and the
+    // summary is the one a reader takes away.
+    const cells = teamwork.querySelectorAll("td.cg-cell");
+    expect(cells.length).toBeGreaterThan(0);
+    for (const cell of cells) {
+      expect(cell.className, "an out-of-scope row drew a measurable cell").toContain(
+        "cg-out-of-scope",
+      );
+      expect(cell.textContent).toMatch(/not measurable by a text benchmark/i);
+    }
+    expect(teamwork.querySelector(".cg-score"), "a score on an unreachable outcome").toBeNull();
   });
 
   it("says 'not measured yet' rather than drawing a blank or a zero", async () => {
@@ -246,11 +310,26 @@ describe("level 3 — the outcomes one course teaches", () => {
       () => OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "gba-300" }) }),
       measuredBoard({ curriculum: WITH_TEAMWORK }),
     );
-    const tiles = Array.from(document.querySelectorAll(".xp-tile"));
-    const ethics = tiles.find((t) => t.textContent?.includes("Ethical Reasoning"))!;
-    expect(ethics.className).toContain("xp-tile-not_measured");
-    expect(ethics.textContent).toContain("Not measured yet");
-    expect(ethics.querySelector(".xp-tile-score"), "an unrun pairing shows a score").toBeNull();
+    const rows = Array.from(document.querySelectorAll("table.cg-grid tbody tr"));
+    const ethics = rows.find((r) => r.textContent?.includes("Ethical Reasoning"))!;
+    expect(ethics.querySelector(".xp-row")!.className).toContain("xp-row-not_measured");
+    expect(ethics.querySelector(".cg-score"), "an unrun pairing shows a score").toBeNull();
+
+    // ⚠ AN EMPTY CELL IS NEVER A BLANK. A dash with a reason behind it does not
+    // read as a zero; an empty square does, to almost everybody.
+    for (const cell of ethics.querySelectorAll("td.cg-cell")) {
+      expect(cell.className).toContain("cg-unmeasured");
+      // Per-model cells say "this model has no…"; the trailing All-models cell
+      // says "no model has a…" — different squares, different claims, and
+      // neither of them a blank.
+      expect(cell.textContent).toMatch(
+        /(this model has no|no model has a) finished, scored run|no task in the catalogue/i,
+      );
+    }
+    // And the page says, in words, what the two glyphs mean.
+    expect(document.querySelector(".xp-matrix-key")!.textContent).toContain(
+      "Not measured yet",
+    );
   });
 
   it("keeps the confidence tell beside every score it does show", async () => {
@@ -258,12 +337,41 @@ describe("level 3 — the outcomes one course teaches", () => {
       () => OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
       measuredBoard(),
     );
-    const tile = document.querySelector(".xp-tile-measured")!;
-    expect(tile.querySelector(".xp-tile-score")!.textContent).toBe("0.72");
-    expect(
-      tile.querySelector(".xp-tile-confidence .confidence-pips"),
-      "a score is shown with no tell for how much it can bear",
-    ).not.toBeNull();
+    const measured = Array.from(document.querySelectorAll("td.cg-measured"));
+    expect(measured.length).toBeGreaterThan(0);
+    for (const cell of measured) {
+      expect(cell.querySelector(".cg-score")!.textContent).toBe("0.72");
+      // ⚠ NEVER OPTIONAL, NEVER DROPPED AT A BREAKPOINT: the number and how
+      // much weight it can bear travel together or not at all.
+      expect(
+        cell.querySelector(".cg-confidence .confidence-pips"),
+        "a score is shown with no tell for how much it can bear",
+      ).not.toBeNull();
+    }
+  });
+
+  it("puts the row's headline in the row, built from the same cells", async () => {
+    // ⚠ THE DISAGREEMENT THIS REBUILD MAKES IMPOSSIBLE. The old tile grid
+    // computed a course's headline on a card and its per-model detail on
+    // another page; nothing structural stopped the two drifting. Here the
+    // "All models" figure is the last cell of the row it summarises, so a
+    // headline that claimed a score over a row of dashes would have to
+    // contradict its own neighbours.
+    await renderLevel(
+      () => OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "gba-300" }) }),
+      measuredBoard({ curriculum: WITH_TEAMWORK }),
+    );
+    for (const row of document.querySelectorAll("table.cg-grid tbody tr")) {
+      const cells = Array.from(row.querySelectorAll("td.cg-cell"));
+      const headline = cells.at(-1)!;
+      const anyModelMeasured = cells
+        .slice(0, -1)
+        .some((c) => c.className.includes("cg-measured"));
+      expect(
+        headline.className.includes("cg-measured"),
+        `${row.textContent?.slice(0, 40)}: headline and cells disagree`,
+      ).toBe(anyModelMeasured);
+    }
   });
 
   it("404s on a course the map does not list", async () => {
@@ -293,10 +401,22 @@ describe("level 3 — the outcomes one course teaches", () => {
     expect(notice, "a seeded course score rendered no demonstration notice").not.toBeNull();
     expect(notice!.textContent).toMatch(/illustrative/i);
 
-    // Self-clears per outcome tile too — the badge sits beside the level
-    // badge, not just in a page-wide banner a reader can miss.
-    const tile = document.querySelector(".xp-tile-measured")!;
-    expect(tile.querySelector(".badge-demo"), "no per-tile seeded badge on the measured outcome").not.toBeNull();
+    // Self-clears per row too — the badge sits beside the level badge in the
+    // row header, not just in a page-wide banner a reader can miss.
+    const row = Array.from(document.querySelectorAll("table.cg-grid tbody tr")).find(
+      (r) => r.querySelector("td.cg-measured"),
+    )!;
+    expect(
+      row.querySelector(".badge-demo"),
+      "no per-row seeded badge on the measured outcome",
+    ).not.toBeNull();
+
+    // And on the axis it actually qualifies: a seeded model's whole COLUMN is
+    // illustrative, the way a seeded model's whole row is on `/compare`.
+    expect(
+      document.querySelector("thead .badge-demo"),
+      "no seeded badge on the model column it belongs to",
+    ).not.toBeNull();
   });
 
   it("renders no demonstration notice or badge when the course's scores are real", async () => {

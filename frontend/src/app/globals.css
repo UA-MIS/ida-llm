@@ -2126,77 +2126,86 @@ a.cg-score:hover { text-decoration: underline; }
 
 /* --- the grids ------------------------------------------------------------ */
 
-/* One column on a phone, two from tablet, three on a wide screen. Never more
-   than three: the point of a level is that its options fit in one look, and a
-   four-up grid of fifteen courses is the wall of everything again. */
-.xp-grid {
-  list-style: none; margin: 1.25rem 0 0; padding: 0;
-  display: grid; gap: 1rem;
-}
-@media (min-width: 46rem) { .xp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 76rem) { .xp-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-/* The programme level has one tile today and would look abandoned in a third
-   of the column, so it gets a wider track of its own. */
-.xp-grid-wide { grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 46rem) { .xp-grid-wide { grid-template-columns: minmax(0, 1fr); } }
-@media (min-width: 76rem) { .xp-grid-wide { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* ⚠ THE DRILL-DOWN IS THE COMPARISON MATRIX, SO IT IS STYLED AS ONE. Every
+   level of `/explore` renders `table.cg-grid` — the same table, the same heat
+   ramp (`.cg-step-N`), the same cells and the same two empty glyphs as
+   `/compare`. Everything below is the delta a DRILL-DOWN needs on top of that
+   and nothing more: a row header you can open, and the row's own caption. If a
+   rule here starts restating something `.cg-*` already says, it is drift and
+   belongs deleted rather than kept in sync. */
 
-.xp-tile {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-top: 3px solid var(--border-strong);
-  border-radius: var(--radius);
-}
-/* The top edge marks the KIND of tile, not its quality: measured, nothing run
-   yet, or out of scope by the curriculum's own account. --accent is used here
-   because it is the interactive/attention token and a measured tile is the one
-   with something to open; it is not a "good" colour. */
-.xp-tile-measured { border-top-color: var(--accent); }
-.xp-tile-not_measured { border-top-color: var(--border-strong); }
-.xp-tile-not_benchmarkable { border-top-color: var(--faint); }
+.xp-matrix { margin-top: 0.25rem; }
+/* Wider than `/compare`'s corner: a row header here carries a name, the reason
+   there is or is not a number, and a badge — where `/compare` carries a model
+   name and a coverage count. */
+.xp-matrix .cg-corner { min-width: 17rem; }
 
-.xp-tile-link {
-  display: grid; gap: 0.45rem;
-  padding: 1.15rem 1.2rem 1.1rem;
+/* The row header is the drill. It is a link, it looks like one, and it is the
+   only thing on the row that navigates a LEVEL — cells still link to their run,
+   exactly as they do on `/compare`. */
+.xp-row { vertical-align: top; padding-top: 0.7rem; padding-bottom: 0.7rem; }
+.xp-row-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline; gap: 0 0.5rem;
   color: inherit; text-decoration: none;
-  height: 100%;
+  border-radius: var(--radius);
+  padding: 0.15rem 0.3rem; margin: -0.15rem -0.3rem;
 }
-.xp-tile-link:hover, .xp-tile-link:focus-visible { background: var(--surface-2); }
-.xp-tile-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.xp-row-link:hover, .xp-row-link:focus-visible { background: var(--surface-2); }
+.xp-row-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.xp-row-link:hover .xp-row-heading { text-decoration: underline; }
 
-.xp-tile-head { display: block; }
-.xp-tile-eyebrow {
-  display: block;
-  font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.04em;
+.xp-row-eyebrow {
+  grid-column: 1 / -1;
+  font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.04em;
   color: var(--muted);
 }
-.xp-tile-heading { display: block; font-size: 1.08rem; font-weight: 650; line-height: 1.3; }
+.xp-row-heading { font-size: 1rem; font-weight: 650; line-height: 1.3; }
+.xp-row-go { color: var(--muted); }
+.xp-row-link:hover .xp-row-go { color: var(--accent); }
 
-.xp-tile-read { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.55rem; }
-.xp-tile-score { font-size: 2.1rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
-/* ⚠ NEVER HIDDEN AT ANY WIDTH. `tests/breakpoints.test.ts` states the rule for
-   the leaderboard's trust column and it is the same rule here: confidence is
-   not detail a narrow screen may drop, it is the difference between a reading
-   and a verdict. */
-.xp-tile-confidence { display: inline-flex; align-items: center; }
+/* The left edge marks the KIND of row — measured, nothing run yet, or out of
+   scope by the curriculum's own account. --accent is the interactive/attention
+   token and a measured row is the one with something to open; it is not a
+   "good" colour, for the same reason the ramp is one hue. */
+.xp-row { border-left: 3px solid transparent; padding-left: 0.55rem; }
+.xp-row-measured { border-left-color: var(--accent); }
+.xp-row-not_measured { border-left-color: var(--border-strong); }
+.xp-row-not_benchmarkable { border-left-color: var(--faint); }
 
-/* An unmeasured tile is drawn at the same weight as a measured one, on purpose:
-   a grid where the empties recede reads as a grid of results with some gaps,
-   when what it actually is is a grid of mostly-unrun pairings. */
-.xp-tile-empty { display: flex; align-items: baseline; gap: 0.5rem; color: var(--muted); }
-.xp-tile-dash { font-size: 2.1rem; font-weight: 700; line-height: 1.1; }
-.xp-tile-empty-label { font-size: 0.92rem; font-weight: 600; }
+/* ⚠ THE REASON IS ON THE PAGE AT EVERY WIDTH. A row with no number still says
+   something, and "not measured yet" collapsing to a bare dash is how a reader
+   ends up with a zero in their head. Clamped, not hidden: the full sentence
+   stays in the DOM for a screen reader and in the title for a hover. */
+.xp-row-reason, .xp-row-foot {
+  white-space: normal; font-weight: 400; max-width: 30ch;
+  display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden;
+}
+.xp-row-reason { -webkit-line-clamp: 3; }
+.xp-row-foot { -webkit-line-clamp: 2; font-size: 0.72rem; }
+.xp-row-badges { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.3rem; }
 
-.xp-tile-reason { font-size: 0.83rem; line-height: 1.5; }
-.xp-tile-foot { font-size: 0.8rem; line-height: 1.5; }
-.xp-tile-badges { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+/* A seeded model's whole COLUMN is illustrative, the way a seeded model's whole
+   row is on `/compare`. The badge sits under the model name, on the axis it
+   qualifies. */
+.xp-col-demo { display: block; margin-top: 0.25rem; }
+.xp-col-demo .badge { white-space: normal; }
+
+/* The key for the two empty glyphs, spelled out under the grid rather than left
+   to a tooltip a reader may never open. */
+.xp-matrix-key { font-size: 0.8rem; line-height: 1.6; max-width: 78ch; margin-top: 0.7rem; }
+.xp-key-mark { font-family: var(--mono); color: var(--fg); font-weight: 700; }
+
 /* An assessment point is where the department already reports a human number,
    which is what makes a benchmark aimed at it comparable to anything. --brand
-   is identity, not status: it marks a kind of cell, not a good one. */
+   is identity, not status: it marks a kind of row, not a good one. */
 .xp-badge-assessed { border-color: var(--brand); color: var(--brand); }
 
-.xp-tile-go { color: var(--muted); justify-self: end; }
-.xp-tile-link:hover .xp-tile-go { color: var(--accent); }
+@media (max-width: 46rem) {
+  .xp-matrix .cg-corner { min-width: 12rem; }
+  .xp-row-reason, .xp-row-foot { max-width: 22ch; }
+}
 
 /* --- the level headings and the evidence page ----------------------------- */
 

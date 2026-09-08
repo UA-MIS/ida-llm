@@ -180,6 +180,11 @@ describe("the three kinds of cell", () => {
     const withTasks = row.cells.find((cell) => cell.slo === "SLO2")!;
     const without = row.cells.find((cell) => cell.slo === "SLO1")!;
     expect(withTasks.reason).toMatch(/no finished, scored run/i);
+    // ⚠ AND IT READS AS ENGLISH. "1 task measure this outcome" is what shipped
+    // here, on the sentence that exists to stop an empty square reading as a
+    // zero — the same machine-generated tell `rollup.ts` refuses elsewhere.
+    expect(withTasks.reason).not.toMatch(/\b1 tasks?\s+measure\b/);
+    expect(withTasks.reason).toMatch(/1 task measures|[2-9]\d* tasks measure/);
     expect(without.reason).toMatch(/no task in the catalogue/i);
   });
 

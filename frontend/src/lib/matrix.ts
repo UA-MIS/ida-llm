@@ -100,15 +100,89 @@ export interface Matrix {
   benchmarkableCount: number;
 }
 
-function cellFor(
-  column: MatrixColumn,
-  outcomeRow: { aggregate: { score: number | null; confidence: Confidence; measured_tasks: number; scored_samples: number; latest_run_id: string | null }; tasks_available: number } | undefined,
+/**
+ * The minimum a cell's subject has to tell the classifier about itself.
+ *
+ * ⚠ WIDER THAN AN OUTCOME ON PURPOSE. `/compare` puts one outcome behind every
+ * cell; `/explore` puts a programme behind one, a course behind the next, and an
+ * outcome behind the third. The three-state rule — measured / not-measured /
+ * not-benchmarkable, and never a blank standing in for a nought — is identical
+ * for all four, and it is the single most load-bearing rule on this site. So it
+ * is stated once, here, and the callers differ only in the NOUN they hand it.
+ */
+export interface CellSubject {
+  /** The id the cell sits under — an outcome id, a course slug, a programme slug. */
+  key: string;
+  benchmarkable: boolean;
+  /** The curriculum's own words on why it is or is not measurable. */
+  note: string;
+  /**
+   * What this cell is about, as a noun phrase a sentence can be built around:
+   * "this outcome", "the outcomes this course teaches". Singular and plural
+   * variants, because "N tasks measure this outcome" and "…measure them" both
+   * have to read as English.
+   */
+  noun: string;
+  pronoun: { singular: string; plural: string };
+  /**
+   * Who has not run it, as the clause "…but ___ finished, scored run against
+   * it": "this model has no" for a per-model cell, "no model has a" for a cell
+   * that summarises every model at once.
+   *
+   * ⚠ A SUMMARY CELL IS NOT A MODEL. `/explore` ends every row with an "All
+   * models" cell, and it inherited the per-model sentence — telling a reader
+   * that "this model" had not run something, in a square that is about all of
+   * them. Small, and exactly the kind of wrong that makes a page look like it
+   * was generated rather than written.
+   */
+  absence: string;
+  /**
+   * The denominator of "nothing ran" — how many things COULD have produced a
+   * score in this cell. Tasks, for a per-model cell; task × model pairings, for
+   * a cell that spans every model.
+   */
+  tasksAvailable: number;
+}
+
+/** The subject wording for one learning outcome — `/compare`'s only case. */
+export function outcomeSubject(column: MatrixColumn, tasksAvailable: number): CellSubject {
+  return {
+    key: column.id,
+    benchmarkable: column.benchmarkable,
+    note: column.note,
+    noun: "this outcome",
+    pronoun: { singular: "it", plural: "them" },
+    absence: "this model has no",
+    tasksAvailable,
+  };
+}
+
+/**
+ * Which of the three things a cell is, and the sentence that says so.
+ *
+ * ⚠ THE ONE IMPLEMENTATION OF THE THREE-STATE RULE. Every grid on this site —
+ * the comparison matrix and all three levels of the drill-down — routes its
+ * cells through this function, so a course grid physically cannot classify a
+ * pairing differently from the leaderboard that feeds it. Duplicating the rule
+ * per page is what let `/explore/[major]/[course]` ship without a disclosure
+ * three other pages already had.
+ */
+export function classifyCell(
+  subject: CellSubject,
+  agg:
+    | {
+        score: number | null;
+        confidence: Confidence;
+        measured_tasks: number;
+        scored_samples: number;
+        latest_run_id: string | null;
+      }
+    | undefined,
 ): MatrixCell {
-  const agg = outcomeRow?.aggregate;
-  const tasksAvailable = outcomeRow?.tasks_available ?? 0;
+  const { tasksAvailable } = subject;
 
   const base = {
-    slo: column.id,
+    slo: subject.key,
     confidence: agg?.confidence ?? ("none" as Confidence),
     measuredTasks: agg?.measured_tasks ?? 0,
     tasksAvailable,
@@ -119,14 +193,14 @@ function cellFor(
   // Checked FIRST, and before looking at any score: an outcome the curriculum
   // says a text benchmark cannot measure is not a gap in our coverage, it is a
   // boundary we published. It must never read as a model's failure.
-  if (!column.benchmarkable) {
+  if (!subject.benchmarkable) {
     return {
       ...base,
       status: "not_benchmarkable",
       score: null,
       step: 0,
       reason:
-        `Not measurable by a text benchmark, so nothing was run. ${column.note}`.trim(),
+        `Not measurable by a text benchmark, so nothing was run. ${subject.note}`.trim(),
     };
   }
 
@@ -138,9 +212,15 @@ function cellFor(
       step: 0,
       reason:
         tasksAvailable === 0
-          ? "No task in the catalogue measures this outcome yet."
-          : `${tasksAvailable} task${tasksAvailable === 1 ? "" : "s"} measure this outcome, ` +
-            `but this model has no finished, scored run against ${tasksAvailable === 1 ? "it" : "them"}.`,
+          ? `No task in the catalogue measures ${subject.noun} yet.`
+          // ⚠ THE VERB AGREES WITH THE NOUN. "1 task measure this outcome"
+          // was what shipped, on the one sentence whose entire job is to stop
+          // an empty square reading as a zero. `lib/rollup.ts` makes the same
+          // argument about "1 of the 2 models have been measured": a caveat
+          // that reads as machine-generated is a caveat nobody believes.
+          : `${tasksAvailable} ${tasksAvailable === 1 ? "task measures" : "tasks measure"} ${subject.noun}, ` +
+            `but ${subject.absence} finished, scored run against ` +
+            `${tasksAvailable === 1 ? subject.pronoun.singular : subject.pronoun.plural}.`,
     };
   }
 
@@ -191,7 +271,13 @@ export function buildMatrix(board: LeaderboardResponse): Matrix {
   const rows: MatrixRow[] = models.map((model) => {
     const byOutcome = rollupByOutcome(model, board);
     const lookup = new Map(byOutcome.map((row) => [row.slo, row]));
-    const cells = columns.map((column) => cellFor(column, lookup.get(column.id)));
+    const cells = columns.map((column) => {
+      const row = lookup.get(column.id);
+      return classifyCell(
+        outcomeSubject(column, row?.tasks_available ?? 0),
+        row?.aggregate,
+      );
+    });
     return {
       model,
       cells,

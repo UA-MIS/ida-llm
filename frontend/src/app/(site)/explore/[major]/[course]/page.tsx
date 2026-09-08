@@ -1,35 +1,42 @@
 /**
- * Level 3: the outcomes one course teaches.
+ * Level 3: the outcomes one course teaches, against every model.
  *
- * ⚠ EVERY OUTCOME THE MAP MARKS FOR THIS COURSE GETS A TILE, including the ones
+ * ⚠ THIS IS `/compare`, SCOPED TO ONE COURSE, AND THAT IS THE WHOLE IDEA. The
+ * comparison grid shows every model against every outcome the programme
+ * publishes; a professor who teaches MIS 200 wants the same grid narrowed to
+ * the outcomes MIS 200 is responsible for. Same cells, same ramp, same three
+ * empty states, same classifier — see `components/explore-matrix.tsx`. Reusing
+ * it rather than restyling it is what stops this page from quietly disagreeing
+ * with the leaderboard it is drawn from.
+ *
+ * ⚠ EVERY OUTCOME THE MAP MARKS FOR THIS COURSE GETS A ROW, including the ones
  * a text benchmark cannot reach. Showing only the measurable ones would make
  * MIS 200 look like a three-outcome course and GBA 300 like a five-outcome one,
  * which is a claim about the curriculum rather than about us — and it is the
  * exact edit `curriculum/slo.yaml` warns against, one level down.
  *
- * The published level (Introduced / Reinforced / Mastered / Assessment point) is
- * shown on every tile because it is what makes the number worth anything: a
+ * The published level (Introduced / Reinforced / Mastered / Assessment point)
+ * is shown on every row because it is what makes the number worth anything: a
  * benchmark aimed at a pair the department already grades is aimed at something
  * with a human number to compare against later. A pair the map marks `I` is not.
  */
 
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Breadcrumbs, ExploreHelp } from "@/components/explore-chrome";
-import { ExploreTile } from "@/components/explore-tile";
+import { ExploreMatrixGrid } from "@/components/explore-matrix";
 import { ResultsUnavailable } from "@/components/service-unavailable";
-import { DemonstrationBadge } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
 import { buildCourses, buildIndex, findCourse, findMajor } from "@/lib/explore";
+import { buildOutcomeMatrix } from "@/lib/explore-matrix";
 import type { LeaderboardResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Course outcomes — Capstone-IDA",
-  description: "The learning outcomes one course teaches, and how the models read on each.",
+  description: "The learning outcomes one course teaches, against every model, in one grid.",
 };
 
 /**
@@ -40,9 +47,9 @@ export const metadata: Metadata = {
  * contract, not a place to share a string.
  */
 const EXPLAIN =
-  "One tile per learning outcome this course teaches, with the level the " +
-  "curriculum map publishes for it. The number is how the models do on that " +
-  "outcome. Open one for the evidence behind it.";
+  "One row per learning outcome this course teaches, with the level the " +
+  "curriculum map publishes for it, and one column per model. Each cell is how " +
+  "that model does on that outcome. Open a row for the evidence behind it.";
 
 export default async function CourseOutcomesPage({
   params,
@@ -70,7 +77,10 @@ export default async function CourseOutcomesPage({
   const course = findCourse(buildCourses(board), courseSlug);
   if (!course) notFound();
 
+  const matrix = buildOutcomeMatrix(board, course, major.slug);
   const unmeasurable = course.outcomes.filter((o) => !o.benchmarkable);
+  // The map's published level for each outcome, by id — the badge on each row.
+  const levels = new Map(course.outcomes.map((o) => [o.slo, o]));
 
   return (
     <>
@@ -85,12 +95,12 @@ export default async function CourseOutcomesPage({
 
       {/* ⚠ ABOVE THE GRID IT QUALIFIES, same as every other level — see
           `/explore/page.tsx`. Scoped to this course's own outcomes, not the
-          whole board: `CourseTile.demonstration` only counts the models that
-          actually contributed a score here, so a course whose own outcomes are
-          all measured never carries a caveat that belongs to a different
-          course. Same rollup, same words — see `summariseDemonstration`. */}
-      {course.demonstration.any ? (
-        <div className="notice">{course.demonstration.notice}</div>
+          whole board: only the models that actually contributed a score here
+          are counted, so a course whose own outcomes are all measured never
+          carries a caveat that belongs to a different course. Same rollup,
+          same words — see `summariseDemonstration`. */}
+      {matrix.demonstration.any ? (
+        <div className="notice">{matrix.demonstration.notice}</div>
       ) : null}
 
       <section className="hero">
@@ -113,49 +123,33 @@ export default async function CourseOutcomesPage({
         </p>
       </section>
 
-      {course.outcomes.length === 0 ? (
+      {!matrix.available ? (
         <div className="empty">
           <h2>The map marks no outcomes for {course.code}</h2>
-          <p className="muted">
-            A blank row in the published coverage grid means the map does not mark
-            this course against any outcome — not that it teaches none. The{" "}
-            <Link href={`/explore/${major.slug}`}>other courses</Link> in this
-            programme do.
-          </p>
+          <p className="muted">{matrix.unavailable_reason}</p>
         </div>
       ) : (
-        <ul className="xp-grid">
-          {course.outcomes.map((outcome) => (
-            <ExploreTile
-              key={outcome.slo}
-              href={`/explore/${major.slug}/${course.slug}/${outcome.slo.toLowerCase()}`}
-              eyebrow={outcome.slo}
-              heading={outcome.title}
-              status={outcome.status}
-              aggregate={outcome.aggregate}
-              reason={outcome.reason}
-              footnote={outcome.statement}
-              badges={
-                <>
-                  <span
-                    className={`badge badge-facet${outcome.assessment_point ? " xp-badge-assessed" : ""}`}
-                    title={
-                      outcome.assessment_point
-                        ? "The programme reports on this outcome in this course, so there is a human number to compare against."
-                        : "The level the published curriculum map marks for this pair."
-                    }
-                  >
-                    {outcome.level_label}
-                  </span>
-                  {/* Per outcome, so it self-clears the moment a real
-                      measurement replaces the seeded one for THIS pairing —
-                      see `entriesAreSeeded`. */}
-                  {outcome.seeded ? <DemonstrationBadge /> : null}
-                </>
-              }
-            />
-          ))}
-        </ul>
+        <ExploreMatrixGrid
+          matrix={matrix}
+          rowKind="Outcome"
+          badgeFor={(row) => {
+            const outcome = levels.get(row.key);
+            if (!outcome) return null;
+            const assessed = outcome.assessment_point;
+            return (
+              <span
+                className={`badge badge-facet${assessed ? " xp-badge-assessed" : ""}`}
+                title={
+                  assessed
+                    ? "The programme reports on this outcome in this course, so there is a human number to compare against."
+                    : "The level the published curriculum map marks for this pair."
+                }
+              >
+                {outcome.level_label}
+              </span>
+            );
+          }}
+        />
       )}
     </>
   );
