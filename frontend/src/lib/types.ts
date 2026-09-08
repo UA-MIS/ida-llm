@@ -400,6 +400,85 @@ export interface CurriculumView {
    * no courses to name, and naming some would be inventing a curriculum.
    */
   coverage: CourseCoverageView[];
+  /**
+   * `curriculum/majors.yaml`, in the file's own order.
+   *
+   * ⚠ INDEPENDENTLY OPTIONAL FROM `available`. That flag is about the
+   * curriculum MAP; the majors taxonomy is a second file with a second source
+   * and a second revision date, and either can be absent without the other
+   * being. An empty array means this deployment has no taxonomy — which
+   * `/explore` states plainly and degrades to the outcome views over. It never
+   * means the college has no majors, and nothing may render it as if it did.
+   */
+  majors: MajorView[];
+  /** Coverage courses no single major owns. Reachable, just not drilled into. */
+  unassigned_core: UnassignedCourseView[];
+}
+
+/**
+ * One undergraduate major, and the classes it owns.
+ *
+ * ⚠ THE TOP OF THE DRILL-DOWN, AND WHY IT IS NOT THE PROGRAMME ANY MORE. The
+ * flow used to open on a single programme — the shared business core — because
+ * that is all the curriculum map describes. Nobody is a professor of "the
+ * core": they teach Management Information Systems, and the flow has to start
+ * where the reader already stands. Which classes exist and whose they are comes
+ * from the course catalog, a different document from the curriculum map; the
+ * two join on the course code, here as in the files.
+ */
+export interface MajorView {
+  /** The URL segment. Authored in the file, never slugified from `name`. */
+  id: string;
+  name: string;
+  /** The department that owns it — one department owns four of the eleven. */
+  department: string;
+  catalog: string | null;
+  /** `catalog` / `core-only` / `none` — how far the class list got. */
+  class_source: string;
+  /**
+   * That same fact in the words a reader gets.
+   *
+   * Served rather than derived so a short class list reads as an incomplete
+   * transcription rather than as a small department.
+   */
+  class_source_label: string;
+  classes: MajorClassView[];
+}
+
+/** One class a major owns. */
+export interface MajorClassView {
+  /** The course code as the catalog prints it — the join key into `coverage`. */
+  course: string;
+  /**
+   * Already resolved on the wire: the catalog's title where it has one, the
+   * curriculum map's otherwise. One implementation of the precedence rule, in
+   * `ida_core.majors`, so no two clients can disagree about a course's name.
+   */
+  title: string;
+  credit_hours: number | null;
+  /**
+   * Task families whose results are ABOUT this class's own material.
+   *
+   * ⚠ THE FIELD THAT KEEPS "MEASURED" A CLAIM ABOUT A CLASS. Results are filed
+   * by OUTCOME — a task carries `slo:SLO2`, never `course:MIS 200`. Score a
+   * class from "the outcomes it teaches" and the number you get is identical
+   * for every other class the map marks against those outcomes: run the three
+   * MIS 200 families and AC 210, ST 260, GBA 300, OM 300 and FI 302 would each
+   * light up with an exam score from a course none of them is. Filtering on
+   * these families is what makes the grid's central promise — every score is
+   * real, everything else says "not measured yet" — structural rather than a
+   * caveat somebody has to remember to print.
+   *
+   * Empty means no result can be attributed to this class. That is the default
+   * and it is correct: a class shows a number only once tasks about it exist.
+   */
+  task_families: string[];
+}
+
+/** A course in the coverage grid that no single major owns, and why. */
+export interface UnassignedCourseView {
+  course: string;
+  reason: string;
 }
 
 /** One row of the published course-by-outcome grid. */

@@ -2135,76 +2135,117 @@ a.cg-score:hover { text-decoration: underline; }
    belongs deleted rather than kept in sync. */
 
 .xp-matrix { margin-top: 0.25rem; }
-/* Wider than `/compare`'s corner: a row header here carries a name, the reason
-   there is or is not a number, and a badge — where `/compare` carries a model
-   name and a coverage count. */
-.xp-matrix .cg-corner { min-width: 17rem; }
 
-/* The row header is the drill. It is a link, it looks like one, and it is the
-   only thing on the row that navigates a LEVEL — cells still link to their run,
-   exactly as they do on `/compare`. */
-.xp-row { vertical-align: top; padding-top: 0.7rem; padding-bottom: 0.7rem; }
-.xp-row-link {
-  display: grid;
+/* ⚠ MODELS ARE ROWS AND ENTITIES ARE COLUMNS, which is `/compare`'s
+   orientation and is a claim rather than a layout: a vertical list is read as a
+   ranking whether or not one was meant, so the axis running down the page is
+   the one where order MEANS something. Model order does — these rows are sorted.
+   Entity order does not — majors are a catalog list and classes are a course
+   listing, and standing them in a column would assert an importance ordering
+   nobody intended.
+
+   The consequence for this stylesheet: the grid is WIDE and SHORT where it used
+   to be tall and narrow. The corner is back to a model-name width, and the
+   per-entity prose that used to live in a 17rem row header now lives in
+   `.xp-col-notes` under the grid, because a sentence does not fit in a column
+   header and truncating it into a tooltip would break the one rule this flow
+   cannot break. */
+.xp-matrix .cg-corner { min-width: 10rem; }
+
+/* --- the model row header: the third click target ------------------------ */
+
+.xp-model { vertical-align: middle; }
+.xp-model-link { font-weight: 650; }
+
+/* The model a cell click carried down from the level above. MARKED, never
+   moved: promoting the clicked row would make the sort order say "this is the
+   best model" when all it means is "this is the one you came from". */
+.xp-model-focused > th { position: relative; }
+.xp-model-focused > th::before {
+  content: ""; position: absolute; left: -0.55rem; top: 0.15rem; bottom: 0.15rem;
+  width: 3px; border-radius: 2px; background: var(--accent);
+}
+.xp-model-focused > td { box-shadow: inset 0 0 0 1px var(--border-strong); }
+
+.xp-focus {
+  margin: 0 0 0.8rem; font-size: 0.88rem; color: var(--muted);
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem;
+}
+.xp-focus-mark { color: var(--accent); }
+.xp-focus strong { color: var(--fg); }
+
+/* --- the entity column header: the drill --------------------------------- */
+
+/* The column header is the drill. It is a link, it looks like one, and it is
+   the only thing in the header row that navigates a LEVEL. */
+.xp-col { vertical-align: bottom; text-align: left; }
+.xp-col-link {
+  display: grid; gap: 0 0.4rem;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: baseline; gap: 0 0.5rem;
+  align-items: baseline;
   color: inherit; text-decoration: none;
   border-radius: var(--radius);
   padding: 0.15rem 0.3rem; margin: -0.15rem -0.3rem;
+  max-width: 13ch;
 }
-.xp-row-link:hover, .xp-row-link:focus-visible { background: var(--surface-2); }
-.xp-row-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.xp-row-link:hover .xp-row-heading { text-decoration: underline; }
+.xp-col-link:hover, .xp-col-link:focus-visible { background: var(--surface-2); }
+.xp-col-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.xp-col-link:hover .xp-col-heading { text-decoration: underline; }
 
-.xp-row-eyebrow {
+.xp-col-eyebrow {
   grid-column: 1 / -1;
-  font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.04em;
-  color: var(--muted);
+  font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.04em;
+  color: var(--muted); white-space: nowrap;
 }
-.xp-row-heading { font-size: 1rem; font-weight: 650; line-height: 1.3; }
-.xp-row-go { color: var(--muted); }
-.xp-row-link:hover .xp-row-go { color: var(--accent); }
-
-/* The left edge marks the KIND of row — measured, nothing run yet, or out of
-   scope by the curriculum's own account. --accent is the interactive/attention
-   token and a measured row is the one with something to open; it is not a
-   "good" colour, for the same reason the ramp is one hue. */
-.xp-row { border-left: 3px solid transparent; padding-left: 0.55rem; }
-.xp-row-measured { border-left-color: var(--accent); }
-.xp-row-not_measured { border-left-color: var(--border-strong); }
-.xp-row-not_benchmarkable { border-left-color: var(--faint); }
-
-/* ⚠ THE REASON IS ON THE PAGE AT EVERY WIDTH. A row with no number still says
-   something, and "not measured yet" collapsing to a bare dash is how a reader
-   ends up with a zero in their head. Clamped, not hidden: the full sentence
-   stays in the DOM for a screen reader and in the title for a hover. */
-.xp-row-reason, .xp-row-foot {
-  white-space: normal; font-weight: 400; max-width: 30ch;
-  display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden;
+.xp-col-heading {
+  font-size: 0.82rem; font-weight: 650; line-height: 1.25;
+  white-space: normal; overflow-wrap: anywhere;
 }
-.xp-row-reason { -webkit-line-clamp: 3; }
-.xp-row-foot { -webkit-line-clamp: 2; font-size: 0.72rem; }
-.xp-row-badges { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.3rem; }
+.xp-col-go { color: var(--muted); }
+.xp-col-link:hover .xp-col-go { color: var(--accent); }
+.xp-col-badges { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.3rem; max-width: 13ch; }
+.xp-col-badges .badge { white-space: normal; font-size: 0.68rem; }
 
-/* A seeded model's whole COLUMN is illustrative, the way a seeded model's whole
-   row is on `/compare`. The badge sits under the model name, on the axis it
-   qualifies. */
-.xp-col-demo { display: block; margin-top: 0.25rem; }
-.xp-col-demo .badge { white-space: normal; }
+/* The bottom edge marks the KIND of column — measured, nothing run yet, or out
+   of scope by the curriculum's own account. --accent is the interactive token
+   and a measured column is the one with something to open; it is not a "good"
+   colour, for the same reason the ramp is one hue. */
+.xp-col { border-bottom: 3px solid transparent; }
+.xp-col-measured { border-bottom-color: var(--accent); }
+.xp-col-not_measured { border-bottom-color: var(--border-strong); }
+.xp-col-not_benchmarkable { border-bottom-color: var(--faint); }
 
-/* The key for the two empty glyphs, spelled out under the grid rather than left
-   to a tooltip a reader may never open. */
-.xp-matrix-key { font-size: 0.8rem; line-height: 1.6; max-width: 78ch; margin-top: 0.7rem; }
-.xp-key-mark { font-family: var(--mono); color: var(--fg); font-weight: 700; }
+/* The "All models" summary row, in the same table as the cells it summarises. */
+.xp-summary > th, .xp-summary > td { border-top: 2px solid var(--border-strong); }
+.xp-summary > th { font-style: italic; color: var(--muted); }
 
-/* An assessment point is where the department already reports a human number,
-   which is what makes a benchmark aimed at it comparable to anything. --brand
-   is identity, not status: it marks a kind of row, not a good one. */
-.xp-badge-assessed { border-color: var(--brand); color: var(--brand); }
+/* --- the reasons, under the grid ----------------------------------------- */
+
+/* ⚠ THIS BLOCK IS WHY THE FLIP DOES NOT COST HONESTY. Every column carries a
+   sentence saying why it does or does not have a number, and "not measured yet"
+   collapsing to a bare dash is how a reader ends up with a zero in their head.
+   When entities were rows, that sentence lived in the row header. A column
+   header cannot hold it, so it lives here — visibly, in column order, at every
+   width. Not a tooltip, not a disclosure widget: a block the grid sits on. */
+.xp-col-notes {
+  margin: 0.9rem 0 0; display: grid; gap: 0.5rem 1.4rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  font-size: 0.82rem; line-height: 1.5;
+}
+.xp-note { border-left: 3px solid var(--border); padding-left: 0.6rem; }
+.xp-note-measured { border-left-color: var(--accent); }
+.xp-note-not_measured { border-left-color: var(--border-strong); }
+.xp-note-not_benchmarkable { border-left-color: var(--faint); }
+.xp-note dt { font-weight: 650; }
+.xp-note dt a { color: inherit; text-decoration: none; }
+.xp-note dt a:hover { text-decoration: underline; }
+.xp-note dd { margin: 0.1rem 0 0; color: var(--muted); }
+.xp-note-eyebrow { font-family: var(--mono); color: var(--muted); font-weight: 500; }
+.xp-note-foot { display: block; font-size: 0.76rem; margin-top: 0.1rem; }
 
 @media (max-width: 46rem) {
-  .xp-matrix .cg-corner { min-width: 12rem; }
-  .xp-row-reason, .xp-row-foot { max-width: 22ch; }
+  .xp-matrix .cg-corner { min-width: 8rem; }
+  .xp-col-link, .xp-col-badges { max-width: 11ch; }
 }
 
 /* --- the level headings and the evidence page ----------------------------- */

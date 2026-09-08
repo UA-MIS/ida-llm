@@ -158,6 +158,8 @@ const CURRICULUM: CurriculumView = {
   ],
   use_modes: MODES,
   coverage: [],
+  majors: [],
+  unassigned_core: [],
 };
 
 function board(

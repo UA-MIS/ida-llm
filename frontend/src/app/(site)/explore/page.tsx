@@ -1,27 +1,39 @@
 /**
- * Level 1 of the guided drill-down: the programmes, against every model.
+ * Level 1 of the guided drill-down: the majors, against every model.
+ *
+ * ⚠ MAJORS, NOT A PROGRAMME, AND THAT IS THE WHOLE REDIRECT. This level used to
+ * be one row — "BScBA General Business (core)", the single programme
+ * `curriculum/slo.yaml` describes. It was the wrong first screen for the only
+ * reader this product has. Nobody is a professor OF THE CORE. They teach
+ * Management Information Systems, and a front door that opens on somebody
+ * else's programme asks them to locate themselves before it tells them
+ * anything. The eleven majors come from the college's own catalog
+ * (`curriculum/majors.yaml`); a visitor finds their own name in the header row
+ * and clicks it.
  *
  * ⚠ WHY THIS FLOW EXISTS, AND WHY IT IS NOT A REDESIGN OF `/leaderboard`. The
  * client's verdict on the previous shape was blunt: too much information, too
  * many clicks, and you should not have to explain what is on the screen. The
- * remedy they prescribed is this — one grid per level, drilling from a
- * programme to a course to an outcome to the evidence, so a reader arrives at
+ * remedy they prescribed is this — one grid per level, drilling from a major to
+ * a class to the outcomes behind it to the evidence, so a reader arrives at
  * exactly the thing they care about instead of a wall of everything.
  *
  * ⚠ A GRID MEANS THE MATRIX, NOT A WALL OF CARDS. The first cut of this flow
  * read "grid" as a tiled layout of paragraph cards, one per entity. It is the
- * `/compare` matrix that was asked for: entities down one axis, models across
+ * `/compare` matrix that was asked for: models down one axis, entities across
  * the other, a score in every cell. `components/explore-matrix.tsx` draws it
  * from the same components and the same classifier `/compare` uses.
+ *
+ * ⚠ TEN OF THE ELEVEN COLUMNS HAVE NOTHING IN THEM, AND THEY STAY. MIS is the
+ * only major with a benchmarked class today. Showing only that one would tell a
+ * professor of Marketing that this benchmark has nothing for them without ever
+ * admitting the reason is us and not them.
  *
  * ⚠ IT SITS ALONGSIDE THE EXISTING PAGES, IT DOES NOT REPLACE THEM. `/` and
  * `/overview` are untouched, and `/leaderboard` and `/compare` still answer the
  * questions they were built for. This is a candidate front door offered for the
  * client to react to, and deleting the others before they have would throw away
  * the comparison that decision needs.
- *
- * One programme is in the map today. It is a one-row matrix anyway — see
- * `buildMajorMatrix` in lib/explore-matrix.ts for why the level is not skipped.
  */
 
 import type { Metadata } from "next";
@@ -31,15 +43,16 @@ import { Breadcrumbs, ExploreHelp } from "@/components/explore-chrome";
 import { ExploreMatrixGrid } from "@/components/explore-matrix";
 import { ResultsUnavailable } from "@/components/service-unavailable";
 import { getLeaderboard } from "@/lib/api";
+import { buildIndex } from "@/lib/explore";
 import { buildMajorMatrix } from "@/lib/explore-matrix";
 import type { LeaderboardResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Explore by programme — Capstone-IDA",
+  title: "Explore by major — Capstone-IDA",
   description:
-    "Every programme against every model, drilling to a course, an outcome, and the evidence behind the number.",
+    "Every model against every major, drilling to a class, the outcomes behind it, and the evidence behind the number.",
 };
 
 /**
@@ -50,10 +63,11 @@ export const metadata: Metadata = {
  * contract, not a place to share a string.
  */
 const EXPLAIN =
-  "One row per programme on this platform, one column per model. Each cell is " +
-  "how that model does across every outcome the programme publishes and a text " +
-  "benchmark can reach — sample-weighted, so a small task cannot outweigh a " +
-  "large one. Open a row to see its courses.";
+  "One row per model, strongest first, and one column per major this college " +
+  "offers. Each cell is how that model does across the classes in that major " +
+  "we have written tasks about — sample-weighted, so a small task cannot " +
+  "outweigh a large one. Open a major to see its classes, or a model to see " +
+  "its own report.";
 
 export default async function ExplorePage() {
   let board: LeaderboardResponse;
@@ -61,20 +75,16 @@ export default async function ExplorePage() {
     board = await getLeaderboard();
   } catch (cause) {
     return (
-      <ResultsUnavailable
-        what="the programme list"
-        retryHref="/explore"
-        cause={cause}
-        singular
-      />
+      <ResultsUnavailable what="the list of majors" retryHref="/explore" cause={cause} singular />
     );
   }
 
+  const index = buildIndex(board);
   const matrix = buildMajorMatrix(board);
 
   return (
     <>
-      <Breadcrumbs trail={[]} here="Programmes" />
+      <Breadcrumbs trail={[]} here="Majors" />
       <ExploreHelp explain={EXPLAIN} />
 
       {/* ⚠ ABOVE THE GRID IT QUALIFIES. A reader forms their impression from the
@@ -88,7 +98,7 @@ export default async function ExplorePage() {
 
       {!matrix.available ? (
         <div className="empty">
-          <h2>No programme to explore</h2>
+          <h2>No major to explore</h2>
           <p className="muted">{matrix.unavailable_reason}</p>
           <p className="muted">
             The <Link href="/leaderboard">leaderboard</Link> still works — it
@@ -96,7 +106,36 @@ export default async function ExplorePage() {
           </p>
         </div>
       ) : (
-        <ExploreMatrixGrid matrix={matrix} rowKind="Programme" />
+        <>
+          <ExploreMatrixGrid
+            matrix={matrix}
+            columnKind="Major"
+            overallLabel="All majors"
+          />
+
+          {/* Courses in the shared business core that no single major owns.
+              Surfaced rather than dropped: a course that is in the core but
+              reachable from no major is a fact about the college, and a
+              drill-down that silently omitted it would be quietly shortening
+              the curriculum. */}
+          {index.unassigned.length > 0 ? (
+            <section className="panel">
+              <div className="panel-head">
+                <h2>
+                  In the core, under no major
+                  {index.unassigned.length === 1 ? "" : ` (${index.unassigned.length})`}
+                </h2>
+              </div>
+              <ul className="result-list">
+                {index.unassigned.map((row) => (
+                  <li key={row.course} className="muted">
+                    <strong>{row.course}</strong> — {row.reason}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </>
       )}
     </>
   );

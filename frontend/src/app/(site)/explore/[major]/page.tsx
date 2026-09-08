@@ -1,34 +1,40 @@
 /**
- * Level 2: the courses of one programme, against every model.
+ * Level 2: the classes of one major, against every model.
  *
- * Read from the published course x outcome coverage grid, which the API serves
- * alongside the outcomes (`CurriculumView.coverage`). Nothing here holds its own
- * list of courses, for the same reason nothing holds its own list of outcomes:
- * the registrar owns both, and a list typed into a component is a list that
- * disagrees with the programme the first time either is edited.
+ * The class list is read from `curriculum/majors.yaml` — the course catalog —
+ * and each class's outcome profile from `curriculum/slo.yaml`'s coverage grid,
+ * joined on the course code. Nothing here holds its own list of classes, for
+ * the same reason nothing holds its own list of outcomes: the registrar owns
+ * both, and a list typed into a component is a list that disagrees with the
+ * catalog the first time either is edited.
  *
- * Course order is the MAP's order, never score order — see `buildCourses`. A
- * matrix makes that temptation stronger, not weaker: rows sorted by score would
- * turn a coverage grid into a ranking of a department's own courses.
+ * ⚠ MOST OF THESE COLUMNS ARE EMPTY, AND THE EMPTINESS IS THE HONEST PART. The
+ * catalog lists fourteen MIS classes; tasks have been authored about one of
+ * them. Each column says which it is and why, in its own words, under the grid.
+ *
+ * Class order is the CATALOG's order, never score order — see `buildClasses`.
+ * Putting classes on the horizontal axis is part of the same argument: a
+ * vertical list of a department's own classes reads as a ranking of them, and
+ * this benchmark has no business ranking a curriculum.
  */
 
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { Breadcrumbs, ExploreHelp } from "@/components/explore-chrome";
+import { Breadcrumbs, ExploreHelp, ModelFocus } from "@/components/explore-chrome";
 import { ExploreMatrixGrid } from "@/components/explore-matrix";
 import { ResultsUnavailable } from "@/components/service-unavailable";
 import { getLeaderboard } from "@/lib/api";
 import { buildIndex, findMajor } from "@/lib/explore";
-import { buildCourseMatrix } from "@/lib/explore-matrix";
+import { buildClassMatrix } from "@/lib/explore-matrix";
 import type { LeaderboardResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Courses — Capstone-IDA",
-  description: "Every course in the programme against every model, and what each one teaches.",
+  title: "Classes — Capstone-IDA",
+  description: "Every model against every class in one major, and what each class teaches.",
 };
 
 /**
@@ -39,17 +45,21 @@ export const metadata: Metadata = {
  * contract, not a place to share a string.
  */
 const EXPLAIN =
-  "One row per course in this programme, in the order the curriculum map " +
-  "publishes them, and one column per model. Each cell is how that model does " +
-  "across the outcomes that course is responsible for. Open a row to see those " +
-  "outcomes.";
+  "One row per model, strongest first, and one column per class in this major, " +
+  "in the order the catalog lists them. Each cell is how that model does on the " +
+  "tasks written about that class. Open a class for the outcomes behind its " +
+  "number.";
 
-export default async function CoursesPage({
+export default async function ClassesPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ major: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { major: majorSlug } = await params;
+  const query = searchParams ? await searchParams : {};
+  const here = `/explore/${encodeURIComponent(majorSlug)}`;
 
   let board: LeaderboardResponse;
   try {
@@ -57,8 +67,8 @@ export default async function CoursesPage({
   } catch (cause) {
     return (
       <ResultsUnavailable
-        what="this programme's courses"
-        retryHref={`/explore/${encodeURIComponent(majorSlug)}`}
+        what="this major's classes"
+        retryHref={here}
         cause={cause}
         singular
       />
@@ -66,16 +76,22 @@ export default async function CoursesPage({
   }
 
   const major = findMajor(buildIndex(board), majorSlug);
-  // ⚠ 404, NOT AN EMPTY GRID. A grid of dashes under a programme name reads as
-  // "we measured this programme and found nothing", which is a different and
-  // false claim from "no such programme is on this platform".
+  // ⚠ 404, NOT AN EMPTY GRID. A grid of dashes under a major's name reads as
+  // "we measured this major and found nothing", which is a different and false
+  // claim from "no such major is on this platform".
   if (!major) notFound();
 
-  const matrix = buildCourseMatrix(board, major.slug);
+  const matrix = buildClassMatrix(board, major);
+
+  // Only honoured when it names a model actually on this level: a focus note
+  // for a model the grid does not contain would be a caption describing a
+  // different page.
+  const wanted = typeof query.model === "string" ? query.model : null;
+  const focus = matrix.models.find((m) => m.model_key === wanted) ?? null;
 
   return (
     <>
-      <Breadcrumbs trail={[{ label: "Programmes", href: "/explore" }]} here={major.name} />
+      <Breadcrumbs trail={[{ label: "Majors", href: "/explore" }]} here={major.name} />
       <ExploreHelp explain={EXPLAIN} />
 
       {matrix.demonstration.any ? (
@@ -85,22 +101,27 @@ export default async function CoursesPage({
       <section className="hero">
         <h2 className="xp-title">{major.name}</h2>
         <p className="subtitle">
-          {major.course_count} courses. {major.measured_count} of{" "}
-          {major.benchmarkable_count} measurable outcomes have a score so far.
-          {major.source ? (
+          {major.class_count} {major.class_count === 1 ? "class" : "classes"}.{" "}
+          {major.measurable_class_count === 0
+            ? "No task in the catalogue is about any of them yet."
+            : `${major.measured_class_count} of the ${major.measurable_class_count} we have written tasks about ${major.measurable_class_count === 1 ? "has" : "have"} a score so far.`}{" "}
+          <span className="muted">{major.department}.</span>
+          {major.catalog ? (
             <>
               {" "}
-              <a className="xp-source" href={major.source} rel="noreferrer">
-                Curriculum map
+              <a className="xp-source" href={major.catalog} rel="noreferrer">
+                Catalog
               </a>
             </>
           ) : null}
         </p>
       </section>
 
+      {focus ? <ModelFocus displayName={focus.display_name} clearHref={here} /> : null}
+
       {!matrix.available ? (
         <div className="empty">
-          <h2>This programme lists no courses</h2>
+          <h2>This major lists no classes</h2>
           <p className="muted">{matrix.unavailable_reason}</p>
           <p className="muted">
             The <Link href="/compare">comparison grid</Link> still reads by
@@ -108,7 +129,12 @@ export default async function CoursesPage({
           </p>
         </div>
       ) : (
-        <ExploreMatrixGrid matrix={matrix} rowKind="Course" />
+        <ExploreMatrixGrid
+          matrix={matrix}
+          columnKind="Class"
+          overallLabel="All classes"
+          focusModel={focus?.model_key ?? null}
+        />
       )}
     </>
   );

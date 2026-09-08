@@ -118,6 +118,8 @@ const CURRICULUM: CurriculumView = {
   ],
   use_modes: [{ id: "capability", title: "Capability", statement: "Can it?", in_use: true }],
   coverage: [],
+  majors: [],
+  unassigned_core: [],
 };
 
 function board(tasks: TaskLeaderboard[]): LeaderboardResponse {

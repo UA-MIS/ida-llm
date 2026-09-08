@@ -124,6 +124,67 @@ export const CURRICULUM: CurriculumView = {
     { course: "MIS 200", title: "Fundamentals of MIS", outcomes: { SLO2: "A" } },
     { course: "GBA 300", title: "Business Communications", outcomes: { SLO2: "R", SLO4: "A" } },
   ],
+  // ⚠ THE SMALLEST TAXONOMY THAT CAN TELL THE LEVELS APART, and every part of
+  // it is load-bearing:
+  //
+  //   two majors                 so a major grid is a grid and not a special case
+  //   MIS 200 with a family      the ONE measurable class — `task()`'s default
+  //                              family is "slo2", so the default fixture task
+  //                              is attributed here and nowhere else
+  //   MIS 221 with no family     a class the catalog lists and nobody has
+  //                              written a task about — the commonest real
+  //                              state, and the one that must never show a
+  //                              number it inherited from MIS 200
+  //   MIS 221 absent from the coverage grid above, so it also exercises "the
+  //                              curriculum map does not mark this class"
+  //   GBA 300 under another major so a score under MIS cannot leak sideways
+  majors: [
+    {
+      id: "management-information-systems",
+      name: "Management Information Systems",
+      department: "Information Systems, Statistics and Management Science",
+      catalog: "https://catalog.ua.edu/undergraduate/business/",
+      class_source: "catalog",
+      class_source_label: "Transcribed from the course catalog",
+      classes: [
+        {
+          course: "MIS 200",
+          title: "Fundamentals of Management Information Systems",
+          credit_hours: 3,
+          task_families: ["slo2"],
+        },
+        {
+          course: "MIS 221",
+          title: "Business Programming I",
+          credit_hours: 3,
+          task_families: [],
+        },
+      ],
+    },
+    {
+      id: "general-business",
+      name: "General Business",
+      department: "Management",
+      catalog: null,
+      class_source: "core-only",
+      class_source_label:
+        "Only the classes this major owns in the shared business core",
+      classes: [
+        {
+          course: "GBA 300",
+          title: "Business Communications",
+          credit_hours: null,
+          task_families: [],
+        },
+      ],
+    },
+  ],
+  unassigned_core: [
+    {
+      course: "LGS 200",
+      reason: "No Legal Studies major exists, so no major owns this core course.",
+    },
+  ],
 };
 
 export function board(
