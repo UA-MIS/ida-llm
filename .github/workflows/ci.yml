@@ -70,7 +70,89 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # DOCS-ONLY DETECTION. A pull request that changes nothing but prose does not
+  # need the test matrix, and running it costs four to six minutes of runner
+  # time per docs PR -- of which this repo merges a lot.
+  #
+  # ⚠ IT FAILS CLOSED. Every gated job reads `docs_only != 'true'`, so if this
+  # job errors, is skipped, or reports nothing, the output is empty, the
+  # comparison is true, and the FULL MATRIX RUNS. The first version was the
+  # other way round -- `needs: changes` alone meant a failure here skipped all
+  # six checks, and the very first run proved it by failing and leaving the PR
+  # with nothing tested at all. A detector that silently disables the tests it
+  # guards is worse than no detector.
+  #
+  # ⚠ THE PATTERN MATCHES EXTENSIONS, NOT DIRECTORIES. An earlier draft allowed
+  # everything under `docs/`, which let `docs/anything.py` read as documentation
+  # and skip the matrix -- caught by testing the pattern against that exact case
+  # rather than against the happy path. `docs/` now admits only image assets;
+  # prose is matched by the `.md` extension wherever it lives.
+  #
+  # ⚠ CONSERVATIVE BY CONSTRUCTION. The rule is "EVERY changed file matches a
+  # documentation pattern", not "some file is documentation". One .py, one .ts,
+  # one workflow edit anywhere in the diff and the whole matrix runs. Being too
+  # eager here ships untested code; being too cautious wastes a few minutes.
+  # Those are not comparable, so this leans hard one way.
+  #
+  # ⚠ NOT the path-filtering that was rejected for the IMAGE builds. That was
+  # dangerous because `bump-dev` points dev at a tag every image must carry, so
+  # skipping a build could leave dev pulling an image that was never pushed.
+  # This workflow builds no images and rewrites no overlay: a skipped check here
+  # has no deploy consequence whatsoever.
+  #
+  # ⚠ IF BRANCH PROTECTION IS EVER ENABLED (it is not today -- the API reports
+  # the feature unavailable on this plan), these jobs would report `skipped`
+  # rather than green on a docs PR, and a REQUIRED skipped check can block a
+  # merge. At that point either mark them non-required, or move this `if:` down
+  # onto the steps so the job still reports. Written down because the person who
+  # enables protection will not otherwise know to look here.
+  changes:
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    container:
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+    steps:
+      - name: Detect a documentation-only diff
+        id: detect
+        # ⚠ THE FILE LIST COMES FROM THE API, NOT `git diff`. The first version
+        # diffed base..head after a checkout and failed with "Could not access
+        # <base sha>": actions/checkout on these runners falls back to a REST
+        # tarball because git is not on the container PATH, so there is no
+        # history to diff. Asking the API for the PR's files needs no checkout
+        # at all, which is why this job no longer does one.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          FILES="$(
+            curl -sSf -H "Authorization: Bearer ${GH_TOKEN}" \
+                 -H "Accept: application/vnd.github+json" \
+                 "https://api.github.com/repos/${REPO}/pulls/${PR}/files?per_page=100" \
+              | sed -n 's/.*"filename": "\([^"]*\)".*/\1/p'
+          )"
+          if [ -z "${FILES}" ]; then
+            echo "no files reported -- running everything"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "changed files:"; echo "${FILES}" | sed 's/^/  /'
+          OTHER="$(printf '%s\n' "${FILES}" | grep -vE '(^|/)[^/]+\.md$|^docs/[^/]*\.(png|jpg|jpeg|svg|gif)$|^LICENSE$|(^|/)CODEOWNERS$' || true)"
+          if [ -n "${OTHER}" ]; then
+            echo "not docs-only -- these force the full matrix:"
+            echo "${OTHER}" | sed 's/^/  /'
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::documentation-only diff -- skipping the check matrix"
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+          fi
+
   python:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
       image: harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
@@ -139,6 +221,8 @@ jobs:
         run: cd e2e && python -m pytest .
 
   frontend:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
       # ⚠ 24.16 PINNED. Node 24.17 shipped a keepAlive regression that broke
@@ -203,6 +287,8 @@ jobs:
     # existed, NOTHING ran it — the component is built and shipped by
     # build-and-push.yaml, but no workflow ever executed its 280 assertions. A
     # test suite that never runs in CI is documentation, not a gate.
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
       # Same 24.16 pin and the same reason as `frontend` above.
@@ -275,6 +361,8 @@ jobs:
     # THE data gate. tasks/** and models.yaml are versioned DATA: every benchmark
     # result cites the git SHA of the task that produced it, and that citation is
     # worthless if the file was malformed. Cheap, fast, and it fails the PR.
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
       image: harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
@@ -335,6 +423,8 @@ jobs:
     # Alembic against a THROWAWAY Postgres 17 -- the same major version the
     # platform's tenant DB tier runs, so a dialect incompatibility is caught here
     # instead of at first ArgoCD sync.
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
       image: harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
@@ -413,6 +503,8 @@ jobs:
     # patch can silently break -- pod budget vs quota WITH rollout surge, TLS
     # hosts matching rule hosts, and the mock-model safety switch being ON in
     # dev/preview and OFF in staging/prod.
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
       image: harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
