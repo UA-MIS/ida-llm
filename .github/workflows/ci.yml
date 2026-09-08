@@ -159,8 +159,35 @@ jobs:
         # different dependency tree than the image builds.
         run: |
           set -eu
-          if [ -f package-lock.json ]; then npm ci --no-audit --no-fund
-          else echo "::warning::no package-lock.json yet -- using npm install"; npm install --no-audit --no-fund; fi
+          # ⚠ AN EXPLICIT LOOP, not npm's own `fetch-retries`.
+          #
+          # The first version of this fix set `npm_config_fetch_retries=5` and
+          # friends at workflow level. Those variables ARE reaching the step --
+          # the run log prints all six -- and npm still failed this install in
+          # twenty seconds flat with `errno -110`, far too fast to have retried
+          # anything. npm's internal retry does not cover the socket-read
+          # timeout this egress path produces.
+          #
+          # So retry the command itself. It is blunt and it cannot silently not
+          # work, which is the property that matters after an elegant fix
+          # already failed once here.
+          npm_install() {
+            if [ -f package-lock.json ]; then npm ci --no-audit --no-fund
+            else echo "::warning::no package-lock.json yet -- using npm install"
+                 npm install --no-audit --no-fund
+            fi
+          }
+          n=1
+          until npm_install; do
+            if [ "$n" -ge 4 ]; then
+              echo "::error::npm install failed 4 times; this is not a blip."
+              exit 1
+            fi
+            wait=$((n * 15))
+            echo "::warning::npm install failed (attempt ${n}/4) -- retrying in ${wait}s"
+            n=$((n + 1))
+            sleep "$wait"
+          done
 
       - name: Lint
         run: npm run lint
@@ -188,7 +215,37 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install
-        run: npm ci --no-audit --no-fund
+        run: |
+          set -eu
+          # ⚠ AN EXPLICIT LOOP, not npm's own `fetch-retries`.
+          #
+          # The first version of this fix set `npm_config_fetch_retries=5` and
+          # friends at workflow level. Those variables ARE reaching the step --
+          # the run log prints all six -- and npm still failed this install in
+          # twenty seconds flat with `errno -110`, far too fast to have retried
+          # anything. npm's internal retry does not cover the socket-read
+          # timeout this egress path produces.
+          #
+          # So retry the command itself. It is blunt and it cannot silently not
+          # work, which is the property that matters after an elegant fix
+          # already failed once here.
+          npm_install() {
+            if [ -f package-lock.json ]; then npm ci --no-audit --no-fund
+            else echo "::warning::no package-lock.json yet -- using npm install"
+                 npm install --no-audit --no-fund
+            fi
+          }
+          n=1
+          until npm_install; do
+            if [ "$n" -ge 4 ]; then
+              echo "::error::npm install failed 4 times; this is not a blip."
+              exit 1
+            fi
+            wait=$((n * 15))
+            echo "::warning::npm install failed (attempt ${n}/4) -- retrying in ${wait}s"
+            n=$((n + 1))
+            sleep "$wait"
+          done
 
       - name: Lint
         run: npm run lint
