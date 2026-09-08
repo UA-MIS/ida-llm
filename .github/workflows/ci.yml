@@ -39,6 +39,32 @@ on:
 permissions:
   contents: read
 
+# ---------------------------------------------------------------------------
+# NETWORK RESILIENCE. These runners reach npm, PyPI and Harbor over an egress
+# path that intermittently times out: over one night of merges this cost three
+# `npm error network read ETIMEDOUT` failures, one Harbor `i/o timeout` on
+# push, and one checkout timeout -- every one transient, every one needing a
+# human to notice and press re-run.
+#
+# npm and pip both retry internally; their DEFAULTS are simply too impatient
+# for this path (npm 2 retries, pip 5 with a 15s timeout). Setting them here,
+# once, covers every install step in this file -- there is no per-step wrapper
+# to forget when someone adds the next job.
+#
+# These raise tolerance for a SLOW or FLAPPING network. They do not mask a real
+# failure: a 404, a bad lockfile, or a genuinely unreachable host still fails,
+# only later. That trade is right for a check whose red state is otherwise
+# indistinguishable from a broken commit.
+env:
+  # npm: 5 attempts, 10s..60s backoff, 5min per-request ceiling.
+  npm_config_fetch_retries: "5"
+  npm_config_fetch_retry_mintimeout: "10000"
+  npm_config_fetch_retry_maxtimeout: "60000"
+  npm_config_fetch_timeout: "300000"
+  # pip: same intent.
+  PIP_RETRIES: "5"
+  PIP_TIMEOUT: "60"
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
