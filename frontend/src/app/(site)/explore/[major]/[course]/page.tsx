@@ -20,6 +20,7 @@ import { notFound } from "next/navigation";
 import { Breadcrumbs, ExploreHelp } from "@/components/explore-chrome";
 import { ExploreTile } from "@/components/explore-tile";
 import { ResultsUnavailable } from "@/components/service-unavailable";
+import { DemonstrationBadge } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
 import { buildCourses, buildIndex, findCourse, findMajor } from "@/lib/explore";
 import type { LeaderboardResponse } from "@/lib/types";
@@ -82,6 +83,16 @@ export default async function CourseOutcomesPage({
       />
       <ExploreHelp explain={EXPLAIN} />
 
+      {/* ⚠ ABOVE THE GRID IT QUALIFIES, same as every other level — see
+          `/explore/page.tsx`. Scoped to this course's own outcomes, not the
+          whole board: `CourseTile.demonstration` only counts the models that
+          actually contributed a score here, so a course whose own outcomes are
+          all measured never carries a caveat that belongs to a different
+          course. Same rollup, same words — see `summariseDemonstration`. */}
+      {course.demonstration.any ? (
+        <div className="notice">{course.demonstration.notice}</div>
+      ) : null}
+
       <section className="hero">
         <h2 className="xp-title">
           <span className="xp-title-code">{course.code}</span> {course.title}
@@ -125,16 +136,22 @@ export default async function CourseOutcomesPage({
               reason={outcome.reason}
               footnote={outcome.statement}
               badges={
-                <span
-                  className={`badge badge-facet${outcome.assessment_point ? " xp-badge-assessed" : ""}`}
-                  title={
-                    outcome.assessment_point
-                      ? "The programme reports on this outcome in this course, so there is a human number to compare against."
-                      : "The level the published curriculum map marks for this pair."
-                  }
-                >
-                  {outcome.level_label}
-                </span>
+                <>
+                  <span
+                    className={`badge badge-facet${outcome.assessment_point ? " xp-badge-assessed" : ""}`}
+                    title={
+                      outcome.assessment_point
+                        ? "The programme reports on this outcome in this course, so there is a human number to compare against."
+                        : "The level the published curriculum map marks for this pair."
+                    }
+                  >
+                    {outcome.level_label}
+                  </span>
+                  {/* Per outcome, so it self-clears the moment a real
+                      measurement replaces the seeded one for THIS pairing —
+                      see `entriesAreSeeded`. */}
+                  {outcome.seeded ? <DemonstrationBadge /> : null}
+                </>
               }
             />
           ))}

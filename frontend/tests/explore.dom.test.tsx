@@ -272,6 +272,41 @@ describe("level 3 — the outcomes one course teaches", () => {
       OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "mis-999" }) }),
     ).rejects.toThrow("NEXT_NOT_FOUND");
   });
+
+  // ⚠ THE GAP THIS FILE EXISTS TO CLOSE. `/explore`, `/explore/[major]` and the
+  // evidence level all disclosed a seeded score; this page rendered the
+  // identical flag as a flat, uncaveated finding. Both directions pinned here,
+  // same as `explore.test.ts` pins the rule that feeds it.
+  it("discloses a seeded score above the grid, same words as every other level", async () => {
+    await renderLevel(
+      () => OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
+      board([
+        task({
+          task_id: "slo2/break-even",
+          slo: "SLO2",
+          has_results: true,
+          results: [result({ mean_score: 0.9, scored_count: 10, demonstration: true })],
+        }),
+      ]),
+    );
+    const notice = document.querySelector(".notice");
+    expect(notice, "a seeded course score rendered no demonstration notice").not.toBeNull();
+    expect(notice!.textContent).toMatch(/illustrative/i);
+
+    // Self-clears per outcome tile too — the badge sits beside the level
+    // badge, not just in a page-wide banner a reader can miss.
+    const tile = document.querySelector(".xp-tile-measured")!;
+    expect(tile.querySelector(".badge-demo"), "no per-tile seeded badge on the measured outcome").not.toBeNull();
+  });
+
+  it("renders no demonstration notice or badge when the course's scores are real", async () => {
+    await renderLevel(
+      () => OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
+      measuredBoard(),
+    );
+    expect(document.querySelector(".notice")).toBeNull();
+    expect(document.querySelector(".badge-demo")).toBeNull();
+  });
 });
 
 describe("level 4 — the evidence", () => {

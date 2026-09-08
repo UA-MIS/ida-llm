@@ -204,6 +204,84 @@ describe("level 2 — the courses", () => {
     expect(findCourse(courses, "mis-200")!.assessment_count).toBe(1);
     expect(findCourse(courses, "gba-300")!.assessment_count).toBe(2);
   });
+
+  it("discloses when the models measured on its outcomes are seeded, not real", () => {
+    // This was the gap: `/explore/[major]/[course]` rendered a course tile's
+    // score with no caveat at all, while `/explore`, `/explore/[major]` and
+    // the evidence level already disclosed the identical flag.
+    const seeded = board([
+      task({
+        task_id: "slo2/a",
+        slo: "SLO2",
+        has_results: true,
+        results: [result({ mean_score: 0.9, scored_count: 10, demonstration: true })],
+      }),
+    ]);
+    const course = findCourse(buildCourses(seeded), "mis-200")!;
+    expect(course.demonstration.any).toBe(true);
+    expect(course.demonstration.notice).toMatch(/illustrative/i);
+  });
+
+  it("never flags a course whose own outcomes are genuinely measured", () => {
+    const course = findCourse(buildCourses(measuredBoard()), "mis-200")!;
+    expect(course.demonstration.any).toBe(false);
+    expect(course.demonstration.notice).toBe("");
+  });
+
+  it("scopes the caveat to the course actually seeded, not the whole board", () => {
+    // MIS 200 is measured for real, by Luna; GBA 300 is seeded, by a different
+    // model entirely. MIS 200's own page must not inherit a caveat that
+    // belongs to a different course's models.
+    const mixed = board(
+      [
+        task({
+          task_id: "slo2/real",
+          slo: "SLO2",
+          has_results: true,
+          results: [result({ model_key: "luna", mean_score: 0.8, scored_count: 10, demonstration: false })],
+        }),
+        task({
+          task_id: "slo4/seeded",
+          slo: "SLO4",
+          has_results: true,
+          results: [
+            result({ model_key: "nova", display_name: "Nova", mean_score: 0.6, scored_count: 10, demonstration: true }),
+          ],
+        }),
+      ],
+      { curriculum: curriculumWithTeamwork() },
+    );
+    const courses = buildCourses(mixed);
+    expect(findCourse(courses, "mis-200")!.demonstration.any).toBe(false);
+    expect(findCourse(courses, "gba-300")!.demonstration.any).toBe(true);
+  });
+});
+
+describe("an outcome tile's own seeded tell", () => {
+  it("self-clears the moment a real measurement replaces the seeded one", () => {
+    const seeded = board([
+      task({
+        task_id: "slo2/a",
+        slo: "SLO2",
+        has_results: true,
+        results: [result({ mean_score: 0.9, scored_count: 10, demonstration: true })],
+      }),
+    ]);
+    const seededTile = findOutcome(findCourse(buildCourses(seeded), "mis-200")!, "SLO2")!;
+    expect(seededTile.seeded).toBe(true);
+
+    const realTile = findOutcome(findCourse(buildCourses(measuredBoard()), "mis-200")!, "SLO2")!;
+    expect(realTile.seeded).toBe(false);
+  });
+
+  it("is never true for a tile with no score at all", () => {
+    const board_ = board([
+      task({ task_id: "slo2/unrun", slo: "SLO2", has_results: false, results: [] }),
+    ]);
+    const tile = findOutcome(findCourse(buildCourses(board_), "mis-200")!, "SLO2")!;
+    expect(tile.status).toBe("not_measured");
+    expect(tile.seeded).toBe(false);
+  });
 });
 
 describe("level 3 — the outcomes, and the three kinds of empty", () => {

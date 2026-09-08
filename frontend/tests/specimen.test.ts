@@ -281,6 +281,35 @@ describe("the measured mode", () => {
     expect(reading.best?.meanScore).toBe(0.55);
   });
 
+  it("never lets a seeded row become the headline finding either", () => {
+    // The front door's own promise is "exactly one number... and it appears
+    // only when a real finished run stands behind it" — no badge, no caveat,
+    // because this is the one page that shows no data vocabulary at all. A
+    // seeded row scoring higher than a real one must still lose.
+    const reading = readingFor(MODES[0]!, SLO2, [
+      task({
+        has_results: true,
+        results: [
+          result({ model_key: "demo", display_name: "Demo", mean_score: 0.97, demonstration: true }),
+          result({ mean_score: 0.55, demonstration: false }),
+        ],
+      }),
+    ]);
+    expect(reading.best?.modelKey).toBe("luna");
+    expect(reading.best?.meanScore).toBe(0.55);
+  });
+
+  it("reads as not-measured-yet when every result for it is seeded", () => {
+    const reading = readingFor(MODES[0]!, SLO2, [
+      task({
+        has_results: true,
+        results: [result({ model_key: "demo", display_name: "Demo", mean_score: 0.9, demonstration: true })],
+      }),
+    ]);
+    expect(reading.status).toBe("not_measured");
+    expect(reading.best).toBeNull();
+  });
+
   it("treats a null score as absent, never as a zero", () => {
     const reading = readingFor(MODES[0]!, SLO2, [
       task({ has_results: true, results: [result({ mean_score: null })] }),
@@ -314,6 +343,14 @@ describe("selecting tasks for a reading", () => {
   it("returns null from bestMeasured when nothing qualifies", () => {
     expect(bestMeasured([])).toBeNull();
     expect(bestMeasured([task({ results: [result({ mean_score: null })] })])).toBeNull();
+  });
+
+  it("excludes a seeded row from bestMeasured, same as it excludes a stub", () => {
+    expect(
+      bestMeasured([
+        task({ results: [result({ mean_score: 0.99, demonstration: true })] }),
+      ]),
+    ).toBeNull();
   });
 });
 
