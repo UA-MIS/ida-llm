@@ -40,6 +40,7 @@ trusting that they do.
 
 from __future__ import annotations
 
+import re
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -62,6 +63,35 @@ USE_MODE_TAG_PREFIX = "use-mode:"
 
 SLO_METADATA_KEY = "slo"
 USE_MODE_METADATA_KEY = "use_mode"
+
+_SLO_FAMILY_PREFIX_RE = re.compile(r"^(mis200-|slo-?\d)")
+"""Matches the leading path segment of a task id that names an SLO-benchmark
+family: ``mis200-*`` (the course-specific exam counterparts) or ``slo<N>-*`` /
+``slo-<N>-*`` (the general per-outcome ladders, both spellings in use --
+compare ``tasks/slo1-problem-solving`` with ``tasks/slo-6-ethical-reasoning``).
+
+A task id's leading segment is its directory, by the repo's own convention
+(``mis200-is-problem-solving/l1-technology-initiative-appraisal``,
+``slo1-problem-solving/l1-problem-definition``), so this can be checked from
+the id alone -- no filesystem path has to be threaded into
+:func:`check_task_tags` for it.
+"""
+
+
+def _should_be_slo_tagged(task_id: str) -> bool:
+    """Does this task's family make an absent ``slo:``/``use-mode:``/
+    ``slo-benchmark`` tag a bug rather than "not this benchmark's business"?
+
+    Exemplar and demo families (``conceptual-grading``, ``research-analysis``,
+    ``demo``, ...) predate SLO tagging and are legitimately untagged --
+    :func:`check_task_tags` must stay clean for them. A task filed under a
+    family the benchmark convention already claims is a different case: an
+    untagged file there is not a task outside the benchmark, it is a task that
+    lost its tags (or never had them written), and the whole point of this
+    module is that that failure must be loud.
+    """
+    family = task_id.split("/", 1)[0]
+    return bool(_SLO_FAMILY_PREFIX_RE.match(family))
 
 
 class CoverageLevel(StrEnum):
@@ -317,16 +347,27 @@ def check_task_tags(spec: TaskSpec, curriculum: CurriculumMap) -> list[str]:
        two different consumers; the moment they disagree, one of them is lying
        and nothing else in the system would notice.
 
-    A task with none of the three tags is not part of this benchmark and is
-    returned clean -- the exemplar and demo families predate it.
+    A task with none of the three tags is usually not part of this benchmark
+    and is returned clean -- the exemplar and demo families predate SLO
+    tagging.  The exception is a task whose id names a family the benchmark
+    convention already claims (see :func:`_should_be_slo_tagged`): there, a
+    completely absent tag block is not "outside the benchmark", it is a task
+    that lost its tags, and it must fail exactly as a mistyped ``slo:`` value
+    does rather than vanish from every per-outcome view uncomplained-about.
     """
     tags = list(spec.tags)
     slo_values = _values_for(tags, SLO_TAG_PREFIX)
     mode_values = _values_for(tags, USE_MODE_TAG_PREFIX)
     tagged_benchmark = BENCHMARK_TAG in tags
 
-    if not slo_values and not mode_values and not tagged_benchmark:
+    untagged = not slo_values and not mode_values and not tagged_benchmark
+    if untagged and not _should_be_slo_tagged(spec.id):
         return []
+    # Otherwise fall through (including the untagged-but-SLO-family case):
+    # this family is part of the SLO benchmark by convention, so the loop
+    # below reports the same "carries no 'slo:' tag" / "carries no
+    # 'use-mode:' tag" / "does not carry 'slo-benchmark'" problems it would
+    # report for a partially-tagged task.
 
     problems: list[str] = []
     here = f"task {spec.id!r}"
@@ -344,10 +385,18 @@ def check_task_tags(spec: TaskSpec, curriculum: CurriculumMap) -> list[str]:
             )
 
     if not tagged_benchmark:
-        problems.append(
-            f"{here}: is SLO-tagged but does not carry the {BENCHMARK_TAG!r} tag, "
-            "so it would be missing from a benchmark-wide selection"
-        )
+        if slo_values or mode_values:
+            problems.append(
+                f"{here}: is SLO-tagged but does not carry the {BENCHMARK_TAG!r} tag, "
+                "so it would be missing from a benchmark-wide selection"
+            )
+        else:
+            problems.append(
+                f"{here}: is filed under an SLO-benchmark family but carries none of "
+                f"{BENCHMARK_TAG!r}, a {SLO_TAG_PREFIX!r} tag or a {USE_MODE_TAG_PREFIX!r} "
+                "tag -- it looks like the task lost its tags rather than being outside "
+                "the benchmark"
+            )
 
     slo = slo_values[0] if len(slo_values) == 1 else None
     mode = mode_values[0] if len(mode_values) == 1 else None
