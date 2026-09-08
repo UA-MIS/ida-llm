@@ -300,10 +300,37 @@ jobs:
             --snapshot-mode=redo
             --use-new-run
             --push-retry=5
+            --cache=true
+            --cache-repo=${CACHE_REPO}
+            --cache-ttl=168h
             --verbosity=info
             '
         env:
           IMAGE: ${{ needs.resolve.outputs.REGISTRY }}/${{ matrix.image }}:${{ needs.resolve.outputs.TAG }}
+          # LAYER CACHE, one repo PER COMPONENT.
+          #
+          # A shared cache repo would work -- kaniko keys a layer on the command
+          # plus the files it reads, so two components cannot collide by
+          # accident -- but per-component keeps the blast radius of "delete the
+          # cache" to one image, and makes it obvious in Harbor which cache
+          # belongs to what.
+          #
+          # ⚠ `--cache-copy-layers` is deliberately NOT set. It is off by
+          # default, it caches COPY layers keyed on file content, and it is
+          # where kaniko's cache-correctness bugs have historically lived. The
+          # expensive layers here are the RUN installs, which `--cache=true`
+          # already covers, so enabling it buys little and risks serving an
+          # image built from files that are no longer in the tree.
+          #
+          # `--cache-ttl=168h` (one week) bounds how long a layer can be reused.
+          # Kaniko's default is two weeks; a shorter window means a poisoned or
+          # simply stale layer ages out on its own rather than persisting until
+          # somebody thinks to purge it.
+          #
+          # `--reproducible` above is unaffected: it normalises timestamps in
+          # the OUTPUT image, which is orthogonal to whether an intermediate
+          # layer came from cache.
+          CACHE_REPO: ${{ needs.resolve.outputs.REGISTRY }}/${{ matrix.image }}-cache
           # PROVENANCE, and it is not the same thing as the TAG above.
           #
           # A container has no .git, so the commit that produced an image has to
