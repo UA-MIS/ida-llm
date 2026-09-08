@@ -152,6 +152,15 @@ export function pickSpecimenOutcome(
  * landing page whose one headline finding came from a deterministic fixture
  * would be a lie in the most prominent position on the site. The leaderboard
  * already excludes stubs from `best_model_key` for exactly this reason.
+ *
+ * ⚠ SEEDED ROWS ARE EXCLUDED TOO, NOT BADGED. This page's own header comment
+ * promises "exactly one number... and it appears only when a real finished run
+ * stands behind it" — the one place on the site that draws no `demonstration`
+ * caveat at all, on purpose: the front door is deliberately spare ("the dense
+ * data stays off this page"), so a seeded row here just reads as "not measured
+ * yet" and falls through to the same honest empty state `readingFor` already
+ * has for that. See `entriesAreSeeded`/`isSeeded` in lib/rollup.ts for the
+ * identical rule everywhere else it is disclosed rather than dropped.
  */
 export function bestMeasured(
   tasks: TaskLeaderboard[],
@@ -160,6 +169,7 @@ export function bestMeasured(
   for (const task of tasks) {
     for (const result of task.results) {
       if (!result.recommendable) continue;
+      if (result.demonstration) continue;
       if (result.mean_score === null) continue;
       if (winner === null || result.mean_score > winner.result.mean_score!) {
         winner = { task, result };

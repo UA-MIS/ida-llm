@@ -436,11 +436,24 @@ export const WEIGHTING_NOTE =
  * the check belongs beside it rather than duplicated (and possibly
  * re-diverged) in each page.
  */
-export function isSeeded(rollup: ModelRollup): boolean {
-  const scored = rollup.entries.filter(
+/**
+ * Whether every entry in a set that actually scored was seeded.
+ *
+ * ⚠ SHARED, NOT DUPLICATED. `isSeeded` below applies this to a whole model's
+ * entries; `lib/explore.ts` applies the identical rule to one outcome's entries
+ * across every model, so a course's outcome tile self-clears the moment a real
+ * measurement lands for THAT outcome, independent of what any other outcome on
+ * the same course reads. Two different groupings, one rule.
+ */
+export function entriesAreSeeded(entries: ModelTaskEntry[]): boolean {
+  const scored = entries.filter(
     (e) => e.result.mean_score !== null && e.result.scored_count > 0,
   );
   return scored.length > 0 && scored.every((e) => e.result.demonstration);
+}
+
+export function isSeeded(rollup: ModelRollup): boolean {
+  return entriesAreSeeded(rollup.entries);
 }
 
 /** The compact, peer-voice tag for one demonstration row — never a paragraph. */
