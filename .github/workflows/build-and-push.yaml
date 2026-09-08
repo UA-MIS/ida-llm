@@ -44,6 +44,32 @@ on:
 permissions:
   contents: read
 
+# ---------------------------------------------------------------------------
+# NETWORK RESILIENCE. These runners reach npm, PyPI and Harbor over an egress
+# path that intermittently times out: over one night of merges this cost three
+# `npm error network read ETIMEDOUT` failures, one Harbor `i/o timeout` on
+# push, and one checkout timeout -- every one transient, every one needing a
+# human to notice and press re-run.
+#
+# npm and pip both retry internally; their DEFAULTS are simply too impatient
+# for this path (npm 2 retries, pip 5 with a 15s timeout). Setting them here,
+# once, covers every install step in this file -- there is no per-step wrapper
+# to forget when someone adds the next job.
+#
+# These raise tolerance for a SLOW or FLAPPING network. They do not mask a real
+# failure: a 404, a bad lockfile, or a genuinely unreachable host still fails,
+# only later. That trade is right for a check whose red state is otherwise
+# indistinguishable from a broken commit.
+env:
+  # npm: 5 attempts, 10s..60s backoff, 5min per-request ceiling.
+  npm_config_fetch_retries: "5"
+  npm_config_fetch_retry_mintimeout: "10000"
+  npm_config_fetch_retry_maxtimeout: "60000"
+  npm_config_fetch_timeout: "300000"
+  # pip: same intent.
+  PIP_RETRIES: "5"
+  PIP_TIMEOUT: "60"
+
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
@@ -142,8 +168,35 @@ jobs:
       - name: Install
         run: |
           set -eu
-          if [ -f package-lock.json ]; then npm ci --no-audit --no-fund
-          else echo "::warning::no package-lock.json yet -- using npm install"; npm install --no-audit --no-fund; fi
+          # ⚠ AN EXPLICIT LOOP, not npm's own `fetch-retries`.
+          #
+          # The first version of this fix set `npm_config_fetch_retries=5` and
+          # friends at workflow level. Those variables ARE reaching the step --
+          # the run log prints all six -- and npm still failed this install in
+          # twenty seconds flat with `errno -110`, far too fast to have retried
+          # anything. npm's internal retry does not cover the socket-read
+          # timeout this egress path produces.
+          #
+          # So retry the command itself. It is blunt and it cannot silently not
+          # work, which is the property that matters after an elegant fix
+          # already failed once here.
+          npm_install() {
+            if [ -f package-lock.json ]; then npm ci --no-audit --no-fund
+            else echo "::warning::no package-lock.json yet -- using npm install"
+                 npm install --no-audit --no-fund
+            fi
+          }
+          n=1
+          until npm_install; do
+            if [ "$n" -ge 4 ]; then
+              echo "::error::npm install failed 4 times; this is not a blip."
+              exit 1
+            fi
+            wait=$((n * 15))
+            echo "::warning::npm install failed (attempt ${n}/4) -- retrying in ${wait}s"
+            n=$((n + 1))
+            sleep "$wait"
+          done
       - name: Lint
         run: npm run lint
       - name: Typecheck
@@ -225,6 +278,11 @@ jobs:
           echo "::error::Harbor push credential never appeared at ${DOCKER_CONFIG_DIR}/config.json"
           exit 1
 
+      # `--push-retry=5`: the push to Harbor has failed with a bare
+      # `dial tcp ...:443: i/o timeout` after a build that otherwise succeeded.
+      # Losing a green build to the last step, and with it the `bump-dev` that
+      # depends on it, is the most expensive way this pipeline fails. Kaniko
+      # retries the push itself; it does NOT rebuild, so a retry costs seconds.
       - name: Build + push '${{ matrix.name }}' with Kaniko
         uses: docker://gcr.io/kaniko-project/executor@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e # v1.23.2-debug
         with:
@@ -241,6 +299,7 @@ jobs:
             --reproducible
             --snapshot-mode=redo
             --use-new-run
+            --push-retry=5
             --verbosity=info
             '
         env:
@@ -346,6 +405,50 @@ jobs:
         # preview-ttl CronJob strips it at 12h, which prunes the App AND its fence
         # together; re-running CI is the only revival path, which is this step.
         run: gh pr edit "${{ github.event.pull_request.number }}" --add-label preview || true
+
+  # WHY THIS JOB EXISTS: `bump-dev` below needs the whole `build-and-push`
+  # matrix, and the matrix is `fail-fast: false`, so ONE image failing to push
+  # while its siblings succeed leaves `bump-dev` skipped -- correctly. Bumping
+  # dev to a tag that only two of three images actually have would give the
+  # third an ImagePullBackOff, which is worse than staying put.
+  #
+  # The bug was never the skip. It was that the skip is SILENT: the merge shows
+  # as done, dev quietly keeps serving the previous commit, and the next person
+  # to look believes they are testing the new one. That happened -- a transient
+  # Harbor timeout on the `agile` image left dev a commit behind while the
+  # frontend image, the one anybody cared about, had pushed fine.
+  #
+  # So say it, loudly, in the run summary and as an annotation.
+  report-stale-dev:
+    needs: [resolve, build-and-push]
+    if: >-
+      ${{ always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.resolve.outputs.PUSH == 'true'
+      && needs.build-and-push.result != 'success' }}
+    runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    steps:
+      - name: Say that dev was not updated
+        run: |
+          set -eu
+          echo "::error title=dev was NOT updated::An image failed to build or push, so bump-dev was skipped and dev still serves the PREVIOUS commit. Re-run the failed job, then confirm dev picks up ${TAG}."
+          {
+            echo "## :warning: dev was NOT updated"
+            echo
+            echo "\`build-and-push\` finished as **${RESULT}**, so \`bump-dev\` did not run."
+            echo "dev is still serving the **previous** commit, not \`${TAG}\`."
+            echo
+            echo "This is deliberate: bumping dev to a tag that not every image has"
+            echo "would leave the missing one in ImagePullBackOff."
+            echo
+            echo "**To fix:** re-run the failed job above. If it was a network timeout"
+            echo "(\`ETIMEDOUT\`, \`i/o timeout\`), it will usually pass on the retry."
+            echo "Then confirm dev reports \`${TAG}\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          TAG: ${{ needs.resolve.outputs.TAG }}
+          RESULT: ${{ needs.build-and-push.result }}
 
   bump-dev:
     needs: [resolve, build-and-push]
