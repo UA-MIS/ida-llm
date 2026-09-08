@@ -26,13 +26,13 @@ labels:
 images:
   - name: ida-llm-frontend
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-frontend
-    newTag: "0.1.9"
+    newTag: "0.1.10"
   - name: ida-llm-python-app
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-python-app
-    newTag: "0.1.9"
+    newTag: "0.1.10"
   - name: ida-llm-agile
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-agile
-    newTag: "0.1.9"
+    newTag: "0.1.10"
 
 patches:
   - target: { kind: Deployment, name: ida-llm-frontend }
