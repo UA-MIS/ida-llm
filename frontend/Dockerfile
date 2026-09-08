@@ -19,7 +19,17 @@ WORKDIR /app
 # Copy ONLY the manifests first. This layer is invalidated by a dependency
 # change, not by every source edit — the single biggest lever on build time.
 COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm ci --no-audit --no-fund
+# ⚠ RETRIED, and deliberately not left to npm. This install runs inside the
+# image build, so the retry wrapped around the CI workflow's own `npm ci` does
+# not cover it -- a registry timeout here fails the BUILD, which fails the push,
+# which skips the dev bump. That is exactly how a green merge left dev serving
+# a stale commit. npm's `fetch-retries` was tried first and does not catch the
+# socket-read timeout this egress path produces.
+RUN n=1; until npm ci --no-audit --no-fund; do \
+      if [ "$n" -ge 4 ]; then echo "npm ci failed 4 times -- not a blip" >&2; exit 1; fi; \
+      echo "npm ci failed (attempt $n/4) -- retrying in $((n * 15))s" >&2; \
+      sleep $((n * 15)); n=$((n + 1)); \
+    done
 
 # ---- build ----------------------------------------------------------------
 FROM ${NODE_IMAGE} AS build
