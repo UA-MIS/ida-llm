@@ -209,8 +209,12 @@ describe("the orientation, in the DOM", () => {
     );
     // The corner names what a ROW is; the columns are the entities.
     expect(headers[0]).toBe("Model");
-    expect(headers.some((h) => h?.includes("Management Information Systems"))).toBe(true);
-    expect(headers.some((h) => h?.includes("General Business"))).toBe(true);
+    // Codes, not full names — a fourteen-column-wide grid has no room for
+    // "Management Information Systems" as a column header.
+    expect(headers.some((h) => h?.includes("MIS"))).toBe(true);
+    expect(headers.some((h) => h?.includes("GBA"))).toBe(true);
+    expect(headers.some((h) => h?.includes("Management Information Systems"))).toBe(false);
+    expect(headers.some((h) => h?.includes("General Business"))).toBe(false);
     expect(headers.at(-1)).toBe("All majors");
   });
 
@@ -265,6 +269,25 @@ describe("the orientation, in the DOM", () => {
       (n) => n.textContent,
     );
     expect(eyebrows).toEqual(["MIS 200", "MIS 221"]);
+  });
+
+  it("labels class columns with the course code, not the full course title", async () => {
+    await renderLevel(
+      () => ClassesPage({ params: Promise.resolve({ major: MAJOR }) }),
+      measuredBoard({ curriculum: WITH_TEAMWORK }),
+    );
+    const headings = Array.from(document.querySelectorAll(".xp-col-heading")).map(
+      (n) => n.textContent,
+    );
+    expect(headings).toEqual(["MIS 200", "MIS 221"]);
+    // Still cheaply reachable, as a hover tooltip on the same link — the full
+    // title is not gone from the page (the reasons list below the grid still
+    // carries it), only out of the column header itself.
+    const links = Array.from(document.querySelectorAll<HTMLAnchorElement>(".xp-col-link"));
+    expect(links.map((a) => a.getAttribute("title"))).toEqual([
+      "Fundamentals of Management Information Systems",
+      "Business Programming I",
+    ]);
   });
 });
 
@@ -356,10 +379,25 @@ describe("the three click targets", () => {
 describe("level 1 — the majors", () => {
   it("names every major the college offers and links into its classes", async () => {
     await renderLevel(() => ExplorePage(), measuredBoard());
-    const hrefs = Array.from(
+    const links = Array.from(
       document.querySelectorAll<HTMLAnchorElement>(".xp-col-link"),
-    ).map((a) => a.getAttribute("href"));
-    expect(hrefs).toEqual([`/explore/${MAJOR}`, `/explore/${GEN}`]);
+    );
+    expect(links.map((a) => a.getAttribute("href"))).toEqual([
+      `/explore/${MAJOR}`,
+      `/explore/${GEN}`,
+    ]);
+    // The column header's visible label is the department code — the full
+    // name is a hover tooltip on the same link, not text in the header.
+    const headings = Array.from(document.querySelectorAll(".xp-col-heading")).map(
+      (n) => n.textContent,
+    );
+    expect(headings).toEqual(["MIS", "GBA"]);
+    expect(links.map((a) => a.getAttribute("title"))).toEqual([
+      "Management Information Systems",
+      "General Business",
+    ]);
+    // Still on the page, in the per-column reasons list beneath the grid —
+    // just no longer the column header itself.
     expect(document.body.textContent).toContain("Management Information Systems");
   });
 

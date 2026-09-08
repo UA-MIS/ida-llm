@@ -63,9 +63,16 @@ function ColumnHeader({
       scope="col"
       className={`xp-col xp-col-${entity.status}${entity.benchmarkable ? "" : " cg-col-out"}`}
     >
-      <Link href={entity.href} className="xp-col-link">
+      <Link
+        href={entity.href}
+        className="xp-col-link"
+        // The full name/title, when the visible label is a shorter code for
+        // it — cheap to carry and useful on hover, but never the text a
+        // sighted reader has to read to find their major or class.
+        title={entity.columnLabel === entity.heading ? undefined : entity.heading}
+      >
         <span className="xp-col-eyebrow">{entity.eyebrow}</span>
-        <span className="xp-col-heading">{entity.heading}</span>
+        <span className="xp-col-heading">{entity.columnLabel}</span>
         <span className="xp-col-go" aria-hidden="true">
           →
         </span>

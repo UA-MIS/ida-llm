@@ -89,6 +89,20 @@ export interface MatrixEntityColumn {
   /** The small line above the name — "Major", a course code, an outcome id. */
   eyebrow: string;
   heading: string;
+  /**
+   * The column header's own visible label — what a 14-column-wide grid
+   * actually has room for.
+   *
+   * ⚠ NOT ALWAYS `heading`, AND THAT IS THE POINT. Level 3 has no shorter
+   * honest label than the outcome's own title, so the two agree there. Levels
+   * 1 and 2 do have one — the major's subject code, the class's course code —
+   * and a full major name or course title never fits fourteen columns without
+   * either wrapping every header three lines deep or being read at a squint.
+   * `heading` keeps carrying the full name for the aria label under the grid
+   * and the per-column reasons list beneath it, where the width the full name
+   * needs actually exists; this field is for the one place it doesn't.
+   */
+  columnLabel: string;
   /** The level below. Every column header is a link; that is the drill. */
   href: string;
   /**
@@ -178,6 +192,8 @@ interface EntitySpec {
   key: string;
   eyebrow: string;
   heading: string;
+  /** See `MatrixEntityColumn.columnLabel`. */
+  columnLabel: string;
   href: string;
   benchmarkable: boolean;
   /** The curriculum's own words on why it is or is not measurable. */
@@ -363,6 +379,7 @@ function buildEntityColumn(
     key: spec.key,
     eyebrow: spec.eyebrow,
     heading: spec.heading,
+    columnLabel: spec.columnLabel,
     href: spec.href,
     overall,
     overallCell,
@@ -445,6 +462,10 @@ function majorSpec(
     key: major.slug,
     eyebrow: "Major",
     heading: major.name,
+    // A department code, not the full name — the visible label a
+    // fourteen-column-wide grid has room for. The full name is still on
+    // `heading`, read by the reasons list below the grid and by screen readers.
+    columnLabel: major.code,
     href: `/explore/${major.slug}`,
     // A major is not a single outcome, so it is never "out of scope" as a
     // whole: it is reachable if any outcome its classes publish is.
@@ -501,6 +522,10 @@ function classSpec(tile: ClassTile, board: LeaderboardResponse, majorSlug: strin
     key: tile.slug,
     eyebrow: tile.code,
     heading: tile.title,
+    // The course code, not the full course title — same reasoning as
+    // `majorSpec`. The title is still on `heading` for the reasons list and
+    // for screen readers.
+    columnLabel: tile.code,
     href: `/explore/${majorSlug}/${tile.slug}`,
     // A class is out of scope only when EVERY outcome it teaches is — which is
     // a real case (`buildClassTile` has the same branch) and must read as the
@@ -557,6 +582,10 @@ function outcomeSpec(
     key: outcome.slo,
     eyebrow: outcome.slo,
     heading: outcome.title,
+    // No shorter honest label exists for an outcome than its own title, so
+    // the column header keeps showing it — unchanged from before this field
+    // existed.
+    columnLabel: outcome.title,
     href: `/explore/${majorSlug}/${tile.slug}/${outcome.slo.toLowerCase()}`,
     benchmarkable: outcome.benchmarkable,
     note: outcome.note,

@@ -142,6 +142,7 @@ export const CURRICULUM: CurriculumView = {
     {
       id: "management-information-systems",
       name: "Management Information Systems",
+      subject_codes: ["MIS"],
       department: "Information Systems, Statistics and Management Science",
       catalog: "https://catalog.ua.edu/undergraduate/business/",
       class_source: "catalog",
@@ -164,6 +165,7 @@ export const CURRICULUM: CurriculumView = {
     {
       id: "general-business",
       name: "General Business",
+      subject_codes: ["GBA"],
       department: "Management",
       catalog: null,
       class_source: "core-only",

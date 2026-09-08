@@ -268,6 +268,16 @@ class MajorView(BaseModel):
 
     name: str
     department: str
+    subject_codes: list[str] = Field(default_factory=list)
+    """The course-prefix codes this major's classes carry (e.g. ``["MIS"]``).
+
+    Served so a client can label a column with the department's own short code
+    instead of the full name -- the catalog's own abbreviation, not one this
+    codebase invents. Empty for a major whose coursework is filed entirely
+    under another major's prefix, or that has none catalogued yet; a client
+    falling back to ``name`` there is showing a real absence, not a bug.
+    """
+
     catalog: str | None = None
     class_source: str
     """``catalog`` / ``core-only`` / ``none`` -- how far the class list got.
@@ -506,6 +516,7 @@ def _load_majors(
                 id=major.id,
                 name=major.name,
                 department=major.department,
+                subject_codes=list(major.subject_codes),
                 catalog=major.catalog,
                 class_source=major.class_source,
                 class_source_label=major.class_source_label,
