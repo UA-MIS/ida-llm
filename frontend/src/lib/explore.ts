@@ -41,6 +41,7 @@
 import {
   aggregate,
   summariseDemonstration,
+  entriesAreSeeded,
   isSeeded,
   rollupByModel,
   type DemonstrationTell,
@@ -138,6 +139,13 @@ export interface OutcomeTile {
   tasks_available: number;
   /** How many models have a real score here. Coverage, stated not implied. */
   models_measured: number;
+  /**
+   * True when every entry that fed this tile's score was seeded, not measured.
+   *
+   * Per outcome, so it self-clears the moment a real measurement replaces the
+   * seeded one for THIS pairing — see `entriesAreSeeded`.
+   */
+  seeded: boolean;
   /** Always populated, always specific — the tile's own caption. */
   reason: string;
 }
@@ -158,6 +166,13 @@ export interface CourseTile {
   status: ExploreStatus;
   aggregate: ScoreAggregate;
   reason: string;
+  /**
+   * Whether the models measured on this course's outcomes are seeded, real, or
+   * a mix — same rule and same words as every other level, scoped to the
+   * models that actually contributed to THIS course rather than the whole
+   * board. See `summariseDemonstration`.
+   */
+  demonstration: DemonstrationTell;
 }
 
 /** One programme. Level 1's tile, and level 2's subject. */
@@ -266,6 +281,7 @@ function buildOutcomeTile(
     aggregate: agg,
     tasks_available: tasksAvailable,
     models_measured: modelsMeasured,
+    seeded: entriesAreSeeded(mine),
   };
 
   // Checked FIRST, and before any score: an outcome the curriculum says a text
@@ -317,6 +333,7 @@ function buildCourseTile(
   order: string[],
   entries: ModelTaskEntry[],
   taskCounts: Map<string, number>,
+  models: ModelRollup[],
 ): CourseTile {
   // Curriculum order, not the YAML mapping's insertion order: SLO10 must not
   // sort before SLO2, and a course page that ordered outcomes differently from
@@ -340,6 +357,23 @@ function buildCourseTile(
   const taughtSet = new Set(taught);
   const agg = aggregate(entries.filter((e) => e.slo !== null && taughtSet.has(e.slo)));
 
+  // Models with a real, rankable contribution to any outcome THIS course
+  // teaches — the same scoping `buildEvidence` uses for one outcome, one level
+  // up. Not the whole board's demonstration split: a course whose own outcomes
+  // are all measured must not be told "some figures here are illustrative"
+  // because a different course somewhere else is still seeded.
+  const contributing = models.filter(
+    (m) =>
+      m.recommendable &&
+      m.entries.some(
+        (e) =>
+          e.slo !== null &&
+          taughtSet.has(e.slo) &&
+          e.result.mean_score !== null &&
+          e.result.scored_count > 0,
+      ),
+  );
+
   const shared = {
     slug: slugify(row.course),
     code: row.course,
@@ -349,6 +383,7 @@ function buildCourseTile(
     measured_count: measured.length,
     assessment_count: tiles.filter((t) => t.assessment_point).length,
     aggregate: agg,
+    demonstration: summariseDemonstration(contributing),
   };
 
   if (benchmarkable.length === 0) {
@@ -387,10 +422,11 @@ export function buildCourses(board: LeaderboardResponse): CourseTile[] {
   const order = board.curriculum.available
     ? board.curriculum.outcomes.map((o) => o.id)
     : board.slos;
-  const entries = benchmarkEntries(rollupByModel(board));
+  const models = rollupByModel(board);
+  const entries = benchmarkEntries(models);
   const taskCounts = tasksPerOutcome(board);
   return board.curriculum.coverage.map((row) =>
-    buildCourseTile(row, outcomes, order, entries, taskCounts),
+    buildCourseTile(row, outcomes, order, entries, taskCounts, models),
   );
 }
 
