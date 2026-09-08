@@ -1,0 +1,290 @@
+# The Culverhouse undergraduate majors, and the classes each one owns.
+#
+# WHY THIS FILE EXISTS. `curriculum/slo.yaml` answers "which outcomes does the
+# business core teach, and where" -- it is the published course x outcome
+# coverage grid for the shared core, and it is the ONLY thing the drill-down had
+# to stand on. That made the top of the drill-down one entity: a programme, the
+# core. Which is wrong for the reader this product is for. A professor is a
+# professor OF A MAJOR -- of Management Information Systems, of Accounting --
+# not a professor of "the core". Landing them on a single programme row and
+# asking them to recognise their course inside a fifteen-course core grid is
+# the "too much information, go find it yourself" the client rejected.
+#
+# So this file is the taxonomy the core map has no opinion about: the eleven
+# majors the college actually offers, and which classes belong to each. It is
+# DATA, not documentation: `ida_core.majors` parses it, `majors.schema.json`
+# constrains it, `tools/validate_tasks.py` gates it, and the API serves it so
+# no client holds its own transcription of a registrar's list.
+#
+# ------------------------------------------------------------------------
+# HOW THIS FILE RELATES TO curriculum/slo.yaml -- read this before editing
+# ------------------------------------------------------------------------
+#
+# Two files, two authorities, one join key (the course code):
+#
+#   majors.yaml   WHICH classes exist and WHOSE they are.       (course catalog)
+#   slo.yaml      WHICH outcomes a class teaches, at what level. (curriculum map)
+#
+# A class listed here that also appears in slo.yaml's `coverage` grid inherits
+# that grid's outcome profile -- that is the whole drill-down: major -> class ->
+# the outcomes behind it -> the evidence. A class listed here that the coverage
+# grid does not mark is NOT an error and must never be rendered as one: it means
+# the published map does not map that course, so the level below it is honestly
+# empty rather than invented. Today MIS 200 is the only class anywhere in this
+# file with a scored benchmark behind it; every other class in every other major
+# reads "not measured yet", which is the truth and is meant to stay visible.
+#
+# WHAT MAKES A CLASS "MEASURED". A class carries `task_families`: the families
+# whose results are about that class's own material. A class that lists none can
+# never show a score, and that default is deliberate -- see the note on MIS 200
+# below for what the alternative does.
+#
+# TITLE PRECEDENCE. A class may omit `title`, and most do. When it does, the
+# title comes from slo.yaml's coverage row for the same course code, so the two
+# files cannot disagree about a course they both name. When a class DOES carry a
+# title it is because the course catalog is the authority on course titles and
+# the curriculum map abbreviates: the map prints "Fundamentals of MIS", the
+# catalog prints "Fundamentals of Management Information Systems". The catalog
+# wins. `tools/validate_tasks.py` prints every such difference so a divergence
+# is visible rather than silent, and a class with NO title and NO coverage row
+# is a hard error -- it would render as a nameless column.
+#
+# COVERAGE MUST NOT BE ORPHANED. Every course in slo.yaml's coverage grid has to
+# be claimed by exactly one major here, or be listed under `unassigned_core`
+# with a reason. That gate is not tidiness: MIS 200 is the one populated leaf in
+# the entire product, and a refactor that dropped it out of every major's class
+# list would empty the demonstration path without failing anything else.
+#
+# PROVENANCE. The eleven majors, their owning departments and the MIS course
+# numbers and titles were read from the University of Alabama undergraduate
+# catalog on the date in `retrieved` (see `source`, and the per-major `catalog`
+# links). Nothing here is invented: a major whose class list has not been
+# transcribed from the catalog says so in `class_source` and carries the classes
+# it can evidence, rather than a plausible-looking list.
+#
+# ⚠ ONE KNOWN DISAGREEMENT WITH slo.yaml, LEFT STANDING ON PURPOSE. slo.yaml's
+# `program` is "BScBA General Business (core)", transcribed from the curriculum
+# map's own header. The catalog is explicit that "the Culverhouse College of
+# Business offers one undergraduate degree, the Bachelor of Science (BS)" --
+# there is no BScBA. Both are recorded as their source states them rather than
+# silently reconciled: the map may simply be older than the degree's renaming,
+# and quietly editing a transcription to agree with a different document is how
+# a provenance trail stops being one.
+version: 1
+
+institution: The University of Alabama
+college: Culverhouse College of Business
+degree: BS
+source: https://catalog.ua.edu/undergraduate/business/
+source_title: Culverhouse College of Business -- The University of Alabama Undergraduate Catalog
+retrieved: "2026-09-08"
+
+# --------------------------------------------------------------------------
+# The eleven majors
+# --------------------------------------------------------------------------
+#
+# `class_source` records how far the class list got, so the UI can say which it
+# is instead of letting a short list read as a small department:
+#
+#   catalog     transcribed from the catalog's course listing for this subject
+#   core-only   only the classes this major owns in the shared business core
+#   none        no class of this major is evidenced yet
+#
+# `id` is the URL segment and is written out rather than derived from `name`, so
+# renaming a major in the catalog does not silently break every link to it.
+majors:
+  - id: accounting
+    name: Accounting
+    department: Culverhouse School of Accountancy
+    subject_codes: [AC]
+    catalog: https://catalog.ua.edu/undergraduate/business/accountancy/bs/
+    class_source: core-only
+    classes:
+      - course: AC 210
+
+  - id: business-cyber-security
+    name: Business Cyber Security
+    department: Information Systems, Statistics and Management Science
+    subject_codes: []
+    catalog: https://catalog.ua.edu/undergraduate/business/information-systems-statistics-management-science/business-cyber-security-bs/
+    class_source: none
+    # Its coursework is taught under the MIS subject code (MIS 460/462/464/466),
+    # so those classes are listed once, under Management Information Systems,
+    # rather than duplicated here. Listing them twice would double-count the
+    # one thing this grid is for -- how much of a major has been measured.
+    classes: []
+
+  - id: business-statistics
+    name: Business Statistics
+    department: Information Systems, Statistics and Management Science
+    subject_codes: [ST]
+    catalog: https://catalog.ua.edu/undergraduate/business/information-systems-statistics-management-science/business-statistics-bs/
+    class_source: core-only
+    classes:
+      - course: ST 260
+
+  - id: economics
+    name: Economics
+    department: Economics, Finance, and Legal Studies
+    subject_codes: [EC]
+    catalog: https://catalog.ua.edu/undergraduate/business/economics-finance-legal-studies/economics-bs/
+    class_source: core-only
+    classes:
+      - course: EC 110
+      - course: EC 111
+
+  - id: finance
+    name: Finance
+    department: Economics, Finance, and Legal Studies
+    subject_codes: [FI]
+    catalog: https://catalog.ua.edu/undergraduate/business/economics-finance-legal-studies/finance-bs/
+    class_source: core-only
+    classes:
+      - course: FI 302
+
+  - id: general-business
+    name: General Business
+    department: Management
+    subject_codes: [GBA]
+    catalog: https://catalog.ua.edu/undergraduate/business/management/general-business-bs/
+    class_source: core-only
+    classes:
+      - course: GBA 146
+      - course: GBA 246
+      - course: GBA 300
+      - course: GBA 346
+      - course: GBA 490
+
+  - id: management
+    name: Management
+    department: Management
+    subject_codes: [MGT]
+    catalog: https://catalog.ua.edu/undergraduate/business/management/bs/
+    class_source: core-only
+    classes:
+      - course: MGT 300
+
+  # ⚠ THE ONE MAJOR WITH A REAL PATH THROUGH IT. MIS 200 is the course the first
+  # exam was ingested from and the only class in this file that any model has
+  # been scored against. Its classes are the full transcribed MIS subject
+  # listing rather than the core course alone, because this is the major the
+  # product is demonstrated on and a demonstration that shows one class does not
+  # show a major.
+  - id: management-information-systems
+    name: Management Information Systems
+    department: Information Systems, Statistics and Management Science
+    subject_codes: [MIS]
+    catalog: https://catalog.ua.edu/undergraduate/business/information-systems-statistics-management-science/mis/
+    class_source: catalog
+    # Titles are the catalog's full forms, not the abbreviated Banner strings
+    # the major-requirements page prints ("Systems Constructn Implemtn II").
+    #
+    # MIS 491 (Independent Study), 492 (Internship) and 497 (Special Topics) are
+    # deliberately absent: they are variable-credit containers with no fixed
+    # content, so a benchmark row against one would be a row about nothing. That
+    # is an editorial exclusion, recorded here rather than left to be noticed as
+    # a gap.
+    classes:
+      # The college-wide core IT course, and the one leaf with real data. Its
+      # title here supersedes slo.yaml's "Fundamentals of MIS" -- see the
+      # TITLE PRECEDENCE note at the top of this file.
+      - course: MIS 200
+        title: Fundamentals of Management Information Systems
+        credit_hours: 3
+        # ⚠ THE ONLY POPULATED `task_families` IN THIS FILE, AND THE REASON THE
+        # FIELD EXISTS. Results are filed by OUTCOME, not by course. Without
+        # this, "how does a model do on MIS 200" would be computed as "how does
+        # it do on SLO1, SLO2 and SLO9" -- and the moment these three families
+        # are run, that same number would appear under AC 210, GBA 300, ST 260,
+        # OM 300 and FI 302, every class the map marks against SLO2. A dozen
+        # courses nobody benchmarked would show one exam's score. Listing the
+        # families makes "measured" a claim about THIS class's own material,
+        # structurally, rather than a caveat somebody has to remember to print.
+        task_families:
+          - mis200-spreadsheet-formulas
+          - mis200-is-concepts
+          - mis200-is-problem-solving
+      - course: MIS 221
+        title: Business Programming I
+        credit_hours: 3
+      - course: MIS 321
+        title: Business Programming II
+        credit_hours: 3
+      - course: MIS 330
+        title: Database Administration
+        credit_hours: 3
+      - course: MIS 405
+        title: Enterprise Networking and Security
+        credit_hours: 3
+      - course: MIS 421
+        title: Enterprise Application Development
+        credit_hours: 3
+      - course: MIS 430
+        title: Systems Analysis and Design I
+        credit_hours: 3
+      - course: MIS 431
+        title: Systems Analysis and Design II
+        credit_hours: 3
+      - course: MIS 440
+        title: Decision Support Systems
+        credit_hours: 3
+      - course: MIS 451
+        title: Systems Construction and Implementation II
+        credit_hours: 3
+      - course: MIS 460
+        title: Applied Cyber Security
+        credit_hours: 3
+      - course: MIS 462
+        title: Behavioral Cyber Security
+        credit_hours: 3
+      - course: MIS 464
+        title: Organizational Security Management
+        credit_hours: 3
+      - course: MIS 466
+        title: Introduction to Cybercrime and Digital Forensics
+        credit_hours: 3
+
+  - id: marketing
+    name: Marketing
+    department: Marketing
+    subject_codes: [MKT]
+    catalog: https://catalog.ua.edu/undergraduate/business/marketing/bs/
+    class_source: core-only
+    classes:
+      - course: MKT 300
+
+  - id: operations-management
+    name: Operations Management
+    department: Information Systems, Statistics and Management Science
+    subject_codes: [OM]
+    catalog: https://catalog.ua.edu/undergraduate/business/information-systems-statistics-management-science/operations-management-bs/
+    class_source: core-only
+    classes:
+      - course: OM 300
+
+  - id: real-estate
+    name: Real Estate
+    department: Economics, Finance, and Legal Studies
+    subject_codes: []
+    catalog: https://catalog.ua.edu/undergraduate/business/economics-finance-legal-studies/real-estate-bs/
+    class_source: none
+    classes: []
+
+# --------------------------------------------------------------------------
+# Core courses no single major owns
+# --------------------------------------------------------------------------
+#
+# The gate is "every coverage course is claimed exactly once". This is the
+# escape hatch for a course that genuinely cannot be, and it requires a reason
+# so the escape hatch cannot be used to quietly park an unclassified course.
+#
+# These are still fully reachable: they carry outcome coverage and appear on
+# `/compare` and `/leaderboard` like any other. What they do not have is a major
+# to be drilled into from, which is a fact about the college, not a gap in us.
+unassigned_core:
+  - course: LGS 200
+    reason: >-
+      Legal Studies (LGS) is taught by the Economics, Finance and Legal Studies
+      department, which offers no Legal Studies major -- the catalog lists
+      economics, finance and real estate. Assigning the course to one of those
+      three would be inventing an ownership the catalog does not state.

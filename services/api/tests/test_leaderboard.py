@@ -545,6 +545,114 @@ class TestCurriculum:
         assert view.unavailable_reason
 
 
+class TestMajorsTaxonomy:
+    """``curriculum/majors.yaml`` on the wire.
+
+    ⚠ SERVED BECAUSE THE READER IS A PROFESSOR OF A MAJOR. The drill-down used
+    to open on the single programme the curriculum map describes, and nobody is
+    a professor of "the core". Which classes exist and whose they are lives in
+    the course catalog -- a different document from the curriculum map -- and it
+    is served for the same reason the coverage grid is: so no client ships its
+    own transcription of a registrar's list.
+    """
+
+    def test_the_taxonomy_is_served_beside_the_coverage_grid(self, client: TestClient) -> None:
+        body = client.get("/leaderboard").json()["curriculum"]
+        if not body["available"]:
+            pytest.skip("no curriculum map in this checkout")
+        assert body["majors"], "the leaderboard served no majors"
+        for major in body["majors"]:
+            assert major["id"] and major["name"] and major["department"]
+            assert major["class_source"] in {"catalog", "core-only", "none"}
+            assert major["class_source_label"]
+
+    def test_every_class_can_name_itself_on_the_wire(self, client: TestClient) -> None:
+        """A titleless class would render as a nameless column.
+
+        The title is resolved server-side -- catalog first, curriculum map
+        second -- so no client re-implements the precedence and no two clients
+        disagree about a course's name.
+        """
+        body = client.get("/leaderboard").json()["curriculum"]
+        if not body["available"]:
+            pytest.skip("no curriculum map in this checkout")
+        for major in body["majors"]:
+            for entry in major["classes"]:
+                assert entry["course"], major["id"]
+                assert entry["title"], f"{major['id']}/{entry['course']} has no title"
+
+    def test_the_catalog_title_wins_over_the_maps_abbreviation(self, client: TestClient) -> None:
+        view = load_curriculum_view(repo_root())
+        if not view.available or not view.majors:
+            pytest.skip("no majors taxonomy in this checkout")
+        mis = view.major("management-information-systems")
+        assert mis is not None
+        mis200 = next(c for c in mis.classes if c.course == "MIS 200")
+        assert mis200.title == "Fundamentals of Management Information Systems"
+        # The curriculum map still says what IT says; neither file was edited to
+        # agree with the other.
+        assert view.course("MIS 200").title == "Fundamentals of MIS"  # type: ignore[union-attr]
+
+    def test_task_families_reach_the_client(self, client: TestClient) -> None:
+        """⚠ WITHOUT THIS FIELD ONE EXAM'S SCORE APPEARS UNDER A DOZEN COURSES.
+
+        Results are filed by outcome -- a task carries ``slo:SLO2``, never
+        ``course:MIS 200`` -- so a client that scored a class from "the outcomes
+        it teaches" would give AC 210, ST 260, GBA 300, OM 300 and FI 302 each a
+        number produced by an MIS 200 exam.
+        """
+        view = load_curriculum_view(repo_root())
+        if not view.available or not view.majors:
+            pytest.skip("no majors taxonomy in this checkout")
+        mis = view.major("management-information-systems")
+        assert mis is not None
+        mis200 = next(c for c in mis.classes if c.course == "MIS 200")
+        assert mis200.task_families, "MIS 200 claims no task family, so it can never score"
+
+        # And every OTHER class in the college claims none, so none of them can
+        # display a number it did not earn.
+        others = [
+            (major.id, entry.course)
+            for major in view.majors
+            for entry in major.classes
+            if entry.task_families and entry.course != "MIS 200"
+        ]
+        assert others == []
+
+    def test_a_major_the_taxonomy_does_not_list_is_none_not_a_blank(self) -> None:
+        """ "No such major" and "this major has no classes" are different answers.
+
+        A caller handed a blank major for an id that does not exist would render
+        a page for it.
+        """
+        view = load_curriculum_view(repo_root())
+        if not view.available or not view.majors:
+            pytest.skip("no majors taxonomy in this checkout")
+        assert view.major("no-such-major") is None
+        assert view.major("business-cyber-security") is not None
+
+    def test_a_deployment_with_no_taxonomy_serves_an_empty_list(self, tmp_path) -> None:
+        """Empty means "no taxonomy here", never "this college has no majors".
+
+        And it degrades independently of ``available``: the taxonomy is a second
+        file with a second source, and either can be absent without the other.
+        """
+        view = load_curriculum_view(tmp_path)
+        assert view.majors == []
+        assert view.unassigned_core == []
+        assert view.major("management-information-systems") is None
+
+    def test_core_courses_no_major_owns_are_surfaced_not_dropped(self) -> None:
+        """A course in the core reachable from no major is a fact about the
+        college. A drill-down that omitted it would quietly shorten the
+        curriculum."""
+        view = load_curriculum_view(repo_root())
+        if not view.available or not view.majors:
+            pytest.skip("no majors taxonomy in this checkout")
+        assert [row.course for row in view.unassigned_core] == ["LGS 200"]
+        assert view.unassigned_core[0].reason
+
+
 class TestPublishedPrice:
     """The value axis: what a reader would PAY, not what our benchmark SPENT.
 
