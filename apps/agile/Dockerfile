@@ -21,7 +21,17 @@ ARG NODE_IMAGE=harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-a
 FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 COPY apps/agile/package.json apps/agile/package-lock.json ./
-RUN npm ci --no-audit --no-fund
+# ⚠ RETRIED, and deliberately not left to npm. This install runs inside the
+# image build, so the retry wrapped around the CI workflow's own `npm ci` does
+# not cover it -- a registry timeout here fails the BUILD, which fails the push,
+# which skips the dev bump. That is exactly how a green merge left dev serving
+# a stale commit. npm's `fetch-retries` was tried first and does not catch the
+# socket-read timeout this egress path produces.
+RUN n=1; until npm ci --no-audit --no-fund; do \
+      if [ "$n" -ge 4 ]; then echo "npm ci failed 4 times -- not a blip" >&2; exit 1; fi; \
+      echo "npm ci failed (attempt $n/4) -- retrying in $((n * 15))s" >&2; \
+      sleep $((n * 15)); n=$((n + 1)); \
+    done
 
 FROM ${NODE_IMAGE} AS builder
 WORKDIR /app

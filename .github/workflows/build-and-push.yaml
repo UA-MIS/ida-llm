@@ -428,6 +428,11 @@ jobs:
       && needs.resolve.outputs.PUSH == 'true'
       && needs.build-and-push.result != 'success' }}
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
+    # This runner refuses container-less jobs ("Jobs without a job container are
+    # forbidden on this runner"). Every other job here carries one; the first
+    # version of this job did not, and failed before running a line.
+    container:
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie
     steps:
       - name: Say that dev was not updated
         run: |
