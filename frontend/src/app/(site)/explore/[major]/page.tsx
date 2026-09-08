@@ -1,13 +1,15 @@
 /**
- * Level 2: the courses of one programme.
+ * Level 2: the courses of one programme, against every model.
  *
- * Read from the published course x outcome coverage grid, which the API now
- * serves alongside the outcomes (`CurriculumView.coverage`). Nothing here holds
- * its own list of courses, for the same reason nothing holds its own list of
- * outcomes: the registrar owns both, and a list typed into a component is a list
- * that disagrees with the programme the first time either is edited.
+ * Read from the published course x outcome coverage grid, which the API serves
+ * alongside the outcomes (`CurriculumView.coverage`). Nothing here holds its own
+ * list of courses, for the same reason nothing holds its own list of outcomes:
+ * the registrar owns both, and a list typed into a component is a list that
+ * disagrees with the programme the first time either is edited.
  *
- * Course order is the MAP's order, never score order — see `buildCourses`.
+ * Course order is the MAP's order, never score order — see `buildCourses`. A
+ * matrix makes that temptation stronger, not weaker: rows sorted by score would
+ * turn a coverage grid into a ranking of a department's own courses.
  */
 
 import type { Metadata } from "next";
@@ -15,17 +17,18 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Breadcrumbs, ExploreHelp } from "@/components/explore-chrome";
-import { ExploreTile } from "@/components/explore-tile";
+import { ExploreMatrixGrid } from "@/components/explore-matrix";
 import { ResultsUnavailable } from "@/components/service-unavailable";
 import { getLeaderboard } from "@/lib/api";
-import { buildCourses, buildIndex, findMajor } from "@/lib/explore";
+import { buildIndex, findMajor } from "@/lib/explore";
+import { buildCourseMatrix } from "@/lib/explore-matrix";
 import type { LeaderboardResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Courses — Capstone-IDA",
-  description: "Every course in the programme, and how the models read on what it teaches.",
+  description: "Every course in the programme against every model, and what each one teaches.",
 };
 
 /**
@@ -36,9 +39,10 @@ export const metadata: Metadata = {
  * contract, not a place to share a string.
  */
 const EXPLAIN =
-  "One tile per course in this programme, in the order the curriculum map " +
-  "publishes them. The number is how the models do across the outcomes that " +
-  "course is responsible for. Open one to see those outcomes.";
+  "One row per course in this programme, in the order the curriculum map " +
+  "publishes them, and one column per model. Each cell is how that model does " +
+  "across the outcomes that course is responsible for. Open a row to see those " +
+  "outcomes.";
 
 export default async function CoursesPage({
   params,
@@ -61,22 +65,21 @@ export default async function CoursesPage({
     );
   }
 
-  const index = buildIndex(board);
-  const major = findMajor(index, majorSlug);
-  // ⚠ 404, NOT AN EMPTY GRID. A page of dashes under a programme name reads as
+  const major = findMajor(buildIndex(board), majorSlug);
+  // ⚠ 404, NOT AN EMPTY GRID. A grid of dashes under a programme name reads as
   // "we measured this programme and found nothing", which is a different and
   // false claim from "no such programme is on this platform".
   if (!major) notFound();
 
-  const courses = buildCourses(board);
+  const matrix = buildCourseMatrix(board, major.slug);
 
   return (
     <>
       <Breadcrumbs trail={[{ label: "Programmes", href: "/explore" }]} here={major.name} />
       <ExploreHelp explain={EXPLAIN} />
 
-      {index.demonstration.any ? (
-        <div className="notice">{index.demonstration.notice}</div>
+      {matrix.demonstration.any ? (
+        <div className="notice">{matrix.demonstration.notice}</div>
       ) : null}
 
       <section className="hero">
@@ -95,45 +98,17 @@ export default async function CoursesPage({
         </p>
       </section>
 
-      {courses.length === 0 ? (
+      {!matrix.available ? (
         <div className="empty">
           <h2>This programme lists no courses</h2>
+          <p className="muted">{matrix.unavailable_reason}</p>
           <p className="muted">
-            The curriculum map has no coverage grid for it, so there is nothing to
-            drill into. The <Link href="/compare">comparison grid</Link> still
-            reads by outcome.
+            The <Link href="/compare">comparison grid</Link> still reads by
+            outcome.
           </p>
         </div>
       ) : (
-        <ul className="xp-grid">
-          {courses.map((course) => (
-            <ExploreTile
-              key={course.slug}
-              href={`/explore/${major.slug}/${course.slug}`}
-              eyebrow={course.code}
-              heading={course.title}
-              status={course.status}
-              aggregate={course.aggregate}
-              reason={course.reason}
-              footnote={
-                <>
-                  Teaches {course.outcomes.length}{" "}
-                  {course.outcomes.length === 1 ? "outcome" : "outcomes"}
-                  {course.assessment_count > 0 ? (
-                    <>
-                      {" "}
-                      ·{" "}
-                      <strong>
-                        {course.assessment_count} assessment{" "}
-                        {course.assessment_count === 1 ? "point" : "points"}
-                      </strong>
-                    </>
-                  ) : null}
-                </>
-              }
-            />
-          ))}
-        </ul>
+        <ExploreMatrixGrid matrix={matrix} rowKind="Course" />
       )}
     </>
   );
