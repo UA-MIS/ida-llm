@@ -1,0 +1,197 @@
+# mis200-is-concepts, rung 1 of 2 in the first batch.
+#
+# WHERE THIS FAMILY COMES FROM. Twenty-six of the thirty-two items on the MIS
+# 200 Exam 1 are forced-choice items over information-systems and business
+# concepts. Against `curriculum/slo.yaml` those items measure SLO9, General
+# Business Knowledge, which the course's published map marks Introduced (I) --
+# breadth over depth, which is what a wide forced-choice family measures well.
+# They do NOT measure SLO1; see the note in the batch's mapping document, and
+# `mis200-is-problem-solving/` for what an SLO1 item off this course has to
+# look like instead.
+#
+# WHAT THIS FAMILY ADDS THAT `slo9-business-knowledge/` DOES NOT. That family
+# is general business: accounting, finance, management, marketing. This one is
+# the information-systems half of general business knowledge -- IS components,
+# revenue models, platform and network concepts, the frameworks a first MIS
+# course teaches. Same outcome, same use mode, disjoint subject matter. They
+# are separate directories rather than extra rungs because the id prefix is
+# the family, and a reader filtering results by subject should be able to.
+#
+# EVERY ITEM IS ADAPTED, NOT COPIED. The concepts and the distractor STRATEGY
+# come from the course blueprint. The scenario, the option wording and the
+# distractors themselves are written for this file. No stem, option or answer
+# key from the exam appears here. The reasoning behind that choice is the
+# leakage note in the batch's mapping document, and it is the single most
+# important thing about this family: an item copied verbatim into a public
+# repository leaks a live exam AND stops measuring anything once it is
+# scraped.
+#
+# THE PAIRING DEVICE. Two items in this file (`internal-advantage-framework`
+# and `industry-attractiveness-framework`) are each other's distractor: the
+# value chain looks inward at a firm's own activities, Five Forces looks
+# outward at an industry. A student who has memorised two framework names
+# without the direction they point in gets exactly one of the pair right, and
+# which one is a coin flip. Asking both is what turns that from noise into a
+# signal.
+version: 1
+id: mis200-is-concepts/l1-core-is-concepts
+title: SLO9 -- identifying core information-systems and business concepts
+description: >
+  Six four-option items over the concepts a first information-systems course
+  establishes: the components of an information system, revenue models,
+  disintermediation, the digital divide, and the two frameworks students most
+  often fuse. Distractors are the neighbouring concept rather than an unrelated
+  term, so an item cannot be cleared by recognising which words belong to the
+  subject.
+
+  Four options, so the guessing floor is 0.25.
+
+  Provenance: every scenario, option and distractor was written for this file.
+  The concepts assessed were derived from the published blueprint of a real MIS
+  200 Exam 1, but no exam stem, option, scenario or answer key is reproduced,
+  and no exam asset is committed to this repository. No student work and no
+  textbook content.
+kind: verifiable
+domain: information-systems
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate
+  information-systems examination. Exactly one option is correct. You may
+  reason briefly first, but you must then put the letter of the correct option
+  alone on the last line, with no punctuation and no other text on that line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", mis200-is-concepts, ladder-l1, business-knowledge, information-systems, forced-choice]
+samples:
+  - id: information-system-software-component
+    input: >-
+      A veterinary clinic installs a self-service check-in station in its
+      waiting room. Owners tap through a screen to confirm their arrival, a
+      program matches them to the day's appointment list and flags any overdue
+      vaccinations, and a receptionist steps in when a booking cannot be found.
+      Which of the following is the SOFTWARE component of this information
+      system?
+      A) The touchscreen terminal and the badge printer beside it
+      B) The check-in program that matches arrivals to the appointment list
+      C) The owners and the receptionist who use the station
+      D) The appointment and vaccination records the clinic keeps
+    # B. The item names all five components of an information system and asks
+    # for one, so each distractor is a real component correctly described:
+    # A is hardware, C is people, D is data. Only the framing sentence -- "a
+    # receptionist steps in" -- gestures at process, which is deliberately the
+    # component NOT offered, so a model cannot arrive at B by elimination of
+    # everything it can label.
+    # The word "program" appears in both the scenario and option B, which makes
+    # this the easiest item in the file. That is intended: it is the floor.
+    target: "B"
+    metadata: { skill: is-component-identification, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: freemium-revenue-model
+    input: >-
+      A recipe application lets anyone browse and save recipes at no cost.
+      Users who want the weekly meal planner and the automatic shopping list
+      pay a monthly fee for the premium tier. Which revenue model does this
+      best describe?
+      A) Subscription
+      B) Advertising
+      C) Freemium
+      D) Transaction
+    # C. A is the trap and it is a good one: the premium tier IS billed as a
+    # subscription, so a model reading only the second sentence answers A and
+    # is not obviously wrong. What makes the model freemium is the FREE tier
+    # that exists to feed the paid one, which is the first sentence. The item
+    # tests whether the whole arrangement is read, not the billing verb.
+    # B is unsupported -- no advertising is mentioned. D would fit a per-order
+    # commission, which this is not.
+    target: "C"
+    metadata: { skill: revenue-model-classification, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: digital-divide
+    input: >-
+      Two counties in the same state have similar populations. In one, nearly
+      every household can buy fixed broadband; in the other, most households
+      cannot get a wired connection at any price, so residents there have far
+      less access to online banking, telehealth and remote coursework. The gap
+      between what the two populations can do is known as:
+      A) Digital density
+      B) Disintermediation
+      C) The Internet of Things
+      D) The digital divide
+    # D. A is the near neighbour and the reason this item is not trivial:
+    # digital density is about the volume of connected devices and data, and
+    # the scenario mentions connectivity, so a keyword match can land on it.
+    # The distinguishing feature is that the item is about a gap BETWEEN two
+    # populations, not about a quantity.
+    # B and C are drawn from the same vocabulary block so that the option set
+    # is internally plausible rather than padded.
+    target: "D"
+    metadata: { skill: digital-divide-versus-density, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: disintermediation
+    input: >-
+      A furniture workshop used to sell only through regional retail chains,
+      which set the display price and kept a share of it. It now sells the same
+      pieces through its own website and ships direct to buyers. The retail
+      chains are no longer involved. This change is best described as:
+      A) Disintermediation
+      B) A freemium model
+      C) Indirect network effects
+      D) Rising digital density
+    # A. The term is the answer, and the scenario is built so the definition
+    # has to be applied rather than recognised: the phrase "cut out the middle
+    # man" does not appear anywhere in the stem, so a model matching on the
+    # textbook gloss has nothing to match. It must notice that a layer of the
+    # chain was removed.
+    # C is the strongest distractor for a model reading "website" as "platform"
+    # -- but nothing here connects two sides of a market; the workshop still
+    # makes what it sells, which is the linear arrangement, not a platform.
+    target: "A"
+    metadata: { skill: disintermediation, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: internal-advantage-framework
+    input: >-
+      A regional bakery chain wants to work out which of its own steps --
+      sourcing flour, baking, packaging, delivery to its shops, and service at
+      the counter -- is the one where it could build an advantage its rivals
+      would struggle to copy. Which analytical framework is designed for that
+      question?
+      A) Porter's Five Forces
+      B) Value chain analysis
+      C) A revenue model canvas
+      D) A network effects assessment
+    # B. Paired with industry-attractiveness-framework below; see the header
+    # note. The value chain looks INWARD at the activities a firm performs, and
+    # every distinguishing word in this stem points inward: "its own steps",
+    # the list of internal activities, "rivals would struggle to copy".
+    # A is the fused reading and is the option a student who knows both names
+    # but neither direction picks half the time. C and D are from the same
+    # course but answer questions nobody asked here.
+    target: "B"
+    metadata: { skill: internal-versus-industry-framework, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: industry-attractiveness-framework
+    input: >-
+      A farm-equipment dealer is weighing whether to start selling lawn-care
+      equipment, a market it has never entered. Before committing, it wants to
+      judge how hard that market would be to compete in: how many established
+      sellers there are, how easily buyers could switch, and how much power the
+      manufacturers hold. Which analytical framework addresses that question?
+      A) Value chain analysis
+      B) Porter's Five Forces
+      C) The long tail
+      D) A digital density assessment
+    # B, and it is the mirror of the item above. Everything distinguishing in
+    # this stem points OUTWARD at an industry the firm is not yet in -- rivals,
+    # buyers, suppliers, which are three of the five forces named without using
+    # the word "forces".
+    # A is the fused reading in the other direction. Scoring the pair together
+    # separates a model that knows what each framework looks at from one that
+    # has memorised two names: the second kind gets one of the two, and the
+    # family reports both.
+    target: "B"
+    metadata: { skill: internal-versus-industry-framework, provenance: synthetic, slo: SLO9, use_mode: capability }

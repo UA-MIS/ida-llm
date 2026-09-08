@@ -1,0 +1,205 @@
+# mis200-spreadsheet-formulas, rung 1 of 2 in the first batch.
+#
+# WHERE THIS FAMILY COMES FROM. MIS 200 is the course this benchmark's first
+# live run is aimed at, and its published assessment point is SLO2. The five
+# spreadsheet items on the course's Exam 1 are the only items on that paper
+# that measure SLO2 as `curriculum/slo.yaml` states it -- "using appropriate
+# software, data sources, and tools". This family is the benchmark counterpart
+# of those five items.
+#
+# WHAT IT ADDS THAT `slo2-quantitative-literacy/` DOES NOT. That family asks
+# for NUMBERS: a margin, a break-even volume, an aggregate over an extract.
+# Every item there could be answered on paper. This family asks for a FORMULA
+# -- the model never sees a value and cannot compute its way out. The skill is
+# expressing a business quantity as a reference-based expression over a named
+# layout, which is the "appropriate software" clause of SLO2 and is exactly
+# what the course's Excel items assess. The two families are complementary and
+# neither substitutes for the other.
+#
+# WHY NO VALUES APPEAR IN THE LAYOUT. The items state the header row and the
+# row range and nothing else. A model handed the numbers can return an
+# arithmetic result that happens to be right while writing no formula at all,
+# which would score the wrong skill. Withholding the values makes the formula
+# the only possible answer.
+#
+# THE OPERAND-ORDER PROBLEM, AND HOW THIS FILE WORKS AROUND IT.
+# `=B2*C2` and `=C2*B2` are the same formula and a spreadsheet accepts both.
+# The repository's verifiable scorers are `exact_match` and `numeric_match`;
+# neither can express "any of these strings". So five of the six items below
+# use SUBTRACTION or DIVISION, where exactly one operand order is correct and
+# the scorer's strictness costs nothing. The single multiplication item
+# (`revenue-cell`) pins the order in its own stem -- "in that order" -- so that
+# a model following the instruction has one target to hit.
+#
+# This is a workaround, not a fix, and it bounds what this family can ask: a
+# genuinely commutative item cannot be scored fairly here. The fix is a scorer
+# that accepts a set of equivalent answers. That is filed as a recommendation
+# alongside this batch and is deliberately NOT built here.
+#
+# NORMALISATION AND WHAT IT CANNOT ABSORB. `lowercase` absorbs `=SUM` vs
+# `=sum` and `B2` vs `b2`, which is the largest real source of spurious
+# mismatch. It cannot absorb interior spaces (`=B2 * C2`), absolute references
+# (`=$B$2*$C$2`) or a missing `=`. The available normalisation options have no
+# "remove all whitespace", so the system prompt states all three constraints
+# explicitly and the items are scored against a model that was told them.
+# `strip_punctuation` MUST stay off: `=`, `*`, `/`, `(`, `)` and `:` are all
+# ASCII punctuation and stripping them would delete the entire answer.
+version: 1
+id: mis200-spreadsheet-formulas/l1-single-cell-formulas
+title: SLO2 -- writing a single-cell formula from a described spreadsheet layout
+description: >
+  Six items, each describing the same twelve-row spreadsheet layout by its
+  header row and asking for the formula that belongs in one derived cell of the
+  first data row. Two items chain on cells that earlier items produce, so a
+  model must read the layout rather than pattern-match the column letters. No
+  cell values are given: the answer is a reference expression, never a number.
+
+  Provenance: the spreadsheet layout, its column names and its business setting
+  are synthetic, authored for this file. The SKILL TARGETS were derived from
+  the published blueprint of a real MIS 200 Exam 1 -- author a single-cell
+  arithmetic formula over a supplied layout -- but no exam wording, column
+  name, scenario or answer key is reproduced. Nothing here is student work, and
+  no exam asset is committed to this repository.
+kind: verifiable
+domain: business-analytics
+system_prompt: >-
+  You are producing the answer key for an undergraduate business spreadsheet
+  assessment. Answer with an Excel formula, not a number, and not an
+  explanation of what the formula does.
+
+  Format the formula exactly as follows, because it is compared literally:
+  begin it with an equals sign; use relative cell references only, with no
+  dollar signs; write no spaces anywhere in the formula; and use the ordinary
+  operators + - * / rather than a function where the item asks for arithmetic.
+  You may reason briefly first, but the formula must then appear alone on the
+  last line with no other text, no trailing full stop and no surrounding
+  backticks or quotation marks.
+scorer:
+  kind: exact_match
+  # lowercase absorbs the only harmless variation this format has left --
+  # `=B2-C2` against `=b2-c2`. strip_punctuation is off and must stay off:
+  # every operator in the answer is ASCII punctuation.
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    lowercase: true
+    strip_punctuation: false
+    take_last_line: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", mis200-spreadsheet-formulas, ladder-l1, quantitative-literacy, spreadsheet-formula]
+samples:
+  - id: revenue-cell
+    input: >-
+      A worksheet records one row per product line for a campus print shop. Row
+      1 is the header row and the twelve product lines occupy rows 2 to 13. The
+      columns are: A Product, B UnitsSold, C UnitPrice, D UnitCost, E Revenue,
+      F TotalCost, G Profit, H UnitsReturned, I ReturnRate, J MarginRate, K
+      NetUnitsSold, L UnitProfit. Columns E, F, G, I, J, K and L are empty and
+      are to be filled with formulas. Write the formula for cell E2, which
+      should hold the revenue of the first product line, calculated by
+      multiplying the units-sold column by the unit-price column, in that
+      order.
+    # =b2*c2 -- units times price.
+    # This is the file's only commutative item, which is why the stem says
+    # "in that order" rather than leaving the reader to choose. A model that
+    # follows the instruction writes b2*c2; one that ignores it may write
+    # c2*b2, which is mathematically identical and scores zero here. That is a
+    # known and accepted cost of exact_match, and it is the reason the other
+    # five items avoid multiplication entirely.
+    # The nearest WRONG answer is =b2*d2, multiplying units by unit COST rather
+    # than unit PRICE -- the confusion the adjacent C and D columns exist to
+    # catch.
+    target: "=b2*c2"
+    metadata: { skill: reference-multiplication, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: profit-cell
+    input: >-
+      A worksheet records one row per product line for a campus print shop. Row
+      1 is the header row and the twelve product lines occupy rows 2 to 13. The
+      columns are: A Product, B UnitsSold, C UnitPrice, D UnitCost, E Revenue,
+      F TotalCost, G Profit, H UnitsReturned, I ReturnRate, J MarginRate, K
+      NetUnitsSold, L UnitProfit. Assume columns E and F have already been
+      filled in. Write the formula for cell G2, which should hold the profit of
+      the first product line: its revenue less its total cost.
+    # =e2-f2. Subtraction, so the operand order is the answer and not a
+    # convention. Reversing it to =f2-e2 gives the loss rather than the profit
+    # and is the specific error this item is built to separate.
+    # A model that ignores "assume E and F are already filled" and expands the
+    # definition inline -- =b2*c2-b2*d2 -- is also wrong here. That is
+    # deliberate: the item tests whether the model reads a layout and reuses
+    # what the layout already computes, which is the habit the course teaches.
+    target: "=e2-f2"
+    metadata: { skill: chained-reference-subtraction, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: return-rate-cell
+    input: >-
+      A worksheet records one row per product line for a campus print shop. Row
+      1 is the header row and the twelve product lines occupy rows 2 to 13. The
+      columns are: A Product, B UnitsSold, C UnitPrice, D UnitCost, E Revenue,
+      F TotalCost, G Profit, H UnitsReturned, I ReturnRate, J MarginRate, K
+      NetUnitsSold, L UnitProfit. Write the formula for cell I2, which should
+      hold the return rate of the first product line: the proportion of the
+      units it sold that were returned.
+    # =h2/b2 -- returned over sold.
+    # Division, so the inversion =b2/h2 is a distinct and plainly wrong answer
+    # (it is units per return, a number greater than one). "Proportion of X
+    # that were Y" placing Y in the numerator is the whole item; a model that
+    # reads the sentence left to right and divides in reading order gets it
+    # backwards.
+    target: "=h2/b2"
+    metadata: { skill: reference-division-rate, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: unit-profit-cell
+    input: >-
+      A worksheet records one row per product line for a campus print shop. Row
+      1 is the header row and the twelve product lines occupy rows 2 to 13. The
+      columns are: A Product, B UnitsSold, C UnitPrice, D UnitCost, E Revenue,
+      F TotalCost, G Profit, H UnitsReturned, I ReturnRate, J MarginRate, K
+      NetUnitsSold, L UnitProfit. Write the formula for cell L2, which should
+      hold the profit earned on a single unit of the first product line: its
+      unit price less its unit cost.
+    # =c2-d2.
+    # The trap is scale, not order: G2 already holds a "profit" and a model
+    # matching on the word rather than on "a single unit" reaches for the
+    # row-level columns and writes =e2-f2, which is this file's profit-cell
+    # answer and is off by a factor of UnitsSold. Two columns named for the
+    # same quantity at different scales is the point of the item.
+    target: "=c2-d2"
+    metadata: { skill: per-unit-versus-row-level, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: margin-rate-cell
+    input: >-
+      A worksheet records one row per product line for a campus print shop. Row
+      1 is the header row and the twelve product lines occupy rows 2 to 13. The
+      columns are: A Product, B UnitsSold, C UnitPrice, D UnitCost, E Revenue,
+      F TotalCost, G Profit, H UnitsReturned, I ReturnRate, J MarginRate, K
+      NetUnitsSold, L UnitProfit. Assume columns E, F and G have already been
+      filled in. Write the formula for cell J2, which should hold the margin
+      rate of the first product line: its profit as a proportion of its
+      revenue.
+    # =g2/e2 -- profit over revenue.
+    # The margin-versus-markup error, which slo2-quantitative-literacy tests
+    # numerically at rung 2, appears here as a REFERENCE error: dividing profit
+    # by cost, =g2/f2, is markup and is the single most common wrong formula.
+    # Inverting to =e2/g2 is a third distinct wrong answer. Three columns are
+    # in play and only one pairing is the margin.
+    target: "=g2/e2"
+    metadata: { skill: margin-as-reference-ratio, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: net-units-cell
+    input: >-
+      A worksheet records one row per product line for a campus print shop. Row
+      1 is the header row and the twelve product lines occupy rows 2 to 13. The
+      columns are: A Product, B UnitsSold, C UnitPrice, D UnitCost, E Revenue,
+      F TotalCost, G Profit, H UnitsReturned, I ReturnRate, J MarginRate, K
+      NetUnitsSold, L UnitProfit. Write the formula for cell K2, which should
+      hold the number of units of the first product line that were sold and not
+      subsequently returned.
+    # =b2-h2.
+    # The easiest item in the file and it is here as a floor: a model that
+    # cannot express "sold minus returned" over a named layout has not cleared
+    # rung 1 at all, and a rung whose every item is a trap cannot tell a weak
+    # model from a careless one.
+    # Note the item does NOT use the word "subtract" -- the arithmetic has to
+    # come from "sold and not subsequently returned".
+    target: "=b2-h2"
+    metadata: { skill: reference-subtraction, provenance: synthetic, slo: SLO2, use_mode: capability }

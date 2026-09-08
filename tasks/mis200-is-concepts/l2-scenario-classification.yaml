@@ -1,0 +1,195 @@
+# mis200-is-concepts, rung 2 of 2 in the first batch.
+#
+# WHAT THIS RUNG ADDS: the concept is never named. Rung 1 asks "which of these
+# terms is this?" and offers the term as an option, so a model can work
+# backwards from the option set. Here the stem is a situation with no
+# vocabulary in it at all, and the work is deciding which distinction the
+# situation turns on before any option is read. That is the difference between
+# recognising a definition and classifying a case, and it is the step the
+# course's own scenario items are built around.
+#
+# TWO DISTINCTIONS, THREE ITEMS EACH.
+#   * Organisational level -- strategic, tactical, operational. The level is
+#     decided by the SCOPE and HORIZON of the decision, not by the seniority of
+#     whoever is described, and one item below is built specifically so that
+#     those two cues disagree.
+#   * Platform and network concepts -- direct against indirect network effects,
+#     and what a platform does and does not do.
+#
+# WHY THE LEVEL ITEMS ARE THE HARD ONES. Strategic, tactical and operational is
+# the distinction a first MIS course returns to most often and the one students
+# get wrong most often, because the obvious cue -- how senior the person is --
+# is correlated with the right answer often enough to feel like a rule and not
+# often enough to be one. `tactical-level-regional-analysis` breaks the
+# correlation on purpose.
+version: 1
+id: mis200-is-concepts/l2-scenario-classification
+title: SLO9 -- classifying a described situation under the right concept
+description: >
+  Six four-option items in which the stem describes a business situation and
+  names no concept at all. Three turn on the organisational level at which an
+  information system is being used; three turn on platform and network-effect
+  distinctions. In each the distractor is the neighbouring category, and in two
+  of them the surface cue and the correct answer disagree.
+
+  Four options, so the guessing floor is 0.25.
+
+  Provenance: every scenario, option and distractor was written for this file.
+  The concepts assessed were derived from the published blueprint of a real MIS
+  200 Exam 1, but no exam stem, option, scenario or answer key is reproduced,
+  and no exam asset is committed to this repository. No student work and no
+  textbook content.
+kind: verifiable
+domain: information-systems
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate
+  information-systems examination. Exactly one option is correct. You may
+  reason briefly first, but you must then put the letter of the correct option
+  alone on the last line, with no punctuation and no other text on that line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", mis200-is-concepts, ladder-l2, business-knowledge, information-systems, forced-choice]
+samples:
+  - id: operational-level-refill-lookup
+    input: >-
+      A pharmacy technician opens the dispensing system to check when a
+      particular customer last collected a prescription, so she can confirm
+      whether today's refill request is due yet. She reads the record, sees the
+      date, and fills the prescription. At which level of the organisation is
+      the information system being used here?
+      A) Strategic
+      B) Tactical
+      C) Operational
+      D) Executive
+    # C. One transaction, one customer, one moment, no discretion: the system
+    # is supporting day-to-day work, which is the operational level.
+    # D is not a level in the three-level model at all. It is included because
+    # "executive" is a word students carry in from elsewhere and will pick if
+    # they are guessing from vocabulary rather than from the model, and its
+    # presence makes a four-option item out of a three-category distinction
+    # without inventing a fourth plausible level.
+    target: "C"
+    metadata: { skill: organisational-level, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: tactical-level-regional-analysis
+    input: >-
+      The vice-president of a supermarket group pulls the last two quarters of
+      sales by store to work out why six of the group's forty stores grew while
+      the rest were flat, so she can decide how to reallocate the promotional
+      budget across them for the coming quarter. At which level of the
+      organisation is the information system being used here?
+      A) Operational
+      B) Tactical
+      C) Strategic
+      D) Transactional
+    # B, and this is the item the rung exists for. The cue that misleads is
+    # SENIORITY: a vice-president appears in the stem, and C is what a model
+    # picks if it reads the title instead of the decision.
+    # The decision itself is allocating an existing budget across existing
+    # stores over one coming quarter -- a medium-horizon resource-allocation
+    # decision inside a strategy already set, which is the definition of
+    # tactical. Nothing about the firm's direction, markets or capabilities is
+    # in question.
+    # D is not a level in the model; it is the adjective attached to the
+    # systems that serve the operational level, and it catches a model matching
+    # on "sales by store" as transaction data.
+    target: "B"
+    metadata: { skill: organisational-level, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: strategic-level-category-exit
+    input: >-
+      The board of a household-goods manufacturer reviews five years of
+      category profitability alongside forecasts of where demand is heading,
+      and begins deciding whether to leave the small-appliance business
+      altogether and put the freed capital into its cleaning-products lines. At
+      which level of the organisation is the information system being used
+      here?
+      A) Strategic
+      B) Tactical
+      C) Operational
+      D) Administrative
+    # A. Long horizon, whole business lines, and the question is what the firm
+    # should BE -- the three marks of a strategic decision, and the item states
+    # all three so that it is decidable without knowing who the board is.
+    # Paired with the item above: there, seniority pointed at strategic and the
+    # answer was tactical; here the decision genuinely is strategic. A model
+    # using seniority as its rule gets this one right and the previous one
+    # wrong, and the family reports both, so the rule is visible rather than
+    # averaged away.
+    target: "A"
+    metadata: { skill: organisational-level, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: indirect-network-effects
+    input: >-
+      An app connects dog owners with local dog walkers. As more owners join
+      and post jobs, the app becomes more worthwhile for walkers, because there
+      is more work available to them. Which of the following does this
+      describe?
+      A) Direct network effects
+      B) Indirect network effects
+      C) Disintermediation
+      D) Economies of scale
+    # B. The effect crosses SIDES: growth on the owner side raises the value to
+    # the walker side. That is what makes it indirect.
+    # A is the whole item. Both effects are "more users make it better", and a
+    # model that has learned that sentence without the two-sided qualifier
+    # splits A and B at chance. The stem names the two groups separately and
+    # says which one grew and which one benefited, so the crossing is stated
+    # rather than implied.
+    # D is a real concept that also makes bigness valuable, through cost rather
+    # than through value to users, and catches a model reasoning "bigger is
+    # better" without asking why.
+    target: "B"
+    metadata: { skill: direct-versus-indirect-network-effects, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: direct-network-effects
+    input: >-
+      A workplace messaging tool is of little use to an employee whose
+      colleagues are not on it. As more people inside the same company start
+      using it, it becomes more useful to every other person inside that
+      company. Which of the following does this describe?
+      A) Indirect network effects
+      B) Direct network effects
+      C) The long tail
+      D) Disintermediation
+    # B, and the mirror of the item above. Here there is only ONE group, and
+    # its growth raises the value to that same group. The stem is written so
+    # the single side is unmissable -- "colleagues", "inside the same company",
+    # "every other person inside that company" -- because the distinction is
+    # the entire content of the item.
+    # A is offered first, ahead of the correct option, so that a model that has
+    # simply learned "network effects on a platform are indirect" is not
+    # rescued by option order.
+    target: "B"
+    metadata: { skill: direct-versus-indirect-network-effects, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: platform-does-not-produce
+    input: >-
+      A company runs a website where independent tour guides list walking tours
+      and travellers book them. The company sets the rules of the listing,
+      handles the payment and resolves disputes, and takes a share of each
+      booking. It employs no guides and runs no tours. Which statement best
+      captures how this company creates value?
+      A) By producing the tours that are sold through it
+      B) By owning the assets the tours depend on
+      C) By connecting two groups and making their transactions work
+      D) By buying tours wholesale and reselling them at a margin
+    # C. The stem states the negative case explicitly -- "employs no guides and
+    # runs no tours" -- so this is decidable, and A and B are ruled out by the
+    # text rather than by knowing what a platform is. That is intentional: the
+    # item is testing whether a model reads the arrangement, and a model that
+    # picks A after being told the company runs no tours has not.
+    # D is the sharpest distractor, because a reseller also does not produce.
+    # What separates it is inventory and price: the company here never takes
+    # ownership and never sets the tour price, it takes a share of a
+    # transaction between two other parties. Linear resale against platform
+    # intermediation is the real distinction, and D is the option that makes
+    # the item test it.
+    target: "C"
+    metadata: { skill: platform-versus-linear-value-creation, provenance: synthetic, slo: SLO9, use_mode: capability }
