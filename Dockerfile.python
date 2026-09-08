@@ -49,45 +49,58 @@ COPY services/api/pyproject.toml      services/api/
 COPY services/runner/pyproject.toml   services/runner/
 COPY services/mock-model/pyproject.toml services/mock-model/
 
+
+# A venv rather than --user or system site-packages: it copies to the runtime
+# stage as one self-contained directory with no path surprises.
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
+COPY .devops/ci/extract-deps.py .devops/ci/
+
+# ⚠ DEPENDENCIES BEFORE SOURCE. The manifests are copied on their own above,
+# with the stated intent that "the dependency layer survives a source-only
+# edit" -- but the source used to be copied immediately after them and the
+# single `pip install ./packages/core ...` came last, so every `.py` edit
+# invalidated the layer that downloads thirteen wheels. The intent was written
+# down and then defeated three lines later. Without layer caching that cost
+# nothing, which is presumably why it went unnoticed; with `--cache=true` now
+# set in build-and-push.yaml it is worth real minutes.
+#
+# `extract-deps.py` READS the dependency lists out of the manifests rather than
+# restating them, so this cannot drift from what the packages declare.
+#
+# ⚠ RETRIED for the reason documented below: on this egress a network failure
+# presents as "No matching distribution found", which reads as a broken
+# dependency and is not one.
+RUN n=1; until pip install --upgrade pip setuptools wheel \
+     && python .devops/ci/extract-deps.py > /tmp/deps.txt \
+     && pip install --only-binary=:all: -r /tmp/deps.txt; do \
+      if [ "$n" -ge 4 ]; then echo "dependency install failed 4 times -- not a blip" >&2; exit 1; fi; \
+      echo "dependency install failed (attempt $n/4) -- retrying in $((n * 15))s" >&2; \
+      sleep $((n * 15)); n=$((n + 1)); \
+    done
+
 COPY packages/ packages/
 COPY services/ services/
 COPY tools/    tools/
 COPY alembic.ini ./
 COPY migrations/ migrations/
 
-# A venv rather than --user or system site-packages: it copies to the runtime
-# stage as one self-contained directory with no path surprises.
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:${PATH}"
-# ⚠ RETRIED. This is the LAST install layer on the flaky path, and the one
-# that has actually been costing deploys: it failed twice in consecutive runs
-# with `No matching distribution found for sqlalchemy~=2.0 (from versions:
-# none)` and `... for setuptools>=68` -- neither a real resolution problem, both
-# pip reporting an unreachable index in the vocabulary of a missing package.
-# That shape is worth knowing: on this egress a network failure does not
-# announce itself as a timeout here, it announces itself as "that package does
-# not exist", which reads like a broken dependency and is not one.
-#
-# A failure here fails the BUILD, which fails the push, which skips the dev
-# bump -- so dev silently keeps serving the previous commit behind a green
-# merge. `PIP_RETRIES`/`PIP_TIMEOUT` are set for the whole workflow, but they
-# do not reach inside the image build, and pip's own retry does not cover an
-# index it cannot resolve against at all.
-#
-# Four attempts, 15s/30s/45s. A genuinely missing package still fails, four
-# times slower and clearly labelled.
-RUN n=1; until pip install --upgrade pip setuptools wheel \
-     && pip install --only-binary=:all: \
-          ./packages/core \
-          ./packages/harness \
-          ./services/api \
-          ./services/runner \
-          ./services/mock-model \
-          alembic==1.16.5; do \
-      if [ "$n" -ge 4 ]; then echo "pip install failed 4 times -- not a blip" >&2; exit 1; fi; \
-      echo "pip install failed (attempt $n/4) -- retrying in $((n * 15))s" >&2; \
-      sleep $((n * 15)); n=$((n + 1)); \
-    done
+# The local distributions, with `--no-deps` because everything they depend on is
+# already installed above. This is the cheap layer, and the one a source edit
+# actually rebuilds.
+RUN pip install --no-deps --only-binary=:all: \
+      ./packages/core \
+      ./packages/harness \
+      ./services/api \
+      ./services/runner \
+      ./services/mock-model
+
+# ⚠ THE GUARD THAT MAKES `--no-deps` SAFE. If extract-deps.py ever misses a
+# dependency -- one added to a pyproject in a form it does not parse -- then
+# `--no-deps` would install the package regardless and the failure would surface
+# as an ImportError inside a running container, long after anyone was watching.
+# This turns that into a build failure, here, naming the missing distribution.
+RUN pip check
 
 # ---- runtime ---------------------------------------------------------------
 FROM ${PYTHON_IMAGE} AS runtime
