@@ -129,6 +129,7 @@ const CURRICULUM: CurriculumView = {
     { id: "assistive", title: "Assistive", statement: "Does it improve a student's own work?", in_use: false },
     { id: "instructional", title: "Instructional", statement: "Can it do the instructor's side?", in_use: false },
   ],
+  coverage: [],
 };
 
 function board(tasks: TaskLeaderboard[]): LeaderboardResponse {

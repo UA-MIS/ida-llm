@@ -116,6 +116,14 @@ export const CURRICULUM: CurriculumView = {
     { id: "assistive", title: "Assistive", statement: "Does it improve a student's own work?", in_use: false },
     { id: "instructional", title: "Instructional", statement: "Can it do the instructor's side?", in_use: false },
   ],
+  // ⚠ A REAL GRID, NOT AN EMPTY LIST. `/explore` reads its two middle levels
+  // from here and nowhere else, so a fixture with no courses could not
+  // exercise a hierarchy at all. Two courses, one of which teaches an outcome
+  // the other does not, is the smallest shape that can tell the levels apart.
+  coverage: [
+    { course: "MIS 200", title: "Fundamentals of MIS", outcomes: { SLO2: "A" } },
+    { course: "GBA 300", title: "Business Communications", outcomes: { SLO2: "R", SLO4: "A" } },
+  ],
 };
 
 export function board(

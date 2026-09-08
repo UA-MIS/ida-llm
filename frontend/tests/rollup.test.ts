@@ -112,6 +112,7 @@ const CURRICULUM: CurriculumView = {
     { id: "SLO9", title: "General Business Knowledge", statement: "…", text_benchmarkable: true, benchmark_note: "…" },
   ],
   use_modes: [{ id: "capability", title: "Capability", statement: "Can it do this?", in_use: true }],
+  coverage: [],
 };
 
 function board(tasks: TaskLeaderboard[], overrides: Partial<LeaderboardResponse> = {}): LeaderboardResponse {
@@ -432,6 +433,7 @@ describe("rollupByOutcome", () => {
         source: null,
         outcomes: [],
         use_modes: [],
+        coverage: [],
       },
     });
     const rows = rollupByOutcome(findRollup(noCurriculum, "luna")!, noCurriculum);

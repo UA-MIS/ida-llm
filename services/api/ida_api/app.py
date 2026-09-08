@@ -601,9 +601,14 @@ def create_app(context: AppContext | None = None) -> FastAPI:
         typed into a component is a list that silently disagrees with the
         programme the first time that wording is edited.
 
+        Also carries the published course x outcome COVERAGE grid, which is what
+        makes a course-level view possible without a second transcription of the
+        registrar's map living in a client.
+
         ``available: false`` is a legitimate answer and carries the reason. A
         deployment without the map still serves results grouped by outcome id;
-        it just cannot render the statements, and says so rather than guessing.
+        it just cannot render the statements or name a course, and says so
+        rather than guessing.
         """
         return ctx.curriculum
 

@@ -24,6 +24,13 @@ import { resolveVersion } from "@/lib/version";
  * they asked for.
  */
 const NAV = [
+  /* ⚠ FIRST, BECAUSE IT IS THE GUIDED DOOR. The client's verdict on the rest of
+     this nav was "too much information, too many clicks" -- every other
+     destination here drops a reader into a full catalogue and asks them to
+     filter it down. `/explore` asks one question per screen instead. It is a
+     CANDIDATE front door, offered alongside the others rather than in place of
+     them, so the comparison the client needs to make is still there to make. */
+  { href: "/explore", label: "Explore" },
   { href: "/leaderboard", label: "Leaderboard" },
   /* A top-level destination rather than a view-switch on the leaderboard: it
      answers "best at WHAT", which is a different question from "best", and the

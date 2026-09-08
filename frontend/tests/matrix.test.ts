@@ -117,6 +117,7 @@ const CURRICULUM: CurriculumView = {
     { id: "SLO5", title: "Teamwork", statement: "…", text_benchmarkable: false, benchmark_note: "OUT OF SCOPE for a text benchmark." },
   ],
   use_modes: [{ id: "capability", title: "Capability", statement: "Can it?", in_use: true }],
+  coverage: [],
 };
 
 function board(tasks: TaskLeaderboard[]): LeaderboardResponse {

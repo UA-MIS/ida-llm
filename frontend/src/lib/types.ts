@@ -391,6 +391,30 @@ export interface CurriculumView {
   source: string | null;
   outcomes: OutcomeView[];
   use_modes: UseModeView[];
+  /**
+   * The published course x outcome grid, in the map's own order.
+   *
+   * The drill-down at `/explore` reads its two middle levels — which courses a
+   * programme has, and which outcomes each course teaches — from here and
+   * nowhere else. Empty when `available` is false: a deployment with no map has
+   * no courses to name, and naming some would be inventing a curriculum.
+   */
+  coverage: CourseCoverageView[];
+}
+
+/** One row of the published course-by-outcome grid. */
+export interface CourseCoverageView {
+  /** The course code as the map spells it, e.g. `MIS 200`. */
+  course: string;
+  title: string;
+  /**
+   * Outcome id to the published level (`I`/`R`/`M`/`A`/`M+A`).
+   *
+   * ⚠ AN ABSENT KEY IS NOT A ZERO. It means the published map does not mark
+   * that (course, outcome) pair at all — not that the level is unknown, and
+   * certainly not that the course covers the outcome badly.
+   */
+  outcomes: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------

@@ -173,6 +173,31 @@ class UseModeView(BaseModel):
     """False declares the spelling without permitting a task to tag it yet."""
 
 
+class CourseCoverageView(BaseModel):
+    """One row of the published course-by-outcome grid, as the dashboard reads it.
+
+    ⚠ SERVED BECAUSE THE HIERARCHY IS THE PRODUCT, NOT BECAUSE IT IS TIDY. The
+    guided drill-down goes programme → course → outcome → evidence, and the
+    middle two levels exist ONLY in ``curriculum/slo.yaml``'s coverage grid.
+    Until this field existed a client could ask which outcomes a course teaches
+    only by shipping its own transcription of the registrar's map -- which is
+    the exact failure :mod:`ida_api.slo` was written to prevent, one table over.
+
+    ``outcomes`` maps outcome id to the published level (``I``/``R``/``M``/``A``/
+    ``M+A``). A key that is ABSENT means the map does not mark that pair; it does
+    NOT mean the level is unknown, and it must never be rendered as a zero.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    course: str
+    """The course code as the map spells it, e.g. ``MIS 200``."""
+
+    title: str
+    outcomes: dict[str, str]
+    """Outcome id to level code. Only the cells the published map fills in."""
+
+
 class CurriculumView(BaseModel):
     """``curriculum/slo.yaml``, projected for the dashboard.
 
@@ -190,12 +215,29 @@ class CurriculumView(BaseModel):
     source: str | None = None
     outcomes: list[OutcomeView] = Field(default_factory=list)
     use_modes: list[UseModeView] = Field(default_factory=list)
+    coverage: list[CourseCoverageView] = Field(default_factory=list)
+    """The published course x outcome grid, in the map's own order.
+
+    Empty when ``available`` is false, for the same reason ``outcomes`` is: a
+    deployment without the map has no courses to name, and naming some would be
+    inventing a curriculum.
+    """
 
     def outcome(self, outcome_id: str) -> OutcomeView | None:
         return next((o for o in self.outcomes if o.id == outcome_id), None)
 
     def use_mode(self, mode_id: str) -> UseModeView | None:
         return next((m for m in self.use_modes if m.id == mode_id), None)
+
+    def course(self, course_code: str) -> CourseCoverageView | None:
+        """One coverage row, or ``None`` for a code this map does not list.
+
+        ``None`` rather than an empty row: "this programme has no MIS 200" and
+        "MIS 200 teaches no outcomes" are different answers, and a caller that
+        got a blank row for a course that does not exist would render a course
+        page for it.
+        """
+        return next((c for c in self.coverage if c.course == course_code), None)
 
 
 UNAVAILABLE_NO_MODULE = (
@@ -259,5 +301,16 @@ def load_curriculum_view(root: Path | str) -> CurriculumView:
                 in_use=mode.in_use,
             )
             for mode in curriculum.use_modes
+        ],
+        coverage=[
+            CourseCoverageView(
+                course=row.course,
+                title=row.title,
+                # `str(level)` because CoverageLevel is a StrEnum: the wire
+                # format is the published legend's letter, not a Python member
+                # name, and a consumer must be able to print it verbatim.
+                outcomes={slo: str(level) for slo, level in row.outcomes.items()},
+            )
+            for row in curriculum.coverage
         ],
     )
