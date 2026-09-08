@@ -389,6 +389,26 @@ describe("the demonstration disclosure survives the new shape", () => {
   });
 });
 
+describe("the prose above a grid describes that grid", () => {
+  it("counts level 3's coverage off the rows it actually draws", () => {
+    // The course page's subtitle reads these two numbers. They must be the
+    // same count as the rows under it, not a parallel tally that can drift.
+    const data = measuredBoard({ curriculum: WITH_TEAMWORK });
+    const course = findCourse(buildCourses(data), "gba-300")!;
+    const matrix = buildOutcomeMatrix(data, course, MAJOR);
+
+    expect(matrix.benchmarkable_rows).toBe(
+      matrix.rows.filter((r) => r.benchmarkable).length,
+    );
+    expect(matrix.measured_rows).toBe(
+      matrix.rows.filter((r) => r.status === "measured").length,
+    );
+    // And it agrees with what the course tile computes independently.
+    expect(matrix.benchmarkable_rows).toBe(course.benchmarkable_count);
+    expect(matrix.measured_rows).toBe(course.measured_count);
+  });
+});
+
 describe("the honest nothing-to-show states", () => {
   it("says why, rather than drawing an empty grid, with no curriculum map", () => {
     const matrix = buildMajorMatrix(

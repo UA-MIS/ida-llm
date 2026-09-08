@@ -127,7 +127,15 @@ export interface ExploreMatrix {
   rows: MatrixEntityRow[];
   /** Seeded-vs-measured across the models that actually appear on this level. */
   demonstration: DemonstrationTell;
-  /** Rows a text benchmark can reach — the denominator for coverage lines. */
+  /**
+   * Rows a text benchmark can reach — the denominator for a coverage line.
+   *
+   * ⚠ ROWS, WHICH IS ONLY THE SAME AS OUTCOMES ON LEVEL 3. Levels 1 and 2 count
+   * programmes and courses here, while their subtitles count OUTCOMES across
+   * them — a different number, correctly, so those pages keep reading it off
+   * the tiles in lib/explore.ts. Level 3's rows ARE its outcomes, so it counts
+   * these instead and its prose is guaranteed to describe the grid under it.
+   */
   benchmarkable_rows: number;
   /** Of those, how many have a score from at least one model. */
   measured_rows: number;

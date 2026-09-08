@@ -108,7 +108,10 @@ export default async function CourseOutcomesPage({
           <span className="xp-title-code">{course.code}</span> {course.title}
         </h2>
         <p className="subtitle">
-          {course.measured_count} of {course.benchmarkable_count} measurable
+          {/* ⚠ COUNTED OFF THE GRID ITSELF, not off a parallel tally. This
+              level's rows ARE its outcomes, so the sentence above the matrix
+              and the matrix cannot end up describing different things. */}
+          {matrix.measured_rows} of {matrix.benchmarkable_rows} measurable
           outcomes have a score.
           {unmeasurable.length > 0 ? (
             <>
