@@ -15,7 +15,7 @@
 #
 # ⚠ CONTEXT IS THE REPO ROOT (`.`) — the four distributions live in packages/ and
 # services/ and depend on each other, so a narrower context cannot resolve them.
-ARG PYTHON_IMAGE=harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
+ARG PYTHON_IMAGE=harbor.capstone.uamishub.com/base-images/library/python:3.12-slim-bookworm
 
 # ---- build: compile wheels, keep the toolchain OUT of the runtime ----------
 FROM ${PYTHON_IMAGE} AS build

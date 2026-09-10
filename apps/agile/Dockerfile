@@ -12,7 +12,7 @@
 #      component happens to build first.
 # Pinned via ARG so a local `docker build --build-arg NODE_IMAGE=node:24.16-alpine`
 # still works off-cluster with no edit.
-ARG NODE_IMAGE=harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-alpine
+ARG NODE_IMAGE=harbor.capstone.uamishub.com/base-images/library/node:24.16-alpine
 #
 # Build context is the REPO ROOT (matches .devops/components.yaml `context: .`),
 # so every path below is repo-relative. Build locally with:

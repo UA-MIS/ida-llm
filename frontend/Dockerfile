@@ -11,7 +11,7 @@
 # ground: reproducible enough to avoid that class of surprise, cheap enough to
 # patch. Pulled through the platform's Harbor pull-through cache so Docker Hub
 # rate limits and the runners' :443-only egress stay out of the build path.
-ARG NODE_IMAGE=harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie-slim
+ARG NODE_IMAGE=harbor.capstone.uamishub.com/base-images/library/node:24.16-trixie-slim
 
 # ---- deps: install once, cached on the lockfile alone ----------------------
 FROM ${NODE_IMAGE} AS deps
