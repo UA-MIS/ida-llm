@@ -87,7 +87,7 @@ jobs:
         github.event.head_commit.author.email == 'ci@capstone.uamishub.com')
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
-      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie-slim
+      image: harbor.capstone.uamishub.com/base-images/library/node:24.16-trixie-slim
     outputs:
       REGISTRY: ${{ steps.img.outputs.REGISTRY }}
       TAG: ${{ steps.img.outputs.TAG }}
@@ -117,7 +117,7 @@ jobs:
     needs: resolve
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
-      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
+      image: harbor.capstone.uamishub.com/base-images/library/python:3.12-slim-bookworm
     env:
       ANTHROPIC_API_KEY: ci-mock-not-a-real-key
       OPENAI_API_KEY: ci-mock-not-a-real-key
@@ -158,7 +158,7 @@ jobs:
     needs: resolve
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
-      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie-slim
+      image: harbor.capstone.uamishub.com/base-images/library/node:24.16-trixie-slim
     defaults:
       run:
         working-directory: frontend
@@ -208,10 +208,10 @@ jobs:
     needs: resolve
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
-      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/python:3.12-slim-bookworm
+      image: harbor.capstone.uamishub.com/base-images/library/python:3.12-slim-bookworm
     services:
       postgres:
-        image: harbor.capstone.uamishub.com/dockerhub-proxy/library/postgres:17-alpine
+        image: harbor.capstone.uamishub.com/base-images/library/postgres:17-alpine
         env:
           POSTGRES_USER: ida
           POSTGRES_PASSWORD: ci-throwaway
@@ -255,7 +255,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.resolve.outputs.matrix) }}
     container:
-      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie-slim
+      image: harbor.capstone.uamishub.com/base-images/library/node:24.16-trixie-slim
     env:
       DOCKER_CONFIG_DIR: /kaniko/.docker
     steps:
@@ -284,7 +284,7 @@ jobs:
       # depends on it, is the most expensive way this pipeline fails. Kaniko
       # retries the push itself; it does NOT rebuild, so a retry costs seconds.
       - name: Build + push '${{ matrix.name }}' with Kaniko
-        uses: docker://gcr.io/kaniko-project/executor@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e # v1.23.2-debug
+        uses: docker://harbor.capstone.uamishub.com/base-images/kaniko-project/executor@sha256:c3109d5926a997b100c4343944e06c6b30a6804b2f9abe0994d3de6ef92b028e # v1.23.2-debug
         with:
           entrypoint: /busybox/sh
           args: >-
@@ -368,7 +368,7 @@ jobs:
     if: ${{ github.event_name == 'pull_request' && needs.resolve.outputs.PUSH == 'true' }}
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
-      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie   # NOT YET in base-images (mirror population pending for this specific tag)
     permissions:
       contents: write
       pull-requests: write
@@ -432,7 +432,7 @@ jobs:
     # forbidden on this runner"). Every other job here carries one; the first
     # version of this job did not, and failed before running a line.
     container:
-      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie   # NOT YET in base-images (mirror population pending for this specific tag)
     steps:
       - name: Say that dev was not updated
         run: |
@@ -460,7 +460,7 @@ jobs:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.resolve.outputs.PUSH == 'true' }}
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
-      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie   # NOT YET in base-images (mirror population pending for this specific tag)
     permissions:
       contents: write
     env:
@@ -538,7 +538,7 @@ jobs:
     if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && needs.resolve.outputs.PUSH == 'true' }}
     runs-on: ${{ vars.RUNNER_SCALE_SET || 'ida-llm-kaniko' }}
     container:
-      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie   # NOT YET in base-images (mirror population pending for this specific tag)
     permissions:
       contents: write
     env:

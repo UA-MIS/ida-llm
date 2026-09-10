@@ -52,7 +52,7 @@ jobs:
     # FULL node image, NOT -slim: this job git-commits and pushes, and -slim ships
     # no git (`git: not found`, exit 127 — live-confirmed on this platform).
     container:
-      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie
+      image: harbor.capstone.uamishub.com/dockerhub-proxy/library/node:24.16-trixie   # NOT YET in base-images (mirror population pending for this specific tag)
     env:
       GIT_AUTHOR_NAME: ua-mis-ci
       GIT_AUTHOR_EMAIL: ci@capstone.uamishub.com
