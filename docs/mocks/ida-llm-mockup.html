@@ -1,0 +1,1896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ida·llm — Institute of Data Analytics</title>
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("ida-theme");
+        document.documentElement.setAttribute("data-theme", t === "light" ? "light" : "dark");
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    })();
+  </script>
+  <style>
+    :root {
+      --bg: #0b0c0e;
+      --bg-2: #12141a;
+      --bg-3: #1a1d26;
+      --line: #2a2e38;
+      --text: #f4f4f2;
+      --muted: #9aa0ad;
+      --crimson: #c41230;
+      --crimson-dim: #8a0e22;
+      --good: #3dd68c;
+      --mid: #f0c14b;
+      --poor: #ff6b6b;
+      --campus: #5b8def;
+      --accent: #5b8def;
+      --link: #60a5fa;
+      --btn: #8a0e22;
+      --accent-hover: #6b0c1b;
+      --header: rgba(11,12,14,.92);
+      --selected: #1f1216;
+      --bar: #2b3140;
+      --th: #10131a;
+      --hover: #161922;
+      --status: #2a2410;
+      --ghost: #252a36;
+      --disabled: #2a3140;
+      --desc: #c5c9d4;
+      --mini: #0e1117;
+      --name-luna: #f87171;
+      --name-sparks: #60a5fa;
+      --name-claude: #f0c14b;
+      --name-gemini: #34d399;
+      --name-llama: #c084fc;
+      --name-mock: #9ca3af;
+      --radius: 12px;
+      color-scheme: dark;
+    }
+    html[data-theme="light"] {
+      --bg: #eceef2;
+      --bg-2: #e2e5eb;
+      --bg-3: #d8dce4;
+      --line: #b0b5bf;
+      --text: #000000;
+      --muted: #1a1a1a;
+      --good: #16a34a;
+      --mid: #ea580c;
+      --poor: #e11d48;
+      --campus: #8a0e22;
+      --accent: #8a0e22;
+      --link: #8a0e22;
+      --btn: #8a0e22;
+      --accent-hover: #6b0c1b;
+      --header: rgba(236, 238, 242, .94);
+      --selected: #d8c8cc;
+      --bar: #c5c9d2;
+      --th: #d6dae2;
+      --hover: #dce0e8;
+      --status: #d8d0b8;
+      --ghost: #d8dce4;
+      --disabled: #c5c9d2;
+      --desc: #111111;
+      --mini: #dde1e8;
+      --name-luna: #7f1d1d;
+      --name-sparks: #1e3a8a;
+      --name-claude: #78350f;
+      --name-gemini: #065f46;
+      --name-llama: #5b21b6;
+      --name-mock: #111827;
+      color-scheme: light;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 1.0625rem;
+      font-weight: 500;
+      line-height: 1.5;
+      letter-spacing: .01em;
+    }
+    a { color: inherit; }
+    button, select { font: inherit; }
+    .top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.95rem 1.75rem;
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      background: var(--header);
+      backdrop-filter: blur(14px);
+      z-index: 20;
+    }
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: .55rem;
+      text-decoration: none;
+      font-weight: 700;
+      letter-spacing: -.03em;
+      font-size: 1.12rem;
+    }
+    .brand em { color: var(--crimson); font-style: normal; }
+    .brand small { color: var(--muted); font-weight: 500; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; }
+    .nav { display: flex; gap: 1.1rem; font-size: .92rem; flex-wrap: wrap; align-items: center; }
+    .top-end { display: flex; align-items: center; gap: 1.15rem; flex-wrap: wrap; }
+    .theme-switch {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      font-size: .78rem;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .theme-switch input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .theme-switch-track {
+      width: 2.45rem;
+      height: 1.28rem;
+      background: var(--bg-3);
+      border: 1px solid var(--line);
+      border-radius: 99px;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .theme-switch-track::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: .9rem;
+      height: .9rem;
+      background: var(--text);
+      border-radius: 50%;
+      transition: transform .16s ease;
+    }
+    .theme-switch input:checked + .theme-switch-track {
+      background: var(--campus);
+      border-color: var(--campus);
+    }
+    .theme-switch input:checked + .theme-switch-track::after {
+      transform: translateX(1.12rem);
+      background: #fff;
+    }
+    .nav a { text-decoration: none; color: var(--muted); padding: .2rem 0; border-bottom: 2px solid transparent; }
+    .nav a.active, .nav a:hover { color: var(--text); border-bottom-color: var(--accent); }
+    .learn-page { max-width: 820px; margin: 0 auto; padding: 1.4rem 1.4rem 3rem; }
+    .learn-page h1 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 700;
+      color: var(--accent);
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      margin: 0 0 .5rem;
+    }
+    .learn-page h2 { font-size: 1.15rem; margin: 1.4rem 0 .45rem; }
+    .learn-page .block {
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+      margin-bottom: .85rem;
+    }
+    .empty-results { text-align: center; padding: 2.4rem 1rem; }
+    .hero {
+      max-width: 920px;
+      margin: 1.6rem auto 1rem;
+      padding: 1.7rem 1.85rem 1.8rem;
+      text-align: center;
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 8px 28px rgba(0,0,0,.12);
+    }
+    .eyebrow {
+      color: var(--crimson);
+      font-size: .72rem;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      margin: 0 0 .4rem;
+    }
+    .hero .welcome {
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--accent);
+      font-size: clamp(1.25rem, 2.6vw, 1.85rem);
+      font-weight: 700;
+      margin: 0 auto .7rem;
+      max-width: 36rem;
+      line-height: 1.25;
+    }
+    .hero p { color: var(--muted); margin: 0 auto; max-width: 38rem; }
+    .hero .welcome { color: var(--accent); }
+    .home-lead {
+      max-width: 1100px;
+      margin: 1rem auto 0;
+      padding: 0 1.4rem;
+    }
+    .home-lead .rec-cta {
+      margin: 0 0 1rem;
+      padding: 0;
+      max-width: none;
+    }
+    .home-lead .compare-card { margin: 0 0 1.75rem; }
+    .rec-cta {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0 auto 1.15rem;
+      max-width: 1100px;
+      padding: 0 1.4rem;
+      gap: .65rem;
+    }
+    .rec-cta .rec-note {
+      margin: 0;
+      max-width: 36rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 1.02rem;
+      line-height: 1.45;
+    }
+    .rec-cta button {
+      width: 100%;
+      max-width: 520px;
+      background: var(--btn);
+      color: #fff;
+      border: 0;
+      border-radius: 10px;
+      padding: .88rem 1.35rem;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.05rem, 2vw, 1.28rem);
+      font-weight: 700;
+      letter-spacing: .04em;
+      cursor: pointer;
+    }
+    .rec-cta button:hover { background: var(--accent-hover); }
+    .shell {
+      display: block;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 1.4rem 3rem;
+    }
+    .side {
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: .85rem;
+      height: fit-content;
+      position: sticky;
+      top: 4.4rem;
+    }
+    .side h2 {
+      font-size: .68rem;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 .7rem;
+    }
+    .model-list { display: flex; flex-direction: column; gap: .4rem; }
+    .model {
+      width: 100%;
+      text-align: left;
+      background: var(--bg-3);
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 8px;
+      padding: .55rem .65rem;
+      cursor: pointer;
+    }
+    .model.selected { border-color: var(--crimson); background: var(--selected); }
+    .model.compare-on { outline: 1px solid var(--campus); }
+    .model-head { display: flex; justify-content: space-between; align-items: baseline; gap: .4rem; }
+    .model-name { font-weight: 650; font-size: .88rem; }
+    .pct { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--good); }
+    .pct.mid { color: var(--mid); }
+    .pct.poor { color: var(--poor); }
+    .model-sub { color: var(--muted); font-size: .72rem; margin-top: .15rem; }
+    .drop {
+      display: none;
+      margin-top: .55rem;
+      border-top: 1px solid var(--line);
+      padding-top: .5rem;
+      font-size: .78rem;
+      color: var(--muted);
+    }
+    .model.open .drop { display: block; }
+    .drop b { color: var(--text); }
+    .bar {
+      height: 6px;
+      background: var(--bar);
+      border-radius: 99px;
+      overflow: hidden;
+      margin: .25rem 0 .55rem;
+    }
+    .bar > span { display: block; height: 100%; background: var(--crimson); }
+    .compare-toggle {
+      display: flex;
+      align-items: center;
+      gap: .45rem;
+      margin: .85rem 0 .35rem;
+      font-size: .85rem;
+      color: var(--muted);
+    }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+      margin-bottom: .85rem;
+      align-items: center;
+    }
+    .filters label { font-size: .75rem; color: var(--muted); }
+    select {
+      background: var(--bg-3);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: .4rem .55rem;
+    }
+    select:disabled { opacity: .45; }
+    .panel {
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .95rem;
+    }
+    th, td {
+      padding: .7rem .75rem;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: middle;
+    }
+    th {
+      font-size: .75rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+    }
+    td.num { font-variant-numeric: tabular-nums; font-weight: 750; }
+    .hi { background: rgba(196,18,48,.18); }
+    tr.expand-row td { background: var(--th); padding: 0; border-bottom: 1px solid var(--line); }
+    tr.model-tr { cursor: pointer; }
+    tr.model-tr:hover td { background: var(--hover); }
+    .row-btn {
+      background: none;
+      border: 0;
+      color: inherit;
+      cursor: pointer;
+      padding: 0;
+      font-weight: 650;
+      display: flex;
+      align-items: center;
+      gap: .45rem;
+      text-align: left;
+    }
+    .chev { color: var(--muted); width: .7rem; }
+    .explain {
+      padding: .85rem 1rem 1rem 2.1rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: .7rem;
+    }
+    .chip {
+      background: var(--bg-3);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: .55rem .65rem;
+    }
+    .chip .k { color: var(--muted); font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; }
+    .chip .v { font-weight: 700; margin-top: .15rem; }
+    .chip p { margin: .3rem 0 0; color: var(--muted); font-size: .75rem; }
+    .classes { display: flex; flex-direction: column; gap: .75rem; margin-top: 1rem; }
+    .class-card {
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem 1.05rem;
+    }
+    .class-card h3 { margin: 0 0 .2rem; font-size: 1.05rem; }
+    .class-card .meta { color: var(--muted); font-size: .8rem; margin-bottom: .75rem; }
+    .model-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: .5rem;
+      padding: .55rem 0;
+      border-top: 1px solid var(--line);
+    }
+    .slo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .45rem; margin-top: .4rem; }
+    .slo {
+      background: var(--bg);
+      border-radius: 6px;
+      padding: .4rem .5rem;
+      font-size: .78rem;
+    }
+    .slo span { color: var(--muted); display: block; font-size: .68rem; }
+    .tabs {
+      display: flex;
+      gap: .35rem;
+      flex-wrap: wrap;
+      margin: 1.2rem 0 .7rem;
+    }
+    .tabs button {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: .4rem .8rem;
+      cursor: pointer;
+    }
+    .tabs button.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+    .tab-panel {
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+    }
+    .tab-panel[hidden] { display: none; }
+    .status {
+      display: inline-block;
+      background: var(--status);
+      color: var(--mid);
+      border-radius: 999px;
+      padding: .12rem .5rem;
+      font-size: .72rem;
+      font-weight: 650;
+    }
+    .status.gap { background: var(--bg-3); color: var(--muted); }
+    details.howto {
+      margin-top: 1.6rem;
+      border-top: 1px solid var(--line);
+      padding-top: .9rem;
+      color: var(--muted);
+      font-size: .88rem;
+    }
+    details.howto summary { cursor: pointer; color: var(--text); font-weight: 650; }
+    details.howto ul { padding-left: 1.1rem; }
+    .view[hidden] { display: none; }
+    #view-recommend {
+      min-height: calc(100vh - 4.4rem);
+      display: flex;
+      flex-direction: column;
+    }
+    #view-recommend .shell {
+      flex: 1;
+      display: flex;
+      width: 100%;
+      max-width: none;
+      padding: 0;
+    }
+    .survey { max-width: 820px; width: 100%; margin: 0 auto; padding: 1.4rem 1.4rem 3rem; }
+    .survey.survey-wide { max-width: 1400px; }
+    .survey.survey-center {
+      max-width: 820px;
+      margin: auto;
+      padding: 1.5rem 1.6rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: calc(100vh - 4.4rem);
+    }
+    .survey.survey-center .rec-intro,
+    .survey.survey-center .howto { display: none; }
+    .survey.survey-center .step-mark { font-size: 1rem; margin-bottom: 1rem; }
+    .survey.survey-center .q {
+      margin-bottom: 1.1rem;
+      padding: 1.8rem 1.9rem 1.95rem;
+      border-radius: 18px;
+    }
+    .survey.survey-center .q h2 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.7rem, 3.2vw, 2.35rem);
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: .55rem;
+    }
+    .survey.survey-center .why { font-size: 1.05rem; margin-bottom: 1.15rem; }
+    .survey.survey-center .choices { gap: .7rem; }
+    .survey.survey-center .choice {
+      padding: 1rem 1.1rem;
+      font-size: 1.2rem;
+      font-weight: 650;
+      border-radius: 12px;
+    }
+    .survey.survey-center .choice small { font-size: .92rem; font-weight: 500; margin-top: .15rem; }
+    .survey.survey-center .choice input { transform: scale(1.25); margin-top: .35rem; }
+    .survey.survey-center .q-nav { justify-content: center; margin-top: .4rem; }
+    .survey.survey-center .q-nav .primary {
+      margin-left: 0;
+      font-size: 1.15rem;
+      padding: .9rem 1.6rem;
+    }
+    .q {
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem;
+      margin-bottom: .75rem;
+    }
+    .q h2 { margin: 0 0 .35rem; font-size: 1.15rem; }
+    .why { color: var(--muted); font-size: .92rem; margin: 0 0 .8rem; }
+    .choices { display: grid; gap: .45rem; }
+    .choices.multi { grid-template-columns: 1fr 1fr; }
+    .choice {
+      display: flex;
+      gap: .55rem;
+      align-items: flex-start;
+      background: var(--bg-3);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: .65rem .7rem;
+      cursor: pointer;
+    }
+    .choice:has(:checked) { border-color: var(--crimson); background: var(--selected); }
+    .choice input { margin-top: .2rem; }
+    .choice small { display: block; color: var(--muted); }
+    .primary {
+      background: var(--crimson);
+      color: white;
+      border: 0;
+      border-radius: 8px;
+      padding: .7rem 1.1rem;
+      cursor: pointer;
+      font-weight: 650;
+    }
+    .step-mark { color: var(--muted); font-size: .8rem; margin: 0 0 .65rem; }
+    .q-nav {
+      display: flex;
+      gap: .75rem;
+      align-items: center;
+      margin: .15rem 0 1rem;
+    }
+    .q-nav .primary { margin-left: auto; }
+    .rec-err { color: var(--poor); font-size: .85rem; margin: 0 0 .7rem; }
+    .rec-major {
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+      margin: 0;
+      min-width: 0;
+    }
+    .rec-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      align-items: start;
+    }
+    .rec-grid.multi {
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+    }
+    .rec-major h2 {
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--accent);
+      font-weight: 700;
+      margin: 0 0 .35rem;
+      font-size: 1.25rem;
+    }
+    .result-box {
+      background: var(--bg-2);
+      border: 1px solid var(--crimson);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+      margin-bottom: .85rem;
+    }
+    .hidden-note { color: var(--muted); font-size: .75rem; margin-top: 2rem; }
+    .compare-card, .topic-card {
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 1.15rem 1.2rem 1.25rem;
+      box-shadow: 0 6px 22px rgba(0,0,0,.1);
+    }
+    .compare-card h2 {
+      margin: 0 0 .75rem;
+      font-size: 1.15rem;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .75rem;
+    }
+    .compare-grid label { display: block; color: var(--muted); font-size: .85rem; margin-bottom: .25rem; }
+    .compare-grid select, .filter-row select { width: 100%; }
+    .compare-actions { display: flex; gap: .55rem; margin-top: .85rem; }
+    .compare-actions button {
+      flex: 1;
+      border: 0;
+      border-radius: 8px;
+      padding: .7rem;
+      cursor: pointer;
+      font-weight: 650;
+    }
+    .compare-actions .go { background: var(--btn); color: #fff; }
+    .compare-actions .go:disabled { background: var(--disabled); color: var(--muted); cursor: not-allowed; }
+    .compare-actions .ghost { background: var(--ghost); color: var(--text); }
+    .filter-row { display: none; grid-template-columns: 1fr 1fr; gap: .75rem; margin-top: .85rem; }
+    .filter-row.on { display: grid; }
+    .topic-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1rem;
+    }
+    .topic-card { cursor: default; }
+    .topic-card:hover { border-color: var(--campus); }
+    .major-detail {
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 1.1rem 1.15rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .major-detail h2 { margin: .35rem 0 .25rem; font-size: 1.55rem; }
+    .back-btn {
+      background: none;
+      border: 0;
+      color: var(--link);
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0;
+      font-size: .9rem;
+    }
+    .sort-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .55rem;
+      margin: .85rem 0 .15rem;
+    }
+    .sort-bar label {
+      color: var(--muted);
+      font-size: .9rem;
+      font-weight: 650;
+    }
+    .section-kicker {
+      margin: 1.65rem 0 .45rem;
+      font-size: .72rem;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--crimson);
+      font-weight: 700;
+    }
+    .section-lead { color: var(--muted); margin: 0 0 .7rem; font-size: .95rem; }
+    .matrix-wrap { overflow: auto; margin-top: .9rem; border: 1px solid var(--line); border-radius: 10px; }
+    .matrix { border-collapse: collapse; min-width: 100%; font-size: .92rem; }
+    .matrix th, .matrix td {
+      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      padding: .55rem .65rem;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .matrix th { background: var(--th); font-weight: 650; }
+    .matrix th.corner, .matrix td.model-cell {
+      text-align: left;
+      position: sticky;
+      left: 0;
+      background: var(--bg-2);
+      z-index: 1;
+      min-width: 11.5rem;
+    }
+    .matrix thead th { position: sticky; top: 0; z-index: 2; }
+    .matrix thead th.corner { z-index: 3; }
+    #view-results .shell { max-width: 1500px; padding-top: 1.2rem; }
+    #view-results .major-detail {
+      padding: 1.5rem 1.6rem 1.7rem;
+    }
+    #view-results .major-detail h2 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.8rem, 3vw, 2.4rem);
+      font-weight: 700;
+      color: var(--accent);
+    }
+    #view-results .major-detail .meta { font-size: 1.02rem; }
+    #view-results .back-btn { font-size: 1.05rem; }
+    #view-results .matrix { font-size: 1.2rem; }
+    #view-results .matrix th, #view-results .matrix td {
+      padding: 1rem 1.15rem;
+    }
+    #view-results .matrix th {
+      font-size: .85rem;
+    }
+    #view-results .matrix th.corner,
+    #view-results .matrix td.model-cell {
+      min-width: 16.5rem;
+      font-size: 1.12rem;
+    }
+    #view-results .matrix th.class-head,
+    #view-results .matrix td[data-open-course] {
+      cursor: pointer;
+    }
+    #view-results .matrix th.class-head {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: .22em;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: .02em;
+      padding: 1.15rem 1.35rem;
+      text-transform: none;
+    }
+    #view-results .matrix th.class-head:hover,
+    #view-results .matrix td[data-open-course]:hover {
+      color: var(--link);
+      background: var(--hover);
+    }
+    #view-results .matrix th.slo-head {
+      cursor: pointer;
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: .18em;
+    }
+    #view-results .matrix th.slo-head:hover,
+    #view-results .matrix th.slo-head.on {
+      background: var(--hover);
+    }
+    .slo-explain {
+      margin-top: 1.1rem;
+      background: var(--bg-3);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1.05rem 1.15rem 1.2rem;
+    }
+    .slo-explain h3 {
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--accent);
+      margin: 0 0 .35rem;
+      font-size: 1.25rem;
+    }
+    .slo-explain h4 { margin: .9rem 0 .3rem; font-size: .95rem; }
+    .slo-explain p { margin: 0 0 .55rem; }
+    .slo-explain .close-slo { margin-bottom: .45rem; }
+    .topic-card h3 {
+      margin: 0 0 .2rem;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .topic-card .open-table {
+      display: inline-block;
+      margin: .15rem 0 .55rem;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--link);
+      font-weight: 700;
+      font-size: .85rem;
+      cursor: pointer;
+    }
+    .topic-card .meta { color: var(--muted); font-size: .88rem; margin: 0 0 .35rem; }
+    .topic-card .desc { color: var(--desc); font-size: 1rem; margin: 0 0 .35rem; }
+    .topic-card .desc.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .show-more {
+      background: none;
+      border: 0;
+      color: var(--link);
+      cursor: pointer;
+      padding: 0;
+      font-size: .85rem;
+      margin-bottom: .55rem;
+    }
+    .mini {
+      background: var(--mini);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: auto;
+    }
+    .mini table { margin: 0; }
+    .mini th, .mini td { border: 0; padding: .55rem .7rem; background: transparent; }
+    .mini tr + tr td { border-top: 1px solid var(--line); }
+    .mini .rank { color: var(--muted); width: 2rem; }
+    .name-luna,
+    .name-sparks,
+    .name-claude,
+    .name-gemini,
+    .name-llama,
+    .name-mock { color: #fff; font-weight: 700; }
+    html[data-theme="light"] .name-luna,
+    html[data-theme="light"] .name-sparks,
+    html[data-theme="light"] .name-claude,
+    html[data-theme="light"] .name-gemini,
+    html[data-theme="light"] .name-llama,
+    html[data-theme="light"] .name-mock { color: #000; }
+    .topic-foot {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: .45rem;
+    }
+    .topic-foot button {
+      background: none;
+      border: 0;
+      color: var(--link);
+      cursor: pointer;
+      font-size: .85rem;
+    }
+    .topic-extra { display: none; margin-top: .6rem; }
+    .topic-extra.on { display: block; }
+    @media (max-width: 980px) {
+      .topic-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 640px) {
+      .topic-grid, .compare-grid, .filter-row.on, .choices.multi { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#" onclick="showView('home'); return false;">ida<em>·</em>llm <small>Institute of Data Analytics</small></a>
+    <div class="top-end">
+    <nav class="nav">
+      <a href="#" class="active" id="nav-home" onclick="showView('home'); return false;">Home</a>
+      <a href="#" id="nav-rec" onclick="showView('recommend'); return false;">Recommendation</a>
+      <a href="#" id="nav-learn" onclick="showView('learn'); return false;">Learn more</a>
+    </nav>
+    <label class="theme-switch">
+      <input type="checkbox" id="themeToggle" onchange="setTheme(this.checked ? 'light' : 'dark')" aria-label="Switch to light mode">
+      <span class="theme-switch-track"></span>
+      Light
+    </label>
+    </div>
+  </header>
+
+  <div id="view-home" class="view">
+  <section class="hero">
+    <p class="eyebrow">A benchmark for teaching</p>
+    <p class="welcome">We test AI models against the learning outcomes your programme already publishes, then help you choose what to use in class.</p>
+    <p>Scores below are measured on real coursework, not trivia. Open a major with View All Classes. Learn more is the method behind the numbers.</p>
+  </section>
+
+    <div class="home-lead">
+    <div class="rec-cta" id="recCta">
+      <p class="rec-note">Below are the majors in the business college. You can open a major to look into specific classes — or, if you’d like to go straight to a recommendation, click here.</p>
+      <button type="button" onclick="showView('recommend')">Recommendation</button>
+    </div>
+
+        <section class="compare-card" id="compareCard">
+          <h2>Compare models</h2>
+          <div class="compare-grid">
+            <div>
+              <label for="modelA">Model 1</label>
+              <select id="modelA" onchange="syncCompare()">
+                <option value="">Select...</option>
+              </select>
+            </div>
+            <div>
+              <label for="modelB">Model 2</label>
+              <select id="modelB" onchange="syncCompare()">
+                <option value="">Select...</option>
+              </select>
+            </div>
+          </div>
+          <div class="compare-actions">
+            <button type="button" class="go" id="compareBtn" disabled onclick="applyCompare()">Compare</button>
+            <button type="button" class="ghost" onclick="document.getElementById('filterRow').classList.toggle('on')">Show filters</button>
+          </div>
+          <div class="filter-row" id="filterRow">
+            <div>
+              <label>Topics
+                <select id="groupBy" onchange="renderMain()">
+                  <option value="all">All majors</option>
+                  <option value="skill" disabled>General skills</option>
+                  <option value="slo" disabled>By SLO</option>
+                  <option value="class">By major</option>
+                  <option value="school" disabled>By school (coming later)</option>
+                </select>
+              </label>
+            </div>
+            <div>
+              <label>Major
+                <select id="classFilter" onchange="onMajorFilter()">
+                  <option value="all">All majors</option>
+                  <option value="mis">MIS</option>
+                  <option value="acct">Accounting</option>
+                  <option value="cyber">Business Cyber Security</option>
+                  <option value="econ">Economics</option>
+                  <option value="fin">Finance</option>
+                  <option value="mgt">Management</option>
+                  <option value="mkt">Marketing</option>
+                  <option value="om">Operations Management</option>
+                  <option value="re">Real Estate</option>
+                  <option value="stats">Statistical Data Analysis</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </section>
+    </div>
+
+    <div class="shell">
+      <aside class="side" hidden>
+        <input type="checkbox" id="compareMode">
+        <div class="model-list" id="modelList"></div>
+      </aside>
+
+      <main>
+        <div class="topic-grid" id="topicGrid"></div>
+        <div class="panel" id="leaderboardWrap" hidden></div>
+        <div class="classes" id="classSections" hidden></div>
+
+      </main>
+    </div>
+  </div>
+
+  <div id="view-results" class="view" hidden>
+    <div class="shell">
+      <div class="major-detail" id="majorDetail"></div>
+    </div>
+  </div>
+
+  <div id="view-learn" class="view" hidden>
+    <div class="learn-page">
+      <p class="eyebrow">Behind the scenes</p>
+      <h1>How we measure, and how to read a score</h1>
+      <p>ida·llm is a faculty-facing benchmark. Models are scored against published programme learning outcomes, not trivia quizzes or our taste.</p>
+
+      <div class="block">
+        <h2>What you are looking at</h2>
+        <p>This site is evidence, not advice. A high score with low confidence is not yet a verdict. Home shows majors. View All Classes opens the ranking table: models down the left, classes across the top, scores out of 100.</p>
+      </div>
+
+      <div class="block">
+        <h2>How a number is made</h2>
+        <ul>
+          <li>A class score such as <b>MIS 200</b> is a sample-weighted mean across work that has actually been scored. Unmeasured work is left out, never counted as zero.</li>
+          <li><b>Confidence</b> is about the measurement — how it was marked, over how many attempts, and whether anything failed — never about the model.</li>
+          <li><b>Not measured yet</b> means nobody has run the test. That is different from having tested it and found it wanting.</li>
+          <li>A failed run is excluded from a score. An outage must not make a model look incompetent.</li>
+          <li>The yardstick is yours: published programme outcomes.</li>
+        </ul>
+      </div>
+
+      <h2>One outcome, three jobs</h2>
+      <p class="why">The same published SLO can be asked three ways. We keep them separate so a model that writes well is not confused with a model that tutors well.</p>
+      <div class="tabs" role="tablist">
+        <button class="on" data-tab="produce" onclick="setTab(this)">Produce the work</button>
+        <button data-tab="tutor" onclick="setTab(this)">Tutor the student</button>
+        <button data-tab="staff" onclick="setTab(this)">Instructor / staff work</button>
+      </div>
+      <div class="tab-panel" id="tab-produce">
+        <p class="eyebrow">BScBA General Business (core) · SLO2 · Quantitative Literacy · as published</p>
+        <p>“Students analyze, solve, and communicate effectively regarding quantitative business problems using appropriate software, data sources, and tools.”</p>
+        <p>Can the model itself produce work that would satisfy the outcome, given the same prompt a student is given? <b>The model is the candidate.</b></p>
+        <p><span class="status gap">Not measured yet</span> 8 tasks ask this question, but no model has a finished, scored run against them yet.</p>
+      </div>
+      <div class="tab-panel" id="tab-tutor" hidden>
+        <p class="eyebrow">Same outcome · tutoring lens</p>
+        <p>Does the model improve a student's own work against the outcome without doing it for them — feedback, critique, a next question? <b>The model is a tutor and the student is the candidate.</b></p>
+        <p><span class="status gap">Not measured yet</span> The curriculum defines this question, but no task has been written against it yet.</p>
+      </div>
+      <div class="tab-panel" id="tab-staff" hidden>
+        <p class="eyebrow">Same outcome · staff lens</p>
+        <p>Can the model do the instructor's side of the outcome — author an item, apply a marking key, grade against a rubric? <b>The model is staff.</b></p>
+        <p><span class="status gap">Not measured yet</span> The curriculum defines this question, but no task has been written against it yet.</p>
+      </div>
+
+      <div class="block" style="margin-top:1rem;">
+        <h2>What sits on the board</h2>
+        <p><b>Luna (OpenAI GPT-5.6)</b> and <b>Campus vLLM (Sparks)</b> are the measured pair on the live site. Other names in this mockup are design placeholders so you can see a fuller ranking table. Campus models keep student work on university hardware.</p>
+      </div>
+
+      <div class="block">
+        <h2>What we do not do</h2>
+        <p>We do not average unmeasured work in as zero. We do not hide a refusal behind a smooth recommendation. If the sample is too thin, Learn more and the recommendation flow both say so.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="view-recommend" class="view" hidden>
+    <div class="shell" style="grid-template-columns:1fr">
+      <div class="survey survey-center" id="recSurvey">
+        <div class="rec-intro">
+          <p class="eyebrow">A recommendation for my class</p>
+          <h1 style="font-family:Georgia,serif;font-size:1.8rem;margin:.2rem 0 .8rem;">A few questions, then an answer that says what it rests on.</h1>
+        </div>
+        <p class="step-mark" id="recProgress">Question 1 of 3</p>
+
+        <div class="q" data-rec="role">
+          <h2>Are you a teacher, a researcher, or both?</h2>
+          <p class="why">Teaching tasks and scholarship tasks are benchmarked separately. Pick one to continue.</p>
+          <div class="choices">
+            <label class="choice"><input type="radio" name="hat" value="teaching" onchange="recContinue()"> Teacher<small>Courses, assessment, students.</small></label>
+            <label class="choice"><input type="radio" name="hat" value="research" onchange="recContinue()"> Researcher<small>Papers, data, grants, literature.</small></label>
+            <label class="choice"><input type="radio" name="hat" value="both" onchange="recContinue()"> Both<small>We will ask about teaching next, then keep going.</small></label>
+          </div>
+        </div>
+
+        <div class="q" data-rec="subjects" hidden>
+          <h2>What subject(s) do you teach?</h2>
+          <p class="why">Choose as many as apply. You will get a recommendation for each one.</p>
+          <div class="choices multi">
+            <label class="choice"><input type="checkbox" name="subject" value="mis"> <span>MIS</span></label>
+            <label class="choice"><input type="checkbox" name="subject" value="acct"> <span>Accounting</span></label>
+            <label class="choice"><input type="checkbox" name="subject" value="cyber"> <span>Business Cyber Security</span></label>
+            <label class="choice"><input type="checkbox" name="subject" value="econ"> <span>Economics</span></label>
+            <label class="choice"><input type="checkbox" name="subject" value="fin"> <span>Finance</span></label>
+            <label class="choice"><input type="checkbox" name="subject" value="mgt"> <span>Management</span></label>
+            <label class="choice"><input type="checkbox" name="subject" value="mkt"> <span>Marketing</span></label>
+            <label class="choice"><input type="checkbox" name="subject" value="om"> <span>Operations Management</span></label>
+            <label class="choice"><input type="checkbox" name="subject" value="re"> <span>Real Estate</span></label>
+            <label class="choice"><input type="checkbox" name="subject" value="stats"> <span>Statistical Data Analysis</span></label>
+          </div>
+        </div>
+
+        <div class="q" data-rec="who" hidden>
+          <h2>Is this for your own work, or for your students to use?</h2>
+          <p class="why">A tool you use yourself and a tool you put in front of students need different guardrails. Pick one to continue.</p>
+          <div class="choices">
+            <label class="choice"><input type="radio" name="who" value="me" onchange="recContinue()"> For me<small>I will be the one using it.</small></label>
+            <label class="choice"><input type="radio" name="who" value="students" onchange="recContinue()"> For my students<small>Students will use it directly.</small></label>
+            <label class="choice"><input type="radio" name="who" value="both" onchange="recContinue()"> Both</label>
+          </div>
+        </div>
+
+        <div class="q" data-rec="help" hidden>
+          <h2>What do you want help with?</h2>
+          <p class="why">Choose as many as apply. The recommendation will speak to each area.</p>
+          <div class="choices multi">
+            <label class="choice"><input type="checkbox" name="help" value="content"> <span>Course content</span><small>Explain or generate material aligned to the outcome.</small></label>
+            <label class="choice"><input type="checkbox" name="help" value="tutoring"> <span>Tutoring</span><small>Coach a stuck student without giving the answer.</small></label>
+            <label class="choice"><input type="checkbox" name="help" value="feedback"> <span>Feedback</span><small>Critique student work; next question, not a rewrite.</small></label>
+            <label class="choice"><input type="checkbox" name="help" value="grading"> <span>Grading</span><small>Apply a marking key fairly.</small></label>
+            <label class="choice"><input type="checkbox" name="help" value="exams"> <span>Writing exams</span><small>Author items against the outcome.</small></label>
+            <label class="choice"><input type="checkbox" name="help" value="notes"> <span>Note taking</span></label>
+            <label class="choice"><input type="checkbox" name="help" value="assignments"> <span>Help on assignments</span></label>
+            <label class="choice"><input type="checkbox" name="help" value="research"> <span>Research assistance</span></label>
+          </div>
+        </div>
+
+        <div data-rec="result" hidden>
+          <div id="recResult"></div>
+        </div>
+
+        <p class="rec-err" id="recErr" hidden></p>
+        <div class="q-nav" id="recNav">
+          <button type="button" class="back-btn" id="recBack" hidden onclick="recBack()">← Back</button>
+          <button type="button" class="primary" id="recNext" onclick="recContinue()">Continue</button>
+        </div>
+
+        <details class="howto">
+          <summary>How to read this</summary>
+          <ol>
+            <li><b>No AI knowledge needed.</b> Questions are about teaching or research, not technology. “I’m not sure” is a real option.</li>
+            <li><b>About two minutes, one question at a time.</b> You will not see every question — later ones depend on earlier answers.</li>
+            <li><b>You may get a refusal, and that is the product.</b> If we have not measured enough, we say what is missing instead of guessing.</li>
+          </ol>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <p class="hidden-note" style="padding:0 1.75rem 2.2rem;">Illustrative prototype. Live scores would attach to scored runs.</p>
+
+  <script>
+    const MODELS = [
+      {
+        id: "luna",
+        name: "Luna (OpenAI GPT-5.6)",
+        color: "luna",
+        overall: 88,
+        conf: "Low confidence",
+        campus: false,
+        samples: "328 scored attempts · 70 pieces of work",
+        sections: {
+          content: { score: 91, note: "Produces work that would satisfy the published outcome on quantitative and written tasks." },
+          tutoring: { score: 74, note: "Improves a draft without completing the assignment — still thin on Socratic follow-ups." },
+          feedback: { score: 81, note: "Formative comments usually stay inside the marking guide." },
+          grading: { score: 86, note: "Partial credit against a stated key is strong; unexpected correct answers are weaker." },
+          exams: { score: 79, note: "Can author items, but distractors sometimes leak the key." }
+        },
+        slos: { SLO1: 90, SLO2: 93, SLO3: 84, SLO4: 82, SLO6: 88, SLO7: 91, SLO9: 85 }
+      },
+      {
+        id: "sparks",
+        name: "Campus vLLM (Sparks)",
+        color: "sparks",
+        overall: 71,
+        conf: "Low confidence",
+        campus: true,
+        samples: "328 scored attempts · 70 pieces of work",
+        sections: {
+          content: { score: 68, note: "Stays on campus hardware, so student work never leaves. Weaker on chained quantitative items." },
+          tutoring: { score: 77, note: "Better at withholding the answer; less fluent on written communication." },
+          feedback: { score: 70, note: "Feedback is generic more often than Luna." },
+          grading: { score: 73, note: "Fine on one-right-answer keys; drifts on constructed response." },
+          exams: { score: 66, note: "Item writing is usable for recall, not yet for higher rungs." }
+        },
+        slos: { SLO1: 72, SLO2: 69, SLO3: 70, SLO4: 68, SLO6: 74, SLO7: 73, SLO9: 71 }
+      },
+      {
+        id: "claude",
+        name: "Claude Sonnet 4.6",
+        color: "claude",
+        overall: 83,
+        conf: "Low confidence",
+        campus: false,
+        samples: "Design placeholder · 70 pieces of work",
+        sections: {
+          content: { score: 80, note: "Fluent on written cases; slightly cautious on chained quantitative items." },
+          tutoring: { score: 88, note: "Strongest of the set at withholding the answer and asking a next question." },
+          feedback: { score: 90, note: "Formative comments stay inside the guide and name the specific miss." },
+          grading: { score: 78, note: "Partial credit is fair; unexpected correct answers are sometimes under-credited." },
+          exams: { score: 84, note: "Item writing is clean; distractors rarely leak the key." }
+        },
+        slos: { SLO1: 81, SLO2: 77, SLO3: 86, SLO4: 88, SLO6: 91, SLO7: 92, SLO9: 80 }
+      },
+      {
+        id: "gemini",
+        name: "Gemini 2.5 Pro",
+        color: "gemini",
+        overall: 79,
+        conf: "Low confidence",
+        campus: false,
+        samples: "Design placeholder · 70 pieces of work",
+        sections: {
+          content: { score: 86, note: "Strong on producing the work, especially quantitative literacy tasks." },
+          tutoring: { score: 69, note: "Tends to complete the step rather than coach it." },
+          feedback: { score: 75, note: "Useful comments, but often generic across learners." },
+          grading: { score: 82, note: "Reliable on one-right-answer keys; constructed response is mixed." },
+          exams: { score: 81, note: "Authors usable items; some templates repeat." }
+        },
+        slos: { SLO1: 84, SLO2: 89, SLO3: 76, SLO4: 74, SLO6: 77, SLO7: 80, SLO9: 83 }
+      },
+      {
+        id: "llama",
+        name: "Llama 4 Scout (campus)",
+        color: "llama",
+        overall: 64,
+        conf: "Low confidence",
+        campus: true,
+        samples: "Design placeholder · 70 pieces of work",
+        sections: {
+          content: { score: 61, note: "Runs on campus; thinner on multi-step quantitative work." },
+          tutoring: { score: 72, note: "Better at not giving the answer away than at explaining the next move." },
+          feedback: { score: 63, note: "Feedback is short and often restates the prompt." },
+          grading: { score: 67, note: "Fine on recall keys; drifts on rubric-judged writing." },
+          exams: { score: 58, note: "Item writing is usable for recall, not yet for higher rungs." }
+        },
+        slos: { SLO1: 66, SLO2: 60, SLO3: 62, SLO4: 64, SLO6: 68, SLO7: 65, SLO9: 63 }
+      },
+      {
+        id: "mock",
+        name: "Mock model (deterministic)",
+        color: "mock",
+        overall: null,
+        conf: "Measured, not ranked",
+        campus: true,
+        samples: "Test stub — shown, never ranked",
+        sections: {
+          content: { score: null, note: "Stub only. Used to check the pipeline, not to advise a class." },
+          tutoring: { score: null, note: "Not a candidate for teaching use." },
+          feedback: { score: null, note: "Not ranked." },
+          grading: { score: null, note: "Not ranked." },
+          exams: { score: null, note: "Not ranked." }
+        },
+        slos: { SLO1: null, SLO2: null, SLO3: null, SLO4: null, SLO6: null, SLO7: null, SLO9: null }
+      }
+    ];
+
+    const SECTION_LABELS = {
+      content: "Course content",
+      tutoring: "Tutoring",
+      feedback: "Feedback",
+      grading: "Grading",
+      exams: "Writing exams"
+    };
+
+    const HELP_META = {
+      content: { label: "Course content", skill: "content" },
+      tutoring: { label: "Tutoring", skill: "tutoring" },
+      feedback: { label: "Feedback", skill: "feedback" },
+      grading: { label: "Grading", skill: "grading" },
+      exams: { label: "Writing exams", skill: "exams" },
+      notes: { label: "Note taking", skill: "content" },
+      assignments: { label: "Help on assignments", skill: "tutoring" },
+      research: { label: "Research assistance", skill: "content" }
+    };
+
+    const SLO_LABELS = {
+      SLO1: "Problem Solving",
+      SLO2: "Quantitative Literacy",
+      SLO3: "Global Perspective",
+      SLO4: "Cultural & Societal",
+      SLO6: "Ethical Reasoning",
+      SLO7: "Written Communication",
+      SLO9: "General Business"
+    };
+
+    const SLO_EXPLAIN = {
+      SLO1: {
+        published: "Students identify a business problem, select an appropriate method, carry the analysis through, and recommend a next step.",
+        meaning: "We are not scoring whether the model is clever. We are scoring whether it can name the problem, pick a tool, run it, and recommend — the published rungs.",
+        produce: "Can the model itself produce work that would satisfy this outcome, given the same prompt a student is given? The model is the candidate.",
+        tutor: "Does the model improve a student's own problem-solving without doing the work — a next question, not the answer key?",
+        staff: "Can the model author an item or apply a marking key for problem solving — the instructor's side of the outcome?",
+        scoring: "The class score is a sample-weighted mean of scored problem-solving tasks for this course. Unmeasured work is left out, never counted as zero. A failed run is excluded."
+      },
+      SLO2: {
+        published: "Students analyze, solve, and communicate effectively regarding quantitative business problems using appropriate software, data sources, and tools.",
+        meaning: "Quantitative literacy here means the quantity asked for, the unit, and the communication of that result — not trivia arithmetic.",
+        produce: "Can the model produce the quantitative work a student is asked to produce, with the same prompt and data?",
+        tutor: "Does it coach a stuck student through the quantitative step without completing the assignment?",
+        staff: "Can it write an item or apply a key that awards partial credit on constructed quantitative response?",
+        scoring: "Scored on quantitative tasks actually marked for this class. Missing batteries stay “not measured yet.”"
+      },
+      SLO3: {
+        published: "Students demonstrate a global perspective by applying a framework to a stated situation across markets, institutions, or regions.",
+        meaning: "The yardstick is whether the model can situate a decision in more than one context — not whether it lists countries.",
+        produce: "Can it write the analysis a student would submit for a global-perspective prompt?",
+        tutor: "Does it ask the student to name the second context, rather than supplying the comparison?",
+        staff: "Can it draft an item or mark a response against the published global-perspective criteria?",
+        scoring: "Mean of scored global-perspective tasks on this course. Cultural name-dropping without a framework does not raise the score."
+      },
+      SLO4: {
+        published: "Students analyze cultural and societal implications of business decisions, including local context and who is affected.",
+        meaning: "We look for the named stakeholder and the local constraint — property, community, or practice — not a generic ethics paragraph.",
+        produce: "Can the model produce work that names the cultural or societal stake in the prompt?",
+        tutor: "Does it push the student to name who is affected, without writing the paragraph for them?",
+        staff: "Can it author or mark an item against the published cultural and societal criteria?",
+        scoring: "Until a dedicated real-estate or local-context battery exists, related cultural and societal tasks stand in. That limit is part of the explanation, not hidden."
+      },
+      SLO6: {
+        published: "Students apply ethical reasoning to a business situation: they name the tension, the duty or consequence, and a defensible next step.",
+        meaning: "Ethical reasoning is scored as a chain — tension, principle, recommendation — not as a moral slogan.",
+        produce: "Can the model write the ethical analysis the prompt asks a student to write?",
+        tutor: "Does it withhold the verdict and ask which duty is in play?",
+        staff: "Can it apply a rubric for ethical reasoning, including partial credit when one rung is missing?",
+        scoring: "Scored attempts on ethical-reasoning tasks for this class, sample-weighted. An outage is not a low ethics score."
+      },
+      SLO7: {
+        published: "Students communicate in writing for a stated business audience, with a claim, evidence, and a structure that can be followed.",
+        meaning: "Written communication is the audience and the next sentence, not fluency for its own sake.",
+        produce: "Can the model produce a student-facing written response that would satisfy the outcome?",
+        tutor: "Does formative critique stay inside the guide and name the specific miss, rather than rewriting the paper?",
+        staff: "Can it mark written work against a stated key or rubric?",
+        scoring: "Mean of scored written-communication tasks. Style without a claim does not raise the score."
+      },
+      SLO9: {
+        published: "Students integrate general business knowledge — accounting, markets, operations, and people — to a stated situation.",
+        meaning: "General business is whether the model uses the right domain for the prompt, not whether it sounds like a textbook.",
+        produce: "Can it produce integrated work a student would be asked to submit?",
+        tutor: "Does it point the student to the missing function (finance, ops, people) without filling it in?",
+        staff: "Can it write or grade an integrative item against the published outcome?",
+        scoring: "Sample-weighted mean of integrative tasks scored for this class. Unmeasured majors stay out of the average."
+      }
+    };
+
+    const SLO_NOTE_SKILL = {
+      SLO1: "tutoring",
+      SLO2: "content",
+      SLO3: "content",
+      SLO4: "feedback",
+      SLO6: "grading",
+      SLO7: "feedback",
+      SLO9: "content"
+    };
+
+    const MAJOR_COURSES = {
+      mis: ["MIS 200", "MIS 221", "MIS 321", "MIS 330", "MIS 430"],
+      econ: ["EC 110", "EC 111", "EC 308", "EC 309", "EC 413"],
+      re: ["FI 331", "FI 334", "FI 436", "FI 444"],
+      acct: ["AC 210", "AC 310", "AC 311", "AC 361", "AC 371"],
+      stats: ["ST 260", "ST 451", "ST 452", "ST 465"],
+      cyber: ["MIS 311", "MIS 411", "MIS 412", "MIS 464"],
+      fin: ["FI 302", "FI 410", "FI 412", "FI 414"],
+      mgt: ["MGT 300", "MGT 301", "MGT 320", "MGT 341"],
+      mkt: ["MKT 300", "MKT 313", "MKT 321", "MKT 337"],
+      om: ["OM 300", "OM 310", "OM 321", "OM 375"]
+    };
+
+    let compareOn = false;
+    let compareIds = new Set();
+    let openDesc = new Set();
+    let openModels = new Set();
+    let openMajor = null;
+    let openCourse = null;
+    let classSort = "overall-desc";
+    let openSlo = null;
+    let recStep = "role";
+
+    function pctClass(n) {
+      if (n == null) return "poor";
+      if (n >= 80) return "";
+      if (n >= 65) return "mid";
+      return "poor";
+    }
+    function fmt(n) { return n == null ? "—" : n + "%"; }
+    function nameClass(m) { return "name-" + (m.color || "mock"); }
+    function hashScore(seed, base) {
+      let h = 0;
+      for (let i = 0; i < seed.length; i++) h = (h * 33 + seed.charCodeAt(i)) >>> 0;
+      const jitter = (h % 19) - 9;
+      return Math.max(38, Math.min(99, (base ?? 70) + jitter));
+    }
+    function courseScore(model, course, majorId) {
+      const topic = TOPICS.find(t => t.id === majorId);
+      const base = scoreFor(model, topic || { scoreFrom: "overall" });
+      return hashScore(model.id + "|" + course, base);
+    }
+    function sloScore(model, course, majorId, sloKey) {
+      const base = model.slos[sloKey];
+      if (base == null) return null;
+      return hashScore(model.id + "|" + course + "|" + sloKey, base);
+    }
+    function skillClassScore(model, course, majorId, helpKey) {
+      const area = helpScore(model, helpKey);
+      if (area == null) return null;
+      return hashScore(model.id + "|" + course + "|job|" + helpKey, area);
+    }
+
+    function fillCompareSelects() {
+      const opts = `<option value="">Select...</option>` + MODELS.map(m => `<option value="${m.id}">${m.name}</option>`).join("");
+      document.getElementById("modelA").innerHTML = opts;
+      document.getElementById("modelB").innerHTML = opts;
+    }
+
+    function syncCompare() {
+      const a = document.getElementById("modelA").value;
+      const b = document.getElementById("modelB").value;
+      document.getElementById("compareBtn").disabled = !(a && b && a !== b);
+    }
+
+    function applyCompare() {
+      const a = document.getElementById("modelA").value;
+      const b = document.getElementById("modelB").value;
+      compareOn = !!(a && b && a !== b);
+      compareIds = compareOn ? new Set([a, b]) : new Set();
+      document.getElementById("compareMode").checked = compareOn;
+      renderMain();
+    }
+
+    function onMajorFilter() {
+      const v = document.getElementById("classFilter").value;
+      if (v === "all") {
+        openMajor = null;
+        renderMain();
+        return;
+      }
+      openMajorView(v);
+    }
+
+    function openMajorView(id) {
+      openMajor = id;
+      openCourse = null;
+      document.getElementById("classFilter").value = id;
+      showView("results");
+    }
+
+    function renderResults() {
+      const detail = document.getElementById("majorDetail");
+      if (!openMajor) {
+        detail.innerHTML = `<div class="empty-results">
+          <p class="eyebrow">Classes</p>
+          <h2>Pick a major to see every class and model</h2>
+          <p class="meta">Home lists the majors. Use View All Classes and this page fills with the ranking table — models down the left, classes across the top. Click a class to see SLOs.</p>
+          <p><button type="button" class="back-btn" onclick="showView('home')">← Back to Home</button></p>
+        </div>`;
+        return;
+      }
+      if (openCourse) {
+        detail.innerHTML = renderClassDetail(openMajor, openCourse);
+        const back = document.getElementById("backCourse");
+        if (back) back.addEventListener("click", () => {
+          openCourse = null;
+          classSort = "overall-desc";
+          openSlo = null;
+          renderResults();
+        });
+        const sortEl = document.getElementById("classSort");
+        if (sortEl) {
+          sortEl.value = classSort;
+          sortEl.addEventListener("change", () => {
+            classSort = sortEl.value;
+            renderResults();
+          });
+        }
+        detail.querySelectorAll("[data-open-slo]").forEach(el => {
+          el.addEventListener("click", () => {
+            const id = el.getAttribute("data-open-slo");
+            openSlo = openSlo === id ? null : id;
+            renderResults();
+            const box = document.getElementById("sloExplain");
+            if (box) box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          });
+        });
+        const closeSlo = document.getElementById("closeSlo");
+        if (closeSlo) closeSlo.addEventListener("click", () => { openSlo = null; renderResults(); });
+        return;
+      }
+      detail.innerHTML = renderMajorDetail(openMajor);
+      const back = document.getElementById("backMajors");
+      if (back) back.addEventListener("click", () => {
+        openMajor = null;
+        openCourse = null;
+        openSlo = null;
+        document.getElementById("classFilter").value = "all";
+        showView("home");
+      });
+      detail.querySelectorAll("[data-open-course]").forEach(el => {
+        el.addEventListener("click", () => {
+          openCourse = el.getAttribute("data-open-course");
+          classSort = "overall-desc";
+          openSlo = null;
+          renderResults();
+        });
+      });
+    }
+
+    function ranked() {
+      return MODELS.filter(m => m.overall != null).sort((a, b) => b.overall - a.overall);
+    }
+
+    function modelsForCompare() {
+      if (compareOn && compareIds.size) return MODELS.filter(m => compareIds.has(m.id) && m.overall != null)
+        .sort((a, b) => (b.overall || 0) - (a.overall || 0));
+      return ranked();
+    }
+
+    function scoreFor(m, topic) {
+      if (topic.kind === "overall" || topic.scoreFrom === "overall") return m.overall;
+      if (topic.kind === "skill" || topic.scoreFrom === "skill") return m.sections[topic.key].score;
+      if (topic.kind === "slo" || topic.scoreFrom === "slo") return m.slos[topic.key];
+      if (topic.kind === "class" || topic.kind === "major") {
+        const vals = (topic.slos || []).map(s => m.slos[s]).filter(v => v != null);
+        if (!vals.length) return m.overall;
+        return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+      }
+      return null;
+    }
+
+    const TOPICS = [
+      { id: "mis", kind: "major", title: "MIS", meta: "Culverhouse major", scoreFrom: "skill", key: "content", desc: "How models do on management information systems coursework — systems, data, and the student-facing prompt." },
+      { id: "acct", kind: "major", title: "Accounting", meta: "Culverhouse major", scoreFrom: "skill", key: "grading", desc: "Keys, partial credit, and constructed response — the instructor side of quantitative and reporting work." },
+      { id: "cyber", kind: "major", title: "Business Cyber Security", meta: "Culverhouse major", scoreFrom: "skill", key: "exams", desc: "Item writing and staff-side work as a stand-in until a dedicated cyber battery is on the board." },
+      { id: "econ", kind: "major", title: "Economics", meta: "Culverhouse major", scoreFrom: "slo", key: "SLO3", desc: "Measured against economic reasoning in the programme map: models, markets, and applying a framework to a stated situation." },
+      { id: "fin", kind: "major", title: "Finance", meta: "Culverhouse major", scoreFrom: "overall", desc: "Overall sample-weighted mean as a first cut for finance until time-value and statement tasks are split out." },
+      { id: "mgt", kind: "major", title: "Management", meta: "Culverhouse major", scoreFrom: "skill", key: "tutoring", desc: "Coaching a stuck student without doing the work — the tutoring lens on organizational and people problems." },
+      { id: "mkt", kind: "major", title: "Marketing", meta: "Culverhouse major", scoreFrom: "skill", key: "feedback", desc: "Formative critique that stays inside a guide: audience, message, and the next question, not a rewrite." },
+      { id: "om", kind: "major", title: "Operations Management", meta: "Culverhouse major", scoreFrom: "slo", key: "SLO1", desc: "Problem solving rungs: naming the problem, choosing a tool, running the analysis, and recommending." },
+      { id: "re", kind: "major", title: "Real Estate", meta: "Culverhouse major", scoreFrom: "slo", key: "SLO4", desc: "Property, markets, and local context — scored from related cultural and societal perspective tasks until a dedicated real-estate battery exists." },
+      { id: "stats", kind: "major", title: "Statistical Data Analysis", meta: "Culverhouse major", scoreFrom: "slo", key: "SLO2", desc: "Quantitative literacy tasks: unit economics, CVP, data extracts, and reporting the quantity asked for." }
+    ];
+
+    function renderTopicCard(topic) {
+      const models = modelsForCompare()
+        .map(m => ({ m, score: scoreFor(m, topic) }))
+        .sort((a, b) => (b.score || -1) - (a.score || -1));
+      const open = openDesc.has(topic.id);
+      const showAll = openModels.has(topic.id);
+      const preview = 3;
+      const shown = showAll ? models : models.slice(0, preview);
+      const hiddenCount = Math.max(0, models.length - preview);
+      const courses = MAJOR_COURSES[topic.id] || [];
+      const head = `<th>Model</th>` + courses.map(c => `<th>${c}</th>`).join("");
+      const rows = shown.map(row => {
+        const cells = courses.map(c => {
+          const n = courseScore(row.m, c, topic.id);
+          return `<td class="num pct ${pctClass(n)}">${n}%</td>`;
+        }).join("");
+        return `<tr><td class="${nameClass(row.m)}">${row.m.name}</td>${cells}</tr>`;
+      }).join("");
+      const moreModels = hiddenCount
+        ? `<div class="topic-foot"><button type="button" class="show-more" data-models="${topic.id}">${showAll ? "Show top 3 models" : `View all (${hiddenCount} remaining)`}</button></div>`
+        : "";
+      return `<article class="topic-card">
+        <h3>${topic.title}</h3>
+        <p class="meta">${topic.meta}</p>
+        <button type="button" class="open-table" data-open-major="${topic.id}">View All Classes</button>
+        <p class="desc ${open ? "" : "clamp"}">${topic.desc}</p>
+        <button type="button" class="show-more" data-more="${topic.id}">${open ? "Show less" : "Show more"}</button>
+        <div class="mini">
+          <table>
+            <thead><tr>${head}</tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        ${moreModels}
+      </article>`;
+    }
+
+    function renderMajorDetail(majorId) {
+      const topic = TOPICS.find(t => t.id === majorId);
+      const courses = MAJOR_COURSES[majorId] || [];
+      const models = modelsForCompare();
+      const head = `<th class="corner">Model</th>` + courses.map(c => `<th class="class-head" data-open-course="${c}">${c}</th>`).join("");
+      const body = models.map(m => {
+        const cells = courses.map(c => {
+          const n = courseScore(m, c, majorId);
+          return `<td class="num pct ${pctClass(n)}" data-open-course="${c}">${n}%</td>`;
+        }).join("");
+        return `<tr><td class="model-cell ${nameClass(m)}">${m.name}</td>${cells}</tr>`;
+      }).join("");
+      return `<button type="button" class="back-btn" id="backMajors">← All majors</button>
+        <h2>${topic.title}</h2>
+        <p class="meta">Classes across the top; models down the left. Click a class to see SLO rankings. Scores are out of 100.</p>
+        <div class="matrix-wrap">
+          <table class="matrix">
+            <thead><tr>${head}</tr></thead>
+            <tbody>${body}</tbody>
+          </table>
+        </div>`;
+    }
+
+    function classAvg(m, course, majorId, sloKeys) {
+      const vals = sloKeys.map(k => sloScore(m, course, majorId, k)).filter(v => v != null);
+      if (!vals.length) return null;
+      return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+    }
+
+    function sortClassModels(models, course, majorId, sloKeys) {
+      const list = models.slice();
+      const dir = classSort.endsWith("-asc") ? 1 : -1;
+      const key = classSort.replace(/-asc|-desc$/, "");
+      list.sort((a, b) => {
+        if (classSort === "name") return a.name.localeCompare(b.name);
+        if (key === "overall") {
+          return dir * ((classAvg(a, course, majorId, sloKeys) ?? -1) - (classAvg(b, course, majorId, sloKeys) ?? -1));
+        }
+        return dir * ((sloScore(a, course, majorId, key) ?? -1) - (sloScore(b, course, majorId, key) ?? -1));
+      });
+      return list;
+    }
+
+    function renderClassDetail(majorId, course) {
+      const topic = TOPICS.find(t => t.id === majorId);
+      const sloKeys = Object.keys(SLO_LABELS);
+      const models = sortClassModels(modelsForCompare(), course, majorId, sloKeys);
+      const sortOpts = [
+        ["overall-desc", "Overall (high to low)"],
+        ["overall-asc", "Overall (low to high)"],
+        ["name", "Model name (A–Z)"],
+        ...sloKeys.flatMap(k => [
+          [k + "-desc", SLO_LABELS[k] + " (high to low)"],
+          [k + "-asc", SLO_LABELS[k] + " (low to high)"]
+        ])
+      ].map(([v, lab]) => `<option value="${v}">${lab}</option>`).join("");
+      const head = `<th class="corner">Model</th>` + sloKeys.map(k => `<th class="slo-head${openSlo === k ? " on" : ""}" data-open-slo="${k}">${k}<br>${SLO_LABELS[k]}</th>`).join("");
+      const body = models.map(m => {
+        const cells = sloKeys.map(k => {
+          const n = sloScore(m, course, majorId, k);
+          return `<td class="num pct ${pctClass(n)}">${fmt(n)}</td>`;
+        }).join("");
+        return `<tr><td class="model-cell ${nameClass(m)}">${m.name}</td>${cells}</tr>`;
+      }).join("");
+      const rankBody = models.map((m, i) => {
+        const avg = classAvg(m, course, majorId, sloKeys);
+        return `<tr>
+          <td class="rank">${i + 1}</td>
+          <td class="${nameClass(m)}">${m.name}</td>
+          <td class="num pct ${pctClass(avg)}">${fmt(avg)}</td>
+        </tr>`;
+      }).join("");
+      const expl = openSlo ? SLO_EXPLAIN[openSlo] : null;
+      const modelNotes = openSlo ? models.map(m => {
+        const n = sloScore(m, course, majorId, openSlo);
+        const skill = SLO_NOTE_SKILL[openSlo];
+        const note = (skill && m.sections[skill] && m.sections[skill].note) ? m.sections[skill].note : "No task-level note on the board yet for this SLO.";
+        return `<tr>
+          <td class="model-cell ${nameClass(m)}">${m.name}</td>
+          <td class="num pct ${pctClass(n)}">${fmt(n)}</td>
+          <td style="text-align:left;white-space:normal;font-weight:500;">${note}</td>
+        </tr>`;
+      }).join("") : "";
+      const explainBox = expl ? `<section class="slo-explain" id="sloExplain">
+          <button type="button" class="back-btn close-slo" id="closeSlo">← Hide explanation</button>
+          <h3>${openSlo} · ${SLO_LABELS[openSlo]}</h3>
+          <p class="eyebrow">${course} · ${topic.title} · as published</p>
+          <h4>Published outcome</h4>
+          <p>“${expl.published}”</p>
+          <h4>What this number means</h4>
+          <p>${expl.meaning}</p>
+          <h4>How the score is made</h4>
+          <p>${expl.scoring}</p>
+          <h4>Produce the work</h4>
+          <p>${expl.produce}</p>
+          <h4>Tutor the student</h4>
+          <p>${expl.tutor}</p>
+          <h4>Instructor / staff work</h4>
+          <p>${expl.staff}</p>
+          <h4>Models on this SLO</h4>
+          <div class="matrix-wrap">
+            <table class="matrix">
+              <thead><tr><th class="corner">Model</th><th>Score</th><th>Explanation</th></tr></thead>
+              <tbody>${modelNotes}</tbody>
+            </table>
+          </div>
+        </section>` : "";
+      const skillKeys = Object.keys(HELP_META);
+      const skillHead = `<th class="corner">Model</th>` + skillKeys.map(k => `<th>${HELP_META[k].label}</th>`).join("");
+      const skillBody = models.map(m => {
+        const cells = skillKeys.map(k => {
+          const n = skillClassScore(m, course, majorId, k);
+          return `<td class="num pct ${pctClass(n)}">${fmt(n)}</td>`;
+        }).join("");
+        return `<tr><td class="model-cell ${nameClass(m)}">${m.name}</td>${cells}</tr>`;
+      }).join("");
+      return `<button type="button" class="back-btn" id="backCourse">← ${topic.title}</button>
+        <h2>${course}</h2>
+        <p class="meta">${topic.title} · models ranked against the published SLOs for this class. Click an SLO heading for the full explanation. Scores are out of 100.</p>
+        <div class="sort-bar">
+          <label for="classSort">Sort by</label>
+          <select id="classSort">${sortOpts}</select>
+        </div>
+        <div class="matrix-wrap">
+          <table class="matrix">
+            <thead><tr>${head}</tr></thead>
+            <tbody>${body}</tbody>
+          </table>
+        </div>
+        ${explainBox}
+        <p class="section-kicker">Outside of SLOs</p>
+        <p class="section-lead">Jobs from the recommendation survey — tutoring, grading, content, exams, and related staff or student work — scored for this class, separate from the published outcomes above.</p>
+        <div class="matrix-wrap">
+          <table class="matrix">
+            <thead><tr>${skillHead}</tr></thead>
+            <tbody>${skillBody}</tbody>
+          </table>
+        </div>
+        <p class="section-kicker">Overall on this class</p>
+        <p class="section-lead">Mean of the SLO scores above. Does not include the jobs outside SLOs.</p>
+        <div class="matrix-wrap">
+          <table class="matrix">
+            <thead><tr><th></th><th class="corner">Model</th><th>Score</th></tr></thead>
+            <tbody>${rankBody}</tbody>
+          </table>
+        </div>`;
+    }
+
+    function renderMain() {
+      const mode = document.getElementById("groupBy").value;
+      const classFilter = document.getElementById("classFilter").value;
+      const grid = document.getElementById("topicGrid");
+      let topics = TOPICS.filter(t => {
+        if (mode === "skill") return t.kind === "skill" || t.kind === "overall";
+        if (mode === "slo") return t.kind === "slo";
+        if (mode === "class") return t.kind === "major";
+        return true;
+      });
+      if (classFilter !== "all") topics = topics.filter(t => t.id === classFilter);
+      grid.innerHTML = topics.map(renderTopicCard).join("");
+      grid.onclick = (e) => {
+        const more = e.target.closest("[data-more]");
+        if (more) {
+          const id = more.getAttribute("data-more");
+          if (openDesc.has(id)) openDesc.delete(id);
+          else openDesc.add(id);
+          renderMain();
+          return;
+        }
+        const moreModels = e.target.closest("[data-models]");
+        if (moreModels) {
+          const id = moreModels.getAttribute("data-models");
+          if (openModels.has(id)) openModels.delete(id);
+          else openModels.add(id);
+          renderMain();
+          return;
+        }
+        const openBtn = e.target.closest(".open-table[data-open-major]");
+        if (!openBtn) return;
+        openMajorView(openBtn.getAttribute("data-open-major"));
+      };
+      grid.onkeydown = null;
+    }
+
+    function setTab(btn) {
+      document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("on"));
+      btn.classList.add("on");
+      ["produce", "tutor", "staff"].forEach(id => {
+        document.getElementById("tab-" + id).hidden = btn.dataset.tab !== id;
+      });
+    }
+
+    function showView(name) {
+      document.getElementById("view-home").hidden = name !== "home";
+      document.getElementById("view-results").hidden = name !== "results";
+      document.getElementById("view-recommend").hidden = name !== "recommend";
+      document.getElementById("view-learn").hidden = name !== "learn";
+      document.getElementById("nav-home").classList.toggle("active", name === "home" || name === "results");
+      document.getElementById("nav-rec").classList.toggle("active", name === "recommend");
+      document.getElementById("nav-learn").classList.toggle("active", name === "learn");
+      if (name === "results") renderResults();
+      if (name === "home") renderMain();
+      if (name === "recommend") showRecStep(recStep);
+      window.scrollTo(0, 0);
+    }
+
+    function recRole() {
+      return document.querySelector("input[name=hat]:checked")?.value || "";
+    }
+    function recWho() {
+      return document.querySelector("input[name=who]:checked")?.value || "";
+    }
+    function recSubjects() {
+      return [...document.querySelectorAll("input[name=subject]:checked")].map(i => i.value);
+    }
+    function recHelps() {
+      return [...document.querySelectorAll("input[name=help]:checked")].map(i => i.value);
+    }
+    function recStepList() {
+      const steps = ["role"];
+      if (recRole() === "teaching" || recRole() === "both") steps.push("subjects");
+      steps.push("who", "help");
+      return steps;
+    }
+    function recSetErr(msg) {
+      const el = document.getElementById("recErr");
+      el.hidden = !msg;
+      el.textContent = msg || "";
+    }
+    function showRecStep(step) {
+      recStep = step;
+      document.querySelectorAll("[data-rec]").forEach(el => {
+        el.hidden = el.dataset.rec !== step;
+      });
+      const steps = recStepList();
+      const i = steps.indexOf(step);
+      const progress = document.getElementById("recProgress");
+      const next = document.getElementById("recNext");
+      const back = document.getElementById("recBack");
+      recSetErr("");
+      document.getElementById("recSurvey").classList.toggle("survey-center", step === "role");
+      document.getElementById("recSurvey").classList.toggle("survey-wide", step === "result");
+      if (step === "result") {
+        progress.textContent = "Your recommendation";
+        back.hidden = false;
+        next.textContent = "Start over";
+        next.hidden = false;
+        return;
+      }
+      progress.textContent = `Question ${i + 1} of ${steps.length}`;
+      back.hidden = i <= 0;
+      next.hidden = false;
+      next.textContent = step === "help" ? "See recommendations" : "Continue";
+    }
+    function recBack() {
+      if (recStep === "result") {
+        showRecStep("help");
+        return;
+      }
+      const steps = recStepList();
+      const i = steps.indexOf(recStep);
+      if (i > 0) showRecStep(steps[i - 1]);
+    }
+    function recContinue() {
+      if (recStep === "result") {
+        recReset();
+        return;
+      }
+      if (recStep === "role" && !recRole()) return recSetErr("Pick teacher, researcher, or both.");
+      if (recStep === "subjects" && !recSubjects().length) return recSetErr("Pick at least one subject.");
+      if (recStep === "who" && !recWho()) return recSetErr("Say who will use the tool.");
+      if (recStep === "help") {
+        if (!recHelps().length) return recSetErr("Pick at least one kind of help.");
+        showRecResults();
+        return;
+      }
+      const steps = recStepList();
+      const i = steps.indexOf(recStep);
+      if (i >= 0 && i < steps.length - 1) showRecStep(steps[i + 1]);
+    }
+    function recReset() {
+      document.querySelectorAll("input[name=hat], input[name=who], input[name=subject], input[name=help]").forEach(i => { i.checked = false; });
+      document.getElementById("recResult").innerHTML = "";
+      showRecStep("role");
+    }
+    function helpScore(m, help) {
+      const skill = HELP_META[help]?.skill;
+      if (skill && m.sections[skill] && m.sections[skill].score != null) return m.sections[skill].score;
+      return m.overall;
+    }
+    function recPick(majorId, help) {
+      const topic = TOPICS.find(t => t.id === majorId);
+      return ranked().map(m => {
+        const area = helpScore(m, help);
+        const major = topic ? scoreFor(m, topic) : (m.overall || 0);
+        const score = Math.round(area * 0.7 + (major || area) * 0.3);
+        return { m, score, area };
+      }).sort((a, b) => b.score - a.score)[0];
+    }
+    function showRecResults() {
+      const role = recRole();
+      const who = recWho();
+      const helps = recHelps();
+      let majors = recSubjects();
+      if (role === "research") majors = ["research"];
+      const roleLabel = role === "teaching" ? "teacher" : role === "research" ? "researcher" : "teacher and researcher";
+      const whoLabel = who === "me" ? "your own work" : who === "students" ? "students to use" : "both your work and students";
+      const campusNote = (who === "students" || who === "both")
+        ? "<p>If student work must stay on university hardware, use Campus vLLM (Sparks) even when another model scores higher.</p>"
+        : "";
+      const summary = `<div class="result-box">
+        <b>Recommendation from what you told us.</b>
+        <p>You are a ${roleLabel}. This is for ${whoLabel}. Help wanted: ${helps.map(h => HELP_META[h].label).join("; ")}.</p>
+        ${campusNote}
+        <p class="why">Mock recommendation — live site would attach the runs behind each number.</p>
+      </div>`;
+      const blocks = majors.map(majorId => {
+        const topic = TOPICS.find(t => t.id === majorId);
+        const title = topic ? topic.title : "Research work";
+        const courses = MAJOR_COURSES[majorId] || [];
+        const rows = helps.map(help => {
+          const pick = recPick(majorId === "research" ? "fin" : majorId, help);
+          return `<tr>
+            <td>${HELP_META[help].label}</td>
+            <td class="${nameClass(pick.m)}">${pick.m.name}</td>
+            <td class="num pct ${pctClass(pick.score)}">${fmt(pick.score)}</td>
+          </tr>`;
+        }).join("");
+        const classHead = `<th class="corner">Model</th>` + courses.map(c => `<th>${c}</th>`).join("");
+        const classBody = ranked().map(m => {
+          const cells = courses.map(c => {
+            const scores = helps.map(help => {
+              const area = helpScore(m, help);
+              const cls = courseScore(m, c, majorId);
+              return area * 0.6 + cls * 0.4;
+            });
+            const n = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+            return `<td class="num pct ${pctClass(n)}">${fmt(n)}</td>`;
+          }).join("");
+          return `<tr><td class="model-cell ${nameClass(m)}">${m.name}</td>${cells}</tr>`;
+        }).join("");
+        const classTable = courses.length
+          ? `<h3 style="font-size:.95rem;margin:1rem 0 .4rem;">By class</h3>
+             <div class="matrix-wrap">
+               <table class="matrix">
+                 <thead><tr>${classHead}</tr></thead>
+                 <tbody>${classBody}</tbody>
+               </table>
+             </div>
+             <p><button type="button" class="back-btn" onclick="openMajorView('${majorId}')">Open full ${title} ranking →</button></p>`
+          : "";
+        return `<article class="rec-major">
+          <h2>${title}</h2>
+          <p class="meta">Best measured model for each area you asked about, then the same breakdown by class.</p>
+          <table>
+            <thead><tr><th>Help needed</th><th>Recommended model</th><th>Score</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          ${classTable}
+        </article>`;
+      }).join("");
+      document.getElementById("recResult").innerHTML = summary + `<div class="rec-grid${majors.length > 1 ? " multi" : ""}">${blocks}</div>`;
+      showRecStep("result");
+    }
+
+    function setTheme(mode) {
+      const theme = mode === "light" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", theme);
+      try { localStorage.setItem("ida-theme", theme); } catch (e) {}
+      const toggle = document.getElementById("themeToggle");
+      if (toggle) {
+        toggle.checked = theme === "light";
+        toggle.setAttribute("aria-label", theme === "light" ? "Switch to dark mode" : "Switch to light mode");
+      }
+    }
+
+    fillCompareSelects();
+    renderMain();
+    setTheme(document.documentElement.getAttribute("data-theme") || "dark");
+  </script>
+</body>
+</html>
