@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fraunces, IBM_Plex_Sans } from "next/font/google";
 
 import "./globals.css";
+import "./faculty.css";
 
 /**
  * ⚠ THE ROOT LAYOUT CARRIES NO CHROME. It used to render the header, the nav

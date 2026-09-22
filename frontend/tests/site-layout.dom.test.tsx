@@ -25,7 +25,7 @@ afterEach(() => {
 
 describe("the tool-page chrome's landmarks", () => {
   it("keeps <header> and <nav> as siblings of <main>, not descendants", () => {
-    usePathname.mockReturnValue("/leaderboard");
+    usePathname.mockReturnValue("/");
     const { container } = render(
       <SiteLayout>
         <p>page content</p>
@@ -41,7 +41,7 @@ describe("the tool-page chrome's landmarks", () => {
   });
 
   it("renders the page content inside <main id=\"main-content\">", () => {
-    usePathname.mockReturnValue("/leaderboard");
+    usePathname.mockReturnValue("/");
     const { container, getByText } = render(
       <SiteLayout>
         <p>page content</p>
@@ -54,7 +54,7 @@ describe("the tool-page chrome's landmarks", () => {
   });
 
   it("puts a skip link first, pointing at the main content", () => {
-    usePathname.mockReturnValue("/leaderboard");
+    usePathname.mockReturnValue("/");
     const { container } = render(
       <SiteLayout>
         <p>page content</p>
@@ -67,7 +67,7 @@ describe("the tool-page chrome's landmarks", () => {
   });
 
   it("marks the current nav item with aria-current, and no other", () => {
-    usePathname.mockReturnValue("/leaderboard");
+    usePathname.mockReturnValue("/");
     const { container } = render(
       <SiteLayout>
         <p>page content</p>
@@ -77,7 +77,7 @@ describe("the tool-page chrome's landmarks", () => {
     const links = Array.from(container.querySelectorAll("nav a"));
     const current = links.filter((a) => a.getAttribute("aria-current") === "page");
     expect(current).toHaveLength(1);
-    expect(current[0]!.getAttribute("href")).toBe("/leaderboard");
+    expect(current[0]!.getAttribute("href")).toBe("/");
   });
 
   it("marks nothing current on a route with no matching nav item", () => {

@@ -37,7 +37,7 @@ import {
   NOT_MEASURED,
   type EvidenceRow,
 } from "@/lib/explore";
-import { formatScore } from "@/lib/format";
+import { formatScore100 } from "@/lib/format";
 import { confidenceLabel, WEIGHTING_NOTE } from "@/lib/rollup";
 import type { LeaderboardResponse } from "@/lib/types";
 
@@ -89,7 +89,7 @@ function ModelRow({ row, focused }: { row: EvidenceRow; focused: boolean }) {
         {agg.score === null ? (
           <span className="muted">— {NOT_MEASURED}</span>
         ) : (
-          formatScore(agg.score)
+          formatScore100(agg.score)
         )}
       </td>
       <td className="col-trust">
@@ -246,7 +246,7 @@ export default async function EvidencePage({
               <thead>
                 <tr>
                   <th scope="col">Model</th>
-                  <th scope="col">Score</th>
+                  <th scope="col">Score / 100</th>
                   <th scope="col">Confidence</th>
                   <th scope="col">Scored samples</th>
                   <th scope="col">Receipt</th>

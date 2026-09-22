@@ -13,6 +13,11 @@ export function formatScore(value: number | null): string {
   return formatScoreValue(value);
 }
 
+/** Course exploration uses whole scores out of 100, preserving the ceiling rule. */
+export function formatScore100(value: number | null): string {
+  return value === null ? "—" : String(Math.round(Number(formatScoreValue(value)) * 100));
+}
+
 /**
  * A score, to two places — and **never rounded up into a perfect 1.00**.
  *

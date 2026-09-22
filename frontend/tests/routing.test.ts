@@ -2,11 +2,10 @@
  * The route map, checked against the filesystem and the sources.
  *
  * ⚠ THIS TEST EXISTS BECAUSE THE MOVE IT GUARDS IS SILENT WHEN IT BREAKS. `/`
- * became the landing page and the leaderboard moved to `/leaderboard`. Every
- * link that still points at `/` expecting a table now lands a professor on the
- * pitch instead — and nothing crashes, nothing 404s, no type fails. The page
- * just quietly shows the wrong thing to the visitor who had already decided to
- * trust us enough to click.
+ * became the faculty-facing explore page and the leaderboard moved to
+ * `/leaderboard`. Every link that still points at `/` expecting a table now
+ * lands a professor on the wrong page — and nothing crashes, nothing 404s, no
+ * type fails.
  *
  * Reading the sources rather than rendering them is deliberate: this is a claim
  * about every route at once, and there is no component to render that would
@@ -50,10 +49,14 @@ function sources(dir = APP, acc: [string, string][] = []): [string, string][] {
 
 const ROUTES = routes();
 const SOURCES = sources();
+const FACULTY_SHELL = readFileSync(join(APP, "..", "components", "faculty-shell.tsx"), "utf8");
 
-describe("the route map after the landing-page move", () => {
-  it("serves the landing at /", () => {
+describe("the route map after the faculty explore move", () => {
+  it("serves faculty explore at /", () => {
     expect(ROUTES).toContain("/");
+    const root = SOURCES.find(([path]) => path === "page.tsx");
+    expect(root?.[1]).toContain("FacultyHome");
+    expect(root?.[1]).toContain("FacultyShell");
   });
 
   it("serves the leaderboard at /leaderboard, not at /", () => {
@@ -69,19 +72,12 @@ describe("the route map after the landing-page move", () => {
     }
   });
 
-  it("serves the candidate front door at /overview, beside / rather than over it", () => {
-    // ⚠ IT IS A CANDIDATE, AND THE POINT IS THAT BOTH EXIST AT ONCE. `/overview`
-    // is a second front door offered for review next to `/`; a change that
-    // quietly made it THE front door, or dropped it, would end the comparison
-    // it was built for without failing anything else.
+  it("keeps the overview route available beside faculty explore", () => {
     expect(ROUTES).toContain("/overview");
     expect(ROUTES).toContain("/");
   });
 
   it("keeps the overview outside the (site) chrome", () => {
-    // It brings its own masthead, exactly as `/` does. Inside the route group
-    // it would render under a second header, in the tool pages' column, and
-    // stop being a front door at all.
     const overview = SOURCES.find(([path]) => path === "overview/page.tsx");
     expect(overview, "overview/page.tsx is not where the route map expects it").toBeDefined();
     expect(overview![1]).toContain("ld-mast");
@@ -104,7 +100,7 @@ describe("the route map after the landing-page move", () => {
 });
 
 describe("no link points at / expecting the leaderboard", () => {
-  /** The landing is `/`; only a wordmark or a "home" link may target it. */
+/** Faculty explore is `/`; only a wordmark or a "home" link may target it. */
   //
   // ⚠ `>the introduction<` IS A NARROWING, NOT A LOOSENING. The rule this guard
   // enforces is "no link points at `/` EXPECTING THE LEADERBOARD" — the failure
@@ -149,25 +145,26 @@ describe("no link points at / expecting the leaderboard", () => {
   });
 });
 
-describe("the chrome sits below the landing, not above it", () => {
+describe("the shared faculty chrome is owned by FacultyShell", () => {
   it("keeps the app header out of the root layout", () => {
     const root = SOURCES.find(([path]) => path === "layout.tsx")![1];
-    // The landing is full-bleed and brings its own masthead. If the nav returns
-    // to the root layout, every landing visitor gets two headers.
+    // The root layout owns document fonts only. FacultyShell owns the shared
+    // header and main/footer wrapper used by both root and tool routes.
     expect(root).not.toContain("<nav");
     expect(root).not.toContain("resolveVersion");
   });
 
-  it("puts the header, nav and version badge in the (site) layout", () => {
+  it("uses FacultyShell in the (site) layout and keeps its details in one source", () => {
     const site = SOURCES.find(([path]) => path.startsWith("(site)") && path.endsWith("layout.tsx"));
     expect(site).toBeDefined();
-    expect(site![1]).toContain("<nav");
-    expect(site![1]).toContain("resolveVersion");
-    // And its nav names the real paths.
-    expect(site![1]).toContain('href: "/leaderboard"');
+    expect(site![1]).toContain("FacultyShell");
+    expect(FACULTY_SHELL).toContain("<nav");
+    expect(FACULTY_SHELL).toContain("resolveVersion");
+    // The shared nav names the real paths.
+    expect(FACULTY_SHELL).toContain('href="/leaderboard"');
     // The grid is a top-level destination; if it is only reachable from a link
     // buried in the leaderboard's browse panel, almost nobody will find it.
-    expect(site![1]).toContain('href: "/compare"');
+    expect(FACULTY_SHELL).toContain('href=\"/compare\"');
   });
 
   it("loads both landing typefaces from the root layout", () => {

@@ -34,7 +34,7 @@ vi.mock("@/lib/api", () => ({
 // Imported after the mock is registered — the page calls getLeaderboard at
 // module-execution time in its own body, not at import time, but the mock has
 // to exist before the module graph is built either way.
-const { default: LandingPage } = await import("@/app/page");
+const { default: LandingPage } = await import("@/app/about/page");
 
 function trust(overrides: Partial<TrustTell> = {}): TrustTell {
   return {

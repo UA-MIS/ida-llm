@@ -37,8 +37,8 @@
  * attribute would have broken the rule this codebase keeps writing tests
  * about — an empty square must still say something, visibly, at every width.
  * So the reasons are a list directly beneath the grid, one line per column, in
- * column order. Not a tooltip, not a footnote nobody scrolls to: the block the
- * grid sits on top of.
+ * column order. The compact homepage places this list in an expandable
+ * disclosure; drill-down pages keep it expanded.
  */
 
 import Link from "next/link";
@@ -54,9 +54,11 @@ const ALL_MODELS = "All models";
 function ColumnHeader({
   entity,
   badge,
+  compact = false,
 }: {
   entity: MatrixEntityColumn;
   badge?: React.ReactNode;
+  compact?: boolean;
 }) {
   return (
     <th
@@ -71,8 +73,8 @@ function ColumnHeader({
         // sighted reader has to read to find their major or class.
         title={entity.columnLabel === entity.heading ? undefined : entity.heading}
       >
-        <span className="xp-col-eyebrow">{entity.eyebrow}</span>
-        <span className="xp-col-heading">{entity.columnLabel}</span>
+        {!compact && <span className="xp-col-eyebrow">{entity.eyebrow}</span>}
+        <span className="xp-col-heading">{compact ? entity.heading : entity.columnLabel}</span>
         <span className="xp-col-go" aria-hidden="true">
           →
         </span>
@@ -103,19 +105,21 @@ export function ExploreMatrixGrid({
   badgeFor,
   /** The model a cell click carried down from the level above, if any. */
   focusModel,
+  compact = false,
 }: {
   matrix: ExploreMatrix;
   columnKind: string;
   overallLabel: string;
   badgeFor?: (entity: MatrixEntityColumn) => React.ReactNode;
   focusModel?: string | null;
+  compact?: boolean;
 }) {
   return (
     <>
-      <RampLegend />
+      {!compact && <RampLegend scale={100} />}
 
       <div className="table-scroll">
-        <table className="cg-grid xp-matrix">
+        <table className={`cg-grid xp-matrix${compact ? " faculty-matrix" : ""}`}>
           <caption className="sr-only">
             {`Every model against every ${columnKind.toLowerCase()} on this level. `}
             {`Models are rows, strongest first; ${columnKind.toLowerCase()}s are columns, `}
@@ -127,16 +131,16 @@ export function ExploreMatrixGrid({
                 Model
               </th>
               {matrix.entities.map((entity) => (
-                <ColumnHeader key={entity.key} entity={entity} badge={badgeFor?.(entity)} />
+                <ColumnHeader key={entity.key} entity={entity} badge={badgeFor?.(entity)} compact={compact} />
               ))}
-              <th scope="col" className="cg-col-overall">
+              {!compact && <th scope="col" className="cg-col-overall">
                 {overallLabel}
-              </th>
+              </th>}
             </tr>
           </thead>
 
           <tbody>
-            {matrix.models.map((model) => (
+            {matrix.models.filter((model) => !compact || model.recommendable).map((model) => (
               <tr
                 key={model.model_key}
                 className={
@@ -180,6 +184,8 @@ export function ExploreMatrixGrid({
                   const entity = matrix.entities[index]!;
                   return (
                     <ScoreCell
+                      scale={100}
+                      compact={compact}
                       key={entity.key}
                       cell={cell}
                       rowLabel={model.display_name}
@@ -192,11 +198,13 @@ export function ExploreMatrixGrid({
                 {/* This model across the whole level — the number its position
                     in the sort is built from, shown so the ranking can be
                     checked rather than taken on trust. */}
-                <ScoreCell
+                {!compact && <ScoreCell
+                      scale={100}
+                      compact={compact}
                   cell={model.overallCell}
                   rowLabel={model.display_name}
                   columnLabel={overallLabel}
-                />
+                />}
               </tr>
             ))}
 
@@ -207,12 +215,14 @@ export function ExploreMatrixGrid({
                 the grid it summarises, built by the same function over the
                 union of the same entries — so a summary that disagreed with
                 the cells above it would have to disagree with itself. */}
-            <tr className="xp-summary">
+            {!compact && <tr className="xp-summary">
               <th scope="row" className="cg-model xp-model">
                 {ALL_MODELS}
               </th>
               {matrix.entities.map((entity) => (
                 <ScoreCell
+                      scale={100}
+                      compact={compact}
                   key={entity.key}
                   cell={entity.overallCell}
                   rowLabel={ALL_MODELS}
@@ -226,7 +236,7 @@ export function ExploreMatrixGrid({
                     that share nothing. Left deliberately blank rather than
                     filled with an arithmetic mean of unrelated things. */}
               </td>
-            </tr>
+            </tr>}
           </tbody>
         </table>
       </div>
@@ -234,6 +244,8 @@ export function ExploreMatrixGrid({
       {/* ⚠ THE REASONS, ON THE PAGE. See the file header for why they are here
           and not in the column headers. One line per column, in column order,
           so the list and the grid can be read against each other. */}
+      <details className="faculty-matrix-details" open={!compact}>
+        <summary>Coverage and scoring details</summary>
       <dl className="xp-col-notes">
         {matrix.entities.map((entity) => (
           <div key={entity.key} className={`xp-note xp-note-${entity.status}`}>
@@ -252,12 +264,15 @@ export function ExploreMatrixGrid({
           </div>
         ))}
       </dl>
+      </details>
 
       {/* ⚠ THE KEY IS ON THE PAGE, NOT ONLY IN A TOOLTIP. Two glyphs carry two
           different claims, and a reader who cannot hover — or who simply does
           not — must still be able to tell them apart. One line, under the grid
           it explains, in the same words `lib/explore.ts` uses everywhere else. */}
-      <p className="muted xp-matrix-key">
+      {compact && <p className="faculty-score-key">Score out of 100 · Higher is better <span>— Not measured yet · ◇ Not text-measurable</span></p>}
+      {compact && matrix.models.some((m) => !m.recommendable) && <details className="faculty-test-models"><summary>Test models (not ranked)</summary><ul>{matrix.models.filter((m) => !m.recommendable).map((m) => <li key={m.model_key}><Link href={m.href}>{m.display_name}</Link> — test stub</li>)}</ul></details>}
+      {!compact && <p className="muted xp-matrix-key">
         <span className="xp-key-mark" aria-hidden="true">
           –
         </span>{" "}
@@ -270,7 +285,7 @@ export function ExploreMatrixGrid({
         it, so nothing was run on purpose. A score opens the level below it,
         carrying the model; a column header opens it for every model; a model
         opens its own report card.
-      </p>
+      </p>}
     </>
   );
 }

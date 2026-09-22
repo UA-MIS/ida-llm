@@ -25,12 +25,14 @@
 import Link from "next/link";
 
 import { ConfidenceTell } from "@/components/trust-badges";
-import { formatScore } from "@/lib/format";
+import { formatScore, formatScore100 } from "@/lib/format";
 import { RAMP_STEPS, type MatrixCell } from "@/lib/matrix";
 import { confidenceLabel } from "@/lib/rollup";
 
 /** The ramp legend. Also the only place the step boundaries are stated. */
-export function RampLegend() {
+type ScoreScale = 1 | 100;
+
+export function RampLegend({ scale = 1 }: { scale?: ScoreScale } = {}) {
   return (
     <div className="cg-legend">
       <span className="cg-legend-label">Score</span>
@@ -40,8 +42,8 @@ export function RampLegend() {
         ))}
       </span>
       <span className="muted cg-legend-ends">
-        <span>0.0</span>
-        <span>1.0</span>
+        <span>{scale === 100 ? "0" : "0.0"}</span>
+        <span>{scale === 100 ? "100" : "1.0"}</span>
       </span>
       <span className="muted cg-legend-note">
         Stronger colour means a higher score, not a better model — how much to
@@ -65,6 +67,8 @@ export function ScoreCell({
   rowLabel,
   columnLabel,
   href,
+  scale = 1,
+  compact = false,
 }: {
   cell: MatrixCell;
   rowLabel: string;
@@ -83,23 +87,39 @@ export function ScoreCell({
    * one of them.
    */
   href?: string;
+  /** Display the score on a 0–1 or 0–100 scale. */
+  scale?: ScoreScale;
+  /** Use a visible confidence word in dense grids, without confidence pips. */
+  compact?: boolean;
 }) {
   const label = `${rowLabel} on ${columnLabel}: ${cell.reason}`;
   const target = href ?? (cell.runId ? `/runs/${encodeURIComponent(cell.runId)}` : null);
+  const scoreText =
+    cell.score === null
+      ? "—"
+      : scale === 100
+        ? formatScore100(cell.score)
+        : formatScore(cell.score);
+  const scoreAccessible = scale === 100 && cell.score !== null ? `${scoreText} out of 100` : scoreText;
+  const confidence = confidenceLabel(cell.confidence);
+  const coverage = `${cell.measuredTasks} of ${cell.tasksAvailable} tasks measured`;
+  const measuredAccessible = `${label} Score: ${scoreAccessible}. Confidence: ${confidence}. ${coverage}.`;
 
   if (cell.status === "measured") {
     return (
       <td className={`cg-cell cg-measured cg-step-${cell.step}`} title={label}>
         {target ? (
           <Link href={target} className="cg-score">
-            {formatScore(cell.score)}
+            {scoreText}
+            {scale === 100 && <span className="sr-only"> out of 100</span>}
           </Link>
         ) : (
-          <span className="cg-score">{formatScore(cell.score)}</span>
+          <span className="cg-score">
+            {scoreText}
+            {scale === 100 && cell.score !== null && <span className="sr-only"> out of 100</span>}
+          </span>
         )}
-        <span className="cg-sub">
-          {cell.measuredTasks}/{cell.tasksAvailable}
-        </span>
+        {!compact && <span className="cg-sub">{cell.measuredTasks}/{cell.tasksAvailable}</span>}
         {/* ⚠ THE PIPS THE PAGE TELLS YOU TO LOOK FOR. Three separate pieces of
             copy — the legend, the how-to-read panel, and the stylesheet's own
             comment — point the reader at a confidence tell beside each number,
@@ -110,13 +130,17 @@ export function ScoreCell({
             because the grid is dense and the label would wrap every cell — the
             full wording stays in the title and the sr-only sentence. */}
         <span className="cg-confidence">
-          <ConfidenceTell
-            confidence={cell.confidence}
-            label={confidenceLabel(cell.confidence)}
-            reason={`${confidenceLabel(cell.confidence)}. How much weight this number can bear — how it was marked, over how many attempts, and whether anything failed. It is about the measurement, not about the model.`}
-          />
+          {compact ? (
+            <span className="cg-confidence-compact-label">{confidence}</span>
+          ) : (
+            <ConfidenceTell
+              confidence={cell.confidence}
+              label={confidence}
+              reason={`${confidence}. How much weight this number can bear — how it was marked, over how many attempts, and whether anything failed. It is about the measurement, not about the model.`}
+            />
+          )}
         </span>
-        <span className="sr-only">{label}</span>
+        <span className="sr-only">{measuredAccessible}</span>
       </td>
     );
   }

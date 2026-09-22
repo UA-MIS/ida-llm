@@ -37,7 +37,7 @@ import { join } from "node:path";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { board, result, task } from "./fixtures";
+import { board, CURRICULUM, result, task } from "./fixtures";
 
 /* -------------------------------------------------------------------------- */
 /* Layer 1 — discover every route that can carry a seeded score               */
@@ -77,13 +77,34 @@ interface ImportSpec {
  */
 function parseNamedImports(source: string): ImportSpec[] {
   const out: ImportSpec[] = [];
-  const re = /import\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g;
+  const re = /import\s+(?!type\b)([\s\S]*?)\s+from\s*["']([^"']+)["']/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(source))) {
-    const names = m[1]!
-      .split(",")
-      .map((s) => s.trim().split(/\s+as\s+/)[0]!.trim())
-      .filter(Boolean);
+    const clause = m[1]!.trim();
+    const names: string[] = [];
+    if (clause.startsWith("{")) {
+      names.push(
+        ...clause
+          .slice(1, clause.lastIndexOf("}"))
+          .split(",")
+          .map((s) => s.trim().split(/\s+as\s+/)[0]!.trim())
+          .filter(Boolean),
+      );
+    } else if (clause.startsWith("*")) {
+      names.push("*");
+    } else {
+      names.push("default");
+      const named = clause.indexOf("{");
+      if (named >= 0) {
+        names.push(
+          ...clause
+            .slice(named + 1, clause.lastIndexOf("}"))
+            .split(",")
+            .map((s) => s.trim().split(/\s+as\s+/)[0]!.trim())
+            .filter(Boolean),
+        );
+      }
+    }
     out.push({ module: m[2]!, names });
   }
   return out;
@@ -91,6 +112,35 @@ function parseNamedImports(source: string): ImportSpec[] {
 
 function fetchesLeaderboard(imports: ImportSpec[]): boolean {
   return imports.some((i) => i.module === "@/lib/api" && i.names.includes("getLeaderboard"));
+}
+
+function resolveLocalImport(from: string, module: string): string | null {
+  const base = module.startsWith("@/")
+    ? join(PROJECT_ROOT, "src", module.slice(2))
+    : module.startsWith(".")
+      ? join(from, module)
+      : null;
+  if (!base) return null;
+  for (const candidate of [base, `${base}.tsx`, `${base}.ts`, join(base, "index.tsx"), join(base, "index.ts")]) {
+    try {
+      if (statSync(candidate).isFile()) return candidate;
+    } catch {
+      // Try the next supported source extension.
+    }
+  }
+  return null;
+}
+
+function fetchesLeaderboardTransitively(file: string, seen = new Set<string>()): boolean {
+  if (seen.has(file)) return false;
+  seen.add(file);
+  const source = readFileSync(file, "utf8");
+  const imports = parseNamedImports(source);
+  if (fetchesLeaderboard(imports)) return true;
+  return imports.some((entry) => {
+    const dependency = resolveLocalImport(file.slice(0, file.lastIndexOf("/")), entry.module);
+    return dependency ? fetchesLeaderboardTransitively(dependency, seen) : false;
+  });
 }
 
 /** `src/app/(site)/explore/[major]/[course]/page.tsx` → `/explore/[major]/[course]`. */
@@ -105,7 +155,7 @@ function routeFromPageFile(file: string): string {
 
 function discoverScoreRoutes(): string[] {
   return findPageFiles(APP_DIR)
-    .filter((file) => fetchesLeaderboard(parseNamedImports(readFileSync(file, "utf8"))))
+    .filter((file) => fetchesLeaderboardTransitively(file))
     .map(routeFromPageFile)
     .sort();
 }
@@ -120,17 +170,18 @@ vi.mock("@/lib/api", () => ({
   ApiError: class ApiError extends Error {},
 }));
 
-const { default: LandingPage } = await import("@/app/page");
+const { FacultyHome } = await import("@/components/faculty-home");
+const { default: AboutPage } = await import("@/app/about/page");
 const { default: OverviewPage } = await import("@/app/overview/page");
 const { default: LeaderboardPage } = await import("@/app/(site)/leaderboard/page");
 const { default: ComparePage } = await import("@/app/(site)/compare/page");
 const { default: ModelReportPage } = await import("@/app/(site)/models/[key]/page");
-const { default: ExplorePage } = await import("@/app/(site)/explore/page");
 const { default: ClassesPage } = await import("@/app/(site)/explore/[major]/page");
 const { default: OutcomesPage } = await import("@/app/(site)/explore/[major]/[course]/page");
 const { default: EvidencePage } = await import(
   "@/app/(site)/explore/[major]/[course]/[slo]/page"
 );
+const { default: GeneralClassPage } = await import("@/app/(site)/classes/[course]/page");
 
 // The major that owns MIS 200 in `fixtures.ts`, and the class that claims the
 // `slo2` family the seeded board below files its one result under. Both halves
@@ -163,7 +214,12 @@ function seededBoard() {
         }),
       ],
     }),
-  ]);
+  ], {
+    curriculum: {
+      ...CURRICULUM,
+      coverage: [...CURRICULUM.coverage, { course: "LGS 200", title: "Legal Studies", outcomes: {} }],
+    },
+  });
 }
 
 /** The shared shape: somewhere on the page, the same words every disclosing page uses. */
@@ -190,18 +246,15 @@ const REGISTRY: {
 }[] = [
   {
     route: "/",
-    render: () => LandingPage(),
-    // The front door doesn't badge a seeded finding — `lib/specimen.ts`
-    // excludes a demonstration row from "the strongest measured result"
-    // outright, so its own promise ("a number appears only when a real
-    // finished run stands behind it") stays literally true. Disclosure here
-    // means no verdict renders at all. See `specimen.test.ts`.
-    assert: (root) => {
-      expect(
-        root.querySelector(".ld-verdict"),
-        "the landing page rendered a Measured verdict from an all-seeded board",
-      ).toBeNull();
-    },
+    render: () => FacultyHome(),
+    assert: assertIllustrative,
+  },
+  {
+    route: "/about",
+    render: () => AboutPage(),
+    // The explanatory page still has the old specimen and must not turn
+    // seeded data into a verdict.
+    assert: (root) => expect(root.querySelector(".ld-verdict")).toBeNull(),
   },
   { route: "/overview", render: () => OverviewPage(), assert: assertIllustrative },
   {
@@ -215,7 +268,6 @@ const REGISTRY: {
     render: () => ModelReportPage({ params: Promise.resolve({ key: "luna" }) }),
     assert: assertIllustrative,
   },
-  { route: "/explore", render: () => ExplorePage(), assert: assertIllustrative },
   {
     route: "/explore/[major]",
     render: () => ClassesPage({ params: Promise.resolve({ major: MAJOR }) }),
@@ -234,6 +286,14 @@ const REGISTRY: {
         params: Promise.resolve({ major: MAJOR, course: CLASS, slo: "slo2" }),
       }),
     assert: assertIllustrative,
+  },
+  {
+    route: "/classes/[course]",
+    render: () => GeneralClassPage({ params: Promise.resolve({ course: "lgs-200" }) }),
+    assert: (root) => {
+      expect(root.textContent).toMatch(/not measured yet/i);
+      expect(root.textContent).not.toMatch(/0\.72|illustrative|results available/i);
+    },
   },
 ];
 
