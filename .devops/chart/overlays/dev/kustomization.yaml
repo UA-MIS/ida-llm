@@ -26,13 +26,13 @@ labels:
 images:
   - name: ida-llm-frontend
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-frontend
-    newTag: "f754ed6"
+    newTag: "0aecb84"
   - name: ida-llm-python-app
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-python-app
-    newTag: "f754ed6"
+    newTag: "0aecb84"
   - name: ida-llm-agile
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-agile
-    newTag: "f754ed6"
+    newTag: "0aecb84"
 
 patches:
   # Replicas are JSON6902 patches, NOT the kustomize builtin `replicas:`
