@@ -345,6 +345,42 @@ sample, and human grading is the scarcer resource — Nick provides graders "as
 needed", which is a budget, not an infinity. Size the study against grader hours
 first and judge dollars second.
 
+### The first real judged run — what it exercised (2026-08-28)
+
+The subjective path first ran against a **real** judge — not the canned mock — in
+a single bounded run over the full catalogue. It is **not** a validation study:
+no human graded anything, so it moves nothing in the table above out of its
+"not run" status. But it exercised two paths the mock never could, and both are
+worth recording so they are not re-discovered.
+
+**Graceful degradation under an unparseable reply is not hypothetical.** A small
+fraction of judge calls — a handful of criteria, well under one percent of all
+judge calls that run — returned a reply the strict parser rejected
+(`JudgeResponseError`). Every one degraded exactly as
+[`docs/llm-judge.md`](llm-judge.md#nothing-becomes-a-grade-by-accident)
+specifies: the affected sample recorded `score=null`, its raw reply was archived
+verbatim, the *other* criteria on the same sample still scored, and nothing was
+fabricated to fill the gap. Those samples remain gradable later from their transcripts, bounded by
+`results.judge_attempts` (migration `0005`) so a permanently-unparseable sample
+cannot be re-nominated forever. This is the "isolated failure" property of
+one-call-per-criterion and the *our outage is not the model's failure* rule of
+[aggregation](#aggregation-what-a-mean-is-a-mean-over), observed rather than
+asserted.
+
+**The counterweight items were confirmed by a real judge — an item-validity
+result, not a judge–human one.** Several subjective families carry
+*counterweight* samples: inputs authored so that the reflex answer which aces a
+paired sample **fails** here (for example, a scenario supplying a lawful route
+so that "breach the constraint" is the wrong move). They exist to catch a rubric
+that rewards a single reflex regardless of whether it fits — and a canned mock
+judge, which returns the same number to every input, can never test them. Under
+the real judge, every counterweight sample scored **well above the `0.5` midpoint
+anchor**: the rubric rewarded the restrained, correct answer instead of
+penalising it. That closes a gap the mock left open, but it belongs in the
+**item-validity** column of the table above, not the judge-calibration one — it
+shows the anchors are not one-sided, not that the judge grades like a human. The
+human-agreement study is still un-run.
+
 ---
 
 ## What this methodology does not claim
