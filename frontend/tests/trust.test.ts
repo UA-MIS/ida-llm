@@ -232,6 +232,15 @@ describe("tags", () => {
       ]),
     ).toEqual(["ladder-l1", "unit-economics"]);
   });
+
+  it("hides the raw kind words, which `TrustBadge` already renders in plain language", () => {
+    // A task authored with a bare `verifiable`/`subjective` tag (many are —
+    // see tasks/slo3-global-knowledge/*) would otherwise print the exact
+    // jargon word `plainTaskKind`/`lib/glossary.ts` exists to keep off the
+    // page, redundant with the badge that already states it in plain words.
+    expect(plainTags(["verifiable", "reference-lookup"])).toEqual(["reference-lookup"]);
+    expect(plainTags(["subjective", "open-ended"])).toEqual(["open-ended"]);
+  });
 });
 
 describe("use mode titles", () => {

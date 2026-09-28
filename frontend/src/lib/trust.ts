@@ -21,8 +21,12 @@ import type {
   DataResidency,
   ModelResult,
   OutcomeView,
+  TaskKind,
   TaskLeaderboard,
 } from "./types";
+
+/** The two raw `TaskKind` words — never printed on their own; see `plainTags`. */
+const TASK_KIND_WORDS: ReadonlySet<TaskKind> = new Set(["verifiable", "subjective"]);
 
 /** Which colour a confidence tier is drawn in. */
 export function confidenceColorVar(confidence: Confidence): string {
@@ -114,9 +118,18 @@ export function isDeEmphasised(result: ModelResult): boolean {
  * (`task.slo`, `task.use_mode`, `task.in_benchmark`), so printing them again as
  * raw tags would show `slo:SLO2` next to the outcome's real title. The filter
  * matches the API's parse rule: a prefixed tag is a claim, not a description.
+ *
+ * Also drops a bare `verifiable`/`subjective` tag — many task families carry
+ * one (see tasks/slo3-global-knowledge/*) — because `FacetRow` already draws
+ * `TrustBadge` on the same row, in `plainTaskKind`'s words. Printing the raw
+ * `TaskKind` word too would be the exact jargon leak `lib/glossary.ts` exists
+ * to keep off the page (see the big comment on `TrustBadge` in
+ * `components/trust-badges.tsx`), just via a second, unguarded path.
  */
 export function plainTags(tags: string[]): string[] {
-  return tags.filter((tag) => !tag.includes(":") && tag !== BENCHMARK_TAG);
+  return tags.filter(
+    (tag) => !tag.includes(":") && tag !== BENCHMARK_TAG && !TASK_KIND_WORDS.has(tag as TaskKind),
+  );
 }
 
 export const BENCHMARK_TAG = "slo-benchmark";
