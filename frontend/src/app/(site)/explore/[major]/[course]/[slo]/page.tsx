@@ -18,6 +18,7 @@
  * page whose entire job is to be checkable.
  */
 
+import { AssignmentEvidence } from "@/components/assignment-evidence";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -149,6 +150,10 @@ export default async function EvidencePage({
   if (!major) notFound();
   const klass = findClass(buildClasses(board, major), courseSlug);
   if (!klass) notFound();
+  if (["exams", "quizzes", "case-analysis"].includes(slo) && klass.task_families.length > 0) {
+    return <AssignmentEvidence board={board} klass={klass} major={major} family={slo}
+      wanted={typeof query.model === "string" ? query.model : null} />;
+  }
   const outcome = findOutcome(klass, slo);
   // ⚠ 404 FOR A PAIR THE MAP DOES NOT MARK. Rendering an empty evidence page for
   // (AC 210, SLO7) would say "we looked and found nothing" about a pairing the
