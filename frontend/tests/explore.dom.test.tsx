@@ -32,8 +32,21 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { board, CURRICULUM, result, task } from "./fixtures";
+import { board as fixtureBoard, CURRICULUM, result, task } from "./fixtures";
 import { expectPeerVoice } from "./voice";
+
+function board(...args: Parameters<typeof fixtureBoard>) {
+  const value = structuredClone(fixtureBoard(...args));
+  for (const major of value.curriculum.majors) {
+    for (const klass of major.classes) {
+      klass.task_families = klass.task_families.map((family) => family === "slo2" ? "mis200-spreadsheet-formulas" : family);
+    }
+  }
+  for (const task of value.tasks) {
+    if (task.family === "slo2") task.family = "mis200-spreadsheet-formulas";
+  }
+  return value;
+}
 
 const getLeaderboard = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", () => ({
@@ -483,86 +496,25 @@ describe("level 2 — the classes", () => {
 // ---------------------------------------------------------------------------
 
 describe("level 3 — the outcomes one class teaches", () => {
-  it("shows the published level on every outcome it draws", async () => {
+  it("groups the class by its assignment families rather than curriculum outcomes", async () => {
     await renderLevel(
       () => OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
       measuredBoard({ curriculum: WITH_TEAMWORK }),
     );
-    expect(document.body.textContent).toContain("Assessment point");
-  });
-
-  it("shows an un-benchmarkable outcome rather than dropping it", async () => {
-    // A class page that listed only the measurable outcomes would make GBA 300
-    // look like a two-outcome class, which is a claim about the curriculum.
-    await renderLevel(
-      () => OutcomesPage({ params: Promise.resolve({ major: GEN, course: "gba-300" }) }),
-      measuredBoard({ curriculum: WITH_TEAMWORK }),
-    );
     const columns = Array.from(document.querySelectorAll("thead th.xp-col"));
     expect(columns).toHaveLength(3);
-
-    const index = columnOf("Teamwork");
-    expect(columns[index]!.className).toContain("xp-col-not_benchmarkable");
-
-    // ⚠ EVERY CELL IN THE COLUMN, THE SUMMARY INCLUDED. A grid where the
-    // per-model cells said "out of scope" and the summary said "not measured"
-    // would be making two different claims about one column — and the summary
-    // is the one a reader takes away.
-    const inColumn = [...modelRows(), summaryRow()].map(
-      (row) => Array.from(row.querySelectorAll("td.cg-cell"))[index]!,
-    );
-    expect(inColumn.length).toBeGreaterThan(1);
-    for (const cell of inColumn) {
-      expect(cell.className, "an out-of-scope column drew a measurable cell").toContain(
-        "cg-out-of-scope",
-      );
-      expect(cell.textContent).toMatch(/not measurable by a text benchmark/i);
-      expect(cell.querySelector(".cg-score")).toBeNull();
-    }
+    expect(document.body.textContent).toContain("assignment types have a score");
+    expect(document.body.textContent).not.toContain("Assessment point");
+    expect(columns[0]!.textContent).not.toContain("Quantitative Literacy");
   });
 
-  it("says 'not measured yet' rather than drawing a blank or a zero", async () => {
+  it("explains when a course has no assignment types", async () => {
     await renderLevel(
       () => OutcomesPage({ params: Promise.resolve({ major: GEN, course: "gba-300" }) }),
       measuredBoard({ curriculum: WITH_TEAMWORK }),
     );
-    const index = columnOf("Ethical Reasoning");
-    const columns = Array.from(document.querySelectorAll("thead th.xp-col"));
-    expect(columns[index]!.className).toContain("xp-col-not_measured");
-
-    // ⚠ AN EMPTY CELL IS NEVER A BLANK. A dash with a reason behind it does not
-    // read as a zero; an empty square does, to almost everybody.
-    for (const row of [...modelRows(), summaryRow()]) {
-      const cell = Array.from(row.querySelectorAll("td.cg-cell"))[index]!;
-      expect(cell.className).toContain("cg-unmeasured");
-      // Per-model cells say "this model has no…"; the summary row says "no
-      // model has a…" — different squares, different claims, neither a blank.
-      expect(cell.textContent).toMatch(
-        /(this model has no|no model has a) finished, scored run|no task/i,
-      );
-    }
-    // And the page says, in words, what the two glyphs mean.
-    expect(document.querySelector(".xp-matrix-key")!.textContent).toContain(
-      "Not measured yet",
-    );
-  });
-
-  it("puts every column's reason on the page, not only in a tooltip", async () => {
-    // ⚠ WHAT THE FLIP COULD HAVE COST. A column header cannot hold a sentence,
-    // and truncating the honest reasons into a `title` attribute would have
-    // made an empty square say nothing to anyone who does not hover.
-    await renderLevel(
-      () => OutcomesPage({ params: Promise.resolve({ major: GEN, course: "gba-300" }) }),
-      measuredBoard({ curriculum: WITH_TEAMWORK }),
-    );
-    const notes = document.querySelectorAll(".xp-col-notes .xp-note");
-    expect(notes).toHaveLength(document.querySelectorAll("thead th.xp-col").length);
-    for (const note of notes) {
-      expect(note.querySelector("dd")!.textContent!.length).toBeGreaterThan(20);
-    }
-    expect(document.querySelector(".xp-col-notes")!.textContent).toMatch(
-      /cannot measure this outcome/i,
-    );
+    expect(document.querySelector("table.cg-grid")).toBeNull();
+    expect(document.body.textContent).toContain("No assignment types have been added");
   });
 
   it("keeps the confidence tell beside every score it does show", async () => {
@@ -596,7 +548,7 @@ describe("level 3 — the outcomes one class teaches", () => {
     const rows = modelRows();
     const summary = Array.from(summaryRow().querySelectorAll("td.cg-cell"));
     const columnCount = document.querySelectorAll("thead th.xp-col").length;
-    expect(columnCount).toBeGreaterThan(1);
+    expect(columnCount).toBeGreaterThan(0);
 
     for (let i = 0; i < columnCount; i += 1) {
       const anyModelMeasured = rows.some((row) =>
@@ -615,7 +567,7 @@ describe("level 3 — the outcomes one class teaches", () => {
       measuredBoard(),
     );
     expect(document.querySelector("table.cg-grid")).toBeNull();
-    expect(document.body.textContent).toMatch(/gap in the map, not in the class/i);
+    expect(document.body.textContent).toMatch(/No assignment types have been added/i);
   });
 
   it("404s on a class this major does not list", async () => {

@@ -22,6 +22,7 @@ import { describe, expect, it } from "vitest";
 import { board, CURRICULUM, result, task } from "./fixtures";
 import { buildIndex, findMajor } from "@/lib/explore";
 import {
+  buildAssignmentMatrix,
   buildClassMatrix,
   buildMajorMatrix,
   buildOutcomeMatrix,
@@ -362,5 +363,28 @@ describe("the demonstration split is scoped to the level", () => {
     const matrix = buildMajorMatrix(b);
     expect(matrix.entities.find((e) => e.key === MIS)!.seeded).toBe(false);
     expect(matrix.demonstration.any).toBe(false);
+  });
+});
+
+
+describe("assignment breakdown", () => {
+  it("groups exam families across SLOs, separates cases, and leaves quizzes unmeasured", () => {
+    const b = board([
+      task({ family: "mis200-spreadsheet-formulas", task_id: "formulas/one", slo: "SLO2", results: [result({ mean_score: 0.8 })] }),
+      task({ family: "mis200-is-concepts", task_id: "concepts/one", slo: "SLO9", results: [result({ mean_score: 0.2 })] }),
+      task({ family: "mis200-is-problem-solving", task_id: "cases/one", slo: "SLO1", results: [result({ mean_score: 0.9 })] }),
+      task({ family: "unrelated", task_id: "unrelated/one", slo: "SLO2", results: [result({ mean_score: 1 })] }),
+    ]);
+    const klass = buildClasses(b, majorOf(b, MIS))[0]!;
+    const matrix = buildAssignmentMatrix(b, { ...klass, task_families: [
+      "mis200-spreadsheet-formulas", "mis200-is-concepts", "mis200-is-problem-solving",
+    ] }, MIS);
+    expect(matrix.entities.map((e) => e.heading)).toEqual(["Exams", "Quizzes", "Case analysis"]);
+    expect(matrix.entities[0]!.overall.score).toBeCloseTo(0.5);
+    expect(matrix.entities[1]!.overall.score).toBeNull();
+    expect(matrix.entities[2]!.overall.score).toBeCloseTo(0.9);
+    expect(matrix.entities[2]!.footnote).toContain("extension");
+    expect(matrix.entities[0]!.href).toContain("/exams");
+    expect(matrix.models[0]!.overall.score).toBeCloseTo(1.9 / 3);
   });
 });

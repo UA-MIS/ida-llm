@@ -644,3 +644,44 @@ export function buildOutcomeMatrix(
 export function cellHref(entity: MatrixEntityColumn, modelKey: string): string {
   return `${entity.href}?model=${encodeURIComponent(modelKey)}`;
 }
+
+/** Display categories are assignment formats, independent of curriculum outcomes. */
+export const ASSIGNMENT_TYPES = ["exams", "quizzes", "case-analysis"] as const;
+
+export function assignmentTitle(type: string): string {
+  return ({ exams: "Exams", quizzes: "Quizzes", "case-analysis": "Case analysis" } as Record<string, string>)[type] ?? type;
+}
+
+export function assignmentFamilies(tile: ClassTile, type: string): string[] {
+  const types: Record<string, string> = {
+    "mis200-spreadsheet-formulas": "exams",
+    "mis200-is-concepts": "exams",
+    "mis200-is-problem-solving": "case-analysis",
+  };
+  return tile.task_families.filter((family) => types[family] === type);
+}
+
+export function buildAssignmentMatrix(
+  board: LeaderboardResponse,
+  tile: ClassTile,
+  majorSlug: string,
+  onlyType?: string,
+): ExploreMatrix {
+  const types = tile.task_families.length ? ASSIGNMENT_TYPES.filter((type) => !onlyType || type === onlyType) : [];
+  return assemble(board, types.map((type): EntitySpec => {
+    const families = assignmentFamilies(tile, type);
+    const tasks = board.tasks.filter((task) => families.includes(task.family));
+    const title = assignmentTitle(type);
+    return {
+      key: type, eyebrow: "Assignment type", heading: title, columnLabel: title,
+      href: `/explore/${majorSlug}/${tile.slug}/${type}`,
+      benchmarkable: true, note: "", noun: "this assignment type",
+      pronoun: { singular: "it", plural: "them" },
+      slos: [...new Set(tasks.flatMap((task) => task.slo ? [task.slo] : []))],
+      families, tasksAvailable: tasks.length,
+      status: "not_measured", reason: `${tasks.length} benchmark tasks in this assignment type.`,
+      footnote: type === "case-analysis" && families.includes("mis200-is-problem-solving")
+        ? "Synthetic extension beyond Exam 1" : "",
+    };
+  }), `No assignment types have been added for ${tile.code} yet.`);
+}
