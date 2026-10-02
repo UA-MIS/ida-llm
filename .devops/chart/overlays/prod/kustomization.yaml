@@ -39,10 +39,10 @@ labels:
 images:
   - name: ida-llm-frontend
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-frontend
-    newTag: "0.1.12"
+    newTag: "e87a9b9"
   - name: ida-llm-python-app
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-python-app
-    newTag: "0.1.12"
+    newTag: "e87a9b9"
   # KEPT DELIBERATELY THOUGH THIS OVERLAY NO LONGER RUNS THE BOARD. The image is
   # still BUILT (components.yaml is unchanged), and both the promotion invariant
   # -- every overlay pins all three components at one tag -- and
@@ -52,7 +52,7 @@ images:
   # nothing for it.
   - name: ida-llm-agile
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-agile
-    newTag: "0.1.12"
+    newTag: "e87a9b9"
 
 # No `patches:`. Every prod value lives in base, where it is read by anyone
 # reviewing the chart rather than reconstructed from a diff. Hosts, replicas,
