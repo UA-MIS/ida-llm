@@ -2138,10 +2138,10 @@ a.cg-score:hover { text-decoration: underline; }
 
    The consequence for this stylesheet: the grid is WIDE and SHORT where it used
    to be tall and narrow. The corner is back to a model-name width, and the
-   per-entity prose that used to live in a 17rem row header now lives in
-   `.xp-col-notes` under the grid, because a sentence does not fit in a column
-   header and truncating it into a tooltip would break the one rule this flow
-   cannot break. */
+   per-entity reason that used to live in a 17rem row header now rides each
+   column header as an `sr-only` span, because a sentence does not fit visibly
+   in a column header and truncating it into a tooltip would break the one rule
+   this flow cannot break. */
 .xp-matrix .cg-corner { min-width: 10rem; }
 
 /* --- the model row header: the third click target ------------------------ */
@@ -2210,30 +2210,6 @@ a.cg-score:hover { text-decoration: underline; }
 /* The "All models" summary row, in the same table as the cells it summarises. */
 .xp-summary > th, .xp-summary > td { border-top: 2px solid var(--border-strong); }
 .xp-summary > th { font-style: italic; color: var(--muted); }
-
-/* --- the reasons, under the grid ----------------------------------------- */
-
-/* ⚠ THIS BLOCK IS WHY THE FLIP DOES NOT COST HONESTY. Every column carries a
-   sentence saying why it does or does not have a number, and "not measured yet"
-   collapsing to a bare dash is how a reader ends up with a zero in their head.
-   When entities were rows, that sentence lived in the row header. A column
-   header cannot hold it, so it lives here — visibly, in column order, at every
-   width. Not a tooltip, not a disclosure widget: a block the grid sits on. */
-.xp-col-notes {
-  margin: 0.9rem 0 0; display: grid; gap: 0.5rem 1.4rem;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
-  font-size: 0.82rem; line-height: 1.5;
-}
-.xp-note { border-left: 3px solid var(--border); padding-left: 0.6rem; }
-.xp-note-measured { border-left-color: var(--accent); }
-.xp-note-not_measured { border-left-color: var(--border-strong); }
-.xp-note-not_benchmarkable { border-left-color: var(--faint); }
-.xp-note dt { font-weight: 650; }
-.xp-note dt a { color: inherit; text-decoration: none; }
-.xp-note dt a:hover { text-decoration: underline; }
-.xp-note dd { margin: 0.1rem 0 0; color: var(--muted); }
-.xp-note-eyebrow { font-family: var(--mono); color: var(--muted); font-weight: 500; }
-.xp-note-foot { display: block; font-size: 0.76rem; margin-top: 0.1rem; }
 
 @media (max-width: 46rem) {
   .xp-matrix .cg-corner { min-width: 8rem; }
