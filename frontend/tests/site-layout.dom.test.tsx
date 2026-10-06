@@ -1,31 +1,31 @@
 /**
  * The tool-page chrome, rendered.
  *
- * ⚠ QA-25. `<header>` and `<nav>` used to live inside `<main>`, which strips
- * `<header>` of its implicit `banner` landmark role (HTML-AAM: `header` is
- * `banner` only when it is NOT a descendant of `article`/`aside`/`main`/
- * `nav`/`section`) — so neither the page's own chrome nor its one piece of
- * real content had a landmark role a screen-reader user could jump to. There
- * was also no skip link, and no visual or semantic way to tell which nav item
- * was the current page.
+ * ⚠ ONE LANDING, NO TOP NAV. The client asked for a true single landing page:
+ * the landing (`/`) IS explore, so a top nav offering "Explore / How we test /
+ * Help me choose" was three doors competing with the page itself. The top nav
+ * is gone. What is left reachable without it: "Help me choose" is the standing
+ * button on the landing, and "How we test" (`/methodology`) moves to the
+ * footer. The header keeps only the wordmark home link.
+ *
+ * ⚠ QA-25 STILL HOLDS. `<header>` (and now `<footer>`) must stay SIBLINGS of
+ * `<main>`, never descendants — a `<header>`/`<footer>` only earns its
+ * `banner`/`contentinfo` landmark role when it is NOT inside
+ * `article`/`aside`/`main`/`nav`/`section`. The skip link stays the first
+ * focusable thing on the page.
  */
 
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-
-const usePathname = vi.hoisted(() => vi.fn());
-vi.mock("next/navigation", () => ({ usePathname }));
+import { afterEach, describe, expect, it } from "vitest";
 
 const { default: SiteLayout } = await import("@/app/(site)/layout");
 
 afterEach(() => {
   cleanup();
-  vi.clearAllMocks();
 });
 
 describe("the tool-page chrome's landmarks", () => {
-  it("keeps <header> and <nav> as siblings of <main>, not descendants", () => {
-    usePathname.mockReturnValue("/leaderboard");
+  it("keeps <header> and <footer> as siblings of <main>, not descendants", () => {
     const { container } = render(
       <SiteLayout>
         <p>page content</p>
@@ -35,13 +35,12 @@ describe("the tool-page chrome's landmarks", () => {
     const main = container.querySelector("main");
     expect(main, "no <main> rendered").not.toBeNull();
     expect(main!.querySelector("header"), "header nested inside main").toBeNull();
-    expect(main!.querySelector("nav"), "nav nested inside main").toBeNull();
+    expect(main!.querySelector("footer"), "footer nested inside main").toBeNull();
     expect(container.querySelector("header")).not.toBeNull();
-    expect(container.querySelector("nav")).not.toBeNull();
+    expect(container.querySelector("footer")).not.toBeNull();
   });
 
   it("renders the page content inside <main id=\"main-content\">", () => {
-    usePathname.mockReturnValue("/leaderboard");
     const { container, getByText } = render(
       <SiteLayout>
         <p>page content</p>
@@ -54,7 +53,6 @@ describe("the tool-page chrome's landmarks", () => {
   });
 
   it("puts a skip link first, pointing at the main content", () => {
-    usePathname.mockReturnValue("/leaderboard");
     const { container } = render(
       <SiteLayout>
         <p>page content</p>
@@ -65,30 +63,70 @@ describe("the tool-page chrome's landmarks", () => {
     expect(skipLink, "no skip link rendered").not.toBeNull();
     expect(skipLink!.getAttribute("href")).toBe("#main-content");
   });
+});
 
-  it("marks the current nav item with aria-current, and no other", () => {
-    usePathname.mockReturnValue("/methodology");
+describe("the header has no top nav, only the wordmark", () => {
+  it("keeps the Capstone-IDA wordmark as a link home", () => {
     const { container } = render(
       <SiteLayout>
         <p>page content</p>
       </SiteLayout>,
     );
 
-    const links = Array.from(container.querySelectorAll("nav a"));
-    const current = links.filter((a) => a.getAttribute("aria-current") === "page");
-    expect(current).toHaveLength(1);
-    expect(current[0]!.getAttribute("href")).toBe("/methodology");
+    const header = container.querySelector("header")!;
+    const home = Array.from(header.querySelectorAll("a")).find(
+      (a) => a.getAttribute("href") === "/",
+    );
+    expect(home, "no wordmark home link in the header").toBeTruthy();
+    expect(home!.textContent).toContain("Capstone-IDA");
   });
 
-  it("marks nothing current on a route with no matching nav item", () => {
-    usePathname.mockReturnValue("/models/luna");
+  it("renders no navigation links in the header", () => {
     const { container } = render(
       <SiteLayout>
         <p>page content</p>
       </SiteLayout>,
     );
 
-    const links = Array.from(container.querySelectorAll("nav a"));
-    expect(links.some((a) => a.getAttribute("aria-current") === "page")).toBe(false);
+    const header = container.querySelector("header")!;
+    // A <nav> landmark inside the header is exactly the top nav we removed.
+    expect(header.querySelector("nav"), "a <nav> is back in the header").toBeNull();
+
+    const labels = Array.from(header.querySelectorAll("a")).map((a) =>
+      a.textContent?.trim(),
+    );
+    expect(labels).not.toContain("Explore");
+    expect(labels).not.toContain("How we test");
+    expect(labels).not.toContain("Help me choose");
+  });
+
+  it("offers no Explore link anywhere in the chrome", () => {
+    const { container } = render(
+      <SiteLayout>
+        <p>page content</p>
+      </SiteLayout>,
+    );
+
+    const labels = Array.from(container.querySelectorAll("a")).map((a) =>
+      a.textContent?.trim(),
+    );
+    expect(labels).not.toContain("Explore");
+  });
+});
+
+describe("the footer keeps How-we-test reachable", () => {
+  it("links How we test to /methodology from the footer", () => {
+    const { container } = render(
+      <SiteLayout>
+        <p>page content</p>
+      </SiteLayout>,
+    );
+
+    const footer = container.querySelector("footer")!;
+    const methodology = Array.from(footer.querySelectorAll("a")).find(
+      (a) => a.getAttribute("href") === "/methodology",
+    );
+    expect(methodology, "no /methodology link in the footer").toBeTruthy();
+    expect(methodology!.textContent).toContain("How we test");
   });
 });
