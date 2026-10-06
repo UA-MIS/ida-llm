@@ -29,16 +29,17 @@
  *                     so the next level opens focused on the number you clicked
  *                     instead of dropping you back into the full field.
  *
- * ⚠ THE PER-ENTITY PROSE MOVED UNDER THE GRID, AND IT IS STILL ON THE PAGE.
+ * ⚠ THE PER-ENTITY REASON IS A SCREEN-READER LINE, NOT A VISIBLE LIST ANYMORE.
  * When entities were rows, a row header was seventeen rems wide and could carry
  * its own sentence. A column header cannot: it is a few characters across, and
  * the honest reasons this flow depends on ("nothing has been run for that
- * pairing, which is not a zero") do not fit. Truncating them into a `title`
- * attribute would have broken the rule this codebase keeps writing tests
- * about — an empty square must still say something, visibly, at every width.
- * So the reasons are a list directly beneath the grid, one line per column, in
- * column order. Not a tooltip, not a footnote nobody scrolls to: the block the
- * grid sits on top of.
+ * pairing, which is not a zero") do not fit visibly there. There used to be a
+ * list of those sentences beneath the grid, but for a sighted reader it only
+ * restated the cells above it and the key line below it — redundant clutter,
+ * almost all of it empty-column filler — so it was removed. The reason still
+ * rides each column as an `sr-only` span inside its header (see `ColumnHeader`),
+ * so assistive tech still hears it, and the single key line under the grid still
+ * explains the "–"/"◇" glyphs for everyone.
  */
 
 import Link from "next/link";
@@ -85,9 +86,11 @@ function ColumnHeader({
           {entity.seeded ? <DemonstrationBadge /> : null}
         </span>
       ) : null}
-      {/* The sentence a sighted reader gets from the list under the grid. Here
-          for anyone who meets the column header on its own — a screen reader
-          walking the header row, or a hover. */}
+      {/* The honest reason this column does or does not carry a number —
+          "nothing has been run for that pairing, which is not a zero". It does
+          not fit visibly in a column header, so it rides here for a screen
+          reader walking the header row. The single key line under the grid
+          carries the glyph legend for sighted readers. */}
       <span className="sr-only">{entity.reason}</span>
     </th>
   );
@@ -230,28 +233,6 @@ export function ExploreMatrixGrid({
           </tbody>
         </table>
       </div>
-
-      {/* ⚠ THE REASONS, ON THE PAGE. See the file header for why they are here
-          and not in the column headers. One line per column, in column order,
-          so the list and the grid can be read against each other. */}
-      <dl className="xp-col-notes">
-        {matrix.entities.map((entity) => (
-          <div key={entity.key} className={`xp-note xp-note-${entity.status}`}>
-            <dt>
-              <Link href={entity.href}>
-                <span className="xp-note-eyebrow">{entity.eyebrow}</span>{" "}
-                {entity.heading}
-              </Link>
-            </dt>
-            <dd>
-              {entity.reason}
-              {entity.footnote ? (
-                <span className="xp-note-foot muted"> {entity.footnote}</span>
-              ) : null}
-            </dd>
-          </div>
-        ))}
-      </dl>
 
       {/* ⚠ THE KEY IS ON THE PAGE, NOT ONLY IN A TOOLTIP. Two glyphs carry two
           different claims, and a reader who cannot hover — or who simply does
