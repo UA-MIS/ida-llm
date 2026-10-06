@@ -22,7 +22,7 @@ import { describe, expect, it } from "vitest";
 import { board, CURRICULUM, result, task } from "./fixtures";
 import { buildIndex, findMajor } from "@/lib/explore";
 import {
-  buildAssignmentMatrix,
+  buildCategoryMatrix,
   buildClassMatrix,
   buildMajorMatrix,
   buildOutcomeMatrix,
@@ -40,12 +40,12 @@ function majorOf(b: LeaderboardResponse, id: string) {
   return tile;
 }
 
-/** Two models, both scored on the `slo2` family MIS 200 claims. */
+/** Two models, both scored on the `mis200-is-concepts` family MIS 200 claims. */
 function twoModelBoard(): LeaderboardResponse {
   return board([
     task({
       task_id: "slo2/break-even",
-      family: "slo2",
+      family: "mis200-is-concepts",
       slo: "SLO2",
       has_results: true,
       best_model_key: "sol",
@@ -89,7 +89,7 @@ describe("the orientation", () => {
     const b = board([
       task({
         task_id: "slo2/break-even",
-        family: "slo2",
+        family: "mis200-is-concepts",
         slo: "SLO2",
         has_results: true,
         results: [
@@ -328,7 +328,7 @@ describe("the demonstration split is scoped to the level", () => {
     const b = board([
       task({
         task_id: "slo2/break-even",
-        family: "slo2",
+        family: "mis200-is-concepts",
         slo: "SLO2",
         has_results: true,
         results: [result({ mean_score: 0.72, demonstration: true })],
@@ -347,7 +347,7 @@ describe("the demonstration split is scoped to the level", () => {
     const b = board([
       task({
         task_id: "slo2/break-even",
-        family: "slo2",
+        family: "mis200-is-concepts",
         slo: "SLO2",
         has_results: true,
         results: [result({ mean_score: 0.72, demonstration: false })],
@@ -367,24 +367,74 @@ describe("the demonstration split is scoped to the level", () => {
 });
 
 
-describe("assignment breakdown", () => {
-  it("groups exam families across SLOs, separates cases, and leaves quizzes unmeasured", () => {
+describe("category breakdown — the class page's content axis", () => {
+  // A class claiming all three MIS 200 families, so the three populated
+  // categories light up and the two empty ones stay honestly unmeasured.
+  function mis200With(families: string[], b: LeaderboardResponse) {
+    return { ...buildClasses(b, majorOf(b, MIS))[0]!, task_families: families };
+  }
+
+  it("buckets each family into one content category and leaves empty categories unmeasured", () => {
     const b = board([
       task({ family: "mis200-spreadsheet-formulas", task_id: "formulas/one", slo: "SLO2", results: [result({ mean_score: 0.8 })] }),
       task({ family: "mis200-is-concepts", task_id: "concepts/one", slo: "SLO9", results: [result({ mean_score: 0.2 })] }),
       task({ family: "mis200-is-problem-solving", task_id: "cases/one", slo: "SLO1", results: [result({ mean_score: 0.9 })] }),
       task({ family: "unrelated", task_id: "unrelated/one", slo: "SLO2", results: [result({ mean_score: 1 })] }),
     ]);
-    const klass = buildClasses(b, majorOf(b, MIS))[0]!;
-    const matrix = buildAssignmentMatrix(b, { ...klass, task_families: [
-      "mis200-spreadsheet-formulas", "mis200-is-concepts", "mis200-is-problem-solving",
-    ] }, MIS);
-    expect(matrix.entities.map((e) => e.heading)).toEqual(["Exams", "Quizzes", "Case analysis"]);
-    expect(matrix.entities[0]!.overall.score).toBeCloseTo(0.5);
-    expect(matrix.entities[1]!.overall.score).toBeNull();
-    expect(matrix.entities[2]!.overall.score).toBeCloseTo(0.9);
-    expect(matrix.entities[2]!.footnote).toContain("extension");
-    expect(matrix.entities[0]!.href).toContain("/exams");
-    expect(matrix.models[0]!.overall.score).toBeCloseTo(1.9 / 3);
+    const klass = mis200With(
+      ["mis200-spreadsheet-formulas", "mis200-is-concepts", "mis200-is-problem-solving"],
+      b,
+    );
+    const matrix = buildCategoryMatrix(b, klass, MIS);
+
+    // Every content category the class defines, in the taxonomy's order.
+    expect(matrix.entities.map((e) => e.heading)).toEqual([
+      "IS concepts & business models",
+      "Competitive-strategy frameworks",
+      "Platform & network economics",
+      "Levels of IS use in organizations",
+      "Spreadsheet & Excel skills",
+    ]);
+
+    const byKey = new Map(matrix.entities.map((e) => [e.key, e]));
+    // Each family's score lands under exactly its one category.
+    expect(byKey.get("is-concepts-business-models")!.overall.score).toBeCloseTo(0.2);
+    expect(byKey.get("competitive-strategy")!.overall.score).toBeCloseTo(0.9);
+    expect(byKey.get("spreadsheet-excel")!.overall.score).toBeCloseTo(0.8);
+
+    // A category with no family never borrows a sibling's number.
+    expect(byKey.get("platform-network-economics")!.overall.score).toBeNull();
+    expect(byKey.get("levels-of-is-use")!.overall.score).toBeNull();
+    expect(byKey.get("platform-network-economics")!.status).toBe("not_measured");
+
+    // The unrelated family is in no MIS 200 category.
+    expect(matrix.entities.some((e) => e.heading.toLowerCase().includes("unrelated"))).toBe(false);
+
+    // A category drills one level down to its own evidence.
+    expect(byKey.get("spreadsheet-excel")!.href).toBe(`/explore/${MIS}/mis-200/spreadsheet-excel`);
+  });
+
+  it("intersects a category's families with the class's own, so it cannot surface a family the class does not claim", () => {
+    const b = board([
+      task({ family: "mis200-is-concepts", task_id: "c/1", slo: "SLO9", results: [result({ mean_score: 0.5 })] }),
+    ]);
+    // The class claims ONLY spreadsheet — so the IS-concepts category, whose
+    // family is present on the board but NOT claimed by this class, stays empty.
+    const klass = mis200With(["mis200-spreadsheet-formulas"], b);
+    const matrix = buildCategoryMatrix(b, klass, MIS);
+    const byKey = new Map(matrix.entities.map((e) => [e.key, e]));
+    expect(byKey.get("is-concepts-business-models")!.overall.score).toBeNull();
+    expect(byKey.get("spreadsheet-excel")!.overall.score).toBeNull();
+  });
+
+  it("narrows to a single category, with its evidence, when asked", () => {
+    const b = board([
+      task({ family: "mis200-spreadsheet-formulas", task_id: "formulas/one", slo: "SLO2", results: [result({ mean_score: 0.8 })] }),
+      task({ family: "mis200-is-concepts", task_id: "concepts/one", slo: "SLO9", results: [result({ mean_score: 0.2 })] }),
+    ]);
+    const klass = mis200With(["mis200-spreadsheet-formulas", "mis200-is-concepts"], b);
+    const matrix = buildCategoryMatrix(b, klass, MIS, "spreadsheet-excel");
+    expect(matrix.entities.map((e) => e.key)).toEqual(["spreadsheet-excel"]);
+    expect(matrix.entities[0]!.overall.score).toBeCloseTo(0.8);
   });
 });

@@ -18,7 +18,7 @@
  * page whose entire job is to be checkable.
  */
 
-import { AssignmentEvidence } from "@/components/assignment-evidence";
+import { CategoryEvidence } from "@/components/category-evidence";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -28,6 +28,7 @@ import { ModelResultCard } from "@/components/model-result-card";
 import { ResultsUnavailable } from "@/components/service-unavailable";
 import { ConfidenceTell, DemonstrationBadge } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
+import { findCategory } from "@/lib/categories";
 import {
   buildClasses,
   buildEvidence,
@@ -150,10 +151,28 @@ export default async function EvidencePage({
   if (!major) notFound();
   const klass = findClass(buildClasses(board, major), courseSlug);
   if (!klass) notFound();
-  if (["exams", "quizzes", "case-analysis"].includes(slo) && klass.task_families.length > 0) {
-    return <AssignmentEvidence board={board} klass={klass} major={major} family={slo}
-      wanted={typeof query.model === "string" ? query.model : null} />;
+
+  // ⚠ THE CLASS PAGE DRILLS INTO CATEGORIES, so the common case here is a
+  // category key ("spreadsheet-excel"). Its evidence is the one-column grid plus
+  // the tasks behind it — see `CategoryEvidence`.
+  const category = findCategory(klass.code, slo);
+  if (category) {
+    return (
+      <CategoryEvidence
+        board={board}
+        klass={klass}
+        major={major}
+        category={category}
+        wanted={typeof query.model === "string" ? query.model : null}
+      />
+    );
   }
+
+  // ⚠ THE OUTCOME PATH IS KEPT AS AN INTERNAL FALLBACK, NOT A LINKED LEVEL. The
+  // SLO data stays intact (see `curriculum/slo.yaml`); nothing in the UI links
+  // an SLO key here any more, but an `slo2`-style segment still resolves to the
+  // outcome's evidence rather than 404ing, so a saved link or an internal probe
+  // keeps working.
   const outcome = findOutcome(klass, slo);
   // ⚠ 404 FOR A PAIR THE MAP DOES NOT MARK. Rendering an empty evidence page for
   // (AC 210, SLO7) would say "we looked and found nothing" about a pairing the
@@ -172,7 +191,7 @@ export default async function EvidencePage({
     <>
       <Breadcrumbs
         trail={[
-          { label: "Majors", href: "/explore" },
+          { label: "Majors", href: "/" },
           { label: major.name, href: `/explore/${major.slug}` },
           { label: klass.code, href: `/explore/${major.slug}/${klass.slug}` },
         ]}
@@ -290,11 +309,7 @@ export default async function EvidencePage({
 
           {evidence.tasks.map((task) => (
             <div key={task.task_id} className="task-section">
-              <h3 className="task-title">
-                <Link href={`/leaderboard?task=${encodeURIComponent(task.task_id)}`}>
-                  {task.title}
-                </Link>
-              </h3>
+              <h3 className="task-title">{task.title}</h3>
               <p className="task-description muted">{task.description}</p>
               {task.results.length === 0 ? (
                 <p className="muted">

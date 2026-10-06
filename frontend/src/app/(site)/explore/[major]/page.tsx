@@ -91,7 +91,7 @@ export default async function ClassesPage({
 
   return (
     <>
-      <Breadcrumbs trail={[{ label: "Majors", href: "/explore" }]} here={major.name} />
+      <Breadcrumbs trail={[{ label: "Majors", href: "/" }]} here={major.name} />
       <ExploreHelp explain={EXPLAIN} />
 
       {matrix.demonstration.any ? (
@@ -124,8 +124,8 @@ export default async function ClassesPage({
           <h2>This major lists no classes</h2>
           <p className="muted">{matrix.unavailable_reason}</p>
           <p className="muted">
-            The <Link href="/compare">comparison grid</Link> still reads by
-            outcome.
+            That is a gap in what has been transcribed from the catalog, not a
+            reading of any model. <Link href="/">Back to all majors</Link>.
           </p>
         </div>
       ) : (

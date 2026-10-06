@@ -6,14 +6,15 @@ import { ExploreMatrixGrid } from "@/components/explore-matrix";
 import { ResultsUnavailable } from "@/components/service-unavailable";
 import { getLeaderboard } from "@/lib/api";
 import { buildClasses, buildIndex, findClass, findMajor } from "@/lib/explore";
-import { buildAssignmentMatrix } from "@/lib/explore-matrix";
+import { buildCategoryMatrix } from "@/lib/explore-matrix";
 import type { LeaderboardResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Why this class reads as it does — Capstone-IDA",
-  description: "Results by assignment type, against every model, with evidence behind each score.",
+  title: "What this class is made of — Capstone-IDA",
+  description:
+    "The content categories that define this class, against every model, with the evidence behind each score.",
 };
 
 /**
@@ -24,8 +25,9 @@ export const metadata: Metadata = {
  * contract, not a place to share a string.
  */
 const EXPLAIN =
-  "One row per model, one column per assignment type. Each score comes from " +
-  "tasks written about this class. Open an assignment type for its results and evidence.";
+  "One row per model, one column per category of this class. Each score comes " +
+  "from tasks written about this class's own material. Open a category for its " +
+  "results and the evidence behind them.";
 
 export default async function ClassAssignmentsPage({
   params,
@@ -57,7 +59,7 @@ export default async function ClassAssignmentsPage({
   const klass = findClass(buildClasses(board, major), courseSlug);
   if (!klass) notFound();
 
-  const matrix = buildAssignmentMatrix(board, klass, major.slug);
+  const matrix = buildCategoryMatrix(board, klass, major.slug);
   const wanted = typeof query.model === "string" ? query.model : null;
   const focus = matrix.models.find((m) => m.model_key === wanted) ?? null;
 
@@ -65,7 +67,7 @@ export default async function ClassAssignmentsPage({
     <>
       <Breadcrumbs
         trail={[
-          { label: "Majors", href: "/explore" },
+          { label: "Majors", href: "/" },
           { label: major.name, href: `/explore/${major.slug}` },
         ]}
         here={klass.code}
@@ -75,7 +77,7 @@ export default async function ClassAssignmentsPage({
       {/* ⚠ ABOVE THE GRID IT QUALIFIES, same as every other level — see
           `/explore/page.tsx`. Scoped to this class's own results, not the whole
           board: only the models that actually contributed a score here are
-          counted, so a class whose own outcomes are all measured never carries
+          counted, so a class whose own categories are all measured never carries
           a caveat that belongs to a different class. Same rollup, same words —
           see `summariseDemonstration`. */}
       {matrix.demonstration.any ? (
@@ -87,7 +89,9 @@ export default async function ClassAssignmentsPage({
           <span className="xp-title-code">{klass.code}</span> {klass.title}
         </h2>
         <p className="subtitle">
-          {matrix.measured_entities} of {matrix.benchmarkable_entities} assignment types have a score.
+          {matrix.measured_entities} of {matrix.benchmarkable_entities}{" "}
+          {matrix.benchmarkable_entities === 1 ? "category" : "categories"} that define this class
+          {matrix.measured_entities === 1 ? " has" : " have"} a score.
         </p>
       </section>
 
@@ -95,7 +99,7 @@ export default async function ClassAssignmentsPage({
 
       {!matrix.available ? (
         <div className="empty">
-          <h2>No assignment breakdown for {klass.code}</h2>
+          <h2>No category breakdown for {klass.code}</h2>
           <p className="muted">{matrix.unavailable_reason}</p>
           <p className="muted">
             That is a gap in what has been published and run, not a reading of
@@ -105,8 +109,8 @@ export default async function ClassAssignmentsPage({
       ) : (
         <ExploreMatrixGrid
           matrix={matrix}
-          columnKind="Assignment type"
-          overallLabel="All assignment types"
+          columnKind="Category"
+          overallLabel="All categories"
           focusModel={focus?.model_key ?? null}
         />
       )}

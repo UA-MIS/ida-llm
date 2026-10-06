@@ -285,9 +285,7 @@ function TaskBreakdown({
               className={entry.result.mean_score === null ? "row-muted" : undefined}
             >
               <td>
-                <Link href={`/leaderboard?task=${encodeURIComponent(entry.task_id)}`}>
-                  {entry.task_title}
-                </Link>
+                {entry.task_title}
                 <div className="mono muted task-id">{entry.task_id}</div>
                 <Caveats caveats={entry.result.trust.caveats} />
               </td>
@@ -369,8 +367,8 @@ export default async function ModelReportPage({
 
   return (
     <>
-      <Link href="/leaderboard" className="back">
-        ← All models
+      <Link href="/" className="back">
+        ← Back to the grid
       </Link>
 
       {/* ⚠ HIGH ON THE PAGE, BEFORE THE SCORE IT QUALIFIES — same rule as

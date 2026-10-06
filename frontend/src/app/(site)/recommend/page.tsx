@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { GlossaryPanel, Term } from "@/components/glossary";
 import { HowToRead, ReadStep } from "@/components/how-to-read";
 import { ResultsUnavailable } from "@/components/service-unavailable";
@@ -87,8 +85,8 @@ export default async function RecommendPage() {
         </p>
         <p className="muted" style={{ marginBottom: 0 }}>
           Nothing you answer here is stored. Every recommendation links back to
-          the benchmark <Term id="run">runs</Term> behind it, which you can read
-          at <Link href="/leaderboard">the leaderboard</Link>.
+          the benchmark <Term id="run">runs</Term> behind it, which you can open
+          from any score.
         </p>
       </div>
 

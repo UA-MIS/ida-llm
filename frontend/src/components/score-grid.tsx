@@ -40,8 +40,8 @@ export function RampLegend() {
         ))}
       </span>
       <span className="muted cg-legend-ends">
-        <span>0.0</span>
-        <span>1.0</span>
+        <span>0%</span>
+        <span>100%</span>
       </span>
       <span className="muted cg-legend-note">
         Stronger colour means a higher score, not a better model — how much to

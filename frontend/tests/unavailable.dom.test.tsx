@@ -37,10 +37,15 @@ class ApiError extends Error {
 }
 vi.mock("@/lib/api", () => ({ getLeaderboard, ApiError }));
 
+const notFound = vi.hoisted(() => vi.fn(() => { throw new Error("NEXT_NOT_FOUND"); }));
+vi.mock("next/navigation", () => ({ notFound }));
+
 const { ResultsUnavailable } = await import("@/components/service-unavailable");
-const { default: LeaderboardPage } = await import("@/app/(site)/leaderboard/page");
-const { default: ComparePage } = await import("@/app/(site)/compare/page");
+const { default: ClassesPage } = await import("@/app/(site)/explore/[major]/page");
 const { default: AppError } = await import("@/app/error");
+
+const MAJOR = "management-information-systems";
+const RETRY = `/explore/${MAJOR}`;
 
 /** The words that make an outage read as a catastrophe. */
 const ALARMING = [
@@ -79,7 +84,7 @@ describe("the fallback itself", () => {
     render(
       <ResultsUnavailable
         what="the benchmark results"
-        retryHref="/leaderboard"
+        retryHref={RETRY}
         cause={new ApiError("Could not reach the API at http://ida-llm-api/leaderboard: ECONNREFUSED", 0)}
       />,
     );
@@ -109,7 +114,7 @@ describe("the fallback itself", () => {
     renderFallback();
     expect(visibleText()).toMatch(/try again/i);
     const hrefs = Array.from(document.querySelectorAll("a")).map((a) => a.getAttribute("href"));
-    expect(hrefs).toContain("/leaderboard"); // retry
+    expect(hrefs).toContain(RETRY); // retry
     expect(hrefs).toContain("/"); // the landing page degrades gracefully on its own
   });
 
@@ -135,73 +140,46 @@ describe("the fallback itself", () => {
   });
 
   it("survives an error it cannot read", () => {
-    render(<ResultsUnavailable what="the results" retryHref="/leaderboard" cause={undefined} />);
+    render(<ResultsUnavailable what="the results" retryHref={RETRY} cause={undefined} />);
     expect(screen.getByRole("heading").textContent).toMatch(/temporarily unavailable/i);
   });
 });
 
-describe("/leaderboard when the API is down", () => {
+describe("a tool page when the API is down", () => {
+  const render503 = async () => {
+    getLeaderboard.mockRejectedValue(new ApiError("GET /leaderboard failed: 503", 503));
+    render(await ClassesPage({ params: Promise.resolve({ major: MAJOR }) }));
+  };
+
   it("does not throw", async () => {
     getLeaderboard.mockRejectedValue(new ApiError("GET /leaderboard failed: 503", 503));
-    await expect(LeaderboardPage({ searchParams: Promise.resolve({}) })).resolves.toBeTruthy();
-  });
-
-  it("shows the calm fallback instead of the ranking", async () => {
-    getLeaderboard.mockRejectedValue(new ApiError("GET /leaderboard failed: 503", 503));
-    render(await LeaderboardPage({ searchParams: Promise.resolve({}) }));
-
-    expect(document.querySelector(".unavailable")).not.toBeNull();
-    expect(document.querySelector("table.leaderboard")).toBeNull();
-    expect(document.querySelector(".plain-summary")).toBeNull();
-  });
-
-  it("leaks no status code into the prose", async () => {
-    getLeaderboard.mockRejectedValue(new ApiError("GET /leaderboard failed: 503", 503));
-    render(await LeaderboardPage({ searchParams: Promise.resolve({}) }));
-    expect(visibleText()).not.toContain("503");
-  });
-});
-
-describe("/compare when the API is down", () => {
-  it("does not throw", async () => {
-    getLeaderboard.mockRejectedValue(new ApiError("Could not reach the API", 0));
-    await expect(ComparePage()).resolves.toBeTruthy();
+    await expect(
+      ClassesPage({ params: Promise.resolve({ major: MAJOR }) }),
+    ).resolves.toBeTruthy();
   });
 
   it("shows the calm fallback instead of the grid", async () => {
-    getLeaderboard.mockRejectedValue(new ApiError("Could not reach the API", 0));
-    render(await ComparePage());
-
+    await render503();
     expect(document.querySelector(".unavailable")).not.toBeNull();
-    expect(document.querySelector(".cg-grid")).toBeNull();
+    expect(document.querySelector("table.cg-grid")).toBeNull();
+  });
+
+  it("leaks no status code into the prose, and uses no alarming vocabulary", async () => {
+    await render503();
+    const text = visibleText().toLowerCase();
+    expect(text).not.toContain("503");
+    for (const word of ALARMING) expect(text).not.toContain(word.toLowerCase());
   });
 
   /**
-   * ⚠ THE MORE VISIBLE CASE. `/compare` is in the nav, so it is a click away
-   * from the front door for a reader who has just decided to trust this.
+   * ⚠ AN OUTAGE IS NOT AN EMPTY BENCHMARK, AND THE TWO MUST NOT LOOK ALIKE.
+   * "We have not measured this yet" is a finding this project is proud of. "We
+   * cannot reach the results right now" is a fault. Rendering the outage as the
+   * empty state would quietly tell a professor the benchmark is emptier than it
+   * is — the same class of lie as inventing a number, pointing the other way.
    */
-  it("uses none of the alarming vocabulary either", async () => {
-    getLeaderboard.mockRejectedValue(new ApiError("Could not reach the API", 0));
-    render(await ComparePage());
-    const text = visibleText().toLowerCase();
-    for (const word of ALARMING) expect(text).not.toContain(word.toLowerCase());
-  });
-});
-
-/**
- * ⚠ AN OUTAGE IS NOT AN EMPTY BENCHMARK, AND THE TWO MUST NOT LOOK ALIKE.
- * "We have not measured this yet" is a finding this project is proud of.
- * "We cannot reach the results right now" is a fault. Rendering the outage as
- * the empty state would quietly tell a professor the benchmark is emptier than
- * it is — which is the same class of lie as inventing a number, pointing the
- * other way.
- */
-describe("an outage and an empty benchmark are told apart", () => {
-  it("does not reuse the 'nothing measured yet' copy for a failure", async () => {
-    getLeaderboard.mockRejectedValue(new ApiError("GET /leaderboard failed: 503", 503));
-    render(await LeaderboardPage({ searchParams: Promise.resolve({}) }));
-
-    expect(screen.queryByText(/No benchmark results yet/i)).toBeNull();
+  it("does not reuse the 'not measured yet' copy for a failure", async () => {
+    await render503();
     expect(visibleText()).not.toMatch(/not (been )?measured (against|yet)/i);
   });
 });
