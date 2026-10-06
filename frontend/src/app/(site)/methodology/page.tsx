@@ -121,11 +121,8 @@ export default function MethodologyPage() {
           data. The evidence underneath is the same.
         </p>
         <div className="cta-row">
-          <Link className="cta" href="/recommend">
-            Help me choose a model →
-          </Link>
-          <Link className="muted" href="/">
-            Back to all majors
+          <Link className="cta" href="/">
+            Back to all majors →
           </Link>
         </div>
       </section>

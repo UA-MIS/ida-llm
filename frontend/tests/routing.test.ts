@@ -3,12 +3,12 @@
  *
  * ⚠ THIS TEST EXISTS BECAUSE THE FAILURES IT GUARDS ARE SILENT. The site
  * collapsed to a single landing (`/`, the by-major grid) plus the drill-down,
- * the recommendation flow, how-we-test and the per-model and per-run detail.
- * Four pages were removed outright — `/overview`, `/leaderboard`, `/compare`
- * and the `/runs` browse list. A link still pointing at one of them does not
- * crash and does not 404 at build time; it just hands a professor a dead click.
- * So this reads every source and fails if a removed route is still linked, or a
- * kept one has gone missing.
+ * how-we-test and the per-model and per-run detail. Pages were removed outright
+ * — `/overview`, `/leaderboard`, `/compare`, the `/runs` browse list, and
+ * `/recommend` (the whole recommendation feature). A link still pointing at one
+ * of them does not crash and does not 404 at build time; it just hands a
+ * professor a dead click. So this reads every source and fails if a removed
+ * route is still linked, or a kept one has gone missing.
  *
  * Reading the sources rather than rendering them is deliberate: this is a claim
  * about every route at once, and there is no component to render that would
@@ -33,7 +33,7 @@ function routes(dir = APP, prefix = ""): string[] {
       continue;
     }
     // A parenthesised directory is a route GROUP: it adds a layout boundary and
-    // no path segment. `(site)/recommend` is served at `/recommend`.
+    // no path segment. `(site)/methodology` is served at `/methodology`.
     const segment = /^\(.*\)$/.test(entry) ? "" : `/${entry}`;
     found.push(...routes(full, prefix + segment));
   }
@@ -53,8 +53,9 @@ function sources(dir = APP, acc: [string, string][] = []): [string, string][] {
 const ROUTES = routes();
 const SOURCES = sources();
 
-/** The routes removed in the single-page redesign. Nothing may link to one. */
-const REMOVED_ROUTES = ["/overview", "/leaderboard", "/compare"];
+/** The routes removed in the single-page redesign. Nothing may link to one.
+ * `/recommend` joined them when the recommendation feature was removed whole. */
+const REMOVED_ROUTES = ["/overview", "/leaderboard", "/compare", "/recommend"];
 
 describe("the single-page route map", () => {
   it("serves the landing at /, inside the (site) chrome", () => {
@@ -66,7 +67,6 @@ describe("the single-page route map", () => {
 
   it("keeps every surviving tool page reachable", () => {
     for (const route of [
-      "/recommend",
       "/methodology",
       "/models/[key]",
       "/runs/[runId]",
@@ -78,7 +78,7 @@ describe("the single-page route map", () => {
     }
   });
 
-  it("removes the overview, leaderboard, compare and runs-browse pages", () => {
+  it("removes overview, leaderboard, compare, recommend and the runs-browse page", () => {
     for (const route of [...REMOVED_ROUTES, "/runs"]) {
       expect(ROUTES, `${route} should have been deleted`).not.toContain(route);
     }

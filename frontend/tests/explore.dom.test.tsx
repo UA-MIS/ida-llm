@@ -106,7 +106,7 @@ afterEach(() => {
 
 // ---------------------------------------------------------------------------
 
-describe("the escape hatch is on every level", () => {
+describe("no recommendation escape hatch on any level", () => {
   const levels: [string, () => Promise<React.ReactElement>][] = [
     ["classes", () => ClassesPage({ params: Promise.resolve({ major: MAJOR }) })],
     ["categories", () => ClassPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) })],
@@ -117,12 +117,20 @@ describe("the escape hatch is on every level", () => {
   ];
 
   for (const [name, page] of levels) {
-    it(`offers a recommendation instead, on the ${name} level`, async () => {
+    it(`offers no recommendation link, on the ${name} level`, async () => {
+      // The recommendation feature was removed from the site. The old "just
+      // tell me what to use" CTA (`a.xp-help-cta` → /recommend) must be gone,
+      // and nothing on the level may link /recommend by any other route.
       getLeaderboard.mockResolvedValue(measuredBoard());
       render(await page());
-      const cta = document.querySelector<HTMLAnchorElement>("a.xp-help-cta");
-      expect(cta, `the ${name} level has no way out to a recommendation`).not.toBeNull();
-      expect(cta!.getAttribute("href")).toBe("/recommend");
+      expect(
+        document.querySelector("a.xp-help-cta"),
+        `the ${name} level still has the old recommendation CTA`,
+      ).toBeNull();
+      const recommendLinks = Array.from(
+        document.querySelectorAll<HTMLAnchorElement>("a"),
+      ).filter((a) => a.getAttribute("href") === "/recommend");
+      expect(recommendLinks, `the ${name} level still links /recommend`).toHaveLength(0);
     });
 
     it(`has no how-to-read panel on the ${name} level`, async () => {

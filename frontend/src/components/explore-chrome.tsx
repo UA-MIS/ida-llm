@@ -82,7 +82,15 @@ export function ModelFocus({
 }
 
 /**
- * The escape hatch, on every level.
+ * The one-line orientation each level can offer, collapsed by default.
+ *
+ * ⚠ THE RECOMMENDATION ESCAPE HATCH THAT USED TO LEAD THIS BOX IS GONE. The
+ * recommendation feature was removed from the site entirely, so the "just tell
+ * me what to use" link that pointed at `/recommend` went with it. What remains
+ * is the optional, collapsed explanation — kept because "what am I looking at"
+ * is still a fair question on a grid, and this is the only place the drill-down
+ * answers it. Without a call to action the box is no longer the second-loudest
+ * thing on the page; it is a quiet aside (`.xp-help` in globals.css).
  *
  * `explain` is the one sentence this particular grid would need if a reader
  * asked — passed in per level rather than written once here, because "what am I
@@ -92,12 +100,6 @@ export function ModelFocus({
 export function ExploreHelp({ explain }: { explain: string }) {
   return (
     <aside className="xp-help">
-      <Link href="/recommend" className="xp-help-cta">
-        Just tell me what to use
-        <span className="xp-help-arrow" aria-hidden="true">
-          →
-        </span>
-      </Link>
       <details className="xp-help-more">
         {/* "page", not "grid": three of the four levels are grids and the fourth
             is not, and a control that misnames what it is about to explain is

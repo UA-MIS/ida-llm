@@ -89,7 +89,7 @@ export function ResultsUnavailable({
 
       {/* ⚠ ONLY `/` IS OFFERED, AND THAT IS DELIBERATE. Every other page on this
           site needs the same API this one just failed to reach, so sending a
-          reader to `/recommend` or `/runs` would be sending them to a second
+          reader to `/models` or `/runs` would be sending them to a second
           failure. The landing page catches its own errors and still makes its
           whole argument without them — it is the one honest destination. */}
       <p className="unavailable-alt muted">

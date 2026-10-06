@@ -20,9 +20,7 @@
  */
 
 import type {
-  IntakeQuestion,
   LeaderboardResponse,
-  RecommendationResponse,
   RunDetail,
   RunListResponse,
   SampleTranscript,
@@ -124,50 +122,4 @@ export function getLeaderboard(params?: {
 /** One full task spec, including each sample's authored `metadata`. */
 export function getTask(taskId: string): Promise<TaskDetail> {
   return getJson<TaskDetail>(`/tasks/${taskId}`, 60);
-}
-
-/**
- * The intake question tree.
- *
- * Fetched rather than hardcoded here so the questions the form asks and the
- * questions the engine gates on cannot drift apart. Cached briefly: the tree is
- * code-shaped data that changes on deploy, not per request.
- */
-export function getIntakeQuestions(): Promise<IntakeQuestion[]> {
-  return getJson<IntakeQuestion[]>("/recommend/questions", 60);
-}
-
-/**
- * Ask for a recommendation.
- *
- * A refusal ("I still need three things", "no model meets your constraint") is
- * a 200 with a status, not an error -- so this only throws when the API itself
- * failed. Server-side only; the browser reaches it through the same-origin
- * proxy at /api/recommend, for the reasons in this file's header.
- */
-export async function postRecommendation(
-  answers: Record<string, string>,
-): Promise<RecommendationResponse> {
-  const url = `${apiBase()}/recommend`;
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ answers }),
-      cache: "no-store",
-    });
-  } catch (cause) {
-    throw new ApiError(
-      `Could not reach the API at ${url}: ${cause instanceof Error ? cause.message : String(cause)}`,
-      0,
-    );
-  }
-  if (!response.ok) {
-    throw new ApiError(
-      `POST /recommend failed: ${response.status} ${response.statusText}`,
-      response.status,
-    );
-  }
-  return (await response.json()) as RecommendationResponse;
 }
