@@ -201,11 +201,24 @@ body {
    same horizontal treatment `main` always gave them, split at the point
    where the vertical padding used to sit between the nav row and the page
    content — so this is a markup change with no visual one. */
-.site-header { max-width: var(--page-max); margin: 0 auto; padding: 2rem 1.5rem 0; }
+.site-header { max-width: var(--page-max); margin: 0 auto; padding: 2rem 1.5rem 1.25rem; }
 main { max-width: var(--page-max); margin: 0 auto; padding: 0 1.5rem 4rem; }
 
+/* ⚠ CONTENTINFO, SIBLING OF MAIN. The one secondary link ("how we test") that
+   used to sit in the top nav lives here now — see `(site)/layout.tsx` for why.
+   It mirrors `.site-header`'s width/padding so the footer lines up with the
+   page column rather than running full-bleed. */
+.site-footer {
+  max-width: var(--page-max); margin: 2rem auto 0; padding: 1.25rem 1.5rem 2.5rem;
+  border-top: 1px solid var(--border); font-size: 0.86rem;
+}
+.site-footer-links { display: flex; flex-wrap: wrap; gap: 1.4rem; }
+.site-footer-links a { color: var(--muted); text-decoration: none; }
+.site-footer-links a:hover { color: var(--accent); text-decoration: underline; }
+
 /* Invisible until focused — the first tab stop on every tool page, so a
-   keyboard user can jump past the four nav links straight to the content. */
+   keyboard user can jump past the wordmark header (and, on the drill-down, the
+   breadcrumb trail) straight to the content. */
 .skip-link {
   position: absolute; top: -3rem; left: 1rem; z-index: 100;
   background: var(--fg); color: var(--bg);
@@ -307,18 +320,11 @@ pre {
    at the top of this file.
    =========================================================================== */
 
-.nav {
-  display: flex; flex-wrap: wrap; gap: 1.25rem;
-  margin: 0.5rem 0 1.75rem; font-size: 0.9rem;
-  border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;
-}
-/* QA-25: the nav carried no visual active state at all — `aria-current`
-   alone tells assistive technology which page you are on but leaves a
-   sighted reader to work it out from the URL bar. */
-.nav a[aria-current="page"] {
-  color: var(--fg); font-weight: 600;
-  text-decoration: underline; text-underline-offset: 0.25em;
-}
+/* ⚠ THE TOP NAV (`.nav`) IS GONE. The client asked for a single landing page
+   with no top nav — the landing IS explore, "help me choose" is the landing's
+   own CTA, and "how we test" moved to `.site-footer`. Its styles were removed
+   with it rather than left as dead rules a future reader would hunt for a user
+   of. See `(site)/layout.tsx`. */
 
 /* ⚠ THE LABEL IS var(--bg), NOT #fff. A filled button inverts, and in dark mode
    --accent is a LIGHT indigo — white-on-light-indigo lands around 1.5:1, which
@@ -716,7 +722,8 @@ h2 { font-size: 1.15rem; }
 .badge { white-space: nowrap; }
 
 @media (max-width: 760px) {
-  .site-header { padding: 1.5rem 1rem 0; }
+  .site-header { padding: 1.5rem 1rem 1rem; }
+  .site-footer { padding: 1rem 1rem 2.5rem; }
   main { padding: 0 1rem 3rem; }
   .col-optional { display: none; }
   /* ⚠ `.col-trust` IS DELIBERATELY ABSENT FROM THE LIST ABOVE, AND MUST STAY

@@ -120,15 +120,27 @@ describe("no source links a removed route", () => {
 });
 
 describe("the chrome sits below the landing", () => {
-  it("keeps the app header and version badge in the (site) layout", () => {
+  it("keeps the wordmark, version badge, and a footer route to methodology", () => {
     const site = SOURCES.find(([path]) => path.startsWith("(site)") && path.endsWith("layout.tsx"));
     expect(site).toBeDefined();
-    expect(site![1]).toContain("<nav");
-    expect(site![1]).toContain("resolveVersion");
-    // The nav names the three surviving destinations and nothing removed.
-    expect(site![1]).toContain('href: "/"');
-    expect(site![1]).toContain('href: "/methodology"');
-    expect(site![1]).toContain('href: "/recommend"');
+    const body = site![1];
+    expect(body).toContain("resolveVersion");
+    // The wordmark doubles as the way home.
+    expect(body).toContain('href="/"');
+    // "How we test" survives in the footer, not the removed top nav.
+    expect(body).toContain('href="/methodology"');
+  });
+
+  it("drops the old top nav — no NAV array, no chrome link to /recommend", () => {
+    const body = SOURCES.find(
+      ([path]) => path.startsWith("(site)") && path.endsWith("layout.tsx"),
+    )![1];
+    // The old top nav was a `NAV = [{ href: "/", label: ... }]` array. Its
+    // object-literal `href:` entries are the tell that it is back.
+    expect(body, "the top-nav NAV array is back in the layout").not.toMatch(/href:\s*"/);
+    // "Help me choose" is now the landing's own CTA, so the chrome links
+    // neither it nor the old "Explore" self-link.
+    expect(body, "the chrome still links /recommend").not.toContain("/recommend");
   });
 
   it("keeps the nav out of the root layout, and the fonts in it", () => {
