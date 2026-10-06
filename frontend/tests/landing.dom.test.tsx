@@ -89,11 +89,12 @@ describe("the general-classes menu", () => {
 });
 
 describe("the standing exits", () => {
-  it("points the recommend button at /recommend and the method link at /methodology", async () => {
+  it("keeps the method link at /methodology and no recommend button", async () => {
     await renderLanding();
     const hrefs = Array.from(document.querySelectorAll("a")).map((a) => a.getAttribute("href"));
-    expect(hrefs).toContain("/recommend");
     expect(hrefs).toContain("/methodology");
+    // The recommendation feature was removed whole — no /recommend exit.
+    expect(hrefs).not.toContain("/recommend");
   });
 });
 
@@ -134,8 +135,13 @@ describe("the landing, written to a peer", () => {
     expectPeerVoice(document.body.textContent!, expect);
   });
 
-  it("names its primary action as a recommendation, not a wall of data", async () => {
+  it("offers no recommendation action — that feature was removed", async () => {
     await renderLanding();
-    expect(screen.getByText(/Help me choose a model/i)).toBeTruthy();
+    // The "Help me choose a model" CTA and every link to /recommend are gone.
+    expect(screen.queryByText(/Help me choose/i)).toBeNull();
+    const recommendLinks = Array.from(
+      document.querySelectorAll<HTMLAnchorElement>("a"),
+    ).filter((a) => a.getAttribute("href") === "/recommend");
+    expect(recommendLinks).toHaveLength(0);
   });
 });

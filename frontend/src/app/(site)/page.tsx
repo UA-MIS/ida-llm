@@ -5,11 +5,10 @@
  * essay made the argument in sentences; the leaderboard made it in a table. The
  * client's verdict on both: too much to read, too many doors, and a professor
  * should not have to be told what is on the screen. So the landing is now the
- * thing itself — the by-major grid you drill, the core classes you can jump
- * straight into, and one standing button for the reader who just wants an
- * answer. No pitch, no "how to read this": a screen that needs explaining has
- * already failed, and the explanation lives behind the button and on
- * /methodology for anyone who wants it.
+ * thing itself — the by-major grid you drill and the core classes you can jump
+ * straight into. No pitch, no "how to read this": a screen that needs
+ * explaining has already failed, and the explanation lives on /methodology for
+ * anyone who wants it.
  *
  * ⚠ IT RENDERS THE SAME MATRIX THE DRILL-DOWN DOES. The by-major grid is
  * `buildMajorMatrix` through the shared `ExploreMatrixGrid` — the same cells,
@@ -67,9 +66,6 @@ export default async function LandingPage() {
           every number. Pick your major, or jump straight to a core class.
         </p>
         <div className="cta-row">
-          <Link className="cta" href="/recommend">
-            Help me choose a model →
-          </Link>
           <Link className="muted" href="/methodology">
             How we test
           </Link>

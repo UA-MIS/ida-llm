@@ -2096,12 +2096,12 @@ a.cg-score:hover { text-decoration: underline; }
 .xp-crumbs li[aria-current="page"] { color: var(--muted); font-weight: 600; }
 .xp-crumb-sep { color: var(--faint); }
 
-/* --- the escape hatch ----------------------------------------------------- */
+/* --- the per-level orientation aside -------------------------------------- */
 
-/* ⚠ AT THE TOP OF ALL FOUR LEVELS, ABOVE THE GRID. The client asked for this
-   button to be present at every level and never buried; a footer, a drawer or
-   a "see also" is buried. It is deliberately the second-loudest thing on the
-   page after the grid itself. */
+/* ⚠ THIS USED TO BE "THE ESCAPE HATCH" — a brand-bordered box whose loud CTA
+   led to `/recommend`. The recommendation feature is gone, so the CTA is gone,
+   and with it the box's reason to shout: it is now a quiet aside holding one
+   collapsed "what this page shows" explanation, above the grid on each level. */
 .xp-help {
   display: flex; flex-wrap: wrap; align-items: center;
   gap: 0.9rem 1.25rem;
@@ -2109,27 +2109,12 @@ a.cg-score:hover { text-decoration: underline; }
   padding: 0.85rem 1.1rem;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--brand);
   border-radius: var(--radius);
 }
-.xp-help-cta {
-  display: inline-flex; align-items: center; gap: 0.45rem;
-  font-weight: 650; font-size: 0.95rem;
-  text-decoration: none;
-  color: var(--accent);
-}
-.xp-help-cta:hover, .xp-help-cta:focus-visible { text-decoration: underline; }
-.xp-help-arrow { transition: transform 0.15s ease; }
-.xp-help-cta:hover .xp-help-arrow { transform: translateX(2px); }
 .xp-help-more { font-size: 0.85rem; color: var(--muted); }
 .xp-help-summary { cursor: pointer; }
 .xp-help-summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .xp-help-body { margin: 0.5rem 0 0; max-width: 68ch; line-height: 1.55; }
-
-@media (prefers-reduced-motion: reduce) {
-  .xp-help-arrow { transition: none; }
-  .xp-help-cta:hover .xp-help-arrow { transform: none; }
-}
 
 /* --- the grids ------------------------------------------------------------ */
 
