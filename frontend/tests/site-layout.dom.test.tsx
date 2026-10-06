@@ -67,7 +67,7 @@ describe("the tool-page chrome's landmarks", () => {
   });
 
   it("marks the current nav item with aria-current, and no other", () => {
-    usePathname.mockReturnValue("/leaderboard");
+    usePathname.mockReturnValue("/methodology");
     const { container } = render(
       <SiteLayout>
         <p>page content</p>
@@ -77,7 +77,7 @@ describe("the tool-page chrome's landmarks", () => {
     const links = Array.from(container.querySelectorAll("nav a"));
     const current = links.filter((a) => a.getAttribute("aria-current") === "page");
     expect(current).toHaveLength(1);
-    expect(current[0]!.getAttribute("href")).toBe("/leaderboard");
+    expect(current[0]!.getAttribute("href")).toBe("/methodology");
   });
 
   it("marks nothing current on a route with no matching nav item", () => {

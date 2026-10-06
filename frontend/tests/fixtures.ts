@@ -68,13 +68,17 @@ export function result(overrides: Partial<ModelResult> = {}): ModelResult {
 
 export function task(overrides: Partial<TaskLeaderboard> = {}): TaskLeaderboard {
   return {
-    task_id: "slo2/l3-break-even",
-    title: "Break-even volume",
-    description: "Work out the break-even volume from a cost structure.",
+    task_id: "mis200-is-concepts/l1-core",
+    title: "Core IS concepts",
+    description: "Identify the information-systems concept a described situation turns on.",
     kind: "verifiable",
     domain: "business-analytics",
     scorer: "numeric_match",
-    family: "slo2",
+    // ⚠ A REAL FAMILY MIS 200 CLAIMS, so the default task is attributed to that
+    // class and lights up a content category — see CURRICULUM below and
+    // `lib/categories.ts`. (It used to be "slo2", a family no class claims once
+    // the class page became a content-category breakdown.)
+    family: "mis200-is-concepts",
     tags: [],
     slo: "SLO2",
     use_mode: "capability",
@@ -129,8 +133,8 @@ export const CURRICULUM: CurriculumView = {
   //
   //   two majors                 so a major grid is a grid and not a special case
   //   MIS 200 with a family      the ONE measurable class — `task()`'s default
-  //                              family is "slo2", so the default fixture task
-  //                              is attributed here and nowhere else
+  //                              family is "mis200-is-concepts", so the default
+  //                              fixture task is attributed here and nowhere else
   //   MIS 221 with no family     a class the catalog lists and nobody has
   //                              written a task about — the commonest real
   //                              state, and the one that must never show a
@@ -152,7 +156,9 @@ export const CURRICULUM: CurriculumView = {
           course: "MIS 200",
           title: "Fundamentals of Management Information Systems",
           credit_hours: 3,
-          task_families: ["slo2"],
+          // A real family, so the class's content-category breakdown (see
+          // `lib/categories.ts`) has something to attribute the default task to.
+          task_families: ["mis200-is-concepts"],
         },
         {
           course: "MIS 221",
@@ -203,7 +209,7 @@ export function board(
     benchmark_task_count: tasks.length,
     slos: ["SLO2", "SLO4"],
     use_modes: ["capability"],
-    families: ["slo2"],
+    families: ["mis200-is-concepts"],
     domains: ["business-analytics"],
     ...overrides,
   };

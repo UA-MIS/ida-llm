@@ -105,11 +105,7 @@ function RunSummary({ run }: { run: RunRecord }) {
         </div>
         <div>
           <dt>Task</dt>
-          <dd className="mono">
-            <Link href={`/leaderboard?task=${encodeURIComponent(run.task_id)}`}>
-              {run.task_id}
-            </Link>
-          </dd>
+          <dd className="mono">{run.task_id}</dd>
         </div>
         <div>
           <dt>Model</dt>
@@ -393,8 +389,8 @@ export default async function RunDetailPage({
 
   return (
     <>
-      <Link href="/runs" className="back">
-        ← All runs
+      <Link href="/" className="back">
+        ← Back to the grid
       </Link>
       {/* A bare UUID told the reader nothing about what they had opened. The
           id stays — it is the thing to quote when reporting a problem — but it

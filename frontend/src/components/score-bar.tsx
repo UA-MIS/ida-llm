@@ -38,7 +38,7 @@ export function ScoreBar({
       <div
         className="scorebar-track"
         role="img"
-        aria-label={`${formatScore(score)} out of 1.00`}
+        aria-label={`Score ${formatScore(score)}`}
       >
         <div className="scorebar-fill" style={{ width: `${pct}%` }} />
       </div>

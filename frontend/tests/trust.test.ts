@@ -113,7 +113,7 @@ describe("summariseResult", () => {
     // plain form here is what stops the jargon leaking back in through a
     // summary nobody thinks of as copy.
     expect(summariseResult(result())).toBe(
-      "Luna: 0.91 on 5 of 5 samples — Checked by a program, high confidence",
+      "Luna: 91% on 5 of 5 samples — Checked by a program, high confidence",
     );
   });
 

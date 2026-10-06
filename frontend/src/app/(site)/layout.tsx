@@ -4,40 +4,21 @@ import { NavLinks } from "@/components/nav-links";
 import { resolveVersion } from "@/lib/version";
 
 /**
- * The product chrome: header, nav, and the 1080px column every tool page reads
- * inside. Lifted out of the root layout when the landing page arrived — see the
- * note there for why a route group rather than a conditional.
+ * The product chrome: header, nav, and the column every page reads inside. The
+ * landing lives in this group too now, so the whole site shares one quiet
+ * header.
  *
- * Three destinations, named for what a professor gets rather than what we call
- * it internally.
- *
- * "Results" was the front door's old label and it described a shape, not an
- * answer — a visitor could not tell it from "All runs". The front door is a
- * LEADERBOARD now, so it says so; the recommendation flow keeps its verb; and
- * the raw run log stays last because it is the drill-down for someone who
- * already believes the numbers and wants to check them.
- *
- * ⚠ `/` IS NO LONGER THE LEADERBOARD. It is the landing page, and the
- * leaderboard has its own path — so this nav names `/leaderboard` explicitly
- * and the wordmark goes home to `/`. Anything still pointing a "back to the
- * results" link at `/` now lands a professor on the pitch instead of the data
- * they asked for.
+ * ⚠ THREE DESTINATIONS, DELIBERATELY. The client's verdict on the old nav was
+ * "too much information, too many clicks, too many options" — it had a landing,
+ * a leaderboard, a compare grid, a run log and a recommend flow all competing as
+ * front doors. Those are gone. What is left is the three things a professor
+ * actually does: explore the grid (the landing, `/`), read how we test it, and
+ * ask for an answer. Named for what they get, not for what we call it inside.
  */
 const NAV = [
-  /* ⚠ FIRST, BECAUSE IT IS THE GUIDED DOOR. The client's verdict on the rest of
-     this nav was "too much information, too many clicks" -- every other
-     destination here drops a reader into a full catalogue and asks them to
-     filter it down. `/explore` asks one question per screen instead. It is a
-     CANDIDATE front door, offered alongside the others rather than in place of
-     them, so the comparison the client needs to make is still there to make. */
-  { href: "/explore", label: "Explore" },
-  { href: "/leaderboard", label: "Leaderboard" },
-  /* A top-level destination rather than a view-switch on the leaderboard: it
-     answers "best at WHAT", which is a different question from "best", and the
-     two do not share a filter bar sensibly. */
-  { href: "/compare", label: "Compare by outcome" },
-  { href: "/recommend", label: "Recommend a model" },
-  { href: "/runs", label: "All runs" },
+  { href: "/", label: "Explore" },
+  { href: "/methodology", label: "How we test" },
+  { href: "/recommend", label: "Help me choose" },
 ];
 
 export default function SiteLayout({

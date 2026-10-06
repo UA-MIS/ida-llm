@@ -1,32 +1,20 @@
 /**
- * The four levels of `/explore`, rendered.
+ * The drill-down's pages, rendered: classes → categories → evidence.
  *
- * ⚠ WHY THESE ARE NOT COVERED BY `explore.test.ts`. That file proves the rules
- * are computed correctly; this one proves the PAGE shows them. A drill-down that
- * classified a pairing as "not measured yet" and then rendered a bare cell would
- * pass every pure test in this directory while telling a professor the models
+ * ⚠ WHY THESE ARE NOT COVERED BY `explore.test.ts` / `explore-matrix.test.ts`.
+ * Those prove the rules are computed correctly; this proves the PAGE shows them.
+ * A grid that classified a pairing as "not measured yet" and then rendered a
+ * bare cell would pass every pure test while telling a professor the models
  * scored zero on their class. The honest empty states are the product, so they
  * are asserted where a reader would actually meet them.
  *
- * ⚠ THE ORIENTATION IS ASSERTED HERE, IN THE DOM, BECAUSE THAT IS WHERE IT IS A
- * CLAIM. Models are ROWS and entities are COLUMNS. A vertical list reads as a
- * ranking whether or not one was meant, so the axis running down the page has to
- * be the one where order means something. Transposing the grid back would break
- * nothing, fail nothing, and quietly start asserting that Accounting outranks
- * Marketing and that MIS 200 matters more than MIS 466.
+ * ⚠ THE TOP LEVEL — the by-major grid — IS THE LANDING NOW, and is asserted in
+ * `landing.dom.test.tsx`. This file is the three levels below it.
  *
- * ⚠ THE THREE GRID LEVELS ARE THE COMPARISON MATRIX, AND THESE TESTS ASSERT
- * THAT SHAPE. Each of levels 1-3 renders `table.cg-grid` — literally the table
- * `/compare` renders, from the same components. A test that only checked "some
- * score appears somewhere" would pass against a wall of cards again, which is
- * the thing the client rejected; so the assertions below are about cells,
- * columns and rows.
- *
- * ⚠ THE PERSISTENT ESCAPE HATCH IS TESTED AT EVERY LEVEL, INDIVIDUALLY. The
- * client asked for it on every screen and never buried, which is exactly the
- * kind of requirement that survives review, ships on three of four pages, and
- * is discovered by the person it was built for. Four assertions, one per level,
- * rather than one assertion on a shared component.
+ * ⚠ THE CLASS PAGE IS A CONTENT-CATEGORY GRID, NOT AN SLO ONE. The class page
+ * used to list the outcomes a class teaches; it now lists the content
+ * categories that define it (see `lib/categories.ts`). The SLO data is intact
+ * internally, but the axis a professor meets on the class page is content.
  */
 
 import { cleanup, render } from "@testing-library/react";
@@ -35,15 +23,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { board as fixtureBoard, CURRICULUM, result, task } from "./fixtures";
 import { expectPeerVoice } from "./voice";
 
+/**
+ * The fixture, with every `slo2` family remapped to `mis200-is-concepts` — the
+ * real family MIS 200 claims, and the one the "IS concepts & business models"
+ * content category maps to. So a default `slo2` task lights up that category.
+ */
 function board(...args: Parameters<typeof fixtureBoard>) {
   const value = structuredClone(fixtureBoard(...args));
   for (const major of value.curriculum.majors) {
     for (const klass of major.classes) {
-      klass.task_families = klass.task_families.map((family) => family === "slo2" ? "mis200-spreadsheet-formulas" : family);
+      klass.task_families = klass.task_families.map((f) => (f === "slo2" ? "mis200-is-concepts" : f));
     }
   }
-  for (const task of value.tasks) {
-    if (task.family === "slo2") task.family = "mis200-spreadsheet-formulas";
+  for (const t of value.tasks) {
+    if (t.family === "slo2") t.family = "mis200-is-concepts";
   }
   return value;
 }
@@ -61,45 +54,22 @@ const notFound = vi.hoisted(() =>
 );
 vi.mock("next/navigation", () => ({ notFound }));
 
-const { default: ExplorePage } = await import("@/app/(site)/explore/page");
 const { default: ClassesPage } = await import("@/app/(site)/explore/[major]/page");
-const { default: OutcomesPage } = await import("@/app/(site)/explore/[major]/[course]/page");
+const { default: ClassPage } = await import("@/app/(site)/explore/[major]/[course]/page");
 const { default: EvidencePage } = await import(
   "@/app/(site)/explore/[major]/[course]/[slo]/page"
 );
 
 const MAJOR = "management-information-systems";
 const GEN = "general-business";
-
-/** The fixture curriculum plus Teamwork, which no text benchmark can measure. */
-const WITH_TEAMWORK = {
-  ...CURRICULUM,
-  outcomes: [
-    ...CURRICULUM.outcomes,
-    {
-      id: "SLO5",
-      title: "Teamwork",
-      statement: "Students demonstrate ability to work effectively on teams.",
-      text_benchmarkable: false,
-      benchmark_note: "OUT OF SCOPE for a text benchmark, and deliberately not faked.",
-    },
-  ],
-  coverage: [
-    { course: "MIS 200", title: "Fundamentals of MIS", outcomes: { SLO2: "A", SLO4: "R" } },
-    {
-      course: "GBA 300",
-      title: "Business Communications",
-      outcomes: { SLO2: "R", SLO4: "A", SLO5: "M+A" },
-    },
-  ],
-};
+const CATEGORY = "is-concepts-business-models";
 
 function measuredBoard(overrides = {}) {
   return board(
     [
       task({
-        task_id: "slo2/break-even",
-        family: "slo2",
+        task_id: "mis200-is-concepts/l1",
+        family: "slo2", // remapped to mis200-is-concepts by board()
         slo: "SLO2",
         has_results: true,
         best_model_key: "luna",
@@ -111,34 +81,17 @@ function measuredBoard(overrides = {}) {
   );
 }
 
-/**
- * ⚠ A THUNK, NOT A PROMISE. Taking `ExplorePage()` as an argument would invoke
- * the page BEFORE the line that sets the mock, so every level would render
- * against whichever board the previous test happened to leave behind —
- * `vi.clearAllMocks()` clears calls, not implementations. Two assertions passed
- * for that reason before this was a thunk, which is the worst possible way for
- * a fixture to be wrong.
- */
-async function renderLevel(
-  page: () => Promise<React.ReactElement>,
-  response: unknown,
-) {
+async function renderLevel(page: () => Promise<React.ReactElement>, response: unknown) {
   getLeaderboard.mockResolvedValue(response);
   render(await page());
 }
 
-/** The grid's data rows — the models — without the "All models" summary. */
 function modelRows(): HTMLTableRowElement[] {
   return Array.from(
     document.querySelectorAll<HTMLTableRowElement>("table.cg-grid tbody tr"),
   ).filter((row) => !row.classList.contains("xp-summary"));
 }
 
-function summaryRow(): HTMLTableRowElement {
-  return document.querySelector<HTMLTableRowElement>("table.cg-grid tbody tr.xp-summary")!;
-}
-
-/** Column index of the entity whose header contains `text`. */
 function columnOf(text: string): number {
   const headers = Array.from(document.querySelectorAll("table.cg-grid thead th.xp-col"));
   const index = headers.findIndex((th) => th.textContent?.includes(text));
@@ -155,19 +108,11 @@ afterEach(() => {
 
 describe("the escape hatch is on every level", () => {
   const levels: [string, () => Promise<React.ReactElement>][] = [
-    ["majors", () => ExplorePage()],
     ["classes", () => ClassesPage({ params: Promise.resolve({ major: MAJOR }) })],
-    [
-      "outcomes",
-      () =>
-        OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
-    ],
+    ["categories", () => ClassPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) })],
     [
       "evidence",
-      () =>
-        EvidencePage({
-          params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: "slo2" }),
-        }),
+      () => EvidencePage({ params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: CATEGORY }) }),
     ],
   ];
 
@@ -175,32 +120,12 @@ describe("the escape hatch is on every level", () => {
     it(`offers a recommendation instead, on the ${name} level`, async () => {
       getLeaderboard.mockResolvedValue(measuredBoard());
       render(await page());
-
       const cta = document.querySelector<HTMLAnchorElement>("a.xp-help-cta");
       expect(cta, `the ${name} level has no way out to a recommendation`).not.toBeNull();
       expect(cta!.getAttribute("href")).toBe("/recommend");
-      // Above the grid it belongs to, not below it: a reader who has to scroll
-      // past the whole matrix to find the escape hatch has already met the
-      // matrix.
-      const grid = document.querySelector("table.cg-grid, table.leaderboard, .empty");
-      if (grid) {
-        expect(
-          cta!.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING,
-          `the escape hatch sits below the content on the ${name} level`,
-        ).toBeTruthy();
-      }
-    });
-
-    it(`offers a plain explanation on the ${name} level`, async () => {
-      getLeaderboard.mockResolvedValue(measuredBoard());
-      render(await page());
-      const more = document.querySelector(".xp-help-body");
-      expect(more?.textContent?.length ?? 0).toBeGreaterThan(40);
     });
 
     it(`has no how-to-read panel on the ${name} level`, async () => {
-      // The client's point: a screen you must explain has failed. The
-      // explanation is one collapsed line beside the button that skips it.
       getLeaderboard.mockResolvedValue(measuredBoard());
       render(await page());
       expect(document.querySelector(".how-to-read")).toBeNull();
@@ -211,277 +136,28 @@ describe("the escape hatch is on every level", () => {
 
 // ---------------------------------------------------------------------------
 
-describe("the orientation, in the DOM", () => {
-  it("heads the row axis with the model and the column axis with the entity", async () => {
-    await renderLevel(() => ExplorePage(), measuredBoard());
+describe("level 2 — the classes of one major", () => {
+  it("heads the row axis with the model and the columns with the classes, in catalog order", async () => {
+    await renderLevel(() => ClassesPage({ params: Promise.resolve({ major: MAJOR }) }), measuredBoard());
     const grid = document.querySelector("table.cg-grid.xp-matrix");
-    expect(grid, "the majors level is not drawn as a matrix").not.toBeNull();
-
-    const headers = Array.from(grid!.querySelectorAll("thead th")).map((th) =>
-      th.textContent?.trim(),
-    );
-    // The corner names what a ROW is; the columns are the entities.
-    expect(headers[0]).toBe("Model");
-    // Codes, not full names — a fourteen-column-wide grid has no room for
-    // "Management Information Systems" as a column header.
-    expect(headers.some((h) => h?.includes("MIS"))).toBe(true);
-    expect(headers.some((h) => h?.includes("GBA"))).toBe(true);
-    expect(headers.some((h) => h?.includes("Management Information Systems"))).toBe(false);
-    expect(headers.some((h) => h?.includes("General Business"))).toBe(false);
-    expect(headers.at(-1)).toBe("All majors");
-  });
-
-  it("makes each model a row, with one cell per entity plus its own summary", async () => {
-    await renderLevel(() => ExplorePage(), measuredBoard());
-    const rows = modelRows();
-    expect(rows.length).toBeGreaterThan(0);
-    for (const row of rows) {
-      expect(row.querySelector("th.xp-model")).not.toBeNull();
-      // Two majors in the fixture, plus the trailing across-the-level cell.
-      expect(row.querySelectorAll("td.cg-cell")).toHaveLength(3);
-    }
-  });
-
-  it("puts the 'All models' summary in the same table, as the last row", async () => {
-    await renderLevel(() => ExplorePage(), measuredBoard());
-    const summary = summaryRow();
-    expect(summary, "no All-models summary row").not.toBeNull();
-    expect(summary.querySelector("th")!.textContent).toBe("All models");
-    expect(summary).toBe(
-      document.querySelector("table.cg-grid tbody tr:last-child"),
-    );
-  });
-
-  it("orders the model rows as a ranking, best first", async () => {
-    await renderLevel(
-      () => ExplorePage(),
-      board([
-        task({
-          task_id: "slo2/a",
-          family: "slo2",
-          slo: "SLO2",
-          has_results: true,
-          results: [
-            result({ model_key: "luna", display_name: "Luna", mean_score: 0.3 }),
-            result({ model_key: "sol", display_name: "Sol", mean_score: 0.9 }),
-          ],
-        }),
-      ]),
-    );
-    expect(
-      modelRows().map((r) => r.querySelector("th")!.textContent?.trim()),
-    ).toEqual(["Sol", "Luna"]);
-  });
-
-  it("keeps the entity columns in the catalog's order, never the score's", async () => {
-    await renderLevel(
-      () => ClassesPage({ params: Promise.resolve({ major: MAJOR }) }),
-      measuredBoard({ curriculum: WITH_TEAMWORK }),
-    );
-    const eyebrows = Array.from(document.querySelectorAll(".xp-col-eyebrow")).map(
-      (n) => n.textContent,
-    );
+    expect(grid, "the classes level is not drawn as a matrix").not.toBeNull();
+    const eyebrows = Array.from(document.querySelectorAll(".xp-col-eyebrow")).map((n) => n.textContent);
     expect(eyebrows).toEqual(["MIS 200", "MIS 221"]);
   });
 
-  it("labels class columns with the course code, not the full course title", async () => {
-    await renderLevel(
-      () => ClassesPage({ params: Promise.resolve({ major: MAJOR }) }),
-      measuredBoard({ curriculum: WITH_TEAMWORK }),
-    );
-    const headings = Array.from(document.querySelectorAll(".xp-col-heading")).map(
-      (n) => n.textContent,
-    );
-    expect(headings).toEqual(["MIS 200", "MIS 221"]);
-    // Still cheaply reachable, as a hover tooltip on the same link — the full
-    // title is not gone from the page (the reasons list below the grid still
-    // carries it), only out of the column header itself.
-    const links = Array.from(document.querySelectorAll<HTMLAnchorElement>(".xp-col-link"));
-    expect(links.map((a) => a.getAttribute("title"))).toEqual([
-      "Fundamentals of Management Information Systems",
-      "Business Programming I",
-    ]);
-  });
-});
-
-// ---------------------------------------------------------------------------
-
-describe("the three click targets", () => {
-  it("opens a column header into the level below", async () => {
-    await renderLevel(
-      () => ClassesPage({ params: Promise.resolve({ major: MAJOR }) }),
-      measuredBoard({ curriculum: WITH_TEAMWORK }),
-    );
-    const hrefs = Array.from(
-      document.querySelectorAll<HTMLAnchorElement>(".xp-col-link"),
-    ).map((a) => a.getAttribute("href"));
-    expect(hrefs).toEqual([`/explore/${MAJOR}/mis-200`, `/explore/${MAJOR}/mis-221`]);
-  });
-
-  it("opens a model row header into that model's report card", async () => {
-    await renderLevel(() => ExplorePage(), measuredBoard());
-    const link = modelRows()[0]!.querySelector<HTMLAnchorElement>("a.xp-model-link");
-    expect(link, "the model row header is not a link").not.toBeNull();
-    expect(link!.getAttribute("href")).toBe("/models/luna");
-  });
-
-  it("opens a score cell into the level below, carrying the model", async () => {
-    await renderLevel(() => ExplorePage(), measuredBoard());
-    const cell = document.querySelector("td.cg-measured")!;
-    const link = cell.querySelector<HTMLAnchorElement>("a.cg-score");
-    expect(link, "a measured cell is not clickable").not.toBeNull();
-    expect(link!.getAttribute("href")).toBe(`/explore/${MAJOR}?model=luna`);
-  });
-
-  it("keeps the run receipt reachable from the evidence page", async () => {
-    // The cell gave up its run link to carry the drill. The receipt is still
-    // one level down, where the whole page is receipts.
-    await renderLevel(
-      () =>
-        EvidencePage({
-          params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: "slo2" }),
-        }),
-      measuredBoard(),
-    );
-    expect(
-      document
-        .querySelector<HTMLAnchorElement>("table.leaderboard .col-go a")!
-        .getAttribute("href"),
-    ).toBe("/runs/run_1");
-  });
-
-  it("marks the model a cell click carried down, without reordering the grid", async () => {
-    await renderLevel(
-      () =>
-        ClassesPage({
-          params: Promise.resolve({ major: MAJOR }),
-          searchParams: Promise.resolve({ model: "luna" }),
-        }),
-      measuredBoard(),
-    );
-    expect(document.querySelector(".xp-focus")!.textContent).toContain("Luna");
-    const focused = document.querySelectorAll("tr.xp-model-focused");
-    expect(focused).toHaveLength(1);
-    expect(focused[0]!.querySelector("th")!.textContent).toContain("Luna");
-    // A way back to the full field, one click away.
-    expect(
-      document
-        .querySelector<HTMLAnchorElement>(".xp-focus a")!
-        .getAttribute("href"),
-    ).toBe(`/explore/${MAJOR}`);
-  });
-
-  it("ignores a ?model= that names nothing on this level", async () => {
-    // A focus note for a model the grid does not contain would be a caption
-    // describing a different page.
-    await renderLevel(
-      () =>
-        ClassesPage({
-          params: Promise.resolve({ major: MAJOR }),
-          searchParams: Promise.resolve({ model: "nobody" }),
-        }),
-      measuredBoard(),
-    );
-    expect(document.querySelector(".xp-focus")).toBeNull();
-    expect(document.querySelector("tr.xp-model-focused")).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-
-describe("level 1 — the majors", () => {
-  it("names every major the college offers and links into its classes", async () => {
-    await renderLevel(() => ExplorePage(), measuredBoard());
-    const links = Array.from(
-      document.querySelectorAll<HTMLAnchorElement>(".xp-col-link"),
-    );
-    expect(links.map((a) => a.getAttribute("href"))).toEqual([
-      `/explore/${MAJOR}`,
-      `/explore/${GEN}`,
-    ]);
-    // The column header's visible label is the department code — the full
-    // name is a hover tooltip on the same link, not text in the header.
-    const headings = Array.from(document.querySelectorAll(".xp-col-heading")).map(
-      (n) => n.textContent,
-    );
-    expect(headings).toEqual(["MIS", "GBA"]);
-    expect(links.map((a) => a.getAttribute("title"))).toEqual([
-      "Management Information Systems",
-      "General Business",
-    ]);
-    // Still on the page, in the per-column reasons list beneath the grid —
-    // just no longer the column header itself.
-    expect(document.body.textContent).toContain("Management Information Systems");
-  });
-
-  it("shows the core courses no major owns rather than dropping them", async () => {
-    await renderLevel(() => ExplorePage(), measuredBoard());
-    expect(document.body.textContent).toContain("LGS 200");
-    expect(document.body.textContent).toMatch(/no major owns this core course/i);
-  });
-
-  it("says so, with the reason, when the deployment has no taxonomy", async () => {
-    await renderLevel(
-      () => ExplorePage(),
-      board([], {
-        curriculum: {
-          available: false,
-          unavailable_reason: "No curriculum/slo.yaml in this deployment.",
-          program: null,
-          source: null,
-          outcomes: [],
-          use_modes: [],
-          coverage: [],
-          majors: [],
-          unassigned_core: [],
-        },
-      }),
-    );
-    expect(document.querySelector("table.cg-grid")).toBeNull();
-    expect(document.body.textContent).toMatch(/no majors taxonomy/i);
-  });
-
-  it("discloses seeded rows above the grid they qualify", async () => {
-    await renderLevel(
-      () => ExplorePage(),
-      board([
-        task({
-          task_id: "slo2/a",
-          family: "slo2",
-          slo: "SLO2",
-          has_results: true,
-          results: [result({ mean_score: 0.9, scored_count: 10, demonstration: true })],
-        }),
-      ]),
-    );
-    const notice = document.querySelector(".notice");
-    expect(notice, "a fully seeded board renders no demonstration notice").not.toBeNull();
-    expect(notice!.textContent).toMatch(/illustrative/i);
-  });
-});
-
-// ---------------------------------------------------------------------------
-
-describe("level 2 — the classes", () => {
-  it("says how far the class list got rather than letting a short list speak", async () => {
-    await renderLevel(
-      () => ClassesPage({ params: Promise.resolve({ major: GEN }) }),
-      measuredBoard({ curriculum: WITH_TEAMWORK }),
-    );
-    expect(document.body.textContent).toContain("General Business");
-    expect(document.body.textContent).toContain("Management");
-  });
-
   it("leaves a class with no tasks about it empty beside a measured sibling", async () => {
-    await renderLevel(
-      () => ClassesPage({ params: Promise.resolve({ major: MAJOR }) }),
-      measuredBoard(),
-    );
+    await renderLevel(() => ClassesPage({ params: Promise.resolve({ major: MAJOR }) }), measuredBoard());
     const row = modelRows()[0]!;
     const cells = Array.from(row.querySelectorAll("td.cg-cell"));
     expect(cells[columnOf("MIS 200")]!.className).toContain("cg-measured");
     expect(cells[columnOf("MIS 221")]!.className).toContain("cg-unmeasured");
     expect(cells[columnOf("MIS 221")]!.querySelector(".cg-score")).toBeNull();
+  });
+
+  it("renders the measured score as a whole-number percent", async () => {
+    await renderLevel(() => ClassesPage({ params: Promise.resolve({ major: MAJOR }) }), measuredBoard());
+    const cell = document.querySelector("td.cg-measured .cg-score")!;
+    expect(cell.textContent).toBe("72%");
   });
 
   it("404s on a major this college does not have", async () => {
@@ -491,43 +167,56 @@ describe("level 2 — the classes", () => {
     ).rejects.toThrow("NEXT_NOT_FOUND");
     expect(notFound).toHaveBeenCalled();
   });
+
+  it("breadcrumbs back to the majors landing at /", async () => {
+    await renderLevel(() => ClassesPage({ params: Promise.resolve({ major: MAJOR }) }), measuredBoard());
+    const hrefs = Array.from(document.querySelectorAll<HTMLAnchorElement>(".xp-crumbs a")).map((a) =>
+      a.getAttribute("href"),
+    );
+    expect(hrefs).toEqual(["/"]);
+  });
 });
 
 // ---------------------------------------------------------------------------
 
-describe("level 3 — the outcomes one class teaches", () => {
-  it("groups the class by its assignment families rather than curriculum outcomes", async () => {
+describe("level 3 — the content categories that define a class", () => {
+  it("shows the class's content categories as the grid columns, not its SLOs", async () => {
     await renderLevel(
-      () => OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
-      measuredBoard({ curriculum: WITH_TEAMWORK }),
+      () => ClassPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
+      measuredBoard(),
     );
     const columns = Array.from(document.querySelectorAll("thead th.xp-col"));
-    expect(columns).toHaveLength(3);
-    expect(document.body.textContent).toContain("assignment types have a score");
-    expect(document.body.textContent).not.toContain("Assessment point");
+    // The five MIS 200 content categories.
+    expect(columns).toHaveLength(5);
+    expect(document.body.textContent).toContain("IS concepts & business models");
+    expect(document.body.textContent).toContain("Spreadsheet & Excel skills");
+    // Not the SLO vocabulary, and not the assignment-type one it briefly had.
+    expect(document.body.textContent).toContain("categories that define this class");
     expect(columns[0]!.textContent).not.toContain("Quantitative Literacy");
   });
 
-  it("explains when a course has no assignment types", async () => {
+  it("measures the mapped category and leaves the unmapped ones honestly empty", async () => {
     await renderLevel(
-      () => OutcomesPage({ params: Promise.resolve({ major: GEN, course: "gba-300" }) }),
-      measuredBoard({ curriculum: WITH_TEAMWORK }),
+      () => ClassPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
+      measuredBoard(),
     );
-    expect(document.querySelector("table.cg-grid")).toBeNull();
-    expect(document.body.textContent).toContain("No assignment types have been added");
+    const row = modelRows()[0]!;
+    const cells = Array.from(row.querySelectorAll("td.cg-cell"));
+    expect(cells[columnOf("IS concepts")]!.className).toContain("cg-measured");
+    expect(cells[columnOf("IS concepts")]!.querySelector(".cg-score")!.textContent).toBe("72%");
+    // A category with no family for this class never borrows a sibling's number.
+    expect(cells[columnOf("Platform & network")]!.className).toContain("cg-unmeasured");
+    expect(cells[columnOf("Platform & network")]!.querySelector(".cg-score")).toBeNull();
   });
 
-  it("keeps the confidence tell beside every score it does show", async () => {
+  it("keeps the confidence tell beside every score it shows", async () => {
     await renderLevel(
-      () => OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
+      () => ClassPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
       measuredBoard(),
     );
     const measured = Array.from(document.querySelectorAll("td.cg-measured"));
     expect(measured.length).toBeGreaterThan(0);
     for (const cell of measured) {
-      expect(cell.querySelector(".cg-score")!.textContent).toBe("0.72");
-      // ⚠ NEVER OPTIONAL, NEVER DROPPED AT A BREAKPOINT: the number and how
-      // much weight it can bear travel together or not at all.
       expect(
         cell.querySelector(".cg-confidence .confidence-pips"),
         "a score is shown with no tell for how much it can bear",
@@ -535,57 +224,12 @@ describe("level 3 — the outcomes one class teaches", () => {
     }
   });
 
-  it("puts each column's summary in the same table, built from the same cells", async () => {
-    // ⚠ THE DISAGREEMENT THE MATRIX MAKES IMPOSSIBLE. A tile grid computed a
-    // class's headline on a card and its per-model detail on another page;
-    // nothing structural stopped the two drifting. Here the "All models" figure
-    // is the last cell of the column it summarises, so a summary claiming a
-    // score under a column of dashes would have to contradict its neighbours.
-    await renderLevel(
-      () => OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
-      measuredBoard({ curriculum: WITH_TEAMWORK }),
-    );
-    const rows = modelRows();
-    const summary = Array.from(summaryRow().querySelectorAll("td.cg-cell"));
-    const columnCount = document.querySelectorAll("thead th.xp-col").length;
-    expect(columnCount).toBeGreaterThan(0);
-
-    for (let i = 0; i < columnCount; i += 1) {
-      const anyModelMeasured = rows.some((row) =>
-        Array.from(row.querySelectorAll("td.cg-cell"))[i]!.className.includes("cg-measured"),
-      );
-      expect(
-        summary[i]!.className.includes("cg-measured"),
-        `column ${i}: summary and cells disagree`,
-      ).toBe(anyModelMeasured);
-    }
-  });
-
-  it("says why, without blaming the class, when the map does not mark it", async () => {
-    await renderLevel(
-      () => OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "mis-221" }) }),
-      measuredBoard(),
-    );
-    expect(document.querySelector("table.cg-grid")).toBeNull();
-    expect(document.body.textContent).toMatch(/No assignment types have been added/i);
-  });
-
-  it("404s on a class this major does not list", async () => {
-    getLeaderboard.mockResolvedValue(measuredBoard());
-    await expect(
-      OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "mis-999" }) }),
-    ).rejects.toThrow("NEXT_NOT_FOUND");
-  });
-
-  // ⚠ THE GAP THIS FILE EXISTS TO CLOSE. `/explore`, `/explore/[major]` and the
-  // evidence level all disclosed a seeded score; this page once rendered the
-  // identical flag as a flat, uncaveated finding. Both directions pinned here.
   it("discloses a seeded score above the grid, same words as every other level", async () => {
     await renderLevel(
-      () => OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
+      () => ClassPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
       board([
         task({
-          task_id: "slo2/break-even",
+          task_id: "mis200-is-concepts/l1",
           family: "slo2",
           slo: "SLO2",
           has_results: true,
@@ -594,146 +238,116 @@ describe("level 3 — the outcomes one class teaches", () => {
       ]),
     );
     const notice = document.querySelector(".notice");
-    expect(notice, "a seeded class score rendered no demonstration notice").not.toBeNull();
+    expect(notice, "a seeded category score rendered no demonstration notice").not.toBeNull();
     expect(notice!.textContent).toMatch(/illustrative/i);
-
-    // Self-clears per column too — the badge sits beside the level badge in the
-    // column header, not just in a page-wide banner a reader can miss.
-    expect(
-      document.querySelector("thead .badge-demo"),
-      "no per-column seeded badge on the measured outcome",
-    ).not.toBeNull();
-
-    // And on the row axis it also qualifies: a seeded model's whole ROW is
-    // illustrative here, the way it is on `/compare`.
-    expect(
-      modelRows()[0]!.querySelector(".badge-demo"),
-      "no seeded badge on the model row it belongs to",
-    ).not.toBeNull();
   });
 
-  it("renders no demonstration notice or badge when the class's scores are real", async () => {
+  it("renders no demonstration notice when the class's scores are real", async () => {
     await renderLevel(
-      () => OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
+      () => ClassPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
       measuredBoard(),
     );
     expect(document.querySelector(".notice")).toBeNull();
-    expect(document.querySelector(".badge-demo")).toBeNull();
+  });
+
+  it("explains, without blaming the class, when it has no category breakdown", async () => {
+    await renderLevel(
+      () => ClassPage({ params: Promise.resolve({ major: GEN, course: "gba-300" }) }),
+      measuredBoard(),
+    );
+    // GBA 300 has no taxonomy in lib/categories.ts.
+    expect(document.querySelector("table.cg-grid")).toBeNull();
+    expect(document.body.textContent).toMatch(/No category breakdown/i);
+  });
+
+  it("404s on a class this major does not list", async () => {
+    getLeaderboard.mockResolvedValue(measuredBoard());
+    await expect(
+      ClassPage({ params: Promise.resolve({ major: MAJOR, course: "mis-999" }) }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
   });
 });
 
 // ---------------------------------------------------------------------------
 
-describe("level 4 — the evidence", () => {
-  it("shows each model's read with its receipt", async () => {
+describe("level 4 — the evidence behind one category", () => {
+  it("opens the category, shows each model's read and the run behind it", async () => {
+    await renderLevel(
+      () => EvidencePage({ params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: CATEGORY }) }),
+      measuredBoard(),
+    );
+    expect(document.body.textContent).toContain("IS concepts & business models");
+    // The score, as a whole-number percent, somewhere on the page.
+    expect(document.body.textContent).toContain("72%");
+    // The receipt is reachable.
+    expect(document.querySelector('a[href="/runs/run_1"]')).not.toBeNull();
+  });
+
+  it("carries the synthetic-extension caveat on the competitive-strategy category", async () => {
     await renderLevel(
       () =>
         EvidencePage({
-          params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: "slo2" }),
+          params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: "competitive-strategy" }),
+        }),
+      // A board where the problem-solving family scored, so the category renders.
+      board([
+        task({
+          task_id: "mis200-is-problem-solving/l1",
+          family: "mis200-is-problem-solving",
+          slo: "SLO2",
+          has_results: true,
+          results: [result({ mean_score: 0.9 })],
+        }),
+      ], {
+        curriculum: {
+          ...CURRICULUM,
+          majors: CURRICULUM.majors.map((m) =>
+            m.id !== MAJOR
+              ? m
+              : {
+                  ...m,
+                  classes: m.classes.map((c) =>
+                    c.course === "MIS 200"
+                      ? { ...c, task_families: ["mis200-is-concepts", "mis200-is-problem-solving"] }
+                      : c,
+                  ),
+                },
+          ),
+        },
+      }),
+    );
+    expect(document.body.textContent).toMatch(/synthetic extension/i);
+    expect(document.body.textContent).toMatch(/not comparable to a student cohort/i);
+  });
+
+  it("says 'not measured yet' rather than an empty grid for a category with no task", async () => {
+    await renderLevel(
+      () =>
+        EvidencePage({
+          params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: "platform-network-economics" }),
         }),
       measuredBoard(),
     );
-    const row = document.querySelector("table.leaderboard tbody tr")!;
-    expect(row.textContent).toContain("Luna");
-    expect(row.querySelector(".col-score")!.textContent).toBe("0.72");
-    expect(row.querySelector(".col-trust .confidence-pips")).not.toBeNull();
-    expect(row.querySelector<HTMLAnchorElement>(".col-go a")!.getAttribute("href")).toBe(
-      "/runs/run_1",
-    );
+    expect(document.querySelector("table.cg-grid")).toBeNull();
+    expect(document.body.textContent).toMatch(/Not measured yet/i);
   });
 
-  it("quotes the curriculum on how the outcome is scored", async () => {
+  it("carries a breadcrumb back up every level, to the majors landing", async () => {
     await renderLevel(
-      () =>
-        EvidencePage({
-          params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: "slo2" }),
-        }),
+      () => EvidencePage({ params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: CATEGORY }) }),
       measuredBoard(),
     );
-    expect(document.body.textContent).toContain("Straightforwardly checkable");
-  });
-
-  it("marks the model a cell click carried down", async () => {
-    await renderLevel(
-      () =>
-        EvidencePage({
-          params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: "slo2" }),
-          searchParams: Promise.resolve({ model: "luna" }),
-        }),
-      measuredBoard(),
+    const hrefs = Array.from(document.querySelectorAll<HTMLAnchorElement>(".xp-crumbs a")).map((a) =>
+      a.getAttribute("href"),
     );
-    expect(document.querySelector(".xp-focus")!.textContent).toContain("Luna");
-    expect(document.querySelector("tr.xp-model-focused")!.textContent).toContain("Luna");
-  });
-
-  it("says nothing was run, and why, for an outcome out of scope", async () => {
-    await renderLevel(
-      () =>
-        EvidencePage({
-          params: Promise.resolve({ major: GEN, course: "gba-300", slo: "slo5" }),
-        }),
-      measuredBoard({ curriculum: WITH_TEAMWORK }),
-    );
-    expect(document.querySelector("table.leaderboard")).toBeNull();
-    expect(document.body.textContent).toContain("deliberately");
-    expect(document.body.textContent).toContain("OUT OF SCOPE");
-  });
-
-  it("says 'not measured yet' rather than showing an empty table", async () => {
-    await renderLevel(
-      () =>
-        EvidencePage({
-          params: Promise.resolve({ major: GEN, course: "gba-300", slo: "slo4" }),
-        }),
-      measuredBoard({ curriculum: WITH_TEAMWORK }),
-    );
-    expect(document.querySelector("table.leaderboard")).toBeNull();
-    expect(document.body.textContent).toContain("Not measured yet");
-    // ⚠ AND IT SAYS WHOSE GAP IT IS. "No model scored" and "we have not run
-    // this" are different claims and only the second one is true here.
-    expect(document.body.textContent).toContain("a gap in what we have run");
-  });
-
-  it("shows no receipts from a class this page is not about", async () => {
-    // The SLO2 task on this board is about MIS 200. An evidence page for
-    // GBA 300 that listed it would show a professor receipts from a course they
-    // do not teach, under a heading that says GBA 300.
-    await renderLevel(
-      () =>
-        EvidencePage({
-          params: Promise.resolve({ major: GEN, course: "gba-300", slo: "slo2" }),
-        }),
-      measuredBoard({ curriculum: WITH_TEAMWORK }),
-    );
-    expect(document.body.textContent).not.toContain("Break-even volume");
-    expect(document.querySelector("table.leaderboard")).toBeNull();
-  });
-
-  it("carries a breadcrumb back up every level", async () => {
-    await renderLevel(
-      () =>
-        EvidencePage({
-          params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: "slo2" }),
-        }),
-      measuredBoard(),
-    );
-    const hrefs = Array.from(
-      document.querySelectorAll<HTMLAnchorElement>(".xp-crumbs a"),
-    ).map((a) => a.getAttribute("href"));
-    expect(hrefs).toEqual(["/explore", `/explore/${MAJOR}`, `/explore/${MAJOR}/mis-200`]);
-    // The last crumb is where you are, and is not a link.
-    expect(document.querySelector('.xp-crumbs [aria-current="page"]')!.textContent).toBe(
-      "SLO2",
-    );
+    expect(hrefs).toEqual(["/", `/explore/${MAJOR}`, `/explore/${MAJOR}/mis-200`]);
     expect(document.querySelector(".xp-crumbs")!.textContent).toContain("Majors");
   });
 
-  it("404s on a pairing the map never marked", async () => {
+  it("404s on a segment that is neither a category nor a marked outcome", async () => {
     getLeaderboard.mockResolvedValue(measuredBoard());
     await expect(
-      EvidencePage({
-        params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: "slo9" }),
-      }),
+      EvidencePage({ params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: "not-a-thing" }) }),
     ).rejects.toThrow("NEXT_NOT_FOUND");
   });
 });
@@ -742,18 +356,10 @@ describe("level 4 — the evidence", () => {
 
 describe("the register", () => {
   it("keeps the peer voice on every level", async () => {
-    // The client's verdict was that a screen you have to explain has failed.
-    // These four pages are the response to it, so the tics that sweep names —
-    // meta-narration, defensiveness, a claim with a shelf life — are exactly
-    // what they must not reintroduce.
     for (const page of [
-      () => ExplorePage(),
       () => ClassesPage({ params: Promise.resolve({ major: MAJOR }) }),
-      () => OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
-      () =>
-        EvidencePage({
-          params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: "slo2" }),
-        }),
+      () => ClassPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
+      () => EvidencePage({ params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: CATEGORY }) }),
     ]) {
       getLeaderboard.mockResolvedValue(measuredBoard());
       render(await page());

@@ -145,7 +145,7 @@ describe("when one model is clearly ahead", () => {
   it("names it, with its score", () => {
     expect(clear.leader?.display_name).toBe("Luna");
     expect(clear.headline).toContain("Luna");
-    expect(clear.headline).toContain("0.86");
+    expect(clear.headline).toContain("86%");
   });
 
   it("treats the field as comparable", () => {

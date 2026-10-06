@@ -726,6 +726,47 @@ export function findMajor(index: ExploreIndex, slug: string): MajorTile | undefi
 }
 
 // ---------------------------------------------------------------------------
+// The shared business core — the landing's "general classes" grid
+// ---------------------------------------------------------------------------
+
+/** One core class, with the major it is reached through. */
+export interface CoreClass {
+  major: MajorTile;
+  klass: ClassTile;
+}
+
+/**
+ * The classes every business student takes regardless of major — the shared
+ * business core — each with the major it drills in through.
+ *
+ * ⚠ "CORE" IS A DATA FACT, NOT A HAND-PICKED LIST. A class is core exactly when
+ * the published curriculum map marks it (`ClassTile.in_curriculum_map`), which
+ * is what `curriculum/slo.yaml`'s coverage grid IS — the shared core's
+ * course×outcome map. So this surfaces precisely the courses the map describes,
+ * including MIS 200 (the one populated leaf) and the single-core-course majors
+ * around it, and it grows when the map does rather than when someone edits a
+ * list here. A class a major lists but the map does not mark (the thirteen other
+ * MIS classes) is NOT core and is reachable only by drilling its major, which is
+ * correct: it is a major's own class, not everyone's.
+ *
+ * Course order — AC before MIS before ST — because this is a catalog read, not a
+ * ranking: sorting it by score would turn the core into a league table of its
+ * own classes, the claim `buildClasses` already refuses to make one level down.
+ */
+export function buildCoreClasses(board: LeaderboardResponse): CoreClass[] {
+  const index = buildIndex(board);
+  const out: CoreClass[] = [];
+  for (const major of index.majors) {
+    for (const klass of buildClasses(board, major)) {
+      if (klass.in_curriculum_map) out.push({ major, klass });
+    }
+  }
+  return out.sort((a, b) =>
+    a.klass.code.localeCompare(b.klass.code, undefined, { numeric: true }),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Level 4 — the evidence behind one (class, outcome) pair
 // ---------------------------------------------------------------------------
 

@@ -34,13 +34,13 @@ import type { LeaderboardResponse } from "@/lib/types";
 const MIS = "management-information-systems";
 const GEN = "general-business";
 
-/** One scored SLO2 task in the `slo2` family — the family MIS 200 claims. */
+/** One scored SLO2 task in the `mis200-is-concepts` family — the family MIS 200 claims. */
 function measuredBoard(overrides = {}): LeaderboardResponse {
   return board(
     [
       task({
         task_id: "slo2/break-even",
-        family: "slo2",
+        family: "mis200-is-concepts",
         slo: "SLO2",
         has_results: true,
         best_model_key: "luna",
@@ -131,7 +131,7 @@ describe("level 1 — the majors", () => {
     const mis = index.majors.find((m) => m.slug === MIS)!;
     const gen = index.majors.find((m) => m.slug === GEN)!;
 
-    // MIS 200 claims the `slo2` family, so the scored SLO2 task reaches it.
+    // MIS 200 claims the `mis200-is-concepts` family, so the scored SLO2 task reaches it.
     expect(mis.status).toBe("measured");
     expect(mis.aggregate.score).toBeCloseTo(0.72);
 
@@ -329,7 +329,7 @@ describe("level 2 — the classes of one major", () => {
     const seeded = board([
       task({
         task_id: "slo2/break-even",
-        family: "slo2",
+        family: "mis200-is-concepts",
         slo: "SLO2",
         has_results: true,
         results: [result({ mean_score: 0.72, demonstration: true })],
@@ -416,7 +416,7 @@ describe("level 4 — the evidence", () => {
     const b = board([
       task({
         task_id: "slo2/break-even",
-        family: "slo2",
+        family: "mis200-is-concepts",
         slo: "SLO2",
         has_results: true,
         results: [

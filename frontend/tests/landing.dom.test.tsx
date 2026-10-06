@@ -1,29 +1,22 @@
 /**
- * The landing page, rendered.
+ * The single-page landing, rendered.
  *
- * ⚠ WHAT THIS TESTS THAT `specimen.test.ts` CANNOT. That file proves the RULES
- * are right — that an unauthored use mode resolves to "not measured yet" with no
- * number. This one proves the PAGE actually shows it. A landing page that
- * computed three honest readings and then rendered only the flattering one would
- * pass every pure test in this directory, and would be the single most damaging
- * bug this project could ship: the marketing page for a benchmark about honesty,
- * quietly hiding its own gaps.
+ * ⚠ THE LANDING IS THE PRODUCT NOW, NOT A PITCH FOR IT. It is the by-major grid
+ * a professor drills, a "general classes" menu into the shared core, and one
+ * standing button to a recommendation. So these tests assert the grid, the core
+ * menu, the exits, and — the expensive one — that an all-seeded board still
+ * discloses itself here, on the one page a professor is guaranteed to see.
  *
- * It also pins the front door's two exits, because the whole point of the
- * routing move was that the dense data stays reachable.
+ * ⚠ THE TOP-LEVEL MATRIX ITSELF is exercised in `explore-matrix.test.ts`; this
+ * file only proves the landing PAGE wires it up, discloses seeded data above it,
+ * and degrades calmly when the API is down.
  */
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { board, result, task } from "./fixtures";
 import { expectPeerVoice } from "./voice";
-import type {
-  CurriculumView,
-  LeaderboardResponse,
-  ModelResult,
-  TaskLeaderboard,
-  TrustTell,
-} from "@/lib/types";
 
 const getLeaderboard = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", () => ({
@@ -31,126 +24,23 @@ vi.mock("@/lib/api", () => ({
   ApiError: class ApiError extends Error {},
 }));
 
-// Imported after the mock is registered — the page calls getLeaderboard at
-// module-execution time in its own body, not at import time, but the mock has
-// to exist before the module graph is built either way.
-const { default: LandingPage } = await import("@/app/page");
+const { default: LandingPage } = await import("@/app/(site)/page");
 
-function trust(overrides: Partial<TrustTell> = {}): TrustTell {
-  return {
-    kind: "verifiable",
-    scorer: "numeric_match",
-    tier_label: "Verifiable",
-    headline: "A program compared the answer to a known correct one.",
-    confidence: "high",
-    confidence_label: "High confidence",
-    confidence_reason: "A program checked the answers against a gold key.",
-    caveats: [],
-    ...overrides,
-  };
+const MAJOR = "management-information-systems";
+
+/** One measured MIS 200 score — the default task's family is mis200-is-concepts. */
+function measuredBoard() {
+  return board([
+    task({
+      has_results: true,
+      best_model_key: "luna",
+      results: [result({ mean_score: 0.72, scored_count: 20, sample_count: 20 })],
+    }),
+  ]);
 }
 
-function result(overrides: Partial<ModelResult> = {}): ModelResult {
-  return {
-    model_key: "luna",
-    display_name: "Luna",
-    model_tags: ["cloud"],
-    data_residency: "third_party",
-    data_residency_label: "Sends data to a third party",
-    enabled: true,
-    recommendable: true,
-    mean_score: 0.74,
-    scored_count: 8,
-    sample_count: 10,
-    error_count: 0,
-    total_cost_usd: 0.5,
-    // ⚠ Present so `ModelResult` type-checks; this file's subject is not the
-    // value axis. The default mirrors tests/fixtures.ts: PRICED but unsized, so
-    // a value bug can never pass by a fixture quietly defaulting to "free".
-    price: {
-      tier: "paid",
-      label: "$0.20 in / $1.20 out per million tokens",
-      detail: "A million tokens is roughly 700,000 words.",
-      input_usd_per_mtok: 0.2,
-      output_usd_per_mtok: 1.2,
-    },
-    usage: { prompt_tokens: 0, completion_tokens: 0 },
-    demonstration: false,
-    trust: trust(),
-    run_id: "run_1",
-    run_status: "succeeded",
-    task_content_sha: null,
-    measured_at: "2026-08-01T12:00:00Z",
-    ...overrides,
-  };
-}
-
-function task(overrides: Partial<TaskLeaderboard> = {}): TaskLeaderboard {
-  return {
-    task_id: "slo2/l3-break-even",
-    title: "Break-even volume",
-    description: "d",
-    kind: "verifiable",
-    domain: "business-analytics",
-    scorer: "numeric_match",
-    family: "slo2",
-    tags: [],
-    slo: "SLO2",
-    use_mode: "capability",
-    in_benchmark: true,
-    sample_count: 10,
-    scorable: true,
-    unscorable_reason: null,
-    results: [],
-    has_results: false,
-    best_model_key: null,
-    ...overrides,
-  };
-}
-
-/** The three modes exactly as `curriculum/slo.yaml` declares them today. */
-const CURRICULUM: CurriculumView = {
-  available: true,
-  unavailable_reason: null,
-  program: "BScBA General Business (core)",
-  source: "https://folio.taskstream.com/Folio/CurMap/view.asp",
-  outcomes: [
-    {
-      id: "SLO2",
-      title: "Quantitative Literacy",
-      statement:
-        "Students analyze, solve, and communicate effectively regarding quantitative business problems using appropriate software, data sources, and tools.",
-      text_benchmarkable: true,
-      benchmark_note: "Straightforwardly checkable.",
-    },
-  ],
-  use_modes: [
-    { id: "capability", title: "Capability", statement: "Can the model itself produce the work?", in_use: true },
-    { id: "assistive", title: "Assistive", statement: "Does it improve a student's own work?", in_use: false },
-    { id: "instructional", title: "Instructional", statement: "Can it do the instructor's side?", in_use: false },
-  ],
-  coverage: [],
-  majors: [],
-  unassigned_core: [],
-};
-
-function board(tasks: TaskLeaderboard[]): LeaderboardResponse {
-  return {
-    tasks,
-    task_count: tasks.length,
-    measured_task_count: tasks.filter((t) => t.has_results).length,
-    runs_considered: 1,
-    has_any_results: tasks.some((t) => t.has_results),
-    curriculum: CURRICULUM,
-    benchmark_task_count: tasks.length,
-    slos: ["SLO2"],
-    use_modes: ["capability"],
-    families: ["slo2"],
-    domains: ["business-analytics"],
-  };
-}
-
-async function renderLanding() {
+async function renderLanding(response: unknown = measuredBoard()) {
+  getLeaderboard.mockResolvedValue(response);
   render(await LandingPage());
 }
 
@@ -159,219 +49,93 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("the landing page's honesty", () => {
-  it("shows 'not measured yet' for both modes that have no data", async () => {
-    getLeaderboard.mockResolvedValue(
-      board([task({ has_results: true, results: [result()] })]),
-    );
+describe("the by-major grid", () => {
+  it("is drawn as the comparison matrix, with the majors as columns", async () => {
     await renderLanding();
-
-    // Exactly two of the three readings are unmeasured today, and BOTH must be
-    // on the page. This is the assertion that fails if someone "tidies up" the
-    // landing by dropping the empty rows.
-    expect(await screen.findAllByText(/Not measured yet\./)).toHaveLength(2);
+    expect(document.querySelector("table.cg-grid.xp-matrix"), "the landing is not a grid").not.toBeNull();
+    const headings = Array.from(document.querySelectorAll(".xp-col-heading")).map((n) => n.textContent);
+    expect(headings).toContain("MIS");
+    expect(headings).toContain("GBA");
   });
 
-  it("puts no number anywhere near an unmeasured reading", async () => {
-    getLeaderboard.mockResolvedValue(
-      board([task({ has_results: true, results: [result({ mean_score: 0.74 })] })]),
-    );
+  it("renders a measured score as a whole-number percent", async () => {
     await renderLanding();
-
-    for (const modeId of ["assistive", "instructional"]) {
-      const row = document.querySelector(`.ld-reading-${modeId}`);
-      expect(row, `missing reading for ${modeId}`).not.toBeNull();
-      // A score leaking across from the measured capability row is the exact
-      // failure this guards.
-      expect(row!.textContent).not.toMatch(/\d\.\d\d/);
-      expect(within(row as HTMLElement).queryByRole("link")).toBeNull();
-    }
-  });
-
-  it("shows the real number and a receipt for the measured mode", async () => {
-    getLeaderboard.mockResolvedValue(
-      board([task({ has_results: true, results: [result({ mean_score: 0.74 })] })]),
-    );
-    await renderLanding();
-
-    const row = document.querySelector(".ld-reading-capability") as HTMLElement;
-    expect(row.textContent).toContain("0.74");
-    expect(row.textContent).toContain("Luna");
-    // The receipt — a claim on this page is worthless without one.
-    // Plain getAttribute rather than a jest-dom matcher: this suite has no
-    // jest-dom dependency and does not need one for a single string compare.
-    expect(within(row).getByRole("link").getAttribute("href")).toBe(
-      "/leaderboard?task=slo2%2Fl3-break-even",
-    );
-  });
-
-  it("quotes the programme's outcome statement verbatim", async () => {
-    getLeaderboard.mockResolvedValue(board([task()]));
-    await renderLanding();
-
-    expect(
-      screen.getByText(new RegExp(CURRICULUM.outcomes[0]!.statement.slice(0, 60))),
-    ).toBeTruthy();
-    expect(screen.getByText(/BScBA General Business \(core\)/)).toBeTruthy();
-  });
-
-  it("reports all three as unmeasured on a fresh install, with no invented finding", async () => {
-    getLeaderboard.mockResolvedValue(board([task({ has_results: false })]));
-    await renderLanding();
-
-    expect(screen.getAllByText(/Not measured yet\./)).toHaveLength(3);
-    expect(document.body.textContent).not.toMatch(/\d\.\d\d/);
+    const score = document.querySelector("td.cg-measured .cg-score");
+    expect(score, "no measured cell on the landing grid").not.toBeNull();
+    expect(score!.textContent).toBe("72%");
   });
 });
 
-describe("the landing page's resilience", () => {
-  it("still renders the argument when the API is unreachable", async () => {
-    getLeaderboard.mockRejectedValue(new Error("connect ECONNREFUSED"));
+describe("the general-classes menu", () => {
+  it("lists the shared-core classes, each linking to its class page", async () => {
     await renderLanding();
-
-    // The pitch is sentences; only the specimen needs the API. A 500 here would
-    // be a front door that will not open for the least patient visitor we have.
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain(
-      "Your syllabus already says",
-    );
-    expect(screen.getByText(/not reachable from this page right now/)).toBeTruthy();
-  });
-
-  it("says why the example is missing when the curriculum map is absent", async () => {
-    getLeaderboard.mockResolvedValue({
-      ...board([]),
-      curriculum: {
-        ...CURRICULUM,
-        available: false,
-        unavailable_reason: "curriculum/slo.yaml was not mounted",
-      },
-    });
-    await renderLanding();
-
-    expect(screen.getByText(/was not mounted/)).toBeTruthy();
-  });
-});
-
-describe("the front door's exits", () => {
-  it("offers both doors, pointing at the leaderboard and the intake", async () => {
-    getLeaderboard.mockResolvedValue(board([task()]));
-    await renderLanding();
-
-    const hrefs = Array.from(document.querySelectorAll("a")).map((a) =>
+    const grid = document.querySelector(".core-grid");
+    expect(grid, "no general-classes grid").not.toBeNull();
+    const hrefs = Array.from(grid!.querySelectorAll<HTMLAnchorElement>("a.core-tile")).map((a) =>
       a.getAttribute("href"),
     );
-    expect(hrefs).toContain("/leaderboard");
+    expect(hrefs).toContain(`/explore/${MAJOR}/mis-200`);
+    expect(hrefs).toContain("/explore/general-business/gba-300");
+  });
+
+  it("shows the one measured core class's score, and 'not measured yet' for the rest", async () => {
+    await renderLanding();
+    const tiles = Array.from(document.querySelectorAll(".core-tile"));
+    const mis200 = tiles.find((t) => t.textContent?.includes("MIS 200"))!;
+    const gba300 = tiles.find((t) => t.textContent?.includes("GBA 300"))!;
+    expect(mis200.textContent).toContain("72%");
+    expect(gba300.textContent).toMatch(/Not measured yet/i);
+  });
+});
+
+describe("the standing exits", () => {
+  it("points the recommend button at /recommend and the method link at /methodology", async () => {
+    await renderLanding();
+    const hrefs = Array.from(document.querySelectorAll("a")).map((a) => a.getAttribute("href"));
     expect(hrefs).toContain("/recommend");
+    expect(hrefs).toContain("/methodology");
   });
+});
 
-  it("never sends a visitor back to the landing for results", async () => {
-    // `/` is the pitch now. A "see the results" link left pointing at `/` would
-    // loop a professor back onto the sales copy — the specific regression the
-    // routing move could introduce.
-    getLeaderboard.mockResolvedValue(board([task()]));
-    await renderLanding();
-
-    const resultsLinks = Array.from(document.querySelectorAll("a")).filter((a) =>
-      /result|found|runs/i.test(a.textContent ?? ""),
+describe("the landing's honesty", () => {
+  it("discloses an all-seeded board above the grid", async () => {
+    await renderLanding(
+      board([
+        task({
+          has_results: true,
+          results: [result({ mean_score: 0.9, scored_count: 10, demonstration: true })],
+        }),
+      ]),
     );
-    expect(resultsLinks.length).toBeGreaterThan(0);
-    for (const link of resultsLinks) {
-      expect(link.getAttribute("href")).not.toBe("/");
-    }
+    const notice = document.querySelector(".notice");
+    expect(notice, "a fully seeded board rendered no demonstration notice").not.toBeNull();
+    expect(notice!.textContent).toMatch(/illustrative/i);
+  });
+
+  it("shows no demonstration notice when the numbers are real", async () => {
+    await renderLanding();
+    expect(document.querySelector(".notice")).toBeNull();
   });
 });
 
-/**
- * QA-25: the landing page had no `<main>` landmark at all and no skip link —
- * every keyboard user had to tab through the whole page with no way to jump
- * past it.
- */
-describe("the landing page's landmarks", () => {
-  it("wraps its content in a <main> that the skip link actually reaches", async () => {
-    getLeaderboard.mockResolvedValue(board([task()]));
-    await renderLanding();
-
-    const main = document.querySelector("main");
-    expect(main, "no <main> landmark on the landing page").not.toBeNull();
-    expect(main!.id).toBe("main-content");
-
-    const skipLink = document.querySelector("a.skip-link");
-    expect(skipLink, "no skip link on the landing page").not.toBeNull();
-    expect(skipLink!.getAttribute("href")).toBe("#main-content");
-  });
-
-  it("keeps the header and footer outside <main>", async () => {
-    getLeaderboard.mockResolvedValue(board([task()]));
-    await renderLanding();
-
-    const main = document.querySelector("main")!;
-    expect(main.querySelector("header")).toBeNull();
-    expect(main.querySelector("footer")).toBeNull();
+describe("the landing's resilience", () => {
+  it("shows the calm fallback, not a crash, when the API is down", async () => {
+    getLeaderboard.mockRejectedValue(new Error("connect ECONNREFUSED"));
+    await expect(LandingPage()).resolves.toBeTruthy();
+    render(await LandingPage());
+    expect(document.querySelector(".unavailable")).not.toBeNull();
+    expect(document.querySelector("table.cg-grid")).toBeNull();
   });
 });
 
-/* --------------------------------------------------------- the copy itself */
-
-/**
- * ⚠ THE FRONT DOOR IS THE PAGE MOST LIKELY TO DRIFT BACK. It is the one surface
- * whose job is persuasion, which makes "add a reassuring sentence" the obvious
- * edit at all times — and this reader is the one for whom reassurance reads as
- * doubt. See `tests/voice.ts` for what each pattern was.
- */
-describe("the landing page, written to a peer", () => {
+describe("the landing, written to a peer", () => {
   it("does not narrate itself, plead its case, or date itself", async () => {
-    getLeaderboard.mockResolvedValue(board([task()]));
     await renderLanding();
-
     expectPeerVoice(document.body.textContent!, expect);
   });
 
-  /**
-   * ⚠ THE COMPANION TO THE SWEEP ABOVE, AND THE MORE IMPORTANT HALF. A voice
-   * pass cuts sentences, and every honesty commitment on this page lives in one
-   * — so the cheapest way to make the page read beautifully is to delete the
-   * guarantees, and nothing else in this directory would notice. The wording is
-   * allowed to change; the commitment is not.
-   */
-  it("still makes all five method commitments after the cuts", async () => {
-    getLeaderboard.mockResolvedValue(board([task()]));
+  it("names its primary action as a recommendation, not a wall of data", async () => {
     await renderLanding();
-
-    const trust = document.querySelector(".ld-trust");
-    expect(trust, "the method block is gone entirely").not.toBeNull();
-    const text = trust!.textContent!;
-
-    // Receipts on every number.
-    expect(text, "no receipt commitment").toMatch(/links to the run behind it/i);
-    // Gaps shown, never filled, never a zero.
-    expect(text, "no gap commitment").toMatch(/gaps/i);
-    expect(text, "unmeasured work no longer promised a non-zero").toMatch(
-      /counted as a zero/i,
-    );
-    // A failed run is excluded, not scored.
-    expect(text, "no errored-sample commitment").toMatch(/never counted as zero/i);
-    // The evidence kind travels with the score.
-    expect(text, "no confidence-ceiling commitment").toMatch(
-      /never labelled high confidence/i,
-    );
-    // The yardstick is the programme's, not ours.
-    expect(text, "no yardstick commitment").toMatch(/published programme outcomes/i);
-  });
-
-  /**
-   * The page's own header comment promises exactly one number anywhere, and
-   * only behind a finished run. The trust block used to break that in prose
-   * ("Two of the three questions … have no data at all today") — a hardcoded
-   * count, which is the same defect as a rendered one plus the inability to
-   * ever be right again.
-   */
-  it("states the coverage rule in the method block rather than counting in prose", async () => {
-    getLeaderboard.mockResolvedValue(board([task()]));
-    await renderLanding();
-
-    const trust = document.querySelector(".ld-trust")!.textContent!;
-    expect(trust, "the method block counts something it cannot keep current").not.toMatch(
-      /\b(two|three|four|five|six|seven|eight|nine|most|half)\b of (the|your)/i,
-    );
+    expect(screen.getByText(/Help me choose a model/i)).toBeTruthy();
   });
 });

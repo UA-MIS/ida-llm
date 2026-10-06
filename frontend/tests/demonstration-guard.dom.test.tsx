@@ -77,7 +77,10 @@ interface ImportSpec {
  */
 function parseNamedImports(source: string): ImportSpec[] {
   const out: ImportSpec[] = [];
-  const re = /import\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g;
+  // `import { … }` and `import type { … }` both — a page whose only brace
+  // import is a type-only `import type { Metadata }` must still read as parsed,
+  // or the "no zero imports" guard below flags it as unparseable.
+  const re = /import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*["']([^"']+)["']/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(source))) {
     const names = m[1]!
@@ -120,35 +123,35 @@ vi.mock("@/lib/api", () => ({
   ApiError: class ApiError extends Error {},
 }));
 
-const { default: LandingPage } = await import("@/app/page");
-const { default: OverviewPage } = await import("@/app/overview/page");
-const { default: LeaderboardPage } = await import("@/app/(site)/leaderboard/page");
-const { default: ComparePage } = await import("@/app/(site)/compare/page");
+const { default: LandingPage } = await import("@/app/(site)/page");
 const { default: ModelReportPage } = await import("@/app/(site)/models/[key]/page");
-const { default: ExplorePage } = await import("@/app/(site)/explore/page");
 const { default: ClassesPage } = await import("@/app/(site)/explore/[major]/page");
-const { default: OutcomesPage } = await import("@/app/(site)/explore/[major]/[course]/page");
+const { default: ClassPage } = await import("@/app/(site)/explore/[major]/[course]/page");
 const { default: EvidencePage } = await import(
   "@/app/(site)/explore/[major]/[course]/[slo]/page"
 );
 
-// The major that owns MIS 200 in `fixtures.ts`, and the class that claims the
-// `slo2` family the seeded board below files its one result under. Both halves
-// matter: a class that claimed no family would render an honest grid of dashes,
-// the page would have no seeded score to disclose, and this guard would go
-// green having proved nothing.
+// The major that owns MIS 200 in `fixtures.ts`, the class that claims the
+// `mis200-is-concepts` family the seeded board below files its one result
+// under, and the content category that claims that family. All three matter: a
+// class that claimed no family, or a category whose family nothing scored,
+// would render an honest grid of dashes — the page would have no seeded score
+// to disclose, and this guard would go green having proved nothing.
 const MAJOR = "management-information-systems";
 const CLASS = "mis-200";
+const CATEGORY = "is-concepts-business-models";
 
 /** One model, one task, entirely seeded — the shape every route must disclose. */
 function seededBoard() {
   return board([
     task({
-      task_id: "slo2/break-even",
-      // ⚠ THE FAMILY MIS 200 CLAIMS. `/explore` attributes a result to a class
-      // by task family, so a fixture whose family nothing claims would render
-      // every level empty and make this whole guard vacuous.
-      family: "slo2",
+      task_id: "mis200-is-concepts/l1-core",
+      // ⚠ THE FAMILY MIS 200 CLAIMS, AND THE ONE THE "IS concepts" CATEGORY
+      // MAPS TO. `/explore` attributes a result to a class by task family and
+      // the class page buckets those families into content categories, so a
+      // fixture whose family nothing claims would render every level empty and
+      // make this whole guard vacuous.
+      family: "mis200-is-concepts",
       slo: "SLO2",
       has_results: true,
       best_model_key: "luna",
@@ -189,33 +192,18 @@ const REGISTRY: {
   assert: (root: HTMLElement) => void;
 }[] = [
   {
+    // The front door is the by-major grid now, so it discloses exactly the way
+    // every other grid does — the page-level "some figures are illustrative"
+    // notice above the matrix.
     route: "/",
     render: () => LandingPage(),
-    // The front door doesn't badge a seeded finding — `lib/specimen.ts`
-    // excludes a demonstration row from "the strongest measured result"
-    // outright, so its own promise ("a number appears only when a real
-    // finished run stands behind it") stays literally true. Disclosure here
-    // means no verdict renders at all. See `specimen.test.ts`.
-    assert: (root) => {
-      expect(
-        root.querySelector(".ld-verdict"),
-        "the landing page rendered a Measured verdict from an all-seeded board",
-      ).toBeNull();
-    },
-  },
-  { route: "/overview", render: () => OverviewPage(), assert: assertIllustrative },
-  {
-    route: "/leaderboard",
-    render: () => LeaderboardPage({ searchParams: Promise.resolve({}) }),
     assert: assertIllustrative,
   },
-  { route: "/compare", render: () => ComparePage(), assert: assertIllustrative },
   {
     route: "/models/[key]",
     render: () => ModelReportPage({ params: Promise.resolve({ key: "luna" }) }),
     assert: assertIllustrative,
   },
-  { route: "/explore", render: () => ExplorePage(), assert: assertIllustrative },
   {
     route: "/explore/[major]",
     render: () => ClassesPage({ params: Promise.resolve({ major: MAJOR }) }),
@@ -223,15 +211,17 @@ const REGISTRY: {
   },
   {
     route: "/explore/[major]/[course]",
-    render: () =>
-      OutcomesPage({ params: Promise.resolve({ major: MAJOR, course: CLASS }) }),
+    render: () => ClassPage({ params: Promise.resolve({ major: MAJOR, course: CLASS }) }),
     assert: assertIllustrative,
   },
   {
+    // Drilled to one content category's evidence — the page that replaced the
+    // SLO breakdown. It must disclose a seeded score the same as every level
+    // above it.
     route: "/explore/[major]/[course]/[slo]",
     render: () =>
       EvidencePage({
-        params: Promise.resolve({ major: MAJOR, course: CLASS, slo: "slo2" }),
+        params: Promise.resolve({ major: MAJOR, course: CLASS, slo: CATEGORY }),
       }),
     assert: assertIllustrative,
   },
