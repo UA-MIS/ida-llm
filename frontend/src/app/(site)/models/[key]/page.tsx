@@ -31,6 +31,7 @@ import {
   ConfidenceMeter,
   ConfidenceTell,
   DemonstrationBadge,
+  DemonstrationNotice,
   ResidencyBadge,
   TrustBadge,
 } from "@/components/trust-badges";
@@ -377,7 +378,7 @@ export default async function ModelReportPage({
           (unlike the shared `summariseDemonstration` sentence, which claims
           things about the whole deployment); another model's report card can
           be fully measured while this one is still seeded. */}
-      {isSeeded(rollup) ? <div className="notice">{DEMONSTRATION_ROW_NOTE}</div> : null}
+      <DemonstrationNotice when={isSeeded(rollup)} text={DEMONSTRATION_ROW_NOTE} />
 
       <ReportHead rollup={rollup} outcomeCount={outcomeCount} />
 

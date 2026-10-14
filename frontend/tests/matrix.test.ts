@@ -411,18 +411,21 @@ describe("the heat ramp stays readable", () => {
     "%s: keeps the score readable on every step",
     (themeName) => {
       // ⚠ THE ASSERTION THE WHOLE RAMP IS TUNED AROUND. Each cell prints its
-      // score in --fg on the tint. Light alone would allow 69%; dark tops out at
-      // 58%, so 58% is the cap. Push a step past it and the number disappears in
-      // one theme only — invisible in a screenshot of the other.
+      // score in `--cell-text` on `--cell-accent` mixed over `--cell-base`.
+      // Cells are warm-paper islands with dark ink in BOTH themes (the mockup's
+      // own choice), so the two themes resolve identically here and the ramp
+      // clears AA to 100% rather than topping out at 58% the way it did when a
+      // cell flipped dark and its light `--fg` score lost contrast. Push a step
+      // dark enough to bury `--cell-text` and this fails.
       const block = THEMES[themeName as "light" | "dark"];
       const accent = token(block, "cell-accent");
-      const surface = token(block, "surface");
-      const fg = token(block, "fg");
+      const base = token(block, "cell-base");
+      const text = token(block, "cell-text");
 
       for (const [step, pct] of percents) {
-        const cell = mix(accent, surface, pct);
+        const cell = mix(accent, base, pct);
         expect(
-          contrastRatio(fg, cell),
+          contrastRatio(text, cell),
           `step ${step} (${pct}%) makes the score unreadable in ${themeName}`,
         ).toBeGreaterThanOrEqual(AA_NORMAL);
       }

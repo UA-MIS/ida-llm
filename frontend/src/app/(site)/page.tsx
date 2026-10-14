@@ -24,6 +24,7 @@ import type { Metadata } from "next";
 
 import { ExploreMatrixGrid } from "@/components/explore-matrix";
 import { ResultsUnavailable } from "@/components/service-unavailable";
+import { DemonstrationNotice } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
 import { buildClasses, buildIndex } from "@/lib/explore";
 import { buildMajorMatrix } from "@/lib/explore-matrix";
@@ -79,10 +80,8 @@ export default async function LandingPage() {
       {/* ⚠ ABOVE THE GRID IT QUALIFIES — a reader forms an impression from the
           first row, so a seeded-data disclosure below the grid is one they have
           already formed an impression without. Same rollup, same words as every
-          other level. */}
-      {matrix.demonstration.any ? (
-        <div className="notice">{matrix.demonstration.notice}</div>
-      ) : null}
+          other level. Silent in the dev preview (see `DemonstrationNotice`). */}
+      <DemonstrationNotice when={matrix.demonstration.any} text={matrix.demonstration.notice} />
 
       {matrix.available ? (
         <ExploreMatrixGrid matrix={matrix} columnKind="Major" overallLabel="Overall" />

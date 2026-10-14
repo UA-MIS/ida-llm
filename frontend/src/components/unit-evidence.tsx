@@ -22,6 +22,7 @@
 import { Breadcrumbs, ExploreHelp, ModelFocus } from "./explore-chrome";
 import { ExploreMatrixGrid } from "./explore-matrix";
 import { ModelResultCard } from "./model-result-card";
+import { DemonstrationNotice } from "./trust-badges";
 import type { ClassUnit } from "@/lib/units";
 import { buildUnitMatrix } from "@/lib/explore-matrix";
 import type { ClassTile, MajorTile } from "@/lib/explore";
@@ -58,7 +59,7 @@ export function UnitEvidence({
       />
       <ExploreHelp explain="One unit of this class, opened. The table is how each model reads on it; the tasks below are what produced those numbers, and every row opens the run behind it — the prompts, the answers and how they were marked." />
 
-      {matrix.demonstration.any ? <div className="notice">{matrix.demonstration.notice}</div> : null}
+      <DemonstrationNotice when={matrix.demonstration.any} text={matrix.demonstration.notice} />
 
       <section className="hero">
         <p className="xp-kicker">

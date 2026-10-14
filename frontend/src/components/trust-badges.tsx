@@ -14,6 +14,7 @@
 
 import { plainTaskKind } from "@/lib/glossary";
 import { plainCaveats, plainLanguage } from "@/lib/plain";
+import { isDevDemoPreview } from "@/lib/preview";
 import { confidenceColorVar, confidencePips, residencyGlyph, trustGlyph } from "@/lib/trust";
 import { DEMONSTRATION_ROW_LABEL } from "@/lib/rollup";
 import type { Confidence, DataResidency, TrustTell } from "@/lib/types";
@@ -147,6 +148,14 @@ export function ResidencyBadge({
  * page-wide claim that could rot.
  */
 export function DemonstrationBadge() {
+  // ⚠ SILENT IN THE DEV PREVIEW, LOUD EVERYWHERE ELSE. The flag on the row is
+  // untouched (`result.demonstration` still says what this is); this only
+  // declines to PAINT the tell when the deployment is the dev demo, where every
+  // row is seeded and the badge is noise the human explicitly did not want. In
+  // prod/staging — or any deployment that did not set the demo gate — a seeded
+  // row is a surprise and this renders. See `lib/preview.ts` for the contract
+  // and `tests/demonstration-guard.dom.test.tsx` for the proof of both halves.
+  if (isDevDemoPreview()) return null;
   return (
     <span
       className="badge badge-demo"
@@ -155,6 +164,23 @@ export function DemonstrationBadge() {
       {DEMONSTRATION_ROW_LABEL}
     </span>
   );
+}
+
+/**
+ * The page-level demonstration banner, with the same dev-preview suppression as
+ * the per-row badge.
+ *
+ * ⚠ ONE COMPONENT, SO NO PAGE CAN FORGET. Five score pages used to inline
+ * `{x.demonstration.any ? <div className="notice">…</div> : null}`, and gating
+ * each by hand on the dev preview is exactly the "one route quietly skipped"
+ * failure the guard exists to catch. Routing every banner through here means the
+ * suppression — and the prod-safety behind it — is decided in a single place.
+ * `when` is the page's own "is any of this seeded" test; this adds the "…and we
+ * are not the dev preview" half.
+ */
+export function DemonstrationNotice({ when, text }: { when: boolean; text: string }) {
+  if (!when || isDevDemoPreview()) return null;
+  return <div className="notice">{text}</div>;
 }
 
 /**

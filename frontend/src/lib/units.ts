@@ -49,6 +49,7 @@
 // merged in only behind the IDA_DEMO_CURRICULUM gate below. The other side
 // imports `ClassUnit` as a TYPE only, so there is no runtime import cycle.
 import { DEMO_TAXONOMY } from "./demo-units.generated";
+import { isDevDemoPreview } from "./preview";
 
 /** One unit of one class. The class page's column; the evidence level's subject. */
 export interface ClassUnit {
@@ -181,17 +182,15 @@ const TAXONOMY: Record<string, ClassUnit[]> = {
  * (AC 210, ST 260, …) ALSO exist in the real `majors.yaml`, so if the demo
  * taxonomy were merged in prod their unit titles would render against those real
  * (unmeasured) classes. Kept off in staging/prod, the demo units never load and
- * every real class there reads exactly as it does today. Read at call time, in a
- * try/catch, because this runs during SSR where `process.env` exists but must
- * never throw if it does not.
+ * every real class there reads exactly as it does today.
+ *
+ * ⚠ ONE READER OF THE GATE. The demo-curriculum merge and the suppression of the
+ * demonstration tells are two faces of the same fact — "this is the dev preview"
+ * — so they read the same env through the same function (`isDevDemoPreview`)
+ * rather than two copies that could drift. See `lib/preview.ts` for the
+ * prod-safety contract and why it is read at call time in a try/catch.
  */
-function demoCurriculumEnabled(): boolean {
-  try {
-    return process.env.IDA_DEMO_CURRICULUM === "1";
-  } catch {
-    return false;
-  }
-}
+const demoCurriculumEnabled = isDevDemoPreview;
 
 /** The taxonomy this request sees: the real one, plus the demo classes when the
  * dev gate is on. MIS 200 is only ever in the real set, so the merge cannot

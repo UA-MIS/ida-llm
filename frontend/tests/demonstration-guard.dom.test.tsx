@@ -29,6 +29,19 @@
  * registry (layer 2 catches it), or register it and skip the disclosure
  * (layer 3, further down, catches it). Neither failure requires anyone to
  * have remembered this file exists.
+ *
+ * ⚠ THE DEV-PREVIEW EXEMPTION, AND WHY IT DOES NOT WEAKEN THE INVARIANT. The
+ * dev demo deployment fills the grid with seeded rows on purpose, and the human
+ * does not want the per-row/column/banner tells shouting "illustrative" on a
+ * preview everyone already knows is illustrative. So the tells are suppressed —
+ * but ONLY when `IDA_DEMO_CURRICULUM=1`, the gate that only the dev overlay
+ * sets (see `lib/preview.ts`). The true contract is therefore sharper than
+ * "every seeded row discloses": it is "every PROD-REACHABLE seeded row
+ * discloses, and the provably-dev-only preview may read clean". Both halves are
+ * pinned below — layer 3 renders with the gate OFF (prod-reachable) and demands
+ * the disclosure; layer 4 renders the SAME routes with the gate ON and demands
+ * they come up clean. Suppress a prod banner by hand and layer 3 fails; leak a
+ * tell into the dev preview and layer 4 fails.
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -177,6 +190,16 @@ function assertIllustrative(root: HTMLElement) {
   ).toMatch(/illustrative/i);
 }
 
+/** The dev-preview shape: the SAME all-seeded board, rendered clean. */
+function assertClean(root: HTMLElement) {
+  expect(
+    root.textContent,
+    "the dev preview still painted an 'illustrative' tell the human asked to suppress",
+  ).not.toMatch(/illustrative/i);
+  // …and the page did not go clean by rendering nothing: the grid is still here.
+  expect(root.textContent?.length ?? 0, "the dev preview rendered an empty page").toBeGreaterThan(0);
+}
+
 /**
  * Every route `discoverScoreRoutes()` can find today, with how to render it
  * and what "it disclosed" looks like there.
@@ -261,11 +284,45 @@ describe("every registered route discloses an all-seeded board", () => {
   }
 });
 
+/* -------------------------------------------------------------------------- */
+/* Layer 4 — the dev preview reads clean, without weakening prod               */
+/* -------------------------------------------------------------------------- */
+
+describe("the dev preview suppresses the tells it is exempt from", () => {
+  // ⚠ ONLY THE GATE THE DEV OVERLAY SETS. `IDA_DEMO_CURRICULUM=1` is the one
+  // signal `lib/preview.ts` keys off; prod and staging never set it, so the
+  // block above (which runs with it unset) is the prod-reachable case and this
+  // is the dev-only one. Same seeded board, same routes — only the environment
+  // differs.
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  for (const entry of REGISTRY) {
+    it(`reads clean on ${entry.route} under the dev gate`, async () => {
+      vi.stubEnv("IDA_DEMO_CURRICULUM", "1");
+      getLeaderboard.mockResolvedValue(seededBoard());
+      const { container } = render(await entry.render());
+      assertClean(container.ownerDocument.body);
+    });
+  }
+});
+
 describe("the guard's own assertions are not vacuous", () => {
   it("assertIllustrative actually fails on content that discloses nothing", () => {
     const div = document.createElement("div");
     div.textContent = "0.72, ranked #1 of 4 models measured";
     expect(() => assertIllustrative(div)).toThrow();
+  });
+
+  it("assertClean actually fails on content that still shows a tell, and on an empty page", () => {
+    const tell = document.createElement("div");
+    tell.textContent = "Some figures here are illustrative.";
+    expect(() => assertClean(tell)).toThrow();
+
+    const empty = document.createElement("div");
+    empty.textContent = "";
+    expect(() => assertClean(empty)).toThrow();
   });
 
   it("the static detector flags a synthetic page that fetches scores and discloses nothing", () => {

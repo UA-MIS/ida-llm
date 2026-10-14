@@ -26,7 +26,7 @@ import { notFound } from "next/navigation";
 import { Breadcrumbs, ExploreHelp, ModelFocus } from "@/components/explore-chrome";
 import { ModelResultCard } from "@/components/model-result-card";
 import { ResultsUnavailable } from "@/components/service-unavailable";
-import { ConfidenceTell, DemonstrationBadge } from "@/components/trust-badges";
+import { ConfidenceTell, DemonstrationBadge, DemonstrationNotice } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
 import { findUnit } from "@/lib/units";
 import {
@@ -201,9 +201,7 @@ export default async function EvidencePage({
 
       {focus ? <ModelFocus displayName={focus.display_name} clearHref={here} /> : null}
 
-      {evidence.demonstration.any ? (
-        <div className="notice">{evidence.demonstration.notice}</div>
-      ) : null}
+      <DemonstrationNotice when={evidence.demonstration.any} text={evidence.demonstration.notice} />
 
       <section className="hero">
         <h2 className="xp-title">

@@ -102,13 +102,26 @@
   --fail: #973018;
   --pending: #6f4d0e;
 
-  /* The grid's heat-ramp endpoints. The ramp is ONE hue, stronger for a higher
-     score — magnitude, never verdict (see the ramp steps below). `--cell-accent`
-     is the mockup's brighter terracotta, mixed over `--cell-base` by the step;
-     a cell carries dark text, so these are backgrounds and need no AA-text
-     rating. */
+  /* ⚠ THE GRID CELLS ARE ISLANDS OF WARM PAPER, IN BOTH THEMES — the mockup's
+     own choice (`style_1.css`: `[data-theme="dark"]{--cell-base:#ebddc5;
+     --cell-accent:#c67139;--cell-text:#201e1d;--cell-muted:#474238}`). A cell is
+     light paper with dark ink whether the page around it is light or dark, so the
+     grid reads as the same warm heat-map the human designed in either mode — the
+     mockup's default view is DARK, and its cells are light there too.
+
+     That is also what lifts the ramp ceiling toward the mockup's saturation. When
+     cells flipped dark in dark mode the score (then `--fg`, a light ink) stopped
+     clearing AA past 58% tint; with dark `--cell-text` on light paper in BOTH
+     themes the score clears AA to 100% (see `tests/matrix.test.ts`), so the ramp
+     can be the strong terracotta the mockup uses instead of a pale wash.
+       --cell-accent  the mockup's brighter terracotta, mixed over --cell-base.
+       --cell-base    the warm paper the tint sits on. Fixed, not --surface.
+       --cell-text    the dark ink every cell prints its score and fraction in.
+       --cell-muted   a quieter ink for secondary marks inside a cell. */
   --cell-accent: #c67139;
-  --cell-base: var(--surface);
+  --cell-base: #ebddc5;
+  --cell-text: #201e1d;
+  --cell-muted: #474238;
 
   /* Gentle separation for raised surfaces. Light mode only carries a real
      shadow; in dark mode a cast shadow is invisible and the tone step does the
@@ -201,8 +214,13 @@
     --fail: #ef9e86;
     --pending: #e0b352;
 
-    --cell-accent: #d67f48;
-    --cell-base: var(--surface);
+    /* ⚠ ISLANDS OF LIGHT — identical to the light theme. A grid cell stays warm
+       paper with dark ink in dark mode, exactly as the mockup does, so the heat
+       ramp reads the same in both themes and the score keeps its AA margin. */
+    --cell-accent: #c67139;
+    --cell-base: #ebddc5;
+    --cell-text: #201e1d;
+    --cell-muted: #474238;
 
     --shadow: none;
 
@@ -235,8 +253,11 @@
   --pass: #a6c27f;
   --fail: #ef9e86;
   --pending: #e0b352;
-  --cell-accent: #d67f48;
-  --cell-base: var(--surface);
+  /* Islands of light — identical to the light theme (see the media block). */
+  --cell-accent: #c67139;
+  --cell-base: #ebddc5;
+  --cell-text: #201e1d;
+  --cell-muted: #474238;
   --shadow: none;
   --ld-raise: #2b2620;
   --ld-accent-deep: #f0ab82;
@@ -1367,14 +1388,20 @@ body:has(.ld) { background: var(--ld-paper); }
 /* The heat ramp uses the mockup's brighter terracotta (`--cell-accent`) mixed
    over the paper (`--cell-base`), not the deep interactive `--accent`. A cell
    carries dark `--fg` text, so legibility is checked against the darkest step. */
-.cg-step-1 { background: color-mix(in srgb, var(--cell-accent) 6%, var(--cell-base)); }
+/* ⚠ THE RAMP NOW MATCHES THE MOCKUP'S HEAT. The old ceiling was 58%, forced by
+   DARK mode: when a cell flipped dark there, the score (then `--fg`, a light ink)
+   fell below AA past 58% tint. Cells are now light-paper islands with dark
+   `--cell-text` in BOTH themes (see the token block), so the score clears AA all
+   the way to 100% — which lets the top steps be the strong terracotta the
+   mockup uses rather than the pale wash 58% produced. These are still ONE hue
+   getting stronger (magnitude, never a red-to-green verdict), and
+   `tests/matrix.test.ts` recomputes every step's contrast from this sheet and
+   fails if a tint ever buries the number again. */
+.cg-step-1 { background: color-mix(in srgb, var(--cell-accent) 7%, var(--cell-base)); }
 .cg-step-2 { background: color-mix(in srgb, var(--cell-accent) 18%, var(--cell-base)); }
-.cg-step-3 { background: color-mix(in srgb, var(--cell-accent) 32%, var(--cell-base)); }
-.cg-step-4 { background: color-mix(in srgb, var(--cell-accent) 46%, var(--cell-base)); }
-/* Ceiling at 58%: higher saturates the cell enough that the score (--fg) drops
-   below WCAG AA in DARK mode, where the terracotta tint lightens toward the
-   light ink. `tests/matrix.test.ts` pins the score's contrast on every step. */
-.cg-step-5 { background: color-mix(in srgb, var(--cell-accent) 58%, var(--cell-base)); }
+.cg-step-3 { background: color-mix(in srgb, var(--cell-accent) 34%, var(--cell-base)); }
+.cg-step-4 { background: color-mix(in srgb, var(--cell-accent) 54%, var(--cell-base)); }
+.cg-step-5 { background: color-mix(in srgb, var(--cell-accent) 76%, var(--cell-base)); }
 
 .cg-grid { border-collapse: separate; border-spacing: 2px; font-size: 0.86rem; }
 .cg-grid th, .cg-grid td { border-bottom: 0; }
@@ -1406,24 +1433,25 @@ body:has(.ld) { background: var(--ld-paper); }
 /* A measured cell lifts on hover — the mockup's cue that a score opens its
    proof. Empties do not lift: there is nothing behind them to open yet. */
 .cg-measured:hover { box-shadow: 0 4px 14px color-mix(in srgb, var(--fg) 16%, transparent); transform: translateY(-1px); }
+/* ⚠ `--cell-text`, THE CELL'S OWN DARK INK, NOT `--fg`. A cell is warm paper in
+   both themes, so its score is printed in the dark `--cell-text` the mockup uses
+   — a light `--fg` would vanish on it in dark mode. `tests/matrix.test.ts` pins
+   this ink's contrast on every ramp step. 22px heading face, the mockup's cell
+   score. */
 .cg-score {
   display: block; font-variant-numeric: tabular-nums; font-weight: 700;
   font-family: var(--font-display), system-ui, sans-serif;
-  font-size: 1.35rem; line-height: 1.1; letter-spacing: -0.01em;
-  color: var(--fg); text-decoration: none;
+  font-size: 1.375rem; line-height: 1; letter-spacing: -0.01em;
+  color: var(--cell-text); text-decoration: none;
 }
 a.cg-score:hover { text-decoration: underline; }
-/* ⚠ `--fg`, NOT `--muted`, AND THAT IS A CONTRAST FIX RATHER THAN A STYLE
-   PREFERENCE. The 58% ramp ceiling was tuned against `--fg` for `.cg-score`,
-   and `--muted` on the same tint falls to 2.85:1 at step 5 and 3.85:1 at
-   step 4 — under the 4.5:1 that 10.9px normal text needs, and every measured
-   cell in the live grid sits at step 4 or 5. The part that vanished was the
-   n/m coverage count: the exact figure that stops a strong score being read as
-   a well-evidenced one. It is still de-emphasised, by size and weight rather
-   than by a colour the ramp eats. */
+/* The coverage fraction under the score — the mockup's "6/8". De-emphasised by
+   SIZE and WEIGHT, never by a colour the ramp would eat: it carries the cell's
+   dark ink (`--cell-text`), which stays AA on every step, rather than a muted
+   grey that drops below it on the strong top tints. */
 .cg-sub {
-  display: block; font-size: 0.68rem; color: var(--fg); opacity: 0.85;
-  margin-top: 0.1rem; font-variant-numeric: tabular-nums;
+  display: block; font-size: 0.72rem; font-weight: 600; color: var(--cell-text);
+  margin-top: 0.15rem; font-variant-numeric: tabular-nums;
 }
 
 /* The confidence tell inside a grid cell: pips only, label hidden. The words

@@ -6,6 +6,7 @@ import { Breadcrumbs, ExploreHelp, ModelFocus } from "@/components/explore-chrom
 import { ExploreMatrixGrid } from "@/components/explore-matrix";
 import { NothingYet } from "@/components/nothing-yet";
 import { ResultsUnavailable } from "@/components/service-unavailable";
+import { DemonstrationNotice } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
 import { buildClasses, buildIndex, findClass, findMajor } from "@/lib/explore";
 import { buildUnitMatrix } from "@/lib/explore-matrix";
@@ -81,10 +82,8 @@ export default async function ClassAssignmentsPage({
           board: only the models that actually contributed a score here are
           counted, so a class whose own categories are all measured never carries
           a caveat that belongs to a different class. Same rollup, same words —
-          see `summariseDemonstration`. */}
-      {matrix.demonstration.any ? (
-        <div className="notice">{matrix.demonstration.notice}</div>
-      ) : null}
+          see `summariseDemonstration`. Silent in the dev preview. */}
+      <DemonstrationNotice when={matrix.demonstration.any} text={matrix.demonstration.notice} />
 
       <section className="hero">
         <p className="xp-kicker">{klass.code}</p>

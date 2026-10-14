@@ -26,6 +26,7 @@ import { Breadcrumbs, ExploreHelp, ModelFocus } from "@/components/explore-chrom
 import { ExploreMatrixGrid } from "@/components/explore-matrix";
 import { NothingYet } from "@/components/nothing-yet";
 import { ResultsUnavailable } from "@/components/service-unavailable";
+import { DemonstrationNotice } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
 import { buildIndex, findMajor } from "@/lib/explore";
 import { buildClassMatrix } from "@/lib/explore-matrix";
@@ -95,9 +96,7 @@ export default async function ClassesPage({
       <Breadcrumbs trail={[{ label: "Majors", href: "/" }]} here={major.name} />
       <ExploreHelp explain={EXPLAIN} />
 
-      {matrix.demonstration.any ? (
-        <div className="notice">{matrix.demonstration.notice}</div>
-      ) : null}
+      <DemonstrationNotice when={matrix.demonstration.any} text={matrix.demonstration.notice} />
 
       <section className="hero">
         <h2 className="xp-title">{major.name}</h2>
