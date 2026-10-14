@@ -346,7 +346,10 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--yes", action="store_true", help="required; confirms this is a dev database")
     ap.add_argument(
-        "--tasks", default=None, help="task directory (default: <repo>/tasks or /app/tasks)"
+        "--tasks",
+        default=None,
+        help="task directory (default: the IDA_TASKS_DIR setting, else /app/tasks, else "
+        "<repo>/tasks). On dev IDA_TASKS_DIR is the union catalogue, so the demo families seed.",
     )
     ap.add_argument(
         "--repo",
@@ -386,10 +389,16 @@ def main() -> int:
     )
     if not models_path.is_file():
         _fail(f"registry file not found at {models_path} -- pass --models or set IDA_MODELS_FILE.")
-    tasks_dir = (
-        pathlib.Path(args.tasks)
-        if args.tasks
-        else (pathlib.Path("/app/tasks") if pathlib.Path("/app/tasks").exists() else repo / "tasks")
+    # Resolve the task tree the SAME way the running API does
+    # (Settings.resolved_tasks_dir reads IDA_TASKS_DIR): explicit --tasks wins,
+    # then IDA_TASKS_DIR, then /app/tasks, then <repo>/tasks. This matters on
+    # dev, where IDA_TASKS_DIR points at the union catalogue (/app/tasks-all):
+    # without honouring it the seeder would write results only for the real
+    # families and the demo classes would stay empty while the API served them.
+    tasks_dir = pathlib.Path(
+        args.tasks
+        or os.environ.get("IDA_TASKS_DIR")
+        or ("/app/tasks" if pathlib.Path("/app/tasks").exists() else str(repo / "tasks"))
     )
     serving = load_serving_configs(models_path)
     specs = list(TaskCatalog.from_directory(tasks_dir).all())
