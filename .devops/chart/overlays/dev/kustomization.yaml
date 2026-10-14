@@ -69,6 +69,22 @@ patches:
       - op: replace
         path: /data/MOCK_MODEL_BASE_URL
         value: http://ida-llm-mock-model
+      # ── DEV-ONLY REGISTRY OVERRIDE ──────────────────────────────────────────
+      # Point the API/runner at the dev registry (real entries + synthetic demo
+      # models) so the dev site shows the ~7-model populated grid. Set ONLY here:
+      # staging and prod never set IDA_MODELS_FILE, load /app/models.yaml, and
+      # never see a demo key. (Settings.resolved_models_file reads this.)
+      - op: add
+        path: /data/IDA_MODELS_FILE
+        value: /app/models.dev.yaml
+      # Defense-in-depth: demo models are tagged `demonstration`. Dev sweeps are
+      # suspended (D-43), but if one ever ran it would otherwise produce REAL
+      # (unflagged) runs for fictional models. Excluding the tag keeps a sweep
+      # from ever scoring a demo model outside the demonstration-flagged seed.
+      # `testing-only` (the default, which holds luna back) is kept.
+      - op: add
+        path: /data/IDA_SWEEP_EXCLUDE_TAGS
+        value: testing-only,demonstration
   # Public host for this env. Single-label under capstone.uamishub.com — the
   # Cloudflare Universal SSL wildcard covers exactly one level (see
   # base/ingress.yaml). Both the rule AND the tls.hosts list must be patched or

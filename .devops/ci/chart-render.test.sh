@@ -176,6 +176,20 @@ else:
 check((config or {}).get("data", {}).get("SPARKS_BASE_URL", "") == "",
       "SPARKS_BASE_URL is empty (no egress route yet)")
 
+# ---- the dev-only demo registry override, asserted BOTH directions ----------
+# models.dev.yaml adds synthetic demo models for the populated dev site. It is
+# honest ONLY because it is dev-only: IDA_MODELS_FILE names it in dev, and
+# staging/prod must NEVER set it, or a demo key reaches the production registry.
+# Same shape as the mock safety switch above: assert the switch is thrown in dev
+# and provably OFF everywhere else.
+models_file = (config or {}).get("data", {}).get("IDA_MODELS_FILE", "")
+if env == "dev":
+    check(models_file == "/app/models.dev.yaml",
+          f"{env}: IDA_MODELS_FILE points at the dev-only registry")
+else:
+    check(models_file == "",
+          f"{env}: IDA_MODELS_FILE is unset (loads the committed models.yaml, no demo models)")
+
 # ---- nightly sweeps in previews ---------------------------------------------
 # ⚠ THIS ASSERTION WAS INVERTED FOR dev/staging/prod. It used to require that
 # the sweeps were ACTIVE outside preview. They are now suspended EVERYWHERE, by
