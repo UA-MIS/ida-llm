@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Breadcrumbs, ExploreHelp, ModelFocus } from "@/components/explore-chrome";
 import { ExploreMatrixGrid } from "@/components/explore-matrix";
+import { NothingYet } from "@/components/nothing-yet";
 import { ResultsUnavailable } from "@/components/service-unavailable";
 import { getLeaderboard } from "@/lib/api";
 import { buildClasses, buildIndex, findClass, findMajor } from "@/lib/explore";
@@ -98,14 +100,13 @@ export default async function ClassAssignmentsPage({
       {focus ? <ModelFocus displayName={focus.display_name} clearHref={here} /> : null}
 
       {!matrix.available ? (
-        <div className="empty">
-          <h2>No unit breakdown for {klass.code}</h2>
-          <p className="muted">{matrix.unavailable_reason}</p>
-          <p className="muted">
-            That is a gap in what has been published and run, not a reading of
-            any model.
-          </p>
-        </div>
+        <NothingYet
+          title={`We haven't broken ${klass.code} into units yet`}
+          lead="This class doesn't have a unit-by-unit breakdown on the site so far — it's on the way."
+          detail={`${matrix.unavailable_reason} That is a gap in what has been published and run, not a reading of any model.`}
+        >
+          <Link href={`/explore/${major.slug}`}>Back to {major.name}</Link>
+        </NothingYet>
       ) : (
         <ExploreMatrixGrid
           matrix={matrix}

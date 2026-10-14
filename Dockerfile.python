@@ -150,7 +150,23 @@ WORKDIR /app
 COPY --from=build --chown=65532:65532 /src/alembic.ini  /app/alembic.ini
 COPY --from=build --chown=65532:65532 /src/migrations   /app/migrations
 COPY --chown=65532:65532 tasks/      /app/tasks/
+# DEV-ONLY union catalogue: the real tasks PLUS the synthetic demonstration
+# families, assembled into one directory by two COPYs (the demo family dirs are
+# uniquely named `demo-*`, so the second COPY merges rather than overwrites).
+# The dev overlay points IDA_TASKS_DIR at /app/tasks-all; staging and prod leave
+# it unset and read /app/tasks (real families only), so no demo family is ever
+# in their catalogue and no seeded demo result could render there even if one
+# existed. Same ship-but-do-not-read pattern as models.dev.yaml.
+COPY --chown=65532:65532 tasks/      /app/tasks-all/
+COPY --chown=65532:65532 tasks-dev/  /app/tasks-all/
 COPY --chown=65532:65532 models.yaml /app/models.yaml
+# models.dev.yaml is the DEV-ONLY registry (real entries + synthetic demo models
+# for the populated-demo dev site). It ships in the image but is INERT unless
+# IDA_MODELS_FILE names it, which only the dev overlay does -- staging and prod
+# never set it and load models.yaml, so a demo key can never reach their
+# registry. A drift test (tools/tests/test_dev_registry.py) keeps its real
+# entries identical to models.yaml.
+COPY --chown=65532:65532 models.dev.yaml /app/models.dev.yaml
 # curriculum/slo.yaml is authored DATA like the two above, not documentation:
 # ida_core.curriculum resolves it relative to IDA_REPO_ROOT (/app here), so a
 # service that reads it would fail at runtime rather than at build time if it

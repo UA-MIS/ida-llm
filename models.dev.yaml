@@ -1,0 +1,244 @@
+# DEV-ONLY model registry. NEVER loaded in staging or prod.
+# ===================================================================
+#
+# WHY THIS FILE EXISTS. The dev site should show the SHAPE of the finished
+# product: ~7 models on the grid. Only `luna` is real, and inventing fake
+# models in the committed `models.yaml` is forbidden -- that file is baked into
+# the image promoted byte-identically to staging and prod, so a demo entry there
+# becomes a fake model in the PRODUCTION registry. The registry override the
+# system already has (`IDA_MODELS_FILE`, resolved by
+# `Settings.resolved_models_file`) is the honest mechanism: this file is named
+# by that variable in the DEV overlay ONLY. Staging and prod never set it, load
+# the committed `models.yaml`, and never see a demo key.
+#
+# WHAT IS IN IT.
+#   * The real entries -- `mock`, `luna`, `sparks-local` -- COPIED verbatim from
+#     models.yaml. `tools/tests/test_dev_registry.py` parses both files and
+#     fails if any real entry here differs from models.yaml, so this file cannot
+#     silently drift from the source of truth. The long rationale comments in
+#     models.yaml are NOT copied; the test compares parsed entries, not text.
+#   * Five SYNTHETIC demonstration models -- `vega` `orion` `atlas` `nova` `sol`.
+#     Codename style (like Luna/Sparks), deliberately NON-IMPERSONATING: no real
+#     vendor or product name (never Claude/Gemini/GPT/OpenAI/Anthropic/...).
+#     Fabricating scores under a real vendor's name is the hard line this avoids.
+#
+# HONESTY OF THE DEMO ENTRIES, STATED ONCE.
+#   * They route to the mock endpoint (MOCK_MODEL_BASE_URL) with no api_key, so a
+#     run against one on dev returns deterministic stub output and costs $0. No
+#     demo model can reach a paid API.
+#   * Their data_residency is left UNKNOWN ("Hosting not stated in the registry")
+#     on purpose. Residency is the FERPA-relevant claim this project treats as
+#     load-bearing; tagging a fictional model `cloud` or `campus` would assert a
+#     false fact about where a nonexistent model sends data. Unknown is the
+#     honest label, and the illustrative nature of the NUMBERS is carried by the
+#     per-row demonstration flag the seeder writes (`tools/seed_dev_benchmark.py`),
+#     which the UI renders as "illustrative".
+#   * Their `cost` rates are illustrative, varied so the cost column has a shape;
+#     the rows that carry those costs are demonstration-flagged like every other
+#     seeded number.
+version: 1
+models:
+  # ---- real: copied verbatim from models.yaml (drift-guarded) ----
+  - key: mock
+    display_name: Mock model (deterministic)
+    base_url_env: MOCK_MODEL_BASE_URL
+    base_url: http://mock-model:8000/v1
+    api_key_env: null
+    enabled: true
+    timeout_s: 30
+    max_retries: 2
+    tags: [mock, ci, tracer]
+    serving:
+      model_id: mock-echo-1
+      serving_stack: mock
+      serving_version: ida-mock-model 0.1.0
+      quantization: none
+      context_window: 8192
+      hardware: null
+      sampling:
+        temperature: 0.0
+        top_p: 1.0
+        max_tokens: 256
+        seed: 20260101
+    cost:
+      input_usd_per_mtok: 0.0
+      output_usd_per_mtok: 0.0
+
+  - key: luna
+    display_name: Luna (OpenAI GPT-5.6)
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, openai, reasoning, testing-only, budget-capped]
+    serving:
+      model_id: gpt-5.6-luna
+      serving_stack: openai_reasoning
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 1050000
+      hardware: null
+      sampling:
+        temperature: 1.0
+        top_p: 1.0
+        max_tokens: 4096
+        seed: null
+    cost:
+      input_usd_per_mtok: 0.20
+      output_usd_per_mtok: 1.20
+
+  - key: sparks-local
+    display_name: Campus vLLM (Sparks)
+    base_url_env: SPARKS_BASE_URL
+    base_url: ""
+    api_key_env: SPARKS_API_KEY
+    enabled: false
+    timeout_s: 300
+    max_retries: 3
+    tags: [local, campus, open-weights, deferred]
+    serving:
+      model_id: TODO-PLACEHOLDER-sparks-model-id
+      serving_stack: vllm
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 32768
+      hardware: 1x DGX Spark GB10 128GB unified
+      sampling:
+        temperature: 0.0
+        top_p: 1.0
+        max_tokens: 2048
+        seed: 20260101
+    cost:
+      input_usd_per_mtok: 0.0
+      output_usd_per_mtok: 0.0
+
+  # ---- synthetic demonstration models (DEV ONLY) ----
+  # All route to the mock endpoint ($0), residency UNKNOWN, numbers are
+  # demonstration-flagged by the seeder. Costs are illustrative and varied.
+  - key: vega
+    display_name: Vega
+    base_url_env: MOCK_MODEL_BASE_URL
+    base_url: http://mock-model:8000/v1
+    api_key_env: null
+    enabled: true
+    timeout_s: 30
+    max_retries: 2
+    tags: [demonstration]
+    serving:
+      model_id: demo-vega-1
+      serving_stack: mock
+      serving_version: synthetic-demo
+      quantization: unknown
+      context_window: 200000
+      hardware: null
+      sampling:
+        temperature: 0.0
+        top_p: 1.0
+        max_tokens: 1024
+        seed: 20260101
+    cost:
+      input_usd_per_mtok: 0.30
+      output_usd_per_mtok: 1.50
+
+  - key: orion
+    display_name: Orion
+    base_url_env: MOCK_MODEL_BASE_URL
+    base_url: http://mock-model:8000/v1
+    api_key_env: null
+    enabled: true
+    timeout_s: 30
+    max_retries: 2
+    tags: [demonstration]
+    serving:
+      model_id: demo-orion-1
+      serving_stack: mock
+      serving_version: synthetic-demo
+      quantization: unknown
+      context_window: 128000
+      hardware: null
+      sampling:
+        temperature: 0.0
+        top_p: 1.0
+        max_tokens: 1024
+        seed: 20260101
+    cost:
+      input_usd_per_mtok: 0.15
+      output_usd_per_mtok: 0.60
+
+  - key: atlas
+    display_name: Atlas
+    base_url_env: MOCK_MODEL_BASE_URL
+    base_url: http://mock-model:8000/v1
+    api_key_env: null
+    enabled: true
+    timeout_s: 30
+    max_retries: 2
+    tags: [demonstration]
+    serving:
+      model_id: demo-atlas-1
+      serving_stack: mock
+      serving_version: synthetic-demo
+      quantization: unknown
+      context_window: 256000
+      hardware: null
+      sampling:
+        temperature: 0.0
+        top_p: 1.0
+        max_tokens: 1024
+        seed: 20260101
+    cost:
+      input_usd_per_mtok: 0.25
+      output_usd_per_mtok: 1.00
+
+  - key: nova
+    display_name: Nova
+    base_url_env: MOCK_MODEL_BASE_URL
+    base_url: http://mock-model:8000/v1
+    api_key_env: null
+    enabled: true
+    timeout_s: 30
+    max_retries: 2
+    tags: [demonstration]
+    serving:
+      model_id: demo-nova-1
+      serving_stack: mock
+      serving_version: synthetic-demo
+      quantization: unknown
+      context_window: 64000
+      hardware: null
+      sampling:
+        temperature: 0.0
+        top_p: 1.0
+        max_tokens: 1024
+        seed: 20260101
+    cost:
+      input_usd_per_mtok: 0.05
+      output_usd_per_mtok: 0.20
+
+  - key: sol
+    display_name: Sol
+    base_url_env: MOCK_MODEL_BASE_URL
+    base_url: http://mock-model:8000/v1
+    api_key_env: null
+    enabled: true
+    timeout_s: 30
+    max_retries: 2
+    tags: [demonstration]
+    serving:
+      model_id: demo-sol-1
+      serving_stack: mock
+      serving_version: synthetic-demo
+      quantization: unknown
+      context_window: 32000
+      hardware: null
+      sampling:
+        temperature: 0.0
+        top_p: 1.0
+        max_tokens: 1024
+        seed: 20260101
+    cost:
+      input_usd_per_mtok: 0.0
+      output_usd_per_mtok: 0.0

@@ -22,6 +22,12 @@ from ida_core.contracts import RunStatus, ScorerKind, ServingConfig
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 
+# The seeder reads the RESOLVED registry (IDA_MODELS_FILE / --models). On dev
+# that is the dev-only registry, which declares the synthetic demo models the
+# seeder fills the grid with; models.yaml does not and must never (it ships to
+# prod). Every test that needs serving configs or cost rates points here.
+DEV_MODELS = REPO / "models.dev.yaml"
+
 
 def _load():
     spec = importlib.util.spec_from_file_location(
@@ -61,26 +67,47 @@ class TestServingConfig:
     read, so that value made every run receipt a 500.
     """
 
-    def test_every_seeded_model_is_in_the_registry(self):
-        registry = {
+    def test_every_seeded_model_is_in_the_dev_registry(self):
+        dev_keys = {
+            e["key"] for e in __import__("yaml").safe_load(DEV_MODELS.read_text())["models"]
+        }
+        assert set(seeder.PROFILES) <= dev_keys, (
+            "the seeder must only seed keys the resolved registry describes -- an unregistered "
+            "key cannot be described honestly by the trust badges (it renders 'test stub')"
+        )
+
+    def test_demo_keys_never_leak_into_the_production_registry(self):
+        """The synthetic demo keys exist ONLY in the dev registry.
+
+        models.yaml ships inside the image promoted byte-identically to staging
+        and prod. A demo key there would be a fake model in the PRODUCTION
+        registry -- the exact failure the dev-only IDA_MODELS_FILE override
+        exists to prevent.
+        """
+        prod_keys = {
             e["key"]
             for e in __import__("yaml").safe_load((REPO / "models.yaml").read_text())["models"]
         }
-        assert set(seeder.PROFILES) <= registry, (
-            "the seeder must only seed models.yaml keys -- an unregistered key cannot be "
-            "described honestly by the trust badges, and adding fakes to models.yaml would "
-            "ship them to the PRODUCTION registry"
+        demo = set(seeder.PROFILES) - {"mock"}
+        assert demo, "expected at least one synthetic demo model in PROFILES"
+        assert not (demo & prod_keys), (
+            f"demo keys {sorted(demo & prod_keys)} are in models.yaml -- they would ship to the "
+            "production registry; keep them in models.dev.yaml only"
         )
 
+    def test_luna_is_never_seeded(self):
+        """Luna has REAL rows on dev; a synthetic luna run would shadow them."""
+        assert "luna" not in seeder.PROFILES
+
     def test_derived_configs_validate(self):
-        for key, cfg in seeder.load_serving_configs(REPO).items():
+        for key, cfg in seeder.load_serving_configs(DEV_MODELS).items():
             try:
                 ServingConfig.model_validate(cfg)
             except ValidationError as exc:  # pragma: no cover - failure path
                 pytest.fail(f"{key} produced an invalid ServingConfig: {exc}")
 
     def test_the_synthetic_marker_lives_in_the_schemas_escape_hatch(self):
-        for cfg in seeder.load_serving_configs(REPO).values():
+        for cfg in seeder.load_serving_configs(DEV_MODELS).values():
             assert cfg["extra"]["synthetic"] is True
             # ...and NOT at the top level, which is what broke it before.
             assert "synthetic" not in {k for k in cfg if k != "extra"}
@@ -100,8 +127,8 @@ class TestPreflight:
         specs = list(TaskCatalog.from_directory(REPO / "tasks").all())
         return seeder.build_rows(
             specs,
-            seeder.load_serving_configs(REPO),
-            seeder.load_cost_rates(REPO),
+            seeder.load_serving_configs(DEV_MODELS),
+            seeder.load_cost_rates(DEV_MODELS),
             dt.datetime(2026, 1, 1, tzinfo=dt.UTC),
         )
 
@@ -141,9 +168,9 @@ def test_rows_are_deterministic():
     from ida_harness.tasks import TaskCatalog
 
     specs = list(TaskCatalog.from_directory(REPO / "tasks").all())
-    cfgs = seeder.load_serving_configs(REPO)
+    cfgs = seeder.load_serving_configs(DEV_MODELS)
     when = dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
-    rates = seeder.load_cost_rates(REPO)
+    rates = seeder.load_cost_rates(DEV_MODELS)
     _, a = seeder.build_rows(specs, cfgs, rates, when)
     _, b = seeder.build_rows(specs, cfgs, rates, when)
     assert [r[7] for r in a] == [r[7] for r in b]
@@ -152,9 +179,12 @@ def test_rows_are_deterministic():
 class TestCost:
     """Regression: the seeder wrote a flat cost_usd=0.0 on every row.
 
-    `luna` is $0.2/$1.2 per mtok and rendered as FREE on dev -- a paid
+    A priced model (several of the demo models carry illustrative rates, e.g.
+    `vega` at $0.3/$1.5 per mtok) rendered as FREE on dev is a paid-looking
     commercial model shown at zero cost on a page that pitches value. These
-    tests exist so cost can never silently become a constant again.
+    tests exist so cost can never silently become a constant again. Costs on
+    seeded rows are themselves illustrative and demonstration-flagged, but the
+    DERIVATION (rate card x varying tokens) must still be exercised.
     """
 
     def _rows(self):
@@ -163,16 +193,15 @@ class TestCost:
         specs = list(TaskCatalog.from_directory(REPO / "tasks").all())
         return seeder.build_rows(
             specs,
-            seeder.load_serving_configs(REPO),
-            seeder.load_cost_rates(REPO),
+            seeder.load_serving_configs(DEV_MODELS),
+            seeder.load_cost_rates(DEV_MODELS),
             dt.datetime(2026, 1, 1, tzinfo=dt.UTC),
         )
 
     def test_rates_come_from_the_registry(self):
-        rates = seeder.load_cost_rates(REPO)
+        rates = seeder.load_cost_rates(DEV_MODELS)
         entries = {
-            e["key"]: e
-            for e in __import__("yaml").safe_load((REPO / "models.yaml").read_text())["models"]
+            e["key"]: e for e in __import__("yaml").safe_load(DEV_MODELS.read_text())["models"]
         }
         for key, (inp, out) in rates.items():
             cost = entries[key].get("cost") or {}
@@ -180,8 +209,8 @@ class TestCost:
             assert out == cost.get("output_usd_per_mtok", 0.0)
 
     def test_a_paid_model_never_costs_zero(self):
-        """The exact defect: luna is priced, so its rows must not be free."""
-        rates = seeder.load_cost_rates(REPO)
+        """The exact defect: a priced seeded model must not write free rows."""
+        rates = seeder.load_cost_rates(DEV_MODELS)
         paid = [k for k, (i, o) in rates.items() if i > 0 or o > 0]
         assert paid, "expected at least one priced model in the registry"
         _, results = self._rows()
@@ -191,8 +220,8 @@ class TestCost:
             assert all(c > 0 for c in costs), f"{key} is priced but wrote a zero cost"
 
     def test_genuinely_free_models_stay_free(self):
-        """sparks-local is self-hosted and mock is a stub -- 0.0 is the truth."""
-        rates = seeder.load_cost_rates(REPO)
+        """`mock` is a stub and `sol` is a zero-rate demo model -- 0.0 is the truth."""
+        rates = seeder.load_cost_rates(DEV_MODELS)
         free = [k for k, (i, o) in rates.items() if i == 0 and o == 0]
         _, results = self._rows()
         for key in free:
@@ -201,7 +230,7 @@ class TestCost:
     def test_cost_is_not_a_flat_constant(self):
         """Per-answer cost must mean something, not be row-count x a constant."""
         _, results = self._rows()
-        paid = [k for k, (i, o) in seeder.load_cost_rates(REPO).items() if i > 0 or o > 0]
+        paid = [k for k, (i, o) in seeder.load_cost_rates(DEV_MODELS).items() if i > 0 or o > 0]
         for key in paid:
             costs = {r[12] for r in results if r[4] == key}
             assert len(costs) > 1, f"{key} wrote one repeated cost -- tokens are not varying"

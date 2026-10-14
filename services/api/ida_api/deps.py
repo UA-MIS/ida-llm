@@ -81,7 +81,12 @@ def build_context(settings: Settings | None = None) -> AppContext:
         registry=load_registry(settings.resolved_models_file()),
         catalog=TaskCatalog.from_directory(settings.resolved_tasks_dir()),
         git_sha=current_git_sha(settings.resolved_tasks_dir()),
-        curriculum=load_curriculum_view(repo_root()),
+        curriculum=load_curriculum_view(
+            repo_root(),
+            # DEV-ONLY overrides (unset in staging/prod -> default locations).
+            curriculum_path=settings.resolved_curriculum_file(),
+            majors_path=settings.resolved_majors_file(),
+        ),
     )
 
 

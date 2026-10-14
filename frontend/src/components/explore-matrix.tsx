@@ -130,6 +130,13 @@ export function ExploreMatrixGrid({
   badgeFor?: (entity: MatrixEntityColumn) => React.ReactNode;
   focusModel?: string | null;
 }) {
+  // English plural for the column-kind word. A naive `+ "s"` turned "class"
+  // into "classs" in the grid caption; a sibilant ending (-s, -x, -z, -ch, -sh)
+  // takes "-es" so "Class" → "classes" while "Major"/"Unit"/"Outcome" stay
+  // correct.
+  const pluralise = (word: string): string =>
+    /(?:s|x|z|ch|sh)$/i.test(word) ? `${word}es` : `${word}s`;
+  const columnWord = columnKind.toLowerCase();
   return (
     <>
       <RampLegend />
@@ -137,8 +144,8 @@ export function ExploreMatrixGrid({
       <div className="table-scroll">
         <table className="cg-grid xp-matrix">
           <caption className="sr-only">
-            {`Every model against every ${columnKind.toLowerCase()} on this level. `}
-            {`Models are rows, strongest first; ${columnKind.toLowerCase()}s are columns, `}
+            {`Every model against every ${columnWord} on this level. `}
+            {`Models are rows, strongest first; ${pluralise(columnWord)} are columns, `}
             {"in the order the catalogue publishes them."}
           </caption>
           <thead>

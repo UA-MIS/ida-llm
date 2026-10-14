@@ -24,6 +24,7 @@ import { notFound } from "next/navigation";
 
 import { Breadcrumbs, ExploreHelp, ModelFocus } from "@/components/explore-chrome";
 import { ExploreMatrixGrid } from "@/components/explore-matrix";
+import { NothingYet } from "@/components/nothing-yet";
 import { ResultsUnavailable } from "@/components/service-unavailable";
 import { getLeaderboard } from "@/lib/api";
 import { buildIndex, findMajor } from "@/lib/explore";
@@ -120,14 +121,13 @@ export default async function ClassesPage({
       {focus ? <ModelFocus displayName={focus.display_name} clearHref={here} /> : null}
 
       {!matrix.available ? (
-        <div className="empty">
-          <h2>This major lists no classes</h2>
-          <p className="muted">{matrix.unavailable_reason}</p>
-          <p className="muted">
-            That is a gap in what has been transcribed from the catalog, not a
-            reading of any model. <Link href="/">Back to all majors</Link>.
-          </p>
-        </div>
+        <NothingYet
+          title={`No classes to show for ${major.name} yet`}
+          lead="We're still building this part out — no classes have been added here so far."
+          detail={matrix.unavailable_reason}
+        >
+          <Link href="/">Back to all majors</Link>
+        </NothingYet>
       ) : (
         <ExploreMatrixGrid
           matrix={matrix}

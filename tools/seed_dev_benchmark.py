@@ -16,17 +16,27 @@ creates is labelled ``synthetic-dev-seed`` with ``harness_version`` set to
 ``0.0.0-synthetic`` so a human, a query, or a future maintainer can tell seeded
 rows from measured ones without guessing. Scores come from a hash, not a model.
 
-REGISTRY-ONLY, ON PURPOSE
--------------------------
-It seeds ONLY keys that exist in ``models.yaml``. An earlier version invented
-``demo-atlas`` / ``demo-vega`` / ``demo-orion`` to make a wider grid, and the UI
-correctly labelled all three "test stub -- never recommended", because the
-trust badges are derived from the registry and an unregistered key cannot be
-described honestly. Registering fakes was not an option either: ``models.yaml``
-ships inside the image that is promoted byte-identically to staging and prod, so
-a demo entry added for dev would become a fake model in the PRODUCTION registry.
-Registry-only keys are the only version of this that is honest in every
-environment. A thinner grid that tells the truth beats a wider one that does not.
+REGISTRY-ONLY, ON PURPOSE -- AND WHICH REGISTRY
+-----------------------------------------------
+It seeds ONLY keys that exist in the registry it is pointed at. An earlier
+version invented ``demo-atlas`` / ``demo-vega`` / ``demo-orion`` as bare keys
+with no registry entry, and the UI correctly labelled all three "test stub --
+never recommended", because the trust badges are derived from the registry and
+an unregistered key cannot be described honestly.
+
+The fix is NOT to register fakes in ``models.yaml``: that file ships inside the
+image promoted byte-identically to staging and prod, so a demo entry added there
+would become a fake model in the PRODUCTION registry. The fix is the registry
+override the rest of the system already has -- ``IDA_MODELS_FILE`` (see
+``Settings.resolved_models_file``). A DEV-ONLY registry file, named by that
+variable in the dev overlay ONLY, carries the real entries plus a handful of
+synthetic demonstration models; staging and prod never set the variable, so they
+load the committed ``models.yaml`` and never see a demo key. This seeder reads
+the SAME resolved path (``--models`` / ``IDA_MODELS_FILE``), so the demo keys it
+seeds are exactly the ones that registry describes -- registered, honestly
+labelled, and impossible to leak into a production registry. A wider grid that
+is dev-only and demonstration-flagged beats both a thinner one and a dishonest
+one.
 
 SERVING CONFIG COMES FROM THE REGISTRY
 --------------------------------------
@@ -93,12 +103,27 @@ SEED_HARNESS_VERSION = SYNTHETIC_HARNESS_VERSION
 # SLO so that no model wins every outcome -- a leaderboard where one row is best
 # at everything exercises none of the UI's comparison logic. These numbers are
 # invented and mean nothing beyond producing a plausible SHAPE.
+#
+# ⚠ `luna` IS DELIBERATELY ABSENT. Luna has REAL measured rows on the MIS 200
+# families in the dev database (ported from the real prod/staging run). Seeding a
+# synthetic luna run would be newer than the real one and
+# `latest_terminal_run_per_pair` would SHADOW the real number with a fabricated
+# one -- the exact opposite of "keep MIS 200's Luna data real and unflagged". So
+# luna is never seeded here: its column stays real, and the demo models below
+# fill the rest of each grid (including MIS 200's other six columns) with
+# demonstration-flagged illustration. `mock` is kept (its rows mean nothing by
+# design and are correctly labelled illustrative when seeded).
+#
+# The five demo keys (`vega` .. `sol`) exist ONLY in the dev-only registry file
+# named by IDA_MODELS_FILE -- never in the committed models.yaml -- so they can
+# never appear in a staging/prod registry. Codename style (like Luna/Sparks),
+# non-impersonating: no real vendor or product name.
 PROFILES: dict[str, dict] = {
-    "luna": {"base": 0.86, "bias": {"SLO2": +0.12, "SLO9": +0.10, "SLO7": -0.06, "SLO6": -0.04}},
-    "sparks-local": {
-        "base": 0.71,
-        "bias": {"SLO1": +0.10, "SLO3": +0.08, "SLO2": -0.09, "SLO9": -0.05},
-    },
+    "vega": {"base": 0.90, "bias": {"SLO2": +0.07, "SLO9": +0.05, "SLO6": -0.06, "SLO7": -0.04}},
+    "orion": {"base": 0.83, "bias": {"SLO1": +0.09, "SLO3": +0.07, "SLO2": -0.05, "SLO4": -0.04}},
+    "atlas": {"base": 0.87, "bias": {"SLO7": +0.06, "SLO4": +0.06, "SLO2": -0.05, "SLO1": -0.05}},
+    "nova": {"base": 0.78, "bias": {"SLO6": +0.10, "SLO3": +0.05, "SLO2": -0.08, "SLO9": -0.04}},
+    "sol": {"base": 0.81, "bias": {"SLO3": +0.08, "SLO4": +0.07, "SLO9": -0.06, "SLO7": -0.03}},
     "mock": {"base": 0.52, "bias": {}},
 }
 
@@ -133,14 +158,19 @@ def slo_of(tags) -> str | None:
     return None
 
 
-def load_cost_rates(repo: pathlib.Path) -> dict[str, tuple[float, float]]:
+def load_cost_rates(models_path: pathlib.Path) -> dict[str, tuple[float, float]]:
     """Per-model (input, output) USD per MILLION tokens, from the registry.
 
     Read rather than invented, so a seeded cost cannot contradict what the model
-    actually charges. `sparks-local` and `mock` are genuinely 0.0 -- self-hosted
-    and a stub -- and stay 0.0; that is a real fact about them, not a placeholder.
+    actually charges. ``mock`` and the self-hosted demo models are genuinely 0.0
+    (a stub and endpoints we do not pay per token for) and stay 0.0; that is a
+    real fact about them, not a placeholder.
+
+    ``models_path`` is the RESOLVED registry (``IDA_MODELS_FILE`` / ``--models``),
+    so demo keys that exist only in the dev-only registry resolve here exactly as
+    they do for the running API.
     """
-    registry = yaml.safe_load((repo / "models.yaml").read_text())
+    registry = yaml.safe_load(models_path.read_text())
     entries = {e["key"]: e for e in registry["models"]}
     rates: dict[str, tuple[float, float]] = {}
     for key in PROFILES:
@@ -152,19 +182,27 @@ def load_cost_rates(repo: pathlib.Path) -> dict[str, tuple[float, float]]:
     return rates
 
 
-def load_serving_configs(repo: pathlib.Path) -> dict[str, dict]:
-    """Read each seeded model's serving config from models.yaml and VALIDATE it.
+def load_serving_configs(models_path: pathlib.Path) -> dict[str, dict]:
+    """Read each seeded model's serving config from the registry and VALIDATE it.
 
     Validating here, before any insert, is the whole point: an invalid config
     fails loudly at seed time instead of silently becoming a 500 on every run
     receipt at read time.
+
+    ``models_path`` is the RESOLVED registry (``IDA_MODELS_FILE`` / ``--models``).
+    A missing key is a hard fail: seeding a demo model that the dev registry does
+    not describe would re-create the "test stub -- never recommended" labelling
+    the module docstring warns about.
     """
-    registry = yaml.safe_load((repo / "models.yaml").read_text())
+    registry = yaml.safe_load(models_path.read_text())
     entries = {e["key"]: e for e in registry["models"]}
 
     missing = sorted(set(PROFILES) - set(entries))
     if missing:
-        _fail(f"models.yaml has no entry for {missing}. Seed registry-only keys.")
+        _fail(
+            f"registry {models_path} has no entry for {missing}. "
+            "Point --models / IDA_MODELS_FILE at the dev registry that declares the demo keys."
+        )
 
     out: dict[str, dict] = {}
     for key in PROFILES:
@@ -308,13 +346,23 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--yes", action="store_true", help="required; confirms this is a dev database")
     ap.add_argument(
-        "--tasks", default=None, help="task directory (default: <repo>/tasks or /app/tasks)"
+        "--tasks",
+        default=None,
+        help="task directory (default: the IDA_TASKS_DIR setting, else /app/tasks, else "
+        "<repo>/tasks). On dev IDA_TASKS_DIR is the union catalogue, so the demo families seed.",
     )
     ap.add_argument(
         "--repo",
         default=None,
         help="directory holding models.yaml (default: the script's parent repo). Needed when "
         "running from a container where this file was copied outside the source tree.",
+    )
+    ap.add_argument(
+        "--models",
+        default=None,
+        help="registry file to read serving configs and cost rates from "
+        "(default: the IDA_MODELS_FILE setting, else <repo>/models.yaml). Point this at the "
+        "DEV-ONLY registry so the synthetic demo models resolve exactly as the running API sees them.",
     )
     args = ap.parse_args()
 
@@ -326,19 +374,38 @@ def main() -> int:
     guard(dsn)
 
     repo = pathlib.Path(args.repo) if args.repo else pathlib.Path(__file__).resolve().parent.parent
-    if not (repo / "models.yaml").is_file():
-        _fail(f"no models.yaml under {repo} -- pass --repo pointing at the tree that has it.")
-    tasks_dir = (
-        pathlib.Path(args.tasks)
-        if args.tasks
-        else (pathlib.Path("/app/tasks") if pathlib.Path("/app/tasks").exists() else repo / "tasks")
+    # Resolve the registry the SAME way Settings.resolved_models_file does:
+    # explicit --models wins, then IDA_MODELS_FILE, then the committed
+    # <repo>/models.yaml. Pointing at the dev-only registry is what makes the
+    # synthetic demo keys resolve.
+    models_path = (
+        pathlib.Path(args.models)
+        if args.models
+        else (
+            pathlib.Path(os.environ["IDA_MODELS_FILE"])
+            if os.environ.get("IDA_MODELS_FILE")
+            else repo / "models.yaml"
+        )
     )
-    serving = load_serving_configs(repo)
+    if not models_path.is_file():
+        _fail(f"registry file not found at {models_path} -- pass --models or set IDA_MODELS_FILE.")
+    # Resolve the task tree the SAME way the running API does
+    # (Settings.resolved_tasks_dir reads IDA_TASKS_DIR): explicit --tasks wins,
+    # then IDA_TASKS_DIR, then /app/tasks, then <repo>/tasks. This matters on
+    # dev, where IDA_TASKS_DIR points at the union catalogue (/app/tasks-all):
+    # without honouring it the seeder would write results only for the real
+    # families and the demo classes would stay empty while the API served them.
+    tasks_dir = pathlib.Path(
+        args.tasks
+        or os.environ.get("IDA_TASKS_DIR")
+        or ("/app/tasks" if pathlib.Path("/app/tasks").exists() else str(repo / "tasks"))
+    )
+    serving = load_serving_configs(models_path)
     specs = list(TaskCatalog.from_directory(tasks_dir).all())
     if not specs:
         _fail(f"no tasks found under {tasks_dir}")
 
-    rates = load_cost_rates(repo)
+    rates = load_cost_rates(models_path)
     runs, results = build_rows(specs, serving, rates, dt.datetime.now(dt.UTC))
 
     # Fail loudly HERE rather than as a 500 on every receipt page later.

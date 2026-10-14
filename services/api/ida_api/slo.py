@@ -380,19 +380,35 @@ UNAVAILABLE_NO_FILE = (
 )
 
 
-def load_curriculum_view(root: Path | str) -> CurriculumView:
+def load_curriculum_view(
+    root: Path | str,
+    *,
+    curriculum_path: Path | str | None = None,
+    majors_path: Path | str | None = None,
+) -> CurriculumView:
     """Read ``curriculum/slo.yaml`` if this build can, and say so when it cannot.
 
     Never raises. A malformed curriculum map is a real problem, but it is the
     task validator's problem (``make lint-tasks`` is the gate that fails a pull
     request over it) — taking the results page down over it would replace a
     visible data error with an invisible outage.
+
+    ``curriculum_path``/``majors_path`` are the DEV-ONLY overrides
+    (``IDA_CURRICULUM_FILE``/``IDA_MAJORS_FILE``). When ``None`` the default
+    locations under ``root`` are used, so staging and prod -- which never set
+    them -- are byte-for-byte unchanged.
     """
     if not CURRICULUM_MODULE_AVAILABLE or _core_load_curriculum is None:
         return CurriculumView(available=False, unavailable_reason=UNAVAILABLE_NO_MODULE)
 
     path = (
-        _core_default_path(root) if _core_default_path else Path(root) / "curriculum" / "slo.yaml"
+        Path(curriculum_path)
+        if curriculum_path
+        else (
+            _core_default_path(root)
+            if _core_default_path
+            else Path(root) / "curriculum" / "slo.yaml"
+        )
     )
     if not Path(path).is_file():
         return CurriculumView(available=False, unavailable_reason=UNAVAILABLE_NO_FILE)
@@ -409,7 +425,7 @@ def load_curriculum_view(root: Path | str) -> CurriculumView:
             ),
         )
 
-    majors, unassigned = _load_majors(root, curriculum)
+    majors, unassigned = _load_majors(root, curriculum, majors_path=majors_path)
 
     return CurriculumView(
         available=True,
@@ -451,7 +467,7 @@ def load_curriculum_view(root: Path | str) -> CurriculumView:
 
 
 def _load_majors(
-    root: Path | str, curriculum: Any
+    root: Path | str, curriculum: Any, *, majors_path: Path | str | None = None
 ) -> tuple[list[MajorView], list[UnassignedCourseView]]:
     """``curriculum/majors.yaml``, or two empty lists and a log line.
 
@@ -477,9 +493,13 @@ def _load_majors(
         return [], []
 
     path = (
-        _core_default_majors_path(root)
-        if _core_default_majors_path
-        else Path(root) / "curriculum" / "majors.yaml"
+        Path(majors_path)
+        if majors_path
+        else (
+            _core_default_majors_path(root)
+            if _core_default_majors_path
+            else Path(root) / "curriculum" / "majors.yaml"
+        )
     )
     if not Path(path).is_file():
         return [], []

@@ -176,6 +176,29 @@ else:
 check((config or {}).get("data", {}).get("SPARKS_BASE_URL", "") == "",
       "SPARKS_BASE_URL is empty (no egress route yet)")
 
+# ---- the dev-only demo overrides, asserted BOTH directions ------------------
+# The populated-demo dev site adds synthetic demo models (models.dev.yaml), demo
+# curriculum (majors.dev.yaml / slo.dev.yaml), a union task catalogue
+# (/app/tasks-all) and the frontend demo-unit gate (IDA_DEMO_CURRICULUM). Every
+# one is honest ONLY because it is dev-only: dev names it, and staging/prod must
+# NEVER set it, or demo models/structure reach the production environment. Same
+# shape as the mock safety switch above — thrown in dev, provably OFF elsewhere.
+DEV_ONLY_OVERRIDES = {
+    "IDA_MODELS_FILE": "/app/models.dev.yaml",
+    "IDA_MAJORS_FILE": "/app/curriculum/majors.dev.yaml",
+    "IDA_CURRICULUM_FILE": "/app/curriculum/slo.dev.yaml",
+    "IDA_TASKS_DIR": "/app/tasks-all",
+    "IDA_DEMO_CURRICULUM": "1",
+}
+cfg_data = (config or {}).get("data", {})
+for key, dev_value in DEV_ONLY_OVERRIDES.items():
+    got = cfg_data.get(key, "")
+    if env == "dev":
+        check(got == dev_value, f"{env}: {key} is set to the dev-only value ({dev_value})")
+    else:
+        check(got == "",
+              f"{env}: {key} is unset (loads committed registry/curriculum/tasks, no demo data)")
+
 # ---- nightly sweeps in previews ---------------------------------------------
 # ⚠ THIS ASSERTION WAS INVERTED FOR dev/staging/prod. It used to require that
 # the sweeps were ACTIVE outside preview. They are now suspended EVERYWHERE, by

@@ -158,6 +158,22 @@ class Settings(BaseSettings):
     tasks_dir: str = ""
     """Root of the task tree.  Empty -> ``repo_root()/tasks``."""
 
+    majors_file: str = ""
+    """Path to ``curriculum/majors.yaml``.  Empty -> the default under the repo root.
+
+    The DEV-ONLY override twin of :attr:`models_file`/:attr:`tasks_dir`: dev
+    names a dev registry, a dev task tree and (via this) a dev majors taxonomy so
+    the populated-demo grid shows more than the one real class, WITHOUT shipping
+    demo curriculum structure into the image's effective curriculum for staging
+    or prod, which never set it.
+    """
+
+    curriculum_file: str = ""
+    """Path to ``curriculum/slo.yaml``.  Empty -> the default under the repo root.
+
+    Same dev-only override rationale as :attr:`majors_file`.
+    """
+
     runner_poll_timeout_s: int = 5
     """How long the runner blocks on the queue before re-checking for shutdown."""
 
@@ -422,6 +438,20 @@ class Settings(BaseSettings):
 
     def resolved_tasks_dir(self) -> Path:
         return Path(self.tasks_dir) if self.tasks_dir else repo_root() / "tasks"
+
+    def resolved_majors_file(self) -> Path | None:
+        """The majors taxonomy override, or ``None`` to use the default location.
+
+        ``None`` (not a computed default) so a caller that already knows how to
+        find the default -- :func:`ida_api.slo._load_majors` resolves it via
+        ``default_majors_path`` -- keeps doing so unchanged when the override is
+        unset.
+        """
+        return Path(self.majors_file) if self.majors_file else None
+
+    def resolved_curriculum_file(self) -> Path | None:
+        """The curriculum map override, or ``None`` to use the default location."""
+        return Path(self.curriculum_file) if self.curriculum_file else None
 
 
 def get_settings() -> Settings:
