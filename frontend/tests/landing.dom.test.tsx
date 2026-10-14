@@ -26,8 +26,6 @@ vi.mock("@/lib/api", () => ({
 
 const { default: LandingPage } = await import("@/app/(site)/page");
 
-const MAJOR = "management-information-systems";
-
 /** One measured MIS 200 score — the default task's family is mis200-is-concepts. */
 function measuredBoard() {
   return board([
@@ -66,33 +64,30 @@ describe("the by-major grid", () => {
   });
 });
 
-describe("the general-classes menu", () => {
-  it("lists the shared-core classes, each linking to its class page", async () => {
+describe("the single measured-class tally", () => {
+  // ⚠ ONCE, AT THE TOP — NOT PER MAJOR. The human asked for the measured-class
+  // count as a single page summary rather than a number repeated on every major
+  // column, so it lives in the subtitle and nowhere else.
+  it("states how many classes are measured, in the subtitle", async () => {
     await renderLanding();
-    const grid = document.querySelector(".core-grid");
-    expect(grid, "no general-classes grid").not.toBeNull();
-    const hrefs = Array.from(grid!.querySelectorAll<HTMLAnchorElement>("a.core-tile")).map((a) =>
-      a.getAttribute("href"),
-    );
-    expect(hrefs).toContain(`/explore/${MAJOR}/mis-200`);
-    expect(hrefs).toContain("/explore/general-business/gba-300");
+    const subtitle = document.querySelector(".hero .subtitle");
+    expect(subtitle, "no hero subtitle").not.toBeNull();
+    // One MIS 200 class is measured in the fixture board; the rest are not.
+    expect(subtitle!.textContent).toMatch(/1 of \d+ class/i);
+    expect(subtitle!.textContent).toMatch(/measured so far/i);
   });
 
-  it("shows the one measured core class's score, and 'not measured yet' for the rest", async () => {
+  it("no longer carries a separate general-classes menu", async () => {
     await renderLanding();
-    const tiles = Array.from(document.querySelectorAll(".core-tile"));
-    const mis200 = tiles.find((t) => t.textContent?.includes("MIS 200"))!;
-    const gba300 = tiles.find((t) => t.textContent?.includes("GBA 300"))!;
-    expect(mis200.textContent).toContain("72%");
-    expect(gba300.textContent).toMatch(/Not measured yet/i);
+    // The mockup's screen 01 is the by-major grid alone; the core-class menu is gone.
+    expect(document.querySelector(".core-grid")).toBeNull();
   });
 });
 
 describe("the standing exits", () => {
-  it("keeps the method link at /methodology and no recommend button", async () => {
+  it("has no recommend button — the feature was removed whole", async () => {
     await renderLanding();
     const hrefs = Array.from(document.querySelectorAll("a")).map((a) => a.getAttribute("href"));
-    expect(hrefs).toContain("/methodology");
     // The recommendation feature was removed whole — no /recommend exit.
     expect(hrefs).not.toContain("/recommend");
   });

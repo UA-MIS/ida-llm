@@ -171,38 +171,37 @@ describe.each([
     }
   });
 
-  it("keeps every neutral cool rather than warm or dead grey", () => {
-    // ⚠ THIS ASSERTION USED TO RUN THE OTHER WAY, and the inversion is the
-    // whole palette-unification change in one line. It read
-    // `expect(r).toBeGreaterThan(b)` — every neutral warm — because the tool
-    // pages were warm paper. The landing then shipped cool, the warm ground was
-    // reviewed as reading BROWN, and the app moved onto the landing's values
-    // rather than the other way round.
-    //
-    // It is INVERTED rather than deleted on purpose: a direction-free "not dead
-    // grey" test would pass for a warm value silently reintroduced by hand, and
-    // reintroducing one is exactly how the seam comes back. It also covers all
-    // eight neutrals now, not the four it used to, because the seam appeared in
-    // the borders as readily as in the background.
+  it("keeps every neutral warm rather than cool or dead grey", () => {
+    // ⚠ THIS ASSERTION HAS NOW RUN BOTH WAYS, and the direction is the whole
+    // palette decision in one line. It once read `r > b` (warm paper), was
+    // inverted to `b > r` when the site unified on a cool-neutral ground, and is
+    // inverted BACK here because the human's mockup specifies the warm "Organic"
+    // ground. It is a direction check rather than a "not dead grey" one on
+    // purpose: a direction-free test would pass for a cool value reintroduced by
+    // hand, and that is exactly how a temperature seam creeps back. All eight
+    // neutrals, because the cast has to hold in the borders as well as the paper.
     for (const key of NEUTRAL_TOKENS) {
       const { r, b } = parseHex(theme[key]!);
-      expect(b, `--${key} is warm or neutral, not cool`).toBeGreaterThan(r);
+      expect(r, `--${key} is cool or neutral, not warm`).toBeGreaterThan(b);
     }
   });
 
-  it("keeps the interactive accent distinguishable from the failure colour", () => {
-    // The reason crimson is the BRAND and indigo is the INTERACTIVE accent: a
-    // link that shares a hue with "low confidence" undermines the one thing this
-    // site is arguing about itself.
+  it("keeps the correct and incorrect colours apart by hue", () => {
+    // ⚠ THE OLD accent-vs-fail / brand-vs-accent HUE GAPS ARE GONE, deliberately.
+    // The cool palette kept the interactive accent >90° from the failure red so a
+    // link could never share a hue with "low confidence". The warm "Organic"
+    // design is monochromatic — accent and brand are both warm by intent — so
+    // that gap cannot hold and is not asserted. State is instead carried by SHAPE
+    // (the warn tokens, the check/✕ icons) wherever colour would be ambiguous.
     //
-    // ⚠ MEASURED AS HUE, NOT AS CONTRAST RATIO. Contrast ratio is a LIGHTNESS
-    // comparison, and in dark mode both of these are deliberately light — their
-    // ratio is ~1.08 and would be ~1.0 for any well-built dark palette. Asserting
-    // on it would mean either a permanently failing test or a threshold tuned
-    // down until it proves nothing. Hue separation is the property actually
-    // being claimed, so hue is what is measured.
-    expect(hueDistance(theme.accent!, theme.fail!)).toBeGreaterThan(90);
-    expect(hueDistance(theme.brand!, theme.accent!)).toBeGreaterThan(90);
+    // What still MUST be hue-distinct is the one pairing colour alone is asked to
+    // carry: a correct mark (--pass, sage) against an incorrect/low one (--fail,
+    // red). Measured as hue, not contrast ratio — in dark mode both are light and
+    // their ratio proves nothing; hue is the property actually claimed.
+    expect(hueDistance(theme.pass!, theme.fail!)).toBeGreaterThan(60);
+    // Accent and brand stay distinct VALUES, so a link reads as different from a
+    // structural mark even inside one warm family.
+    expect(theme.accent).not.toBe(theme.brand);
   });
 });
 
