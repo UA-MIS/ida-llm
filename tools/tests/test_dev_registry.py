@@ -47,7 +47,7 @@ def test_real_entries_are_identical_to_models_yaml():
 def test_demo_keys_are_dev_only():
     prod = {m.key for m in load_registry(PROD).models}
     dev = {m.key for m in load_registry(DEV).models}
-    assert DEMO_KEYS <= dev, f"missing demo keys in dev registry: {sorted(DEMO_KEYS - dev)}"
+    assert dev >= DEMO_KEYS, f"missing demo keys in dev registry: {sorted(DEMO_KEYS - dev)}"
     leaked = DEMO_KEYS & prod
     assert not leaked, f"demo keys leaked into models.yaml (the prod registry): {sorted(leaked)}"
 
