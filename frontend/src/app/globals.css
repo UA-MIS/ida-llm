@@ -409,6 +409,25 @@ pre {
 }
 
 .empty { text-align: center; color: var(--muted); padding: 3rem 1rem; }
+
+/* The friendly zero-data screen (NothingYet) — shown when a level has nothing
+   to put in a grid at all. On-brand: a soft surface card, the seedling mark in
+   the accent, warm and legible in both themes. */
+.nothing-yet {
+  max-width: 34rem;
+  margin: 2.5rem auto;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 1.5);
+}
+.nothing-yet-mark { color: var(--accent); margin-bottom: 0.75rem; }
+.nothing-yet-title { margin: 0 0 0.5rem; font-size: 1.25rem; }
+.nothing-yet-lead { margin: 0 auto 0.75rem; max-width: 28rem; }
+.nothing-yet-detail { margin: 0 auto; max-width: 30rem; font-size: 0.92rem; }
+.nothing-yet-foot { margin-top: 1.25rem; font-size: 0.9rem; }
+.nothing-yet-foot a { color: var(--accent); }
 .back { display: inline-block; margin-bottom: 1rem; font-size: 0.9rem; }
 
 /* ===========================================================================

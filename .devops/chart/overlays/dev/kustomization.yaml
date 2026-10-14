@@ -77,6 +77,29 @@ patches:
       - op: add
         path: /data/IDA_MODELS_FILE
         value: /app/models.dev.yaml
+      # The dev-only curriculum: a majors taxonomy that gives real classes demo
+      # task_families, a coverage map with the two extra MIS classes, and the
+      # union task catalogue (real + synthetic demo families). All ship in the
+      # image but are read ONLY here — staging/prod leave these unset and load
+      # the committed models.yaml / curriculum / tasks, so zero demo curriculum
+      # structure reaches their effective output. (Settings.resolved_*_file /
+      # resolved_tasks_dir read these.)
+      - op: add
+        path: /data/IDA_MAJORS_FILE
+        value: /app/curriculum/majors.dev.yaml
+      - op: add
+        path: /data/IDA_CURRICULUM_FILE
+        value: /app/curriculum/slo.dev.yaml
+      - op: add
+        path: /data/IDA_TASKS_DIR
+        value: /app/tasks-all
+      # The frontend gate for the demo UNIT taxonomy (lib/units.ts). Load-bearing,
+      # not cosmetic: the demo classes also exist in the real majors.yaml, so
+      # without this flag off in prod their unit titles would render against the
+      # real (unmeasured) classes there.
+      - op: add
+        path: /data/IDA_DEMO_CURRICULUM
+        value: "1"
       # Defense-in-depth: demo models are tagged `demonstration`. Dev sweeps are
       # suspended (D-43), but if one ever ran it would otherwise produce REAL
       # (unflagged) runs for fictional models. Excluding the tag keeps a sweep

@@ -271,9 +271,13 @@ describe("level 3 — the course units that define a class", () => {
       () => ClassPage({ params: Promise.resolve({ major: GEN, course: "gba-300" }) }),
       measuredBoard(),
     );
-    // GBA 300 has no taxonomy in lib/units.ts.
+    // GBA 300 has no taxonomy in lib/units.ts (the demo taxonomy is gated off
+    // outside dev), so the class page shows the friendly zero-data screen rather
+    // than an empty grid.
     expect(document.querySelector("table.cg-grid")).toBeNull();
-    expect(document.body.textContent).toMatch(/No unit breakdown/i);
+    expect(document.body.textContent).toMatch(/into units yet/i);
+    // ...and it still puts the gap on us, not on the class or the models.
+    expect(document.body.textContent).toMatch(/not a reading of any model/i);
   });
 
   it("404s on a class this major does not list", async () => {
