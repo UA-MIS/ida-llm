@@ -139,7 +139,7 @@ const { default: EvidencePage } = await import(
 // to disclose, and this guard would go green having proved nothing.
 const MAJOR = "management-information-systems";
 const CLASS = "mis-200";
-const CATEGORY = "is-concepts-business-models";
+const CATEGORY = "information-systems-business-models";
 
 /** One model, one task, entirely seeded — the shape every route must disclose. */
 function seededBoard() {

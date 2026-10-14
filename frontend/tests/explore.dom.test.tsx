@@ -62,7 +62,7 @@ const { default: EvidencePage } = await import(
 
 const MAJOR = "management-information-systems";
 const GEN = "general-business";
-const CATEGORY = "is-concepts-business-models";
+const CATEGORY = "information-systems-business-models";
 
 function measuredBoard(overrides = {}) {
   return board(
@@ -149,8 +149,12 @@ describe("level 2 — the classes of one major", () => {
     await renderLevel(() => ClassesPage({ params: Promise.resolve({ major: MAJOR }) }), measuredBoard());
     const grid = document.querySelector("table.cg-grid.xp-matrix");
     expect(grid, "the classes level is not drawn as a matrix").not.toBeNull();
-    const eyebrows = Array.from(document.querySelectorAll(".xp-col-eyebrow")).map((n) => n.textContent);
-    expect(eyebrows).toEqual(["MIS 200", "MIS 221"]);
+    // The class code is the column label; a class column has no separate eyebrow
+    // (its eyebrow would just repeat the code), so read the labels in order.
+    const labels = Array.from(document.querySelectorAll("thead th.xp-col .xp-col-heading")).map(
+      (n) => n.textContent,
+    );
+    expect(labels).toEqual(["MIS 200", "MIS 221"]);
   });
 
   it("leaves a class with no tasks about it empty beside a measured sibling", async () => {
@@ -187,32 +191,36 @@ describe("level 2 — the classes of one major", () => {
 
 // ---------------------------------------------------------------------------
 
-describe("level 3 — the content categories that define a class", () => {
-  it("shows the class's content categories as the grid columns, not its SLOs", async () => {
+describe("level 3 — the course units that define a class", () => {
+  it("shows the class's units as the grid columns, not its SLOs, and lists what each covers", async () => {
     await renderLevel(
       () => ClassPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
       measuredBoard(),
     );
     const columns = Array.from(document.querySelectorAll("thead th.xp-col"));
-    // The five MIS 200 content categories.
+    // The five MIS 200 units, in course order.
     expect(columns).toHaveLength(5);
-    expect(document.body.textContent).toContain("IS concepts & business models");
-    expect(document.body.textContent).toContain("Spreadsheet & Excel skills");
+    expect(document.body.textContent).toContain("Unit 1");
+    expect(document.body.textContent).toContain("Information systems & business models");
+    expect(document.body.textContent).toContain("Spreadsheets & data analysis");
+    // What a unit covers rides on its column header.
+    expect(document.body.textContent).toContain("What an IS is");
+    // The class page says what the axis is, in units.
+    expect(document.body.textContent).toContain("Each column lists what that unit");
     // Not the SLO vocabulary, and not the assignment-type one it briefly had.
-    expect(document.body.textContent).toContain("categories that define this class");
     expect(columns[0]!.textContent).not.toContain("Quantitative Literacy");
   });
 
-  it("measures the mapped category and leaves the unmapped ones honestly empty", async () => {
+  it("measures the mapped unit and leaves the unmapped ones honestly empty", async () => {
     await renderLevel(
       () => ClassPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
       measuredBoard(),
     );
     const row = modelRows()[0]!;
     const cells = Array.from(row.querySelectorAll("td.cg-cell"));
-    expect(cells[columnOf("IS concepts")]!.className).toContain("cg-measured");
-    expect(cells[columnOf("IS concepts")]!.querySelector(".cg-score")!.textContent).toBe("72%");
-    // A category with no family for this class never borrows a sibling's number.
+    expect(cells[columnOf("Information systems")]!.className).toContain("cg-measured");
+    expect(cells[columnOf("Information systems")]!.querySelector(".cg-score")!.textContent).toBe("72%");
+    // A unit with no family for this class never borrows a sibling's number.
     expect(cells[columnOf("Platform & network")]!.className).toContain("cg-unmeasured");
     expect(cells[columnOf("Platform & network")]!.querySelector(".cg-score")).toBeNull();
   });
@@ -258,14 +266,14 @@ describe("level 3 — the content categories that define a class", () => {
     expect(document.querySelector(".notice")).toBeNull();
   });
 
-  it("explains, without blaming the class, when it has no category breakdown", async () => {
+  it("explains, without blaming the class, when it has no unit breakdown", async () => {
     await renderLevel(
       () => ClassPage({ params: Promise.resolve({ major: GEN, course: "gba-300" }) }),
       measuredBoard(),
     );
-    // GBA 300 has no taxonomy in lib/categories.ts.
+    // GBA 300 has no taxonomy in lib/units.ts.
     expect(document.querySelector("table.cg-grid")).toBeNull();
-    expect(document.body.textContent).toMatch(/No category breakdown/i);
+    expect(document.body.textContent).toMatch(/No unit breakdown/i);
   });
 
   it("404s on a class this major does not list", async () => {
@@ -278,24 +286,24 @@ describe("level 3 — the content categories that define a class", () => {
 
 // ---------------------------------------------------------------------------
 
-describe("level 4 — the evidence behind one category", () => {
-  it("opens the category, shows each model's read and the run behind it", async () => {
+describe("level 4 — the evidence behind one unit", () => {
+  it("opens the unit, shows each model's read and the run behind it", async () => {
     await renderLevel(
       () => EvidencePage({ params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: CATEGORY }) }),
       measuredBoard(),
     );
-    expect(document.body.textContent).toContain("IS concepts & business models");
+    expect(document.body.textContent).toContain("Information systems & business models");
     // The score, as a whole-number percent, somewhere on the page.
     expect(document.body.textContent).toContain("72%");
     // The receipt is reachable.
     expect(document.querySelector('a[href="/runs/run_1"]')).not.toBeNull();
   });
 
-  it("carries the synthetic-extension caveat on the competitive-strategy category", async () => {
+  it("carries the synthetic-extension caveat on the competitive-strategy unit", async () => {
     await renderLevel(
       () =>
         EvidencePage({
-          params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: "competitive-strategy" }),
+          params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: "competitive-strategy-with-is" }),
         }),
       // A board where the problem-solving family scored, so the category renders.
       board([

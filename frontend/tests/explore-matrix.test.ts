@@ -22,10 +22,10 @@ import { describe, expect, it } from "vitest";
 import { board, CURRICULUM, result, task } from "./fixtures";
 import { buildIndex, findMajor } from "@/lib/explore";
 import {
-  buildCategoryMatrix,
   buildClassMatrix,
   buildMajorMatrix,
   buildOutcomeMatrix,
+  buildUnitMatrix,
   cellHref,
 } from "@/lib/explore-matrix";
 import { buildClasses, findClass } from "@/lib/explore";
@@ -367,14 +367,14 @@ describe("the demonstration split is scoped to the level", () => {
 });
 
 
-describe("category breakdown — the class page's content axis", () => {
-  // A class claiming all three MIS 200 families, so the three populated
-  // categories light up and the two empty ones stay honestly unmeasured.
+describe("unit breakdown — the class page's content axis", () => {
+  // A class claiming all three MIS 200 families, so the three populated units
+  // light up and the two empty ones stay honestly unmeasured.
   function mis200With(families: string[], b: LeaderboardResponse) {
     return { ...buildClasses(b, majorOf(b, MIS))[0]!, task_families: families };
   }
 
-  it("buckets each family into one content category and leaves empty categories unmeasured", () => {
+  it("buckets each family into one unit and leaves empty units unmeasured", () => {
     const b = board([
       task({ family: "mis200-spreadsheet-formulas", task_id: "formulas/one", slo: "SLO2", results: [result({ mean_score: 0.8 })] }),
       task({ family: "mis200-is-concepts", task_id: "concepts/one", slo: "SLO9", results: [result({ mean_score: 0.2 })] }),
@@ -385,56 +385,72 @@ describe("category breakdown — the class page's content axis", () => {
       ["mis200-spreadsheet-formulas", "mis200-is-concepts", "mis200-is-problem-solving"],
       b,
     );
-    const matrix = buildCategoryMatrix(b, klass, MIS);
+    const matrix = buildUnitMatrix(b, klass, MIS);
 
-    // Every content category the class defines, in the taxonomy's order.
+    // Every unit the class defines, in course order.
     expect(matrix.entities.map((e) => e.heading)).toEqual([
-      "IS concepts & business models",
-      "Competitive-strategy frameworks",
+      "Information systems & business models",
+      "Competitive strategy with IS",
+      "Spreadsheets & data analysis",
       "Platform & network economics",
       "Levels of IS use in organizations",
-      "Spreadsheet & Excel skills",
+    ]);
+
+    // The column label is the short "Unit N" code, and it carries what the unit covers.
+    expect(matrix.entities.map((e) => e.columnLabel)).toEqual([
+      "Unit 1",
+      "Unit 2",
+      "Unit 3",
+      "Unit 4",
+      "Unit 5",
+    ]);
+    expect(matrix.entities[0]!.covers).toEqual([
+      "What an IS is",
+      "System types",
+      "Business-model basics",
     ]);
 
     const byKey = new Map(matrix.entities.map((e) => [e.key, e]));
-    // Each family's score lands under exactly its one category.
-    expect(byKey.get("is-concepts-business-models")!.overall.score).toBeCloseTo(0.2);
-    expect(byKey.get("competitive-strategy")!.overall.score).toBeCloseTo(0.9);
-    expect(byKey.get("spreadsheet-excel")!.overall.score).toBeCloseTo(0.8);
+    // Each family's score lands under exactly its one unit.
+    expect(byKey.get("information-systems-business-models")!.overall.score).toBeCloseTo(0.2);
+    expect(byKey.get("competitive-strategy-with-is")!.overall.score).toBeCloseTo(0.9);
+    expect(byKey.get("spreadsheets-data-analysis")!.overall.score).toBeCloseTo(0.8);
 
-    // A category with no family never borrows a sibling's number.
+    // A unit with no family never borrows a sibling's number.
     expect(byKey.get("platform-network-economics")!.overall.score).toBeNull();
     expect(byKey.get("levels-of-is-use")!.overall.score).toBeNull();
     expect(byKey.get("platform-network-economics")!.status).toBe("not_measured");
 
-    // The unrelated family is in no MIS 200 category.
+    // The unrelated family is in no MIS 200 unit.
     expect(matrix.entities.some((e) => e.heading.toLowerCase().includes("unrelated"))).toBe(false);
 
-    // A category drills one level down to its own evidence.
-    expect(byKey.get("spreadsheet-excel")!.href).toBe(`/explore/${MIS}/mis-200/spreadsheet-excel`);
+    // A unit drills one level down to its own evidence.
+    expect(byKey.get("spreadsheets-data-analysis")!.href).toBe(
+      `/explore/${MIS}/mis-200/spreadsheets-data-analysis`,
+    );
   });
 
-  it("intersects a category's families with the class's own, so it cannot surface a family the class does not claim", () => {
+  it("intersects a unit's families with the class's own, so it cannot surface a family the class does not claim", () => {
     const b = board([
       task({ family: "mis200-is-concepts", task_id: "c/1", slo: "SLO9", results: [result({ mean_score: 0.5 })] }),
     ]);
-    // The class claims ONLY spreadsheet — so the IS-concepts category, whose
-    // family is present on the board but NOT claimed by this class, stays empty.
+    // The class claims ONLY spreadsheet — so Unit 1 (IS concepts), whose family is
+    // present on the board but NOT claimed by this class, stays empty.
     const klass = mis200With(["mis200-spreadsheet-formulas"], b);
-    const matrix = buildCategoryMatrix(b, klass, MIS);
+    const matrix = buildUnitMatrix(b, klass, MIS);
     const byKey = new Map(matrix.entities.map((e) => [e.key, e]));
-    expect(byKey.get("is-concepts-business-models")!.overall.score).toBeNull();
-    expect(byKey.get("spreadsheet-excel")!.overall.score).toBeNull();
+    expect(byKey.get("information-systems-business-models")!.overall.score).toBeNull();
+    expect(byKey.get("spreadsheets-data-analysis")!.overall.score).toBeNull();
   });
 
-  it("narrows to a single category, with its evidence, when asked", () => {
+  it("narrows to a single unit, with its evidence, when asked", () => {
     const b = board([
       task({ family: "mis200-spreadsheet-formulas", task_id: "formulas/one", slo: "SLO2", results: [result({ mean_score: 0.8 })] }),
       task({ family: "mis200-is-concepts", task_id: "concepts/one", slo: "SLO9", results: [result({ mean_score: 0.2 })] }),
     ]);
     const klass = mis200With(["mis200-spreadsheet-formulas", "mis200-is-concepts"], b);
-    const matrix = buildCategoryMatrix(b, klass, MIS, "spreadsheet-excel");
-    expect(matrix.entities.map((e) => e.key)).toEqual(["spreadsheet-excel"]);
+    const matrix = buildUnitMatrix(b, klass, MIS, "spreadsheets-data-analysis");
+    expect(matrix.entities.map((e) => e.key)).toEqual(["spreadsheets-data-analysis"]);
     expect(matrix.entities[0]!.overall.score).toBeCloseTo(0.8);
   });
 });
