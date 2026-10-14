@@ -67,7 +67,7 @@ import {
   type ScoreAggregate,
 } from "./rollup";
 import { classifyCell, type MatrixCell } from "./matrix";
-import { categoriesFor } from "./categories";
+import { unitsFor } from "./units";
 import {
   buildClasses,
   buildIndex,
@@ -135,6 +135,13 @@ export interface MatrixEntityColumn {
   benchmarkable: boolean;
   /** Extra context — a level badge, a coverage count, a credit line. */
   footnote: string;
+  /**
+   * What this column's tests COVER — the short list of topics shown under the
+   * header. Set for a unit column (the class page's axis), where "what is in this
+   * part of the class" is content the reader should see whether or not anything
+   * has run. Absent for majors, classes and outcomes, which carry no such list.
+   */
+  covers?: string[];
 }
 
 /** One row: a model, as it reads across every entity on this level. */
@@ -220,6 +227,8 @@ interface EntitySpec {
   status: ExploreStatus;
   reason: string;
   footnote: string;
+  /** See `MatrixEntityColumn.covers`. */
+  covers?: string[];
 }
 
 function entriesUnder(model: ModelRollup, spec: MatchSpec): ModelTaskEntry[] {
@@ -392,6 +401,7 @@ function buildEntityColumn(
     seeded: entriesAreSeeded(contributing),
     benchmarkable: spec.benchmarkable,
     footnote: spec.footnote,
+    covers: spec.covers,
   };
 }
 
@@ -647,54 +657,67 @@ export function cellHref(entity: MatrixEntityColumn, modelKey: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// The class page: content categories × models
+// The class page: course units × models
 // ---------------------------------------------------------------------------
 
 /**
- * One class, broken into the content CATEGORIES that define it — the axis the
- * class page shows in place of an SLO breakdown. See `lib/categories.ts` for
- * why the class is read by content rather than by outcome, and for the two
- * invariants (one family per category; a category's families ⊆ the class's own)
- * that stop a category fabricating a score.
+ * One class, broken into the course UNITS that define it — the axis the class
+ * page shows in place of an SLO breakdown. See `lib/units.ts` for why the class
+ * is read by unit rather than by outcome, and for the two invariants (one family
+ * per unit; a unit's families ⊆ the class's own) that stop a unit fabricating a
+ * score.
  *
- * ⚠ THE SAME `assemble` EVERY OTHER LEVEL USES, so a category cell cannot
- * classify a pairing differently from the class, major or leaderboard that
- * feeds it. A category is just another `EntitySpec`: its filter is the
- * category's families (intersected with the class's own — invariant 2 enforced,
- * not trusted) and the outcome ids those families' tasks carry. An empty-family
- * category contributes no entries, so every cell reads "not measured yet", which
- * is the honest state for a part of the class nobody has authored a task for.
+ * ⚠ THE SAME `assemble` EVERY OTHER LEVEL USES, so a unit cell cannot classify a
+ * pairing differently from the class, major or leaderboard that feeds it. A unit
+ * is just another `EntitySpec`: its filter is the unit's families (intersected
+ * with the class's own — invariant 2 enforced, not trusted) and the outcome ids
+ * those families' tasks carry. An empty-family unit contributes no entries, so
+ * every cell reads "not measured yet", which is the honest state for a part of
+ * the class nobody has authored a task for.
  *
- * `onlyKey` narrows to a single category — the evidence level renders exactly
- * one column plus the tasks behind it.
+ * ⚠ THE COLUMN HEADER CARRIES WHAT THE UNIT COVERS, MEASURED OR NOT. A unit's
+ * topic list is content about the class — true whether or not a task has run for
+ * it — so it rides on the column (`covers`) and shows under an empty unit just
+ * as it shows under a measured one. The "Unit N" label and the title come across
+ * the same way, so an unmeasured unit is still a legible part of the course, not
+ * a blank waiting to be explained.
+ *
+ * `onlyKey` narrows to a single unit — the evidence level renders exactly one
+ * column plus the tasks behind it.
  */
-export function buildCategoryMatrix(
+export function buildUnitMatrix(
   board: LeaderboardResponse,
   tile: ClassTile,
   majorSlug: string,
   onlyKey?: string,
 ): ExploreMatrix {
-  const categories = categoriesFor(tile.code).filter((category) => !onlyKey || category.key === onlyKey);
+  const units = unitsFor(tile.code).filter((unit) => !onlyKey || unit.key === onlyKey);
   return assemble(
     board,
-    categories.map((category): EntitySpec => {
-      // Invariant 2, enforced here rather than trusted: a category can only ever
+    units.map((unit): EntitySpec => {
+      // Invariant 2, enforced here rather than trusted: a unit can only ever
       // surface families the class itself claims.
-      const families = category.families.filter((family) => tile.task_families.includes(family));
+      const families = unit.families.filter((family) => tile.task_families.includes(family));
       const tasks = board.tasks.filter((task) => families.includes(task.family));
       const slos = [...new Set(tasks.flatMap((task) => (task.slo ? [task.slo] : [])))];
       return {
-        key: category.key,
-        eyebrow: "Category",
-        heading: category.title,
-        columnLabel: category.title,
-        href: `/explore/${majorSlug}/${tile.slug}/${category.key}`,
-        // A content category is always reachable: an empty one is "not measured
-        // yet", never the published "a text benchmark cannot reach this" boundary
-        // (that claim belongs to an SLO, and lives on the outcome, not here).
+        key: unit.key,
+        // No eyebrow: "Unit N" is the column's own label, and a "Unit N / Unit N"
+        // stutter is not a hierarchy. The title rides on `heading` (the name
+        // sub-line) and the topics on `covers`.
+        eyebrow: "",
+        heading: unit.title,
+        // "Unit N" is the shortest honest label for the column; the full title
+        // rides on `heading` for the aria label and the visible sub-line, and
+        // `covers` carries what the unit's tests are about.
+        columnLabel: `Unit ${unit.n}`,
+        href: `/explore/${majorSlug}/${tile.slug}/${unit.key}`,
+        // A unit is always reachable: an empty one is "not measured yet", never
+        // the published "a text benchmark cannot reach this" boundary (that claim
+        // belongs to an SLO, and lives on the outcome, not here).
         benchmarkable: true,
         note: "",
-        noun: "this category",
+        noun: "this unit",
         pronoun: { singular: "it", plural: "them" },
         slos,
         families,
@@ -702,11 +725,12 @@ export function buildCategoryMatrix(
         status: "not_measured",
         reason:
           families.length === 0
-            ? `${category.blurb} Not measured yet — no task about ${tile.code} covers this category.`
-            : `${category.blurb} ${tasks.length} ${tasks.length === 1 ? "task measures" : "tasks measure"} this part of the class.`,
+            ? `${unit.blurb} Not measured yet — no task about ${tile.code} covers this unit.`
+            : `${unit.blurb} ${tasks.length} ${tasks.length === 1 ? "task measures" : "tasks measure"} this part of the class.`,
         footnote: "",
+        covers: unit.covers,
       };
     }),
-    `No content categories have been defined for ${tile.code} yet.`,
+    `No units have been defined for ${tile.code} yet.`,
   );
 }

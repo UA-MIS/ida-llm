@@ -6,7 +6,7 @@ import { ExploreMatrixGrid } from "@/components/explore-matrix";
 import { ResultsUnavailable } from "@/components/service-unavailable";
 import { getLeaderboard } from "@/lib/api";
 import { buildClasses, buildIndex, findClass, findMajor } from "@/lib/explore";
-import { buildCategoryMatrix } from "@/lib/explore-matrix";
+import { buildUnitMatrix } from "@/lib/explore-matrix";
 import type { LeaderboardResponse } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "What this class is made of — Capstone-IDA",
   description:
-    "The content categories that define this class, against every model, with the evidence behind each score.",
+    "The course units that make up this class, against every model, with the evidence behind each score.",
 };
 
 /**
@@ -25,9 +25,9 @@ export const metadata: Metadata = {
  * contract, not a place to share a string.
  */
 const EXPLAIN =
-  "One row per model, one column per category of this class. Each score comes " +
-  "from tasks written about this class's own material. Open a category for its " +
-  "results and the evidence behind them.";
+  "One row per model, one column per unit of this class — each column lists what " +
+  "that unit's tests cover. Each score comes from tasks written about this " +
+  "class's own material. Open a score to see every question and the run behind it.";
 
 export default async function ClassAssignmentsPage({
   params,
@@ -59,7 +59,7 @@ export default async function ClassAssignmentsPage({
   const klass = findClass(buildClasses(board, major), courseSlug);
   if (!klass) notFound();
 
-  const matrix = buildCategoryMatrix(board, klass, major.slug);
+  const matrix = buildUnitMatrix(board, klass, major.slug);
   const wanted = typeof query.model === "string" ? query.model : null;
   const focus = matrix.models.find((m) => m.model_key === wanted) ?? null;
 
@@ -85,13 +85,13 @@ export default async function ClassAssignmentsPage({
       ) : null}
 
       <section className="hero">
-        <h2 className="xp-title">
-          <span className="xp-title-code">{klass.code}</span> {klass.title}
-        </h2>
+        <p className="xp-kicker">{klass.code}</p>
+        <h2 className="xp-title">{klass.title}</h2>
         <p className="subtitle">
-          {matrix.measured_entities} of {matrix.benchmarkable_entities}{" "}
-          {matrix.benchmarkable_entities === 1 ? "category" : "categories"} that define this class
-          {matrix.measured_entities === 1 ? " has" : " have"} a score.
+          {matrix.entities.length} {matrix.entities.length === 1 ? "unit" : "units"}. Each column
+          lists what that unit&rsquo;s tests cover. {matrix.measured_entities} of{" "}
+          {matrix.benchmarkable_entities}{" "}
+          {matrix.measured_entities === 1 ? "has" : "have"} a score so far.
         </p>
       </section>
 
@@ -99,7 +99,7 @@ export default async function ClassAssignmentsPage({
 
       {!matrix.available ? (
         <div className="empty">
-          <h2>No category breakdown for {klass.code}</h2>
+          <h2>No unit breakdown for {klass.code}</h2>
           <p className="muted">{matrix.unavailable_reason}</p>
           <p className="muted">
             That is a gap in what has been published and run, not a reading of
@@ -109,8 +109,8 @@ export default async function ClassAssignmentsPage({
       ) : (
         <ExploreMatrixGrid
           matrix={matrix}
-          columnKind="Category"
-          overallLabel="All categories"
+          columnKind="Unit"
+          overallLabel="Overall"
           focusModel={focus?.model_key ?? null}
         />
       )}

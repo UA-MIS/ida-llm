@@ -54,20 +54,24 @@
    =========================================================================== */
 
 :root {
-  /* Bright, cool, and deliberately not white. */
-  --bg: #fbfcfd;
-  --surface: #eff3f7;
-  --surface-2: #e3eaf1;
-  --fg: #14171a;
-  /* Secondary text. 8.65:1 on the page, 7.97:1 on a surface. */
-  --muted: #414b55;
+  /* Warm paper, and deliberately not white — the "Organic" ground the human's
+     mockup is built on. The site used to be cool-neutral; the new design spec
+     reverses that, so every neutral below now carries a warm cast (r > b), the
+     mirror of what was here, and `tests/palette.test.ts` asserts the cast in
+     this direction so a cool value reintroduced by hand fails. */
+  --bg: #f5ead8;
+  --surface: #ece0c9;
+  --surface-2: #e3d6bd;
+  --fg: #221f1b;
+  /* Secondary text. Tuned to clear WCAG AA on the darkest paper surface. */
+  --muted: #574f43;
   /* ⚠ NEW TOKEN: a THIRD text tone, quieter than --muted. The landing's rails,
      eyebrows and side notes need a step below secondary that is still comfortably
      readable (6.07:1 / 5.59:1) — it arrived with the landing as `--ld-ink-faint`
      and is promoted here so the tool pages can use it too. */
-  --faint: #556270;
-  --border: #dde4eb;
-  --border-strong: #c3cdd7;
+  --faint: #655c4d;
+  --border: #ddccae;
+  --border-strong: #ccb892;
   /* QA-26: neither of the two tokens above clears WCAG 1.4.11's 3:1 floor for
      a UI component boundary — --border-strong sits at 1.57:1 on the page and
      1.44:1 on a card, so a form control's only edge against its own panel was
@@ -76,14 +80,35 @@
      boundaries that are the ONLY affordance marking a control (an input, a
      button, the glossary term's underline) — decorative rules stay on
      --border/--border-strong, which would otherwise all get needlessly heavier. */
-  --border-control: #828c96;
+  --border-control: #877658;
 
-  --accent: #2f4c8a;
-  --brand: #9e1b32;
+  /* ⚠ TWO WARM REDS, ONE WARM HUE FAMILY — THE MOCKUP IS MONOCHROMATIC.
+       --accent   INTERACTIVE. Links, focus rings, active controls, the grid's
+                  heat ramp. A deep terracotta — the mockup's own link colour
+                  (its lighter #c67139 is too pale for AA body text, so the
+                  interactive token is the darker step and the ramp uses the
+                  brighter one through `--cell-accent`).
+       --brand    IDENTITY. UA crimson, structural and sparing.
+     The old palette kept these >90° apart in hue so a link could never share a
+     colour with a status; the warm design cannot, and does not try. It keeps
+     "right vs wrong" legible by HUE where it matters (sage --pass vs red --fail)
+     and everywhere else by shape — the warn tokens, the check/✕ icons — rather
+     than by colour alone. `tests/palette.test.ts` asserts the pass/fail hue gap,
+     not an accent/fail one. */
+  --accent: #8c491a;
+  --brand: #9b1b31;
 
-  --pass: #2c6e49;
-  --fail: #b3392c;
-  --pending: #8a6212;
+  --pass: #47612a;
+  --fail: #973018;
+  --pending: #6f4d0e;
+
+  /* The grid's heat-ramp endpoints. The ramp is ONE hue, stronger for a higher
+     score — magnitude, never verdict (see the ramp steps below). `--cell-accent`
+     is the mockup's brighter terracotta, mixed over `--cell-base` by the step;
+     a cell carries dark text, so these are backgrounds and need no AA-text
+     rating. */
+  --cell-accent: #c67139;
+  --cell-base: var(--surface);
 
   /* Gentle separation for raised surfaces. Light mode only carries a real
      shadow; in dark mode a cast shadow is invisible and the tone step does the
@@ -92,6 +117,14 @@
 
   --radius: 8px;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* ⚠ ONE TYPEFACE. The "Organic" design uses Figtree for body AND headings —
+     headings are just heavier (700). `--font-body` is set on <html> by
+     `next/font` (see layout.tsx); `--font-display` aliases it so the many
+     `var(--font-display)` heading rules in this sheet pick up the same family
+     without a second download. The serif fallbacks further down are vestigial
+     (Figtree is self-hosted and reliable) and only show if the font fails. */
+  --font-display: var(--font-body);
 
   /* ⚠ ONE PAGE WIDTH, DECLARED ONCE. There used to be three `main { max-width }`
      rules in this sheet — 1080px in the skeleton, 1140px in Dashboard v1, 1180px
@@ -144,42 +177,72 @@
   --ld-shadow: 0 1px 2px rgba(20, 23, 26, 0.06), 0 12px 28px -18px rgba(20, 23, 26, 0.40);
 }
 
+/* ⚠ DARK, BY THE SYSTEM PREFERENCE — unless the reader has set a manual theme.
+   The guard `:not([data-theme="light"])` is what lets the toggle force light on
+   an OS that is dark; the matching `:root[data-theme="dark"]` block below forces
+   dark on an OS that is light. The two dark blocks are deliberately identical. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    /* Cool near-black, not black — the same cool cast as the ground above. */
-    --bg: #0e1114;
-    --surface: #161a1f;
-    --surface-2: #222930;
-    --fg: #f2f5f8;
-    --muted: #b8c2cc;
-    --faint: #94a1ad;
-    --border: #2e363f;
-    --border-strong: #46515e;
-    /* QA-26, dark side: --border-strong is 2.34:1 on the page and 2.16:1 on a
-       surface here — still under 3:1. 3.38:1 / 3.12:1. */
-    --border-control: #5d6976;
+  :root:not([data-theme="light"]) {
+    /* Warm near-black, not black — the same warm cast (r > b) as the paper above. */
+    --bg: #1b1815;
+    --surface: #241f1a;
+    --surface-2: #322b23;
+    --fg: #f5ead8;
+    --muted: #cabea9;
+    --faint: #a1917c;
+    --border: #39322a;
+    --border-strong: #544a3d;
+    --border-control: #857760;
 
-    --accent: #93abee;
-    /* ⚠ BRIGHTER THAN THE #e0657e IT REPLACES, and that is the unification: the
-       landing shipped its own dark crimson because #e0657e sat at 5.71:1 on the
-       cool ground. One brand colour, and it is the better-contrasting one (7.54:1). */
-    --brand: #fb7b93;
+    --accent: #e8996a;
+    --brand: #f3889b;
 
-    --pass: #5fc08d;
-    --fail: #f08a7c;
-    --pending: #e5b84f;
+    --pass: #a6c27f;
+    --fail: #ef9e86;
+    --pending: #e0b352;
+
+    --cell-accent: #d67f48;
+    --cell-base: var(--surface);
 
     --shadow: none;
 
     /* Only the four landing-only values need a dark variant; the eight aliases
        above follow the canonical tokens into this block automatically, which is
        the whole point of aliasing them. */
-    --ld-raise: #1a1f25;
-    --ld-accent-deep: #ff9cad;
-    --ld-on-accent: #0e1114;
-    --ld-pine: #63cfae;
+    --ld-raise: #2b2620;
+    --ld-accent-deep: #f0ab82;
+    --ld-on-accent: #241f1a;
+    --ld-pine: #a6c27f;
     --ld-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 14px 32px -18px rgba(0, 0, 0, 0.85);
   }
+}
+
+/* The manual toggle forcing dark on a light-preference OS. Identical to the
+   media block above; kept in step by hand because a declaration block cannot be
+   shared across the media-query boundary. */
+:root[data-theme="dark"] {
+  --bg: #1b1815;
+  --surface: #241f1a;
+  --surface-2: #322b23;
+  --fg: #f5ead8;
+  --muted: #cabea9;
+  --faint: #a1917c;
+  --border: #39322a;
+  --border-strong: #544a3d;
+  --border-control: #857760;
+  --accent: #e8996a;
+  --brand: #f3889b;
+  --pass: #a6c27f;
+  --fail: #ef9e86;
+  --pending: #e0b352;
+  --cell-accent: #d67f48;
+  --cell-base: var(--surface);
+  --shadow: none;
+  --ld-raise: #2b2620;
+  --ld-accent-deep: #f0ab82;
+  --ld-on-accent: #241f1a;
+  --ld-pine: #a6c27f;
+  --ld-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 14px 32px -18px rgba(0, 0, 0, 0.85);
 }
 
 * { box-sizing: border-box; }
@@ -188,9 +251,19 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-body), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 15px;
   line-height: 1.55;
+}
+
+/* ⚠ HEADINGS ARE THE BODY FACE, HEAVIER. The Organic design sets headings in
+   Figtree 700 with a touch of negative tracking — not a separate display serif.
+   Per-page heading sizes stay where they are defined; this only fixes the family,
+   weight and tracking so every heading reads as one system. */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.015em;
 }
 
 /* ⚠ SPLIT FROM ONE `main` RULE — QA-25. `<header>` and `<nav>` used to be
@@ -201,7 +274,38 @@ body {
    same horizontal treatment `main` always gave them, split at the point
    where the vertical padding used to sit between the nav row and the page
    content — so this is a markup change with no visual one. */
-.site-header { max-width: var(--page-max); margin: 0 auto; padding: 2rem 1.5rem 1.25rem; }
+.site-header {
+  max-width: var(--page-max); margin: 0 auto; padding: 1.5rem 1.5rem 1.25rem;
+  display: flex; align-items: center; gap: 0.9rem;
+}
+/* The brand — dot-in-circle mark + name + college, the whole thing the way home. */
+.brand {
+  display: flex; align-items: center; gap: 0.7rem;
+  text-decoration: none; color: inherit; margin-right: auto;
+}
+.brand-mark {
+  width: 1.9rem; height: 1.9rem; flex: none; border-radius: 999px;
+  background: var(--cell-accent); display: grid; place-items: center;
+}
+.brand-dot { width: 0.65rem; height: 0.65rem; border-radius: 999px; background: var(--bg); }
+.brand-text { display: flex; flex-direction: column; line-height: 1.2; }
+.brand-name {
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 1.12rem; font-weight: 700; letter-spacing: -0.01em; color: var(--fg);
+}
+.brand-sub { font-size: 0.76rem; color: var(--faint); }
+.brand:hover .brand-name { color: var(--accent); }
+
+/* The light/dark switch — a quiet square icon button at the far right. */
+.theme-toggle {
+  flex: none; width: 2.3rem; height: 2.3rem; display: grid; place-items: center;
+  border: 1px solid var(--border-strong); border-radius: 999px;
+  background: transparent; color: var(--fg); cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.theme-toggle:hover { background: var(--surface-2); border-color: var(--border-control); }
+.theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 main { max-width: var(--page-max); margin: 0 auto; padding: 0 1.5rem 4rem; }
 
 /* ⚠ CONTENTINFO, SIBLING OF MAIN. The one secondary link ("how we test") that
@@ -1241,11 +1345,17 @@ body:has(.ld) { background: var(--ld-paper); }
    colour perception at all.
    =========================================================================== */
 
-.cg-step-1 { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
-.cg-step-2 { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
-.cg-step-3 { background: color-mix(in srgb, var(--accent) 29%, var(--surface)); }
-.cg-step-4 { background: color-mix(in srgb, var(--accent) 43%, var(--surface)); }
-.cg-step-5 { background: color-mix(in srgb, var(--accent) 58%, var(--surface)); }
+/* The heat ramp uses the mockup's brighter terracotta (`--cell-accent`) mixed
+   over the paper (`--cell-base`), not the deep interactive `--accent`. A cell
+   carries dark `--fg` text, so legibility is checked against the darkest step. */
+.cg-step-1 { background: color-mix(in srgb, var(--cell-accent) 6%, var(--cell-base)); }
+.cg-step-2 { background: color-mix(in srgb, var(--cell-accent) 18%, var(--cell-base)); }
+.cg-step-3 { background: color-mix(in srgb, var(--cell-accent) 32%, var(--cell-base)); }
+.cg-step-4 { background: color-mix(in srgb, var(--cell-accent) 46%, var(--cell-base)); }
+/* Ceiling at 58%: higher saturates the cell enough that the score (--fg) drops
+   below WCAG AA in DARK mode, where the terracotta tint lightens toward the
+   light ink. `tests/matrix.test.ts` pins the score's contrast on every step. */
+.cg-step-5 { background: color-mix(in srgb, var(--cell-accent) 58%, var(--cell-base)); }
 
 .cg-grid { border-collapse: separate; border-spacing: 2px; font-size: 0.86rem; }
 .cg-grid th, .cg-grid td { border-bottom: 0; }
@@ -1270,12 +1380,18 @@ body:has(.ld) { background: var(--ld-paper); }
 .cg-model-sub { display: block; font-size: 0.74rem; font-weight: 400; margin-top: 0.1rem; }
 
 .cg-cell {
-  text-align: center; vertical-align: middle; padding: 0.5rem 0.35rem;
-  border-radius: 3px; min-width: 4.25rem;
+  text-align: center; vertical-align: middle; padding: 0.55rem 0.35rem;
+  border-radius: 10px; min-width: 4.25rem; min-height: 3.25rem;
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
 }
+/* A measured cell lifts on hover — the mockup's cue that a score opens its
+   proof. Empties do not lift: there is nothing behind them to open yet. */
+.cg-measured:hover { box-shadow: 0 4px 14px color-mix(in srgb, var(--fg) 16%, transparent); transform: translateY(-1px); }
 .cg-score {
-  display: block; font-variant-numeric: tabular-nums; font-weight: 600;
-  font-size: 0.95rem; color: var(--fg); text-decoration: none;
+  display: block; font-variant-numeric: tabular-nums; font-weight: 700;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 1.35rem; line-height: 1.1; letter-spacing: -0.01em;
+  color: var(--fg); text-decoration: none;
 }
 a.cg-score:hover { text-decoration: underline; }
 /* ⚠ `--fg`, NOT `--muted`, AND THAT IS A CONTRAST FIX RATHER THAN A STYLE
@@ -1302,8 +1418,16 @@ a.cg-score:hover { text-decoration: underline; }
 /* A column the footer refuses to call, and the reason it refused. */
 .cg-foot-note { display: block; font-size: 0.68rem; font-style: italic; }
 
-/* The two empty states, drawn differently because they are different claims. */
-.cg-unmeasured { background: var(--surface); color: var(--faint); }
+/* The two empty states, drawn differently because they are different claims.
+   "Not measured yet" is a dashed outline on the bare page — the mockup's cue for
+   a square nothing has run for, visibly NOT a zero and NOT a filled score. */
+.cg-unmeasured {
+  background: transparent; color: var(--faint);
+  /* A dashed inset outline, not a border — so it does not add a pixel of box and
+     shift the dashed empties out of line with the filled, borderless cells. */
+  outline: 1.5px dashed var(--border-strong); outline-offset: -1.5px;
+  border-radius: 10px;
+}
 .cg-out-of-scope {
   /* Hatched rather than merely pale: "we did not measure this, on purpose"
      should not look like the same cell as "nobody has got to it yet". */
@@ -2178,7 +2302,7 @@ a.cg-score:hover { text-decoration: underline; }
   color: inherit; text-decoration: none;
   border-radius: var(--radius);
   padding: 0.15rem 0.3rem; margin: -0.15rem -0.3rem;
-  max-width: 13ch;
+  max-width: 16ch;
 }
 .xp-col-link:hover, .xp-col-link:focus-visible { background: var(--surface-2); }
 .xp-col-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -2186,12 +2310,32 @@ a.cg-score:hover { text-decoration: underline; }
 
 .xp-col-eyebrow {
   grid-column: 1 / -1;
-  font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.04em;
-  color: var(--muted); white-space: nowrap;
+  font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--faint); white-space: nowrap;
 }
+/* The column's own label — a major/class code, or "Unit N" — set in the heading
+   face and the interactive colour, the mockup's prominent column code. */
 .xp-col-heading {
-  font-size: 0.82rem; font-weight: 650; line-height: 1.25;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 0.95rem; font-weight: 700; line-height: 1.2;
+  letter-spacing: -0.01em; color: var(--accent);
+  white-space: nowrap;
+}
+/* The full name under the code — the major's name, the class's title, the unit's
+   title. Quiet, so it informs without competing with the code. */
+.xp-col-name {
+  grid-column: 1 / -1;
+  font-size: 0.72rem; font-weight: 500; line-height: 1.3;
+  color: var(--muted); margin-top: 0.15rem;
   white-space: normal; overflow-wrap: anywhere;
+}
+/* ⚠ WHAT A UNIT COVERS — the class page's whole point, on the column header. In
+   the sage second hue so it reads as "this is the material", distinct from the
+   score's terracotta. */
+.xp-col-covers {
+  grid-column: 1 / -1;
+  font-size: 0.68rem; line-height: 1.35; color: var(--pass);
+  margin-top: 0.25rem; white-space: normal; overflow-wrap: anywhere;
 }
 .xp-col-go { color: var(--muted); }
 .xp-col-link:hover .xp-col-go { color: var(--accent); }
@@ -2218,9 +2362,30 @@ a.cg-score:hover { text-decoration: underline; }
 
 /* --- the level headings and the evidence page ----------------------------- */
 
-.xp-title { margin: 0 0 0.35rem; font-size: 1.5rem; line-height: 1.25; }
+.xp-title { margin: 0 0 0.35rem; font-size: 1.9rem; line-height: 1.15; letter-spacing: -0.02em; }
 .xp-title-code { font-family: var(--mono); color: var(--muted); }
-.xp-source { font-size: 0.85rem; }
+
+/* The small accent line above a drill-down title — "MIS 200", "MIS 200 · Unit 1".
+   The mockup's kicker: the context you came from, set apart from the title. */
+.xp-kicker {
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 0.95rem; font-weight: 700; color: var(--accent);
+  margin: 0 0 0.3rem; letter-spacing: 0;
+}
+
+/* The topic chips — what a unit covers — on the proof/evidence hero. Sage, pill,
+   the mockup's tag treatment. */
+.xp-chips {
+  list-style: none; margin: 0.9rem 0 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 0.5rem;
+}
+.xp-chip {
+  font-size: 0.8rem; line-height: 1; padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pass) 14%, var(--bg));
+  color: var(--pass);
+}
+.xp-source { font-size: 0.85rem; margin-top: 0.9rem; }
 .xp-level { font-size: 0.88rem; margin: 0.4rem 0 0; max-width: 74ch; line-height: 1.55; }
 
 /* --------------------------------------------------------------------------

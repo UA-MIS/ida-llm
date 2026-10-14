@@ -68,12 +68,29 @@ function ColumnHeader({
         href={entity.href}
         className="xp-col-link"
         // The full name/title, when the visible label is a shorter code for
-        // it — cheap to carry and useful on hover, but never the text a
-        // sighted reader has to read to find their major or class.
+        // it — cheap to carry and useful on hover.
         title={entity.columnLabel === entity.heading ? undefined : entity.heading}
       >
-        <span className="xp-col-eyebrow">{entity.eyebrow}</span>
+        {/* Suppressed when it would just repeat the label — a class column's
+            eyebrow IS its code, and "MIS 200 / MIS 200" is a stutter, not a
+            hierarchy. */}
+        {entity.eyebrow && entity.eyebrow !== entity.columnLabel ? (
+          <span className="xp-col-eyebrow">{entity.eyebrow}</span>
+        ) : null}
         <span className="xp-col-heading">{entity.columnLabel}</span>
+        {/* The full name under the short code — the major's name, the class's
+            title, the unit's title. Shown now (the mockup's design), where it was
+            once aria-only, because the grid is a handful of columns wide, not
+            fourteen, and the name is what a reader scans for. */}
+        {entity.heading && entity.heading !== entity.columnLabel ? (
+          <span className="xp-col-name">{entity.heading}</span>
+        ) : null}
+        {/* ⚠ WHAT THIS UNIT COVERS — the class page's whole point. A unit column
+            says what its tests are about, measured or not, so an unmeasured unit
+            is still a legible part of the course rather than an empty square. */}
+        {entity.covers && entity.covers.length > 0 ? (
+          <span className="xp-col-covers">{entity.covers.join(" · ")}</span>
+        ) : null}
         <span className="xp-col-go" aria-hidden="true">
           →
         </span>

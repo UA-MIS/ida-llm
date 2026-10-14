@@ -18,7 +18,7 @@
  * page whose entire job is to be checkable.
  */
 
-import { CategoryEvidence } from "@/components/category-evidence";
+import { UnitEvidence } from "@/components/unit-evidence";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -28,7 +28,7 @@ import { ModelResultCard } from "@/components/model-result-card";
 import { ResultsUnavailable } from "@/components/service-unavailable";
 import { ConfidenceTell, DemonstrationBadge } from "@/components/trust-badges";
 import { getLeaderboard } from "@/lib/api";
-import { findCategory } from "@/lib/categories";
+import { findUnit } from "@/lib/units";
 import {
   buildClasses,
   buildEvidence,
@@ -152,17 +152,17 @@ export default async function EvidencePage({
   const klass = findClass(buildClasses(board, major), courseSlug);
   if (!klass) notFound();
 
-  // ⚠ THE CLASS PAGE DRILLS INTO CATEGORIES, so the common case here is a
-  // category key ("spreadsheet-excel"). Its evidence is the one-column grid plus
-  // the tasks behind it — see `CategoryEvidence`.
-  const category = findCategory(klass.code, slo);
-  if (category) {
+  // ⚠ THE CLASS PAGE DRILLS INTO UNITS, so the common case here is a unit key
+  // ("spreadsheets-data-analysis"). Its evidence is the one-column grid plus the
+  // tasks behind it — see `UnitEvidence`.
+  const unit = findUnit(klass.code, slo);
+  if (unit) {
     return (
-      <CategoryEvidence
+      <UnitEvidence
         board={board}
         klass={klass}
         major={major}
-        category={category}
+        unit={unit}
         wanted={typeof query.model === "string" ? query.model : null}
       />
     );

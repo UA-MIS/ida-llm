@@ -387,8 +387,10 @@ describe("the heat ramp stays readable", () => {
     dark: CSS.slice(darkStart, CSS.indexOf("* { box-sizing")),
   };
 
-  /** The percentages actually declared by `.cg-step-N`, read from the sheet. */
-  const percents = [...CSS.matchAll(/\.cg-step-(\d)\s*\{[^}]*?var\(--accent\)\s*(\d+)%/g)]
+  /** The percentages actually declared by `.cg-step-N`, read from the sheet. The
+   *  ramp mixes the brighter `--cell-accent` over `--cell-base` (= --surface), not
+   *  the deep interactive `--accent`. */
+  const percents = [...CSS.matchAll(/\.cg-step-(\d)\s*\{[^}]*?var\(--cell-accent\)\s*(\d+)%/g)]
     .map((m) => [Number(m[1]), Number(m[2])] as const)
     .sort((a, b) => a[0] - b[0]);
 
@@ -413,7 +415,7 @@ describe("the heat ramp stays readable", () => {
       // 58%, so 58% is the cap. Push a step past it and the number disappears in
       // one theme only — invisible in a screenshot of the other.
       const block = THEMES[themeName as "light" | "dark"];
-      const accent = token(block, "accent");
+      const accent = token(block, "cell-accent");
       const surface = token(block, "surface");
       const fg = token(block, "fg");
 

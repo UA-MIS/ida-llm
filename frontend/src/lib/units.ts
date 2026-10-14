@@ -1,0 +1,197 @@
+/**
+ * The course UNITS that a class breaks into — the axis the class page shows in
+ * place of a Student Learning Outcome breakdown. A unit is a part of the course
+ * as the course itself is taught: its topics, its skills, the material one quiz
+ * or exercise set covers. Each unit says (a) what its tests COVER and (b) how
+ * well a model does on that material.
+ *
+ * ⚠ WHY A CLASS IS SHOWN BY UNIT, NOT BY SLO. An SLO (SLO2 Quantitative
+ * Literacy, SLO9 General Business Knowledge) is the registrar's cross-programme
+ * outcome vocabulary. It is the right axis for "how does a model do on an
+ * outcome the whole college teaches" — and the wrong axis for a professor who
+ * asked "what is MY class made of, and how does AI do on each part". A class is
+ * made of UNITS: the concepts, the frameworks, the skills the course actually
+ * covers, in the order it covers them. The SLO data stays intact and still
+ * groups results internally (see `curriculum/slo.yaml` and `lib/explore.ts`);
+ * this file is the presentation grouping the class page reads instead.
+ *
+ * ⚠ WHY THIS IS A FRONTEND DATA MODULE AND NOT A SERVED curriculum FILE. The two
+ * things the registrar actually owns — which majors and classes exist
+ * (`majors.yaml`), and which outcomes each class teaches (`slo.yaml`) — are
+ * served by the API precisely so no client transcribes a registrar's list. A
+ * class's UNITS are not a registrar fact: they are our editorial analysis of
+ * what the ingested material covers (the same analysis recorded in
+ * `tasks/mis200-exam1-mapping.md`, provenance `synthetic`). Keeping units here
+ * keeps that boundary honest: a served taxonomy would dress our content analysis
+ * up as the catalog. It is still data-driven and still generalises the way
+ * `majors.yaml` does: a second class gets units by adding a row below, never by
+ * editing a component.
+ *
+ * ⚠ TWO INVARIANTS THAT KEEP A UNIT FROM FABRICATING A SCORE:
+ *
+ *   1. A UNIT MAPS TO TASK FAMILIES; A FAMILY MAPS TO EXACTLY ONE UNIT.
+ *      Results are a (model, task) mean per family. If one family fed two units,
+ *      the SAME number would appear under both headings — the "one exam's score
+ *      under a dozen courses" fabrication `lib/explore.ts` is built to prevent,
+ *      one level down. So the family→unit map is a partition: every family of a
+ *      class lands in one and only one unit.
+ *   2. A UNIT'S FAMILIES ARE A SUBSET OF THE CLASS'S OWN `task_families`.
+ *      A unit can only ever show results that are already attributable to the
+ *      class. `units.test.ts` pins both invariants against `curriculum/majors.yaml`.
+ *
+ * A unit with no families is honest, not broken: it is a part of the class
+ * nothing has been authored for yet, and it reads "not measured yet" — never a
+ * blank, never a zero. Its `source` is absent for the same reason: there is no
+ * quiz or exercise set behind a score that does not exist.
+ */
+
+/** One unit of one class. The class page's column; the evidence level's subject. */
+export interface ClassUnit {
+  /** URL segment and React key. Stable; the title may be reworded. */
+  key: string;
+  /** The unit's number within the course, and its display order. 1-based. */
+  n: number;
+  /** What the professor reads at the top of the column. */
+  title: string;
+  /**
+   * What this unit's tests cover — the short list of topics or skills shown as
+   * chips on the column header and the evidence page. The honest answer to "what
+   * is in this part of the class", independent of whether anything has run.
+   */
+  covers: string[];
+  /** One line under the title: what this part of the class is. */
+  blurb: string;
+  /**
+   * The task families whose results define this unit. Empty means nothing has
+   * been authored for this part of the class yet — "not measured yet", by
+   * construction, not by a remembered caveat.
+   */
+  families: string[];
+  /**
+   * The quiz or exercise set the unit's items come from, shown on the evidence
+   * page's receipt line. Absent for a unit with no families — there is no source
+   * behind a score that does not exist.
+   */
+  source?: string;
+  /**
+   * An honesty caveat shown on the unit's evidence page, when the results under
+   * it need one the score alone cannot carry — e.g. that they come from a
+   * synthetic extension rather than an ingest of the real instrument. Absent
+   * when the unit is exactly what it looks like.
+   */
+  caveat?: string;
+}
+
+/**
+ * The taxonomy, keyed by course code — the same join key `majors.yaml` and
+ * `slo.yaml` use. A class absent here has no unit breakdown and the class page
+ * says so rather than inventing one.
+ *
+ * MIS 200 — the one populated class in the product. Its five units are the five
+ * content areas of the real Exam 1, as analysed in `tasks/mis200-exam1-mapping.md`,
+ * laid out in course order. The mapping of the three authored families:
+ *
+ *   mis200-is-concepts          → Unit 1 Information systems & business models (SLO9)
+ *   mis200-is-problem-solving   → Unit 2 Competitive strategy with IS         (SLO1)
+ *   mis200-spreadsheet-formulas → Unit 3 Spreadsheets & data analysis         (SLO2)
+ *
+ * ⚠ THE Unit 2 PLACEMENT IS A JUDGEMENT CALL, RECORDED HERE. The
+ * is-problem-solving family is not an Exam 1 ingest — it is a synthetic
+ * extension raising the course's technology-investment material to SLO1's
+ * problem-solving level (appraise an initiative, recommend a course of action).
+ * Of the five content areas, strategic appraisal of a technology initiative sits
+ * closest to competitive strategy, so that is the unit it is filed under. Its
+ * evidence page carries the synthetic-extension caveat so the number is not
+ * misread as exam-derived.
+ *
+ * ⚠ TWO UNITS READ "NOT MEASURED YET" AND THAT IS CONSERVATIVE, NOT WRONG.
+ * Unit 4 (Platform & network economics) and Unit 5 (Levels of IS use) have no
+ * dedicated family, so they are empty. Some items inside `mis200-is-concepts` do
+ * touch those topics, but that family carries one aggregate score; splitting it
+ * across three units would print one number three times (invariant 1).
+ * Separating those areas honestly needs task- or sample-level content tags — a
+ * follow-up, noted in the exam-mapping doc.
+ */
+const TAXONOMY: Record<string, ClassUnit[]> = {
+  "MIS 200": [
+    {
+      key: "information-systems-business-models",
+      n: 1,
+      title: "Information systems & business models",
+      covers: ["What an IS is", "System types", "Business-model basics"],
+      blurb:
+        "The vocabulary of information systems and the business models they enable — the breadth the first course is built on.",
+      families: ["mis200-is-concepts"],
+      source: "Unit 1 quiz and practice set",
+    },
+    {
+      key: "competitive-strategy-with-is",
+      n: 2,
+      title: "Competitive strategy with IS",
+      covers: ["Value chain", "Five Forces", "Competing with IS"],
+      blurb:
+        "Appraising a proposed technology initiative and recommending a course of action — strategy applied to an IS investment.",
+      families: ["mis200-is-problem-solving"],
+      source: "Unit 2 quiz and practice set",
+      caveat:
+        "These items are a synthetic extension, not an ingest of Exam 1. Every item on that paper is forced-choice, and MIS 200 reinforces problem-solving without examining it there; this raises the course's technology-investment material to the level of appraising and recommending. A score here is not comparable to a student cohort's Exam 1 performance, because no such performance exists.",
+    },
+    {
+      key: "spreadsheets-data-analysis",
+      n: 3,
+      title: "Spreadsheets & data analysis",
+      covers: ["Excel formulas", "Functions", "Analyzing business data"],
+      blurb:
+        "Authoring formulas over a supplied layout and reading a business dataset — the one content area MIS 200 is a programme assessment point for.",
+      families: ["mis200-spreadsheet-formulas"],
+      source: "Unit 3 Excel exercises",
+    },
+    {
+      key: "platform-network-economics",
+      n: 4,
+      title: "Platform & network economics",
+      covers: ["Network effects", "Two-sided platforms", "Platform strategy"],
+      blurb:
+        "Direct and indirect network effects, and what a platform does and does not do.",
+      families: [],
+    },
+    {
+      key: "levels-of-is-use",
+      n: 5,
+      title: "Levels of IS use in organizations",
+      covers: ["Operational systems", "Managerial systems", "Strategic systems"],
+      blurb:
+        "Strategic, tactical and operational use of information systems — decided by the scope and horizon of a decision, not the seniority of whoever makes it.",
+      families: [],
+    },
+  ],
+};
+
+/** The units a class defines, in course order. Empty for a class with no
+ * taxonomy yet — the class page renders that honestly. */
+export function unitsFor(course: string): ClassUnit[] {
+  return TAXONOMY[course] ?? [];
+}
+
+/** Does this class have a unit breakdown at all? */
+export function hasUnits(course: string): boolean {
+  return (TAXONOMY[course]?.length ?? 0) > 0;
+}
+
+/** One unit of one class, by its URL key. Case-insensitive on the key so a
+ * hand-typed URL still resolves. */
+export function findUnit(course: string, key: string): ClassUnit | undefined {
+  const wanted = key.toLowerCase();
+  return unitsFor(course).find((unit) => unit.key.toLowerCase() === wanted);
+}
+
+/** The unit's title, or the raw key when the class defines no such unit — never
+ * a thrown error on a bad URL segment. */
+export function unitTitle(course: string, key: string): string {
+  return findUnit(course, key)?.title ?? key;
+}
+
+/** Every course code that carries a unit taxonomy. For tests and guards. */
+export function coursesWithUnits(): string[] {
+  return Object.keys(TAXONOMY);
+}

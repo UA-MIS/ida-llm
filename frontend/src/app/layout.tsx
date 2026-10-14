@@ -1,74 +1,48 @@
 import type { Metadata } from "next";
-import { Fraunces, IBM_Plex_Sans } from "next/font/google";
+import { Figtree } from "next/font/google";
 
 import "./globals.css";
 
 /**
- * ⚠ THE ROOT LAYOUT CARRIES NO CHROME. It used to render the header, the nav
- * and the `<main>` wrapper, which meant every route in the app was inside a
- * 1080px column under a "Capstone-IDA" h1.
- *
- * The landing page is a full-bleed editorial page with its own masthead, so it
- * cannot live inside that column. Rather than conditionally suppress the chrome
- * from a layout that does not know which route it is rendering — the usual way
- * this goes wrong — the chrome moved down one level into `(site)/layout.tsx`,
- * and every product route moved into that route group with it.
- *
- * A route group `(site)` adds NO path segment: `/leaderboard` is still
- * `/leaderboard`. What it buys is exactly one thing — a layout boundary the
- * landing page sits outside of.
+ * ⚠ THE ROOT LAYOUT CARRIES NO CHROME. The product header, nav and `<main>`
+ * wrapper live one level down in `(site)/layout.tsx`, behind a `(site)` route
+ * group that adds no path segment. See that file for why.
  */
 
 /**
- * ⚠ SELF-HOSTED AT BUILD TIME, NOT LINKED TO GOOGLE AT RUNTIME.
+ * ⚠ ONE FAMILY, SELF-HOSTED AT BUILD TIME. The "Organic" design the human's
+ * mockup specifies uses Figtree for everything — body text and headings alike,
+ * headings simply set at weight 700. `next/font/google` downloads it during
+ * `next build` and serves it same-origin under `/_next/static/media`, so the
+ * browser makes NO request to fonts.gstatic.com at runtime (no third party
+ * watching who reads the page, no render-blocking round trip, and nothing for a
+ * future CSP to break). The cost is that `next build` needs egress to
+ * fonts.gstatic.com — the Docker build already reaches the network for `npm ci`,
+ * so this adds no new class of dependency; an airgapped build would fail here and
+ * the fix is `next/font/local` with the .woff2 vendored in.
  *
- * `next/font/google` downloads these during `next build` and emits them as
- * same-origin assets under `/_next/static/media`. The browser therefore makes
- * NO request to fonts.googleapis.com or fonts.gstatic.com, which matters for
- * three separate reasons:
- *
- *   1. There is no CSP on this app today, but `apps/agile` already ships one and
- *      pins it by test. When this app grows the same headers, a `<link>` to
- *      Google would break at that moment — and the failure would be a silent
- *      fallback to Times New Roman, not an error. Self-hosting is immune.
- *   2. No third-party request means no third party able to see who reads the
- *      page, which a site arguing about data residency should not concede.
- *   3. No render-blocking round trip to a host we do not control.
- *
- * The cost is that `next build` needs egress to fonts.gstatic.com. The Docker
- * build already reaches the network (`npm ci`), so this adds no new class of
- * dependency — but if a future airgapped build fails here, THIS is the reason,
- * and the fix is `next/font/local` with the .woff2 files vendored into the repo.
- *
- * ⚠ THE VARIABLE NAMES ARE THE CONTRACT. `--font-display` and `--font-body` are
- * consumed by the Landing block in globals.css; renaming one here silently
- * drops the page back to the fallback stack.
+ * ⚠ THE VARIABLE NAME IS THE CONTRACT. `--font-body` is consumed throughout
+ * globals.css; `--font-display` is aliased to it there (headings are the same
+ * family, heavier), so renaming this silently drops the page to the fallback.
  */
-const fraunces = Fraunces({
+const figtree = Figtree({
   subsets: ["latin"],
   display: "swap",
-  // `opsz` is what lets one family work at both 60px and 14px; `SOFT` rounds the
-  // terminals just enough to read warm rather than institutional. Both axes are
-  // set per-rule in the stylesheet.
-  //
-  // ⚠ NO `weight` HERE, AND THAT IS REQUIRED, NOT AN OVERSIGHT. `next/font`
-  // rejects `axes` combined with an explicit weight list — "Axes can only be
-  // defined for variable fonts when the weight property is nonexistent or set
-  // to `variable`" — because naming weights pins the static instances, which is
-  // exactly what having axes means we do not want. Omitting it ships the full
-  // variable weight range, which the stylesheet uses from 300 to 600.
-  axes: ["SOFT", "WONK", "opsz"],
-  style: ["normal", "italic"],
-  variable: "--font-display",
-});
-
-const plex = IBM_Plex_Sans({
-  subsets: ["latin"],
-  display: "swap",
-  weight: ["300", "400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
   style: ["normal", "italic"],
   variable: "--font-body",
 });
+
+/**
+ * ⚠ NO-FLASH THEME. The toggle writes the reader's choice to localStorage and
+ * sets `data-theme` on <html>; this inline script replays that choice BEFORE the
+ * first paint, so a reader who picked dark does not see a flash of light (or vice
+ * versa) on every navigation. With no stored choice it does nothing and the
+ * `@media (prefers-color-scheme)` default in globals.css decides. It is tiny,
+ * self-contained, and must run before CSS applies, which is why it is inlined
+ * here rather than shipped as a component.
+ */
+const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t);}}catch(e){}})();`;
 
 export const metadata: Metadata = {
   title: "Capstone-IDA",
@@ -82,7 +56,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${plex.variable}`}>
+    <html lang="en" className={figtree.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body>{children}</body>
     </html>
   );

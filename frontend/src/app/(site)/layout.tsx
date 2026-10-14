@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ThemeToggle } from "@/components/theme-toggle";
 import { resolveVersion } from "@/lib/version";
 
 /**
@@ -43,18 +44,27 @@ export default function SiteLayout({
           `<footer>` the `contentinfo` role — only when it is NOT inside
           `article`/`aside`/`main`/`nav`/`section`. `.site-header`/`.site-footer`
           in globals.css carry the page width and padding. */}
+      {/* ⚠ THE BRAND IS THE WAY HOME. The mockup's masthead: a terracotta
+          dot-in-circle mark, the product name, and the college under it — the
+          whole thing a link to `/`. The version badge rides quietly beside it,
+          and the light/dark toggle sits at the far right. */}
       <header className="site-header">
-        <h1>
-          <Link href="/" style={{ color: "inherit", textDecoration: "none" }}>
-            Capstone-IDA
-          </Link>
-          <span
-            className={`badge badge-version${version.identified ? "" : " badge-version-unknown"}`}
-            title={version.detail}
-          >
-            {version.label}
+        <Link href="/" className="brand" aria-label="Coursework Benchmark — home">
+          <span className="brand-mark" aria-hidden="true">
+            <span className="brand-dot" />
           </span>
-        </h1>
+          <span className="brand-text">
+            <span className="brand-name">Coursework Benchmark</span>
+            <span className="brand-sub">Culverhouse College of Business</span>
+          </span>
+        </Link>
+        <span
+          className={`badge badge-version${version.identified ? "" : " badge-version-unknown"}`}
+          title={version.detail}
+        >
+          {version.label}
+        </span>
+        <ThemeToggle />
       </header>
       <main id="main-content">{children}</main>
       {/* The secondary way to "how we test". It left the top nav so the landing

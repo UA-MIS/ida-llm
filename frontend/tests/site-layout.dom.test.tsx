@@ -66,7 +66,7 @@ describe("the tool-page chrome's landmarks", () => {
 });
 
 describe("the header has no top nav, only the wordmark", () => {
-  it("keeps the Capstone-IDA wordmark as a link home", () => {
+  it("keeps the Coursework Benchmark brand as a link home", () => {
     const { container } = render(
       <SiteLayout>
         <p>page content</p>
@@ -77,8 +77,8 @@ describe("the header has no top nav, only the wordmark", () => {
     const home = Array.from(header.querySelectorAll("a")).find(
       (a) => a.getAttribute("href") === "/",
     );
-    expect(home, "no wordmark home link in the header").toBeTruthy();
-    expect(home!.textContent).toContain("Capstone-IDA");
+    expect(home, "no brand home link in the header").toBeTruthy();
+    expect(home!.textContent).toContain("Coursework Benchmark");
   });
 
   it("renders no navigation links in the header", () => {
