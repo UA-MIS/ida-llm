@@ -194,15 +194,37 @@ majors:
         # ⚠ THE ONLY POPULATED `task_families` IN THIS FILE, AND THE REASON THE
         # FIELD EXISTS. Results are filed by OUTCOME, not by course. Without
         # this, "how does a model do on MIS 200" would be computed as "how does
-        # it do on SLO1, SLO2 and SLO9" -- and the moment these three families
-        # are run, that same number would appear under AC 210, GBA 300, ST 260,
+        # it do on SLO1, SLO2 and SLO9" -- and the moment these families are
+        # run, that same number would appear under AC 210, GBA 300, ST 260,
         # OM 300 and FI 302, every class the map marks against SLO2. A dozen
         # courses nobody benchmarked would show one exam's score. Listing the
         # families makes "measured" a claim about THIS class's own material,
         # structurally, rather than a caveat somebody has to remember to print.
+        #
+        # ⚠ THE PER-TOPIC SLO9 FAMILIES (competitive-strategy, platform-network,
+        # levels-of-is-use) ARE ADDITIONS, NOT A SPLIT OF THE BREADTH FAMILY.
+        # `mis200-is-concepts` stays the WIDE SLO9 breadth family (Unit 1); the
+        # three per-topic families measure the course's other exam content areas
+        # (Units 2, 4, 5) each on its own, so the class page can report every
+        # part of the course. They overlap in subject with the breadth family on
+        # purpose -- breadth and depth are different measurements -- and because
+        # they are different families, no result row is printed under two units
+        # (the one-family-per-unit partition in `frontend/src/lib/units.ts`). The
+        # design decision is written up in `tasks/mis200-exam1-mapping.md` §6.
+        #
+        # ⚠ `mis200-is-problem-solving` STAYS LISTED HERE BUT IS NOT A UNIT.
+        # It is the synthetic SLO1 extension (a cognitive level Exam 1 does not
+        # reach -- see the mapping doc §3). Keeping it attributed to MIS 200
+        # keeps the SLO1 OUTCOME view non-empty for the course; it is
+        # deliberately absent from the UNIT taxonomy, which is organised by the
+        # exam's content areas, because it is not one of them. See
+        # `frontend/src/lib/units.ts` and the mapping doc §6.
         task_families:
           - mis200-spreadsheet-formulas
           - mis200-is-concepts
+          - mis200-competitive-strategy
+          - mis200-platform-network
+          - mis200-levels-of-is-use
           - mis200-is-problem-solving
       - course: MIS 221
         title: Business Programming I

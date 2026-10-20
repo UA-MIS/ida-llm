@@ -374,15 +374,27 @@ describe("unit breakdown — the class page's content axis", () => {
     return { ...buildClasses(b, majorOf(b, MIS))[0]!, task_families: families };
   }
 
-  it("buckets each family into one unit and leaves empty units unmeasured", () => {
+  it("gives each of the five units its own family's score, and surfaces no family twice", () => {
     const b = board([
-      task({ family: "mis200-spreadsheet-formulas", task_id: "formulas/one", slo: "SLO2", results: [result({ mean_score: 0.8 })] }),
       task({ family: "mis200-is-concepts", task_id: "concepts/one", slo: "SLO9", results: [result({ mean_score: 0.2 })] }),
+      task({ family: "mis200-competitive-strategy", task_id: "strategy/one", slo: "SLO9", results: [result({ mean_score: 0.5 })] }),
+      task({ family: "mis200-spreadsheet-formulas", task_id: "formulas/one", slo: "SLO2", results: [result({ mean_score: 0.8 })] }),
+      task({ family: "mis200-platform-network", task_id: "platform/one", slo: "SLO9", results: [result({ mean_score: 0.4 })] }),
+      task({ family: "mis200-levels-of-is-use", task_id: "levels/one", slo: "SLO9", results: [result({ mean_score: 0.6 })] }),
+      // Claimed by the class but NOT by any unit — its 0.9 must never surface
+      // under a unit column (it belongs to the SLO1 outcome axis).
       task({ family: "mis200-is-problem-solving", task_id: "cases/one", slo: "SLO1", results: [result({ mean_score: 0.9 })] }),
       task({ family: "unrelated", task_id: "unrelated/one", slo: "SLO2", results: [result({ mean_score: 1 })] }),
     ]);
     const klass = mis200With(
-      ["mis200-spreadsheet-formulas", "mis200-is-concepts", "mis200-is-problem-solving"],
+      [
+        "mis200-spreadsheet-formulas",
+        "mis200-is-concepts",
+        "mis200-competitive-strategy",
+        "mis200-platform-network",
+        "mis200-levels-of-is-use",
+        "mis200-is-problem-solving",
+      ],
       b,
     );
     const matrix = buildUnitMatrix(b, klass, MIS);
@@ -411,15 +423,18 @@ describe("unit breakdown — the class page's content axis", () => {
     ]);
 
     const byKey = new Map(matrix.entities.map((e) => [e.key, e]));
-    // Each family's score lands under exactly its one unit.
+    // Each unit shows its OWN family's score — all five measured, none borrowed.
     expect(byKey.get("information-systems-business-models")!.overall.score).toBeCloseTo(0.2);
-    expect(byKey.get("competitive-strategy-with-is")!.overall.score).toBeCloseTo(0.9);
+    expect(byKey.get("competitive-strategy-with-is")!.overall.score).toBeCloseTo(0.5);
     expect(byKey.get("spreadsheets-data-analysis")!.overall.score).toBeCloseTo(0.8);
+    expect(byKey.get("platform-network-economics")!.overall.score).toBeCloseTo(0.4);
+    expect(byKey.get("levels-of-is-use")!.overall.score).toBeCloseTo(0.6);
 
-    // A unit with no family never borrows a sibling's number.
-    expect(byKey.get("platform-network-economics")!.overall.score).toBeNull();
-    expect(byKey.get("levels-of-is-use")!.overall.score).toBeNull();
-    expect(byKey.get("platform-network-economics")!.status).toBe("not_measured");
+    // The SLO1 extension is claimed by the class but belongs to no unit, so its
+    // 0.9 appears under no column — the content axis does not show it.
+    for (const e of matrix.entities) {
+      expect(e.overall.score, `${e.key} must not show the SLO1 extension's 0.9`).not.toBeCloseTo(0.9);
+    }
 
     // The unrelated family is in no MIS 200 unit.
     expect(matrix.entities.some((e) => e.heading.toLowerCase().includes("unrelated"))).toBe(false);

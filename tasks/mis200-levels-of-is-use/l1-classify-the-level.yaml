@@ -1,0 +1,153 @@
+# mis200-levels-of-is-use, rung 1 of 2.
+#
+# WHERE THIS FAMILY COMES FROM. Three of the thirty-two items on the MIS 200
+# Exam 1 concern the organisational LEVELS at which information systems are used
+# -- operational, tactical (managerial) and strategic. Against
+# `curriculum/slo.yaml` they measure SLO9 (General Business Knowledge):
+# forced-choice recognition items. The family is tagged SLO9 for the reason in
+# `tasks/mis200-exam1-mapping.md` §3.
+#
+# WHY IT IS ITS OWN FAMILY, DISTINCT FROM `mis200-is-concepts`. The breadth
+# family (`mis200-is-concepts/l2`) already carries three level-classification
+# items as part of a wide SLO9 recall sweep, and it stays exactly as it is: it
+# is Unit 1's measurement. This family is the course's Unit 5, "Levels of IS use
+# in organizations", measured on its own, with scenarios different from the
+# breadth family's and a second rung (match a system to the level it serves)
+# the breadth family does not reach. The breadth-vs-per-topic design decision is
+# recorded in `tasks/mis200-exam1-mapping.md` §6; the two families overlap in
+# subject on purpose and, being separate families, never print one result under
+# two units (the partition in `frontend/src/lib/units.ts`).
+#
+# WHY THESE ARE THE HARD ONES. The level is decided by the SCOPE and HORIZON of
+# the use, not by the SENIORITY of whoever is described -- and seniority is
+# correlated with level often enough to feel like a rule. `senior-doing-routine`
+# breaks that correlation deliberately: a senior executive performing a single
+# routine lookup is using the system at the OPERATIONAL level, title
+# notwithstanding. `mis200-is-concepts/l2` breaks the correlation in the other
+# direction (a vice-president making a tactical decision), so the two families
+# together test the rule from both sides.
+version: 1
+id: mis200-levels-of-is-use/l1-classify-the-level
+title: SLO9 -- classifying the organisational level of a described system use
+description: >
+  Four four-option items in which a situation is described and the student must
+  decide the organisational level at which the information system is being used
+  -- operational, tactical or strategic -- from the scope and time horizon of
+  the use rather than from the seniority of the person. One item is built so
+  that seniority and the correct level disagree. The fourth option is a word
+  that is not a level in the three-level model, included so the item is a
+  genuine four-option choice.
+
+  Four options, so the guessing floor is 0.25.
+
+  Provenance: every scenario, option and distractor was written for this file,
+  and the scenarios differ from those in `mis200-is-concepts/l2`. The concepts
+  were derived from the published blueprint of a real MIS 200 Exam 1 (three
+  levels-of-IS-use items), but no exam stem, option, scenario or answer key is
+  reproduced, and no exam asset is committed to this repository. No student work
+  and no textbook content.
+kind: verifiable
+domain: information-systems
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate
+  information-systems examination. Exactly one option is correct. You may
+  reason briefly first, but you must then put the letter of the correct option
+  alone on the last line, with no punctuation and no other text on that line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", mis200-levels-of-is-use, ladder-l1, business-knowledge, information-systems, forced-choice]
+samples:
+  - id: operational-stock-receipt
+    input: >-
+      A warehouse worker scans each pallet as it comes off a delivery truck. The
+      system adds the items to the on-hand count and prints a putaway label
+      telling him which aisle to shelve them in. He scans, reads the label,
+      shelves the pallet, and moves to the next. At which level of the
+      organisation is the information system being used here?
+      A) Strategic
+      B) Tactical
+      C) Operational
+      D) Executive
+    # C. One routine transaction at a time, no discretion, immediate horizon:
+    # the system is supporting day-to-day work, which is the operational level.
+    # D ("Executive") is not a level in the three-level model; it is the word a
+    # student carries in from elsewhere and picks when guessing from vocabulary,
+    # and it makes a four-option item out of a three-category distinction
+    # without inventing a fourth plausible level. A and B are the real levels
+    # the item is tested against, and nothing in the stem -- no planning, no
+    # allocation, no direction -- supports either.
+    target: "C"
+    metadata: { skill: organisational-level, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: tactical-quarter-allocation
+    input: >-
+      A regional sales manager pulls the last two quarters of results by product
+      line and decides how to split next quarter's promotional spend across
+      those lines to hit the targets head office has already set. The strategy
+      and the targets are fixed; she is allocating a budget within them for the
+      coming quarter. At which level is the information system being used here?
+      A) Operational
+      B) Tactical
+      C) Strategic
+      D) Administrative
+    # B. A medium-horizon resource-allocation decision taken INSIDE a strategy
+    # already set -- the hallmark of the tactical (managerial) level. The stem
+    # states both marks: a single coming quarter, and "the strategy and the
+    # targets are fixed".
+    # C is the trap for a model that reads "decides how to split spend" as
+    # strategy-making; it is not, because the firm's direction is not in
+    # question, only the allocation within it. A is too low (this is a planning
+    # decision, not a transaction). D is not a level in the model.
+    target: "B"
+    metadata: { skill: organisational-level, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: strategic-new-market-entry
+    input: >-
+      The executive committee of a regional bank studies five years of
+      demographic trends, competitor moves and its own capability data to decide
+      whether to enter retail banking in a neighbouring country over the next
+      several years -- a commitment that would reshape what the bank is. At which
+      level is the information system being used here?
+      A) Strategic
+      B) Tactical
+      C) Operational
+      D) Transactional
+    # A. Long horizon (several years), whole-firm scope, and a decision about
+    # what the bank should BE -- the three marks of a strategic use, all stated
+    # so the item is decidable from the decision rather than from who is making
+    # it. B is too narrow (this is not allocation within a set strategy; it is
+    # setting the strategy). C and D name the lowest level and the transaction
+    # systems that serve it, neither of which fits a multi-year direction call.
+    target: "A"
+    metadata: { skill: organisational-level, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: senior-doing-routine
+    input: >-
+      A company's chief operating officer happens to take a customer's phone
+      call and opens the order system to read back the status and tracking
+      number of that one customer's shipment. She reads the record, relays the
+      three lines on the screen, and ends the call. At which level is the
+      information system being used in this instance?
+      A) Strategic, because a chief officer is using it
+      B) Tactical, because she is a manager
+      C) Operational, because it is a single routine lookup
+      D) Executive, because of her title
+    # C, and this is the item the rung exists for. The cue that misleads is
+    # SENIORITY: the user is a chief officer, so A, B and D all offer to decide
+    # the level from her TITLE. But the level is decided by the USE, and the use
+    # is a single routine record lookup with no planning and no discretion --
+    # the operational level, exactly as the warehouse scan was.
+    # The options are written so the distractor's faulty REASONING is visible in
+    # the option itself ("because a chief officer is using it"), which is the
+    # mistaken rule the item is checking for. D's "Executive" is additionally
+    # not a level in the model at all. This inverts the seniority trap in
+    # `mis200-is-concepts/l2`, where a vice-president made a genuinely tactical
+    # decision; here a chief officer makes a genuinely operational one.
+    target: "C"
+    metadata: { skill: level-versus-seniority, provenance: synthetic, slo: SLO9, use_mode: capability }

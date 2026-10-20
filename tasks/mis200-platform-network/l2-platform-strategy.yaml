@@ -1,0 +1,146 @@
+# mis200-platform-network, rung 2 of 2.
+#
+# WHAT THIS RUNG ADDS over rung 1. Rung 1 asks which network phenomenon is at
+# work. This rung asks about the STRATEGY that follows from it: how a two-sided
+# platform gets off the ground when neither side will come without the other,
+# why some platform markets tip to a single winner, what weakens a platform's
+# hold on its users, and why a platform subsidises one side. These are the
+# platform-economics ideas a first MIS course introduces beyond the bare
+# definition of a network effect.
+#
+# STILL SLO9. Forced-choice recognition, one correct option each; the work is
+# recognising the mechanism, not proposing a strategy of one's own.
+#
+# WHY THE SCENARIOS ARE NEW. None reuses a situation from
+# `mis200-is-concepts/l2` or from rung 1; every platform, side and figure is
+# synthetic and authored for this file. Adapted, not copied -- see rung 1's
+# header and `tasks/mis200-exam1-mapping.md` §4.
+#
+# THE TRAP IN `multi-homing`. The seductive wrong reading is that strong network
+# effects always mean a durable monopoly. Multi-homing -- users keeping a foot
+# on several competing platforms at once -- is the standard counterweight a
+# first course teaches, and the item is built so the "network effects win it
+# all" answer is the one to resist.
+version: 1
+id: mis200-platform-network/l2-platform-strategy
+title: SLO9 -- platform strategy and market dynamics
+description: >
+  Four four-option items on the strategy of two-sided platforms: the
+  chicken-and-egg launch problem, winner-take-all tipping, multi-homing as a
+  check on platform power, and cross-side (two-sided) pricing where one side is
+  subsidised to attract the other. Distractors are the neighbouring platform
+  concept, so an item cannot be cleared by naming any plausible platform idea.
+
+  Four options, so the guessing floor is 0.25.
+
+  Provenance: every platform, side, figure, option and distractor was written
+  for this file. The concepts were derived from the published blueprint of a
+  real MIS 200 Exam 1 (five platform-and-network items), but no exam stem,
+  option, scenario or answer key is reproduced, and no exam asset is committed
+  to this repository. No student work and no textbook content.
+kind: verifiable
+domain: information-systems
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate
+  information-systems examination. Exactly one option is correct. You may
+  reason briefly first, but you must then put the letter of the correct option
+  alone on the last line, with no punctuation and no other text on that line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", mis200-platform-network, ladder-l2, business-knowledge, information-systems, forced-choice]
+samples:
+  - id: chicken-and-egg-launch
+    input: >-
+      A startup wants to launch a food-delivery platform in a new city.
+      Restaurants will not sign up because there are no customers ordering yet,
+      and customers will not download the app because no restaurants are listed
+      yet. Neither side will join until the other side is already there. What is
+      this launch difficulty called?
+      A) The chicken-and-egg problem of a two-sided platform
+      B) A negative network effect
+      C) Disintermediation
+      D) Economies of scale
+    # A. The textbook name for the launch bind of a two-sided platform: each
+    # side waits for the other, so an empty platform struggles to start. The
+    # stem describes the bind in both directions.
+    # B is wrong in sign -- this is the ABSENCE of users, not users degrading
+    # the service. C and D are real platform-adjacent terms that name something
+    # else entirely (removing a middleman; falling unit cost), and test whether
+    # a model recognises the specific launch problem or just platform vocabulary.
+    target: "A"
+    metadata: { skill: platform-launch-dynamics, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: winner-take-all-tipping
+    input: >-
+      In one city's ride-hailing market, riders want the app with the most
+      drivers (shorter waits) and drivers want the app with the most riders
+      (less idle time), and almost nobody bothers running two apps at once. Over
+      a year the market collapses onto a single dominant app while the others
+      fade. What property of this market best explains that outcome?
+      A) Weak network effects and easy multi-homing
+      B) Strong cross-side network effects with little multi-homing, so the market tips
+      C) Economies of scale on the app's server costs
+      D) A negative network effect among riders
+    # B. Two conditions together produce a winner-take-all tip: strong cross-side
+    # network effects (each side wants the side with the most of the other) AND
+    # little multi-homing (users commit to one app). The stem states both, and
+    # it is the COMBINATION that tips the market -- which is why A, the exact
+    # opposite pair, is the wrong answer rather than a nonsense one.
+    # C attributes the outcome to the app's own costs, which the stem never
+    # mentions and which would not concentrate a market this way. D is the wrong
+    # sign and the wrong side -- riders here benefit from more drivers, not from
+    # fewer riders.
+    target: "B"
+    metadata: { skill: winner-take-all-dynamics, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: multi-homing
+    input: >-
+      Most food couriers in a city keep three different delivery apps open at
+      once and simply take whichever job pays best at the moment, and many
+      diners likewise have all three apps installed. No single app can count on
+      keeping either couriers or diners to itself. What does this behaviour do
+      to any one platform's competitive position?
+      A) It strengthens each platform into a monopoly through network effects
+      B) It weakens each platform's hold, because users multi-home across rivals
+      C) It is an example of disintermediation
+      D) It raises switching costs for couriers
+    # B. When users keep a presence on several competing platforms at once --
+    # multi-homing -- no single platform locks them in, so network effects do
+    # NOT harden into a monopoly. This is the counterweight a first course
+    # teaches against the assumption that network effects always win.
+    # A is that assumption, stated as the trap the item exists to catch. C
+    # misnames the behaviour (no intermediary is being removed). D is backwards:
+    # multi-homing means switching costs are LOW -- a courier already on all
+    # three apps pays nothing to move a job between them.
+    target: "B"
+    metadata: { skill: multi-homing-and-platform-power, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: cross-side-subsidy
+    input: >-
+      A professional-networking platform lets ordinary members join and use it
+      for free, and makes its money by charging recruiters for premium access to
+      those members. The free side exists to build the audience the paying side
+      will pay to reach. What pricing pattern is this?
+      A) Cost leadership
+      B) A freemium upgrade within a single group of users
+      C) Cross-side (two-sided) pricing: one side is subsidised to attract the other
+      D) A negative network effect
+    # C. The defining feature of two-sided pricing: the platform subsidises one
+    # side (free members) to make itself valuable to the other side (paying
+    # recruiters), because each side's value depends on the other's size. The
+    # stem states the logic -- "the free side exists to build the audience the
+    # paying side will pay to reach".
+    # B is the sharp distractor: freemium also mixes free and paid, but freemium
+    # upgrades the SAME user from a free to a paid tier, whereas here the free
+    # users and the paying users are DIFFERENT SIDES of a market -- members
+    # versus recruiters. That two-sided structure is what makes it cross-side
+    # pricing and not freemium. A is a cost strategy, unrelated. D is the wrong
+    # sign.
+    target: "C"
+    metadata: { skill: two-sided-pricing, provenance: synthetic, slo: SLO9, use_mode: capability }

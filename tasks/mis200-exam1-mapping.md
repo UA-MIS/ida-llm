@@ -160,3 +160,102 @@ representation in the current scorer set.
 **Coverage so far.** 5 tasks, 27 samples: SLO2 ×2 tasks (11 samples), SLO9 ×2
 (12), SLO1 ×1 (4). This is a first batch sized to prove the approach, not the
 whole paper.
+
+---
+
+## 6. The per-unit families, and the SLO9-breadth tension they resolve
+
+The first batch (§5) left the class page able to score three of the course's
+five content areas. The product shows a class by UNIT — the five content areas
+of Exam 1, in course order (`frontend/src/lib/units.ts`) — so two units
+(Platform & network economics, Levels of IS use) read "not measured yet", and a
+third (Competitive strategy) carried only the synthetic SLO1 extension, which
+does not score without a judge. This section records the second batch, which
+makes all five units independently scorable, and the decisions it rested on.
+
+**The tension.** `curriculum/slo.yaml` describes SLO9 as the one outcome a
+*wide* forced-choice breadth family measures well, and `mis200-is-concepts` is
+that family: it sweeps IS concepts, business models, two competitive-strategy
+frameworks, platform/network distinctions and the organisational levels, as one
+aggregate SLO9 score. But a breadth family carries one number, and
+`units.ts` invariant 1 forbids feeding that number to more than one unit. So the
+platform items and the level items already *inside* the breadth family could not
+light up Units 4 and 5 without printing one score under three headings — the
+exact fabrication the invariant exists to prevent.
+
+**The resolution: add per-topic families; do not gut the breadth family.** The
+breadth family stays exactly as it is and remains Unit 1's measurement — its job
+is breadth, and narrowing it to make room for the per-topic families would
+destroy the thing it measures. Alongside it, three new forced-choice families
+measure the other content areas on their own:
+
+| family | unit | items |
+|---|---|---|
+| `mis200-competitive-strategy` | Unit 2 Competitive strategy with IS | l1 strategy frameworks (4) + l2 competing with IS (4) |
+| `mis200-platform-network` | Unit 4 Platform & network economics | l1 network effects (4) + l2 platform strategy (4) |
+| `mis200-levels-of-is-use` | Unit 5 Levels of IS use | l1 classify the level (4) + l2 match system to level (4) |
+
+These overlap in SUBJECT with the breadth family on purpose: breadth and depth
+are different measurements. Because they are different FAMILIES, and a family
+maps to exactly one unit, no result row is ever printed under two units. Their
+scenarios are deliberately distinct from the breadth family's, and they reach
+further than it does — negative network effects, winner-take-all and
+multi-homing (Unit 4), and matching a system's behaviour to the level it serves
+(Unit 5) — so a dedicated family earns its place rather than re-skinning the
+breadth items.
+
+**Unit 2 scores at the honest outcome (SLO9), not via a rushed SLO1 judge.**
+Two options were on the table: (a) approve a judge rubric so the existing
+`mis200-is-problem-solving` SLO1 extension scores Unit 2, or (b) author a
+competitive-strategy family at the outcome the exam section actually tests. We
+took (b). The six competitive-strategy items on Exam 1 are forced-choice
+framework-RECOGNITION items, and §3 of this document is explicit that a
+scenario-dressed single-best-answer item measures recognition (SLO9), not the
+problem-solving SLO1 names. So `mis200-competitive-strategy` is tagged SLO9 and
+scored deterministically (`exact_match`), with no judge, exactly as Units 1 and
+3 are. This makes Unit 2's score the honest counterpart of the exam's own
+competitive-strategy section — comparable to what that section measured — and
+avoids standing up an LLM-judge rubric under a deadline, where the pressure is
+to produce a number rather than a sound instrument.
+
+**The SLO1 extension moves to the outcome axis.** `mis200-is-problem-solving`
+remains a MIS 200 family — it stays in the course's `task_families` so the SLO1
+OUTCOME view is not silently empty (§3's finding stands: the course reinforces
+SLO1, and no instrument here assesses it, so this synthetic extension is the
+only SLO1 signal MIS 200 has). But it is deliberately absent from the UNIT
+taxonomy: it is not one of Exam 1's content areas, it is a cross-cutting
+capability extension at a cognitive level the paper never reaches. It therefore
+belongs on the outcome axis (where its own `description` carries the
+synthetic-extension caveat), not on the content axis the class page shows. This
+is permitted by construction: `units.ts`'s invariants require a family to live
+in at most one unit, not that every class family live in one. The
+`fix/slo1-appraisal-tags` work (merged into `main`, commit `8a08888`) restored
+and guarded that family's SLO1 tags; nothing here changes them.
+
+**The exact new task ids** (for the eventual benchmark run; all SLO9, all
+`verifiable`/`exact_match`, four 4-option samples each):
+
+```
+mis200-competitive-strategy/l1-strategy-frameworks
+mis200-competitive-strategy/l2-competing-with-is
+mis200-platform-network/l1-network-effects
+mis200-platform-network/l2-platform-strategy
+mis200-levels-of-is-use/l1-classify-the-level
+mis200-levels-of-is-use/l2-match-system-to-level
+```
+
+**Provenance and honesty.** Every scenario, option, distractor and answer in
+the three new families was written for its file. The concepts and the
+distractor strategy are the course's — derived from the exam blueprint recorded
+above (competitive strategy 6 items, platform/network 5, levels of IS use 3) and
+from the course content the first batch's families already demonstrate — but no
+exam stem, option, scenario or answer key is reproduced, and no exam asset is
+committed to this repository. Provenance is `synthetic` throughout, for the
+reasons in §4. Nothing here is student work. The item counts exceed the exam's
+section counts because an adapted family is built as a ladder of items on the
+same skill, not a one-for-one copy of a section; the SKILL, not the item count,
+is what is anchored to the blueprint.
+
+**Second-batch coverage.** 6 tasks, 24 samples, all SLO9. Combined with the
+first batch, MIS 200 now has all five units independently scorable: Units 1/2/4/5
+on SLO9 (forced-choice, judge-free) and Unit 3 on SLO2.

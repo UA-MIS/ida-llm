@@ -1,0 +1,164 @@
+# mis200-competitive-strategy, rung 1 of 2.
+#
+# WHERE THIS FAMILY COMES FROM. Six of the thirty-two items on the MIS 200
+# Exam 1 are competitive-strategy items -- Porter's generic strategies, the
+# Five Forces, and the value chain. Against `curriculum/slo.yaml` those items
+# measure SLO9 (General Business Knowledge): they are forced-choice items that
+# ask the student to RECOGNISE which strategy concept a situation illustrates,
+# and `tasks/mis200-exam1-mapping.md` §3 is explicit that a scenario-dressed
+# single-best-answer item measures recognition, not the problem-solving SLO1
+# names. So this family is tagged SLO9, like the exam section it adapts.
+#
+# WHY IT IS ITS OWN FAMILY AND NOT PART OF `mis200-is-concepts`. The breadth
+# family carries two framework items (value chain vs Five Forces) as one small
+# corner of a wide SLO9 recall sweep, and it stays exactly as it is -- its job
+# is Unit 1, "the breadth the first course is built on". This family is the
+# course's Unit 2, "Competitive strategy with IS", measured on its own so the
+# class page can report that part of the course independently. The two overlap
+# in subject on purpose: breadth and depth are different measurements, and
+# because they are different FAMILIES, no result row is ever printed twice (the
+# one-family-per-unit partition in `frontend/src/lib/units.ts`). The design
+# tension this resolves is written up in `tasks/mis200-exam1-mapping.md` §6.
+#
+# WHAT RUNG 1 PROBES. Recognition: a situation is described and the student
+# must name the competitive-strategy concept it illustrates. Rung 2 raises the
+# demand to application -- how an information system changes a firm's position
+# under one of these frameworks.
+#
+# EVERY ITEM IS ADAPTED, NOT COPIED. The concepts and the distractor STRATEGY
+# are the course's; every scenario, option and distractor is written for this
+# file, and the scenarios are deliberately different from the two framework
+# items in `mis200-is-concepts/l1`. No exam stem, option, scenario or answer
+# key appears here, and no exam asset is committed to this repository. The
+# reasoning behind adapting rather than copying is the leakage note in
+# `tasks/mis200-exam1-mapping.md` §4.
+#
+# THE WITHIN-FRAMEWORK DEVICE. Two items (`buyer-power` and
+# `threat-of-substitutes`) both live inside the Five Forces and are each
+# other's nearest distractor: buyer power is pressure from the customers a firm
+# already sells to, substitution is a different product solving the same need.
+# A student who can name "Five Forces" but cannot tell its forces apart gets
+# one of the pair and misses the other, and the family reports both.
+version: 1
+id: mis200-competitive-strategy/l1-strategy-frameworks
+title: SLO9 -- identifying the competitive-strategy concept a situation illustrates
+description: >
+  Four four-option items over the competitive-strategy frameworks a first
+  information-systems course establishes: Porter's three generic strategies
+  (cost leadership, differentiation, focus) and two of the Five Forces (the
+  bargaining power of buyers and the threat of substitutes). Distractors are
+  the neighbouring concept within the same framework rather than an unrelated
+  term, so an item cannot be cleared by recognising which words belong to
+  strategy.
+
+  Four options, so the guessing floor is 0.25.
+
+  Provenance: every scenario, option and distractor was written for this file.
+  The concepts assessed were derived from the published blueprint of a real MIS
+  200 Exam 1 (six competitive-strategy items), but no exam stem, option,
+  scenario or answer key is reproduced, and no exam asset is committed to this
+  repository. No student work and no textbook content.
+kind: verifiable
+domain: information-systems
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate
+  information-systems examination. Exactly one option is correct. You may
+  reason briefly first, but you must then put the letter of the correct option
+  alone on the last line, with no punctuation and no other text on that line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", mis200-competitive-strategy, ladder-l1, business-knowledge, information-systems, forced-choice]
+samples:
+  - id: cost-leadership
+    input: >-
+      A national chain of budget supermarkets competes by running the leanest
+      operation in its industry: it stocks a narrow range, negotiates hard on
+      volume, automates its warehouses, and passes the savings on as prices no
+      broad-market rival can beat. It aims at the whole grocery-buying public,
+      not a niche. Which of Porter's generic strategies is this?
+      A) Cost leadership
+      B) Differentiation
+      C) Focused differentiation
+      D) Focused low cost
+    # A. The two marks of cost leadership are both stated: the firm competes on
+    # being the lowest-cost operator, and it targets a BROAD market ("the whole
+    # grocery-buying public"). C and D are the focus strategies and are the
+    # trap for a model that latches onto "narrow range" -- but a narrow PRODUCT
+    # range is not a narrow MARKET; the firm still sells to everyone. B is ruled
+    # out because the firm competes on price, not on being distinctively better.
+    target: "A"
+    metadata: { skill: generic-strategy-classification, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: focused-differentiation
+    input: >-
+      A workshop builds custom bicycles only for competitive triathletes,
+      fitting each frame to the rider and charging several times the price of a
+      mass-market bike. It ignores the general cycling public entirely and wins
+      by being better than anyone else at this one demanding segment. Which of
+      Porter's generic strategies is this?
+      A) Cost leadership
+      B) Differentiation
+      C) Focused differentiation
+      D) Focused low cost
+    # C. Two features decide it: the firm serves a NARROW segment (competitive
+    # triathletes only) AND competes on being distinctively better, not cheaper
+    # (it charges a premium). That pair is focused differentiation.
+    # B is the strongest distractor -- the firm IS differentiating -- and it is
+    # wrong only because broad differentiation serves a wide market, which this
+    # firm explicitly does not. D inverts the basis of advantage: this firm is
+    # the expensive option, not the cheap one. A is ruled out the same way.
+    target: "C"
+    metadata: { skill: generic-strategy-classification, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: buyer-power
+    input: >-
+      A company makes a component that three giant carmakers buy in enormous
+      volume. There is little to distinguish its component from a competitor's,
+      the carmakers know exactly what it costs to produce, and any one of them
+      could take its business elsewhere next year. These customers keep forcing
+      the price down. In Porter's Five Forces, which force is squeezing this
+      company?
+      A) The bargaining power of buyers
+      B) The threat of substitute products
+      C) The threat of new entrants
+      D) Rivalry among existing competitors
+    # A. Paired with threat-of-substitutes below; see the header note. The
+    # pressure here comes from the firm's own CUSTOMERS -- few of them, buying
+    # in volume, well informed, able to switch suppliers -- which is the
+    # textbook description of high buyer power.
+    # B is the nearest distractor and the one a model picks if it reads "take
+    # its business elsewhere" as "buy a different product". It is not: the
+    # carmakers are not replacing the component with a different solution, they
+    # are buying the same component from a rival, which is supplier switching,
+    # i.e. buyer power. C and D are real forces that nothing in the stem
+    # describes -- no new entrant and no head-to-head rivalry is mentioned.
+    target: "A"
+    metadata: { skill: five-forces-discrimination, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: threat-of-substitutes
+    input: >-
+      A chain of cinemas finds that its audience is shrinking, not because a
+      rival cinema opened, but because people increasingly stay home and watch
+      newly released films on streaming subscriptions instead. The streaming
+      services are not cinemas, but they meet the same want -- watching a film
+      -- in a different way. In Porter's Five Forces, which force is this?
+      A) The bargaining power of buyers
+      B) The threat of substitute products
+      C) The threat of new entrants
+      D) Rivalry among existing competitors
+    # B, and the mirror of the item above. The pressure comes from a DIFFERENT
+    # kind of product meeting the same customer need -- the definition of a
+    # substitute. The stem states the distinguishing fact outright: "not because
+    # a rival cinema opened", which rules out C (a new cinema would be a new
+    # entrant) and D (rivalry is between cinemas). A is the paired trap: a model
+    # that files any loss of customers under "buyer power" gets this one wrong,
+    # because the customers are not negotiating the price down, they are leaving
+    # for another way to meet the need.
+    target: "B"
+    metadata: { skill: five-forces-discrimination, provenance: synthetic, slo: SLO9, use_mode: capability }

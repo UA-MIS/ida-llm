@@ -1,0 +1,142 @@
+# mis200-levels-of-is-use, rung 2 of 2.
+#
+# WHAT THIS RUNG ADDS over rung 1. Rung 1 classifies a described USE by its
+# scope and horizon. This rung goes to the paired idea a first MIS course
+# teaches alongside the three levels: each level is served by a characteristic
+# KIND of system, and you can recognise the level from what the system does.
+# A system that records each transaction as it happens serves the operational
+# level; one that produces periodic summary reports for managers serves the
+# tactical level; one that scans long-horizon internal and external data for
+# executives serves the strategic level. The student reads the system's
+# behaviour and names the level it serves.
+#
+# STILL SLO9. Forced-choice recognition, one correct option each.
+#
+# THE TRAP IN `optimiser-is-operational`. A model that treats any word like
+# "optimise" or "dashboard" as a mark of seniority will over-read a real-time
+# dispatch tool as managerial or strategic. The deciding fact is that it handles
+# each individual job the moment it arrives, all day -- which is operational,
+# however clever the routing is. This keeps the rung from being graded on
+# buzzwords.
+#
+# Options are the three levels plus one word that is not a level, matching the
+# four-option shape of rung 1 and of `mis200-is-concepts/l2`. Adapted, not
+# copied; every system and scenario is synthetic. See rung 1's header and
+# `tasks/mis200-exam1-mapping.md` §4.
+version: 1
+id: mis200-levels-of-is-use/l2-match-system-to-level
+title: SLO9 -- matching a system's behaviour to the organisational level it serves
+description: >
+  Four four-option items, each describing what an information system does, and
+  asking which organisational level it chiefly serves -- operational, tactical
+  or strategic. The behaviours are the characteristic ones a first course pairs
+  with each level (transaction capture, periodic managerial reporting,
+  long-horizon executive scanning), and one item is built so that an impressive
+  surface word does not decide the level.
+
+  Four options, so the guessing floor is 0.25.
+
+  Provenance: every system, scenario, option and distractor was written for this
+  file. The concepts were derived from the published blueprint of a real MIS 200
+  Exam 1 (three levels-of-IS-use items), but no exam stem, option, scenario or
+  answer key is reproduced, and no exam asset is committed to this repository.
+  No student work and no textbook content.
+kind: verifiable
+domain: information-systems
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate
+  information-systems examination. Exactly one option is correct. You may
+  reason briefly first, but you must then put the letter of the correct option
+  alone on the last line, with no punctuation and no other text on that line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", mis200-levels-of-is-use, ladder-l2, business-knowledge, information-systems, forced-choice]
+samples:
+  - id: transaction-capture-operational
+    input: >-
+      A supermarket's checkout system records every item sold at the moment it
+      is scanned, takes payment, and decrements the stock count for that item.
+      It runs continuously through the trading day and handles one sale at a
+      time. Which organisational level does this system chiefly serve?
+      A) Strategic
+      B) Tactical
+      C) Operational
+      D) Executive
+    # C. Capturing individual transactions as they happen, continuously, is the
+    # defining behaviour of a system serving the operational level (a
+    # transaction-processing system in the course's vocabulary). A and B are the
+    # higher levels, which this system feeds but does not itself serve. D is not
+    # a level in the three-level model.
+    target: "C"
+    metadata: { skill: system-to-level, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: managerial-reporting-tactical
+    input: >-
+      A system takes the transactions the sales offices generate and produces a
+      standard set of monthly reports -- sales by region against target, margin
+      by product line -- that middle managers read to see whether the quarter is
+      running to plan and where to intervene. Which organisational level does
+      this system chiefly serve?
+      A) Operational
+      B) Tactical
+      C) Strategic
+      D) Transactional
+    # B. Periodic summary reporting that managers use to monitor performance
+    # against an existing plan and decide where to adjust is the tactical
+    # (managerial) level -- a management-information-system behaviour in the
+    # course's terms.
+    # A is the trap for a model that stops at "takes the transactions": the
+    # system is BUILT ON transaction data but SERVES managers monitoring a plan,
+    # which is a level up. C is too high -- monthly monitoring against a set plan
+    # is not setting the firm's direction. D names the transaction systems that
+    # feed this one, not the level this one serves.
+    target: "B"
+    metadata: { skill: system-to-level, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: executive-scanning-strategic
+    input: >-
+      A system pulls together several years of the firm's own performance with
+      outside data on markets, competitors and economic trends, and presents the
+      long-run picture to the senior leadership team as they weigh which
+      businesses to grow, shrink or exit over the next five years. Which
+      organisational level does this system chiefly serve?
+      A) Operational
+      B) Tactical
+      C) Strategic
+      D) Clerical
+    # C. Long-horizon, whole-firm, internal-plus-external data supporting
+    # direction-setting decisions is the strategic level -- an executive-support
+    # behaviour. The stem supplies all three marks (multi-year, firm-wide scope,
+    # which businesses to grow or exit).
+    # B is too low (this is not allocation within a set strategy; it informs the
+    # strategy itself). A is far too low. D is not a level in the model.
+    target: "C"
+    metadata: { skill: system-to-level, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: optimiser-is-operational
+    input: >-
+      A courier company runs a dispatch system that, the instant each delivery
+      request arrives, assigns it to the best-placed driver and sends the
+      updated route to that driver's handset. Dispatchers watch it run all day
+      and it decides each individual job as it comes in. Despite being described
+      internally as an "optimisation engine", which organisational level does it
+      chiefly serve?
+      A) Strategic, because it optimises
+      B) Tactical, because it plans routes
+      C) Operational, because it handles each job in real time as it arrives
+      D) Executive, because of the word "engine"
+    # C, and this is the trap item. The impressive word is "optimisation", and
+    # A, B and D all offer to raise the level on the strength of a surface word.
+    # The deciding behaviour is in the stem: it assigns EACH INDIVIDUAL JOB the
+    # moment it arrives, continuously, which is transaction-level, real-time work
+    # -- the operational level, however sophisticated the routing. As in rung 1,
+    # the distractors carry their faulty reasoning in the option text so the
+    # mistaken rule being tested is visible.
+    target: "C"
+    metadata: { skill: system-to-level, provenance: synthetic, slo: SLO9, use_mode: capability }

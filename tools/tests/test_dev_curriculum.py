@@ -129,6 +129,9 @@ def test_mis200_real_families_are_untouched_in_dev_majors():
     assert mis200.task_families == [
         "mis200-spreadsheet-formulas",
         "mis200-is-concepts",
+        "mis200-competitive-strategy",
+        "mis200-platform-network",
+        "mis200-levels-of-is-use",
         "mis200-is-problem-solving",
     ]
 
