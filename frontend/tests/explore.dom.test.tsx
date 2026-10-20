@@ -303,20 +303,24 @@ describe("level 4 — the evidence behind one unit", () => {
     expect(document.querySelector('a[href="/runs/run_1"]')).not.toBeNull();
   });
 
-  it("carries the synthetic-extension caveat on the competitive-strategy unit", async () => {
+  it("scores the competitive-strategy unit from its own family, with no synthetic-extension caveat", async () => {
+    // Unit 2 now maps to the forced-choice `mis200-competitive-strategy` family
+    // — an honest adaptation of the exam's own competitive-strategy section — so
+    // it scores deterministically and needs no caveat. (The SLO1 appraisal
+    // extension that used to sit here moved to the outcome axis; see
+    // `tasks/mis200-exam1-mapping.md` §6.)
     await renderLevel(
       () =>
         EvidencePage({
           params: Promise.resolve({ major: MAJOR, course: "mis-200", slo: "competitive-strategy-with-is" }),
         }),
-      // A board where the problem-solving family scored, so the category renders.
       board([
         task({
-          task_id: "mis200-is-problem-solving/l1",
-          family: "mis200-is-problem-solving",
-          slo: "SLO2",
+          task_id: "mis200-competitive-strategy/l1-strategy-frameworks",
+          family: "mis200-competitive-strategy",
+          slo: "SLO9",
           has_results: true,
-          results: [result({ mean_score: 0.9 })],
+          results: [result({ mean_score: 0.6 })],
         }),
       ], {
         curriculum: {
@@ -328,7 +332,7 @@ describe("level 4 — the evidence behind one unit", () => {
                   ...m,
                   classes: m.classes.map((c) =>
                     c.course === "MIS 200"
-                      ? { ...c, task_families: ["mis200-is-concepts", "mis200-is-problem-solving"] }
+                      ? { ...c, task_families: ["mis200-is-concepts", "mis200-competitive-strategy"] }
                       : c,
                   ),
                 },
@@ -336,8 +340,9 @@ describe("level 4 — the evidence behind one unit", () => {
         },
       }),
     );
-    expect(document.body.textContent).toMatch(/synthetic extension/i);
-    expect(document.body.textContent).toMatch(/not comparable to a student cohort/i);
+    expect(document.body.textContent).toContain("Competitive strategy with IS");
+    expect(document.body.textContent).toContain("60%");
+    expect(document.body.textContent).not.toMatch(/synthetic extension/i);
   });
 
   it("says 'not measured yet' rather than an empty grid for a category with no task", async () => {

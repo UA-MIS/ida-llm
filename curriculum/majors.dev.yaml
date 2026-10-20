@@ -110,6 +110,9 @@ majors:
     task_families:
     - mis200-spreadsheet-formulas
     - mis200-is-concepts
+    - mis200-competitive-strategy
+    - mis200-platform-network
+    - mis200-levels-of-is-use
     - mis200-is-problem-solving
   - course: MIS 221
     title: Business Programming I

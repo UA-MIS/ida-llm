@@ -28,7 +28,24 @@ import {
 const MIS200_FAMILIES = [
   "mis200-spreadsheet-formulas",
   "mis200-is-concepts",
+  "mis200-competitive-strategy",
+  "mis200-platform-network",
+  "mis200-levels-of-is-use",
   "mis200-is-problem-solving",
+];
+
+/**
+ * The five families that map to a UNIT — the exam's content areas. The SLO1
+ * extension (`mis200-is-problem-solving`) is a MIS 200 family but deliberately
+ * NOT one of these: it lives on the outcome axis, not the content axis. See the
+ * header of `@/lib/units` and `tasks/mis200-exam1-mapping.md` §6.
+ */
+const MIS200_UNIT_FAMILIES = [
+  "mis200-spreadsheet-formulas",
+  "mis200-is-concepts",
+  "mis200-competitive-strategy",
+  "mis200-platform-network",
+  "mis200-levels-of-is-use",
 ];
 
 describe("every class's unit taxonomy", () => {
@@ -114,24 +131,39 @@ describe("MIS 200 specifically", () => {
     }
   });
 
-  it("covers all three authored families across its units", () => {
+  it("claims every exam-content family in exactly one unit", () => {
     const covered = unitsFor(CLS).flatMap((u) => u.families);
-    for (const family of MIS200_FAMILIES) {
+    for (const family of MIS200_UNIT_FAMILIES) {
       expect(covered, `no unit claims ${family}`).toContain(family);
     }
   });
 
-  it("maps Unit 1 to the IS-concepts family", () => {
+  it("leaves the synthetic SLO1 extension OFF the unit axis, on purpose", () => {
+    // `mis200-is-problem-solving` is a MIS 200 family (it keeps the SLO1 outcome
+    // view non-empty) but is not one of Exam 1's content areas, so no unit
+    // claims it — a class family may live in at most one unit, not necessarily
+    // in one. See the header of `@/lib/units` and the mapping doc §6.
+    const covered = unitsFor(CLS).flatMap((u) => u.families);
+    expect(covered, "the SLO1 extension must not be a unit").not.toContain(
+      "mis200-is-problem-solving",
+    );
+  });
+
+  it("maps Unit 1 to the IS-concepts breadth family", () => {
     expect(findUnit(CLS, "information-systems-business-models")!.families).toEqual([
       "mis200-is-concepts",
     ]);
   });
 
-  it("files the synthetic SLO1 extension under Unit 2 (competitive strategy), with its caveat", () => {
+  it("maps Unit 2 to the competitive-strategy family, scorable and with no caveat", () => {
     const unit = findUnit(CLS, "competitive-strategy-with-is")!;
     expect(unit.n).toBe(2);
-    expect(unit.families).toEqual(["mis200-is-problem-solving"]);
-    expect(unit.caveat, "the synthetic-extension caveat is missing").toMatch(/synthetic extension/i);
+    expect(unit.families).toEqual(["mis200-competitive-strategy"]);
+    // The competitive-strategy family is an honest adaptation of the exam's own
+    // competitive-strategy section, so — unlike the SLO1 extension it replaces —
+    // it needs no synthetic-extension caveat.
+    expect(unit.caveat).toBeUndefined();
+    expect(unit.source, "a scorable unit names its source").toBeTruthy();
   });
 
   it("maps Unit 3 to the spreadsheet family", () => {
@@ -140,9 +172,13 @@ describe("MIS 200 specifically", () => {
     ]);
   });
 
-  it("leaves Unit 4 (platform economics) and Unit 5 (levels of IS use) honestly empty", () => {
-    expect(findUnit(CLS, "platform-network-economics")!.families).toEqual([]);
-    expect(findUnit(CLS, "levels-of-is-use")!.families).toEqual([]);
+  it("maps Unit 4 to platform economics and Unit 5 to levels of IS use", () => {
+    expect(findUnit(CLS, "platform-network-economics")!.families).toEqual([
+      "mis200-platform-network",
+    ]);
+    expect(findUnit(CLS, "levels-of-is-use")!.families).toEqual([
+      "mis200-levels-of-is-use",
+    ]);
   });
 
   it("resolves a title case-insensitively and falls back to the raw key", () => {

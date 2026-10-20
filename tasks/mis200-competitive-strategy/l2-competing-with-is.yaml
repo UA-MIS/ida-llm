@@ -1,0 +1,156 @@
+# mis200-competitive-strategy, rung 2 of 2.
+#
+# WHAT THIS RUNG ADDS over rung 1. Rung 1 asks the student to name a strategy
+# concept from a situation. This rung asks the harder, more MIS-specific
+# question the course is actually built toward: given an information system,
+# how does it change the firm's competitive position? The concept is never the
+# whole answer -- the student has to see which competitive EFFECT the system
+# produces (a switching cost, an entry barrier, a point of differentiation) and
+# whether that effect is durable.
+#
+# WHY IT IS STILL SLO9 AND NOT SLO1. These remain forced-choice recognition
+# items: exactly one option is correct, and the work is recognising the effect,
+# not appraising a decision and recommending a course of action. SLO1's
+# problem-solving ("assess, choose, propose") is measured by
+# `mis200-is-problem-solving/`, which is a subjective, judged family for
+# exactly the reason `curriculum/slo.yaml` records -- it has no single right
+# answer. A single-best-answer item about competitive strategy is SLO9.
+#
+# THE DEGENERATE-READING THE LAST ITEM GUARDS AGAINST. The most seductive wrong
+# idea in this topic is "a new information system is a competitive advantage".
+# `advantage-is-not-durable` is built so that the plausible-sounding answer --
+# yes, it is an advantage -- is wrong, because an off-the-shelf system every
+# rival can buy confers no lasting edge. A model that has learned the slogan
+# without the caveat fails it, which is the point.
+#
+# EVERY ITEM IS ADAPTED, NOT COPIED; see rung 1's header and
+# `tasks/mis200-exam1-mapping.md` §4. Every firm, system and scenario is
+# synthetic, authored for this file.
+version: 1
+id: mis200-competitive-strategy/l2-competing-with-is
+title: SLO9 -- how an information system changes a firm's competitive position
+description: >
+  Four four-option items, each describing a firm and an information system, and
+  asking which competitive effect the system produces -- a switching cost that
+  locks customers in, a barrier that keeps new entrants out, a point of
+  differentiation, or, in the last item, no durable advantage at all. The
+  distractors are the other real effects a system can have, so an item cannot
+  be cleared by naming any plausible benefit; the student must identify the
+  specific one the scenario describes.
+
+  Four options, so the guessing floor is 0.25.
+
+  Provenance: every firm, system, scenario, option and distractor was written
+  for this file. The skill targets were derived from the published blueprint of
+  a real MIS 200 Exam 1 (six competitive-strategy items), but no exam stem,
+  option, scenario or answer key is reproduced, and no exam asset is committed
+  to this repository. No student work and no textbook content.
+kind: verifiable
+domain: information-systems
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate
+  information-systems examination. Exactly one option is correct. You may
+  reason briefly first, but you must then put the letter of the correct option
+  alone on the last line, with no punctuation and no other text on that line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", mis200-competitive-strategy, ladder-l2, business-knowledge, information-systems, forced-choice]
+samples:
+  - id: switching-cost-lock-in
+    input: >-
+      A payroll software company's customers load years of employee records,
+      tax settings and pay rules into its system and train their staff to use
+      it. Moving to a competitor would mean re-entering all of that and
+      retraining everyone, which few customers are willing to do even when a
+      rival is a little cheaper. How does the software most improve the
+      company's competitive position?
+      A) It raises customers' switching costs, locking them in
+      B) It lowers the company's own production costs
+      C) It creates a substitute for payroll altogether
+      D) It increases rivalry among payroll vendors
+    # A. The mechanism is in the stem: the cost of LEAVING is high (re-entry,
+    # retraining), so customers stay even when a rival is cheaper. That is a
+    # switching cost, the classic way an information system locks customers in.
+    # B is the trap for a model that files every IS benefit under "efficiency":
+    # nothing here lowers the vendor's own costs, the effect is entirely on the
+    # customer's cost of leaving. C misreads the product as replacing the need
+    # (it does not -- it is payroll software, doing payroll). D is backwards: a
+    # lock-in reduces the rival's ability to compete for these customers.
+    target: "A"
+    metadata: { skill: competitive-effect-of-is, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: barrier-to-entry
+    input: >-
+      A parcel carrier has spent fifteen years and an enormous sum building a
+      nationwide tracking and routing system integrated with every depot and
+      vehicle. A would-be competitor could match the trucks and the depots, but
+      could not realistically build or buy an equivalent system quickly or
+      cheaply enough to offer the same next-day reliability. What is the main
+      competitive effect of the carrier's system?
+      A) It raises the bargaining power of the carrier's customers
+      B) It raises the barrier to entry for new competitors
+      C) It makes parcel delivery a substitute for something else
+      D) It differentiates the service to a narrow niche only
+    # B. The effect is on would-be ENTRANTS: the system is expensive and slow to
+    # replicate, so it deters firms from entering the market at all. That is a
+    # barrier to entry, one of the Five Forces an information system can raise.
+    # A is backwards (a strong system does not hand power to customers). C
+    # misuses "substitute" (the service is still parcel delivery). D is the
+    # subtle distractor -- the system IS a kind of differentiator -- but the
+    # stem frames the effect against NEW COMPETITORS and a mass market ("same
+    # next-day reliability" for everyone), which is the entry-barrier reading,
+    # not a narrow-niche focus.
+    target: "B"
+    metadata: { skill: competitive-effect-of-is, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: differentiation-via-is
+    input: >-
+      An online retailer builds a recommendation and fit-prediction system that
+      tells each shopper how a specific garment is likely to fit them, using
+      their past returns and measurements. No competitor offers anything like
+      it, and shoppers choose this retailer specifically because buying clothes
+      online finally feels low-risk. The retailer's prices are not the lowest.
+      How does the system most improve its competitive position?
+      A) By making it the lowest-cost retailer in its market
+      B) By creating a new substitute for online shopping
+      C) By differentiating it on a feature rivals do not offer
+      D) By raising the bargaining power of its suppliers
+    # C. The retailer wins on a distinctive capability rivals lack, and the stem
+    # closes off the alternative reading explicitly: "the retailer's prices are
+    # not the lowest", so this is differentiation, not cost leadership.
+    # A is the trap that sentence exists to kill. B misuses "substitute" (it is
+    # still online shopping, done better). D is unrelated -- nothing in the stem
+    # concerns suppliers, and a firm would not WANT to raise its suppliers'
+    # power anyway, which is a second tell that D is a distractor, not a benefit.
+    target: "C"
+    metadata: { skill: competitive-effect-of-is, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: advantage-is-not-durable
+    input: >-
+      A mid-sized insurer buys a well-known off-the-shelf claims-processing
+      package that speeds up its claims handling. The same package is sold by
+      its vendor to any insurer that wants it, and two of this insurer's direct
+      competitors install it within the year. Which statement best describes the
+      system's effect on the insurer's competitive position?
+      A) It is a sustainable competitive advantage, because the technology is modern
+      B) It is at best a temporary advantage, because competitors can buy the same system
+      C) It raises switching costs for the insurer's policyholders
+      D) It is a barrier to entry against new insurers
+    # B. This is the item the rung is built around (see the header). The system
+    # is genuinely useful, so "it's an advantage" feels right -- but it is an
+    # advantage any rival can purchase, and two already have, so it cannot be a
+    # SUSTAINABLE one. The durable-advantage test is whether competitors can
+    # copy it; an off-the-shelf package fails that test by construction.
+    # A is the slogan the item punishes ("modern technology" is not what makes
+    # an advantage durable). C and D describe effects this system does not have:
+    # it processes the insurer's OWN claims faster -- it does not touch what it
+    # costs a policyholder to switch insurers, nor does a package on open sale
+    # keep anyone out of the market.
+    target: "B"
+    metadata: { skill: durability-of-is-advantage, provenance: synthetic, slo: SLO9, use_mode: capability }

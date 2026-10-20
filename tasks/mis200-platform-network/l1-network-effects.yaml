@@ -1,0 +1,153 @@
+# mis200-platform-network, rung 1 of 2.
+#
+# WHERE THIS FAMILY COMES FROM. Five of the thirty-two items on the MIS 200
+# Exam 1 are platform-and-network-economics items. Against `curriculum/slo.yaml`
+# they measure SLO9 (General Business Knowledge): forced-choice items that ask
+# the student to recognise a network or platform phenomenon. The family is
+# tagged SLO9, like the exam section it adapts, for the reason set out in
+# `tasks/mis200-exam1-mapping.md` §3.
+#
+# WHY IT IS ITS OWN FAMILY, DISTINCT FROM `mis200-is-concepts`. The breadth
+# family (`mis200-is-concepts/l2`) already carries three network/platform items
+# -- direct vs indirect effects and platform-vs-linear value -- as part of a
+# wide SLO9 recall sweep, and it stays exactly as it is: it is Unit 1's
+# measurement. This family is the course's Unit 4, "Platform & network
+# economics", measured on its own. The scenarios here are deliberately
+# different from the breadth family's, and the rung goes FURTHER than it does --
+# negative network effects, the economies-of-scale confusion, and (in rung 2)
+# platform launch and winner-take-all dynamics the breadth family never reaches.
+# The breadth-vs-per-topic design decision is recorded in
+# `tasks/mis200-exam1-mapping.md` §6. Because these are separate families, no
+# result is printed under two units (the partition in `frontend/src/lib/units.ts`).
+#
+# WHAT RUNG 1 PROBES. Classifying a network phenomenon from a described
+# situation: which effect is at work, and whether a "bigger is better" story is
+# even a network effect at all. Rung 2 raises the demand to platform strategy.
+#
+# THE DISTINCTION THIS RUNG EXISTS FOR. "More users make it more valuable" is
+# true of direct effects, indirect effects AND economies of scale, and a model
+# that has learned only that sentence cannot tell them apart. The rung forces
+# the distinction: `economies-of-scale-not-a-network-effect` is a bigness story
+# with no user-to-user value at all, and `negative-network-effect` is a case
+# where more users make it WORSE -- both of which a one-sentence rule gets wrong.
+version: 1
+id: mis200-platform-network/l1-network-effects
+title: SLO9 -- classifying a network or platform phenomenon
+description: >
+  Four four-option items in which a situation is described and the student must
+  identify the network phenomenon at work: a direct (same-side) network effect,
+  an indirect (cross-side) one, a negative network effect, or a cost advantage
+  that is economies of scale rather than a network effect at all. Distractors
+  are the neighbouring phenomenon, and two items are built so that the surface
+  "more users is better" cue is misleading.
+
+  Four options, so the guessing floor is 0.25.
+
+  Provenance: every scenario, option and distractor was written for this file,
+  and the scenarios differ from those in `mis200-is-concepts/l2`. The concepts
+  were derived from the published blueprint of a real MIS 200 Exam 1 (five
+  platform-and-network items), but no exam stem, option, scenario or answer key
+  is reproduced, and no exam asset is committed to this repository. No student
+  work and no textbook content.
+kind: verifiable
+domain: information-systems
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate
+  information-systems examination. Exactly one option is correct. You may
+  reason briefly first, but you must then put the letter of the correct option
+  alone on the last line, with no punctuation and no other text on that line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", mis200-platform-network, ladder-l1, business-knowledge, information-systems, forced-choice]
+samples:
+  - id: cross-side-indirect-effect
+    input: >-
+      An online marketplace connects independent sellers with shoppers. The
+      more sellers list their goods, the more shoppers want to visit because the
+      selection is wider; and the more shoppers visit, the more sellers want to
+      list because there are more buyers. Each side becomes more valuable as the
+      OTHER side grows. Which phenomenon does this describe?
+      A) A direct network effect
+      B) An indirect network effect
+      C) Economies of scale
+      D) A negative network effect
+    # B. The value crosses SIDES -- sellers benefit from more shoppers and
+    # shoppers from more sellers -- which is what makes the effect indirect
+    # (cross-side). The stem states the crossing in both directions so it is
+    # decidable without inference.
+    # A is the trap for a model that has not internalised "same side vs other
+    # side": a direct effect would be sellers valuing more sellers, or shoppers
+    # valuing more shoppers, which is not what happens here. C is a cost story,
+    # absent here. D is ruled out because growth helps, not hurts.
+    target: "B"
+    metadata: { skill: network-effect-classification, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: same-side-direct-effect
+    input: >-
+      A document-editing tool lets people co-edit files in real time. It is of
+      little use to someone whose own colleagues do not use it, and it becomes
+      more useful to each user as more of the SAME group -- their coworkers --
+      adopt it. There is only one kind of participant here. Which phenomenon
+      does this describe?
+      A) An indirect network effect
+      B) A direct network effect
+      C) Economies of scale
+      D) Disintermediation
+    # B. One group, and its growth raises the value to that same group: a direct
+    # (same-side) network effect. The stem removes the cross-side reading
+    # explicitly -- "there is only one kind of participant here".
+    # A is offered first so option order does not rescue a model that has
+    # learned "platform effects are indirect". C is a cost story. D (removing an
+    # intermediary) is unrelated and tests whether a model is reading the
+    # mechanism or matching platform vocabulary.
+    target: "B"
+    metadata: { skill: network-effect-classification, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: negative-network-effect
+    input: >-
+      A free navigation app routes drivers along whatever road is currently
+      fastest. As the number of drivers using it in one city climbs, so many are
+      sent down the same "fastest" side streets that those streets jam, and
+      every user's trip gets slower. Here, more users make the service WORSE for
+      the people already using it. Which phenomenon does this describe?
+      A) A positive direct network effect
+      B) A negative network effect (congestion)
+      C) An indirect network effect
+      D) Economies of scale
+    # B. The item inverts the usual sign: additional users impose a COST on
+    # existing users (congestion), so the effect is negative. This is the
+    # concept the breadth family never tests, and it is included because the
+    # one-sentence rule "more users is better" gets it exactly backwards.
+    # A is that rule, stated as a trap. C would require two sides; there is only
+    # one (drivers). D is a cost-of-production story, which this is not -- the
+    # app's costs are not what the stem is about.
+    target: "B"
+    metadata: { skill: network-effect-classification, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: economies-of-scale-not-a-network-effect
+    input: >-
+      A cloud-storage provider finds that as it grows it can buy hardware in
+      bulk, run its data centres closer to capacity, and spread its fixed costs
+      over more customers, so its cost PER CUSTOMER keeps falling. Its customers
+      do not interact with one another and gain nothing from each other's
+      presence. Why is bigness valuable to this provider?
+      A) Because of a direct network effect
+      B) Because of an indirect network effect
+      C) Because of economies of scale
+      D) Because of a negative network effect
+    # C. This is the discrimination the rung is built for. Bigness is valuable
+    # here through COST -- bulk buying, higher utilisation, fixed costs spread
+    # wider -- not through any value users get from one another. The stem closes
+    # the network-effect reading off outright: "customers do not interact ...
+    # and gain nothing from each other's presence".
+    # A and B are the traps for a model that files every "bigger is better"
+    # story as a network effect; both require user-to-user value, which the stem
+    # denies. D is ruled out because growth helps the provider, not hurts it.
+    target: "C"
+    metadata: { skill: scale-versus-network-effect, provenance: synthetic, slo: SLO9, use_mode: capability }

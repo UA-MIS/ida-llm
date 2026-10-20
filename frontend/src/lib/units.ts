@@ -95,28 +95,40 @@ export interface ClassUnit {
  *
  * MIS 200 — the one populated class in the product. Its five units are the five
  * content areas of the real Exam 1, as analysed in `tasks/mis200-exam1-mapping.md`,
- * laid out in course order. The mapping of the three authored families:
+ * laid out in course order. Each unit maps to its own scorable family:
  *
  *   mis200-is-concepts          → Unit 1 Information systems & business models (SLO9)
- *   mis200-is-problem-solving   → Unit 2 Competitive strategy with IS         (SLO1)
+ *   mis200-competitive-strategy → Unit 2 Competitive strategy with IS         (SLO9)
  *   mis200-spreadsheet-formulas → Unit 3 Spreadsheets & data analysis         (SLO2)
+ *   mis200-platform-network     → Unit 4 Platform & network economics         (SLO9)
+ *   mis200-levels-of-is-use     → Unit 5 Levels of IS use in organizations    (SLO9)
  *
- * ⚠ THE Unit 2 PLACEMENT IS A JUDGEMENT CALL, RECORDED HERE. The
- * is-problem-solving family is not an Exam 1 ingest — it is a synthetic
- * extension raising the course's technology-investment material to SLO1's
- * problem-solving level (appraise an initiative, recommend a course of action).
- * Of the five content areas, strategic appraisal of a technology initiative sits
- * closest to competitive strategy, so that is the unit it is filed under. Its
- * evidence page carries the synthetic-extension caveat so the number is not
- * misread as exam-derived.
+ * ⚠ FOUR OF THE FIVE UNITS ARE SLO9, AND THAT IS HONEST. Every non-spreadsheet
+ * section of Exam 1 is forced-choice recognition, which `curriculum/slo.yaml`
+ * and `tasks/mis200-exam1-mapping.md` §3 file under SLO9 (General Business
+ * Knowledge), not SLO1. Unit 3 is the one SLO2 (Quantitative Literacy) section.
+ * The units are a CONTENT axis, not an outcome axis — four units sharing an
+ * outcome is exactly why the class page is shown by unit and not by SLO.
  *
- * ⚠ TWO UNITS READ "NOT MEASURED YET" AND THAT IS CONSERVATIVE, NOT WRONG.
- * Unit 4 (Platform & network economics) and Unit 5 (Levels of IS use) have no
- * dedicated family, so they are empty. Some items inside `mis200-is-concepts` do
- * touch those topics, but that family carries one aggregate score; splitting it
- * across three units would print one number three times (invariant 1).
- * Separating those areas honestly needs task- or sample-level content tags — a
- * follow-up, noted in the exam-mapping doc.
+ * ⚠ UNIT 1 IS THE WIDE BREADTH FAMILY; UNITS 2/4/5 ARE PER-TOPIC FAMILIES, AND
+ * THE OVERLAP IS DELIBERATE. `mis200-is-concepts` stays a wide SLO9 breadth
+ * sweep and some of its items touch competitive strategy, platform economics and
+ * levels of use — that is what "breadth" means, and it is Unit 1's measurement.
+ * The three per-topic families measure those areas on their own, as Units 2, 4
+ * and 5, with their own scenarios. Because a family maps to exactly one unit
+ * (invariant 1), no result row is ever printed under two units; breadth and depth
+ * are simply different families measuring different things. The decision to ADD
+ * per-topic families rather than gut the breadth family is written up in
+ * `tasks/mis200-exam1-mapping.md` §6.
+ *
+ * ⚠ WHERE THE SLO1 EXTENSION WENT. `mis200-is-problem-solving` — the synthetic
+ * SLO1 appraisal extension — is intentionally NOT in this taxonomy. It is a
+ * cross-cutting capability extension, not one of Exam 1's content areas (the
+ * paper does not assess SLO1; see the mapping doc §3). It stays in MIS 200's
+ * `task_families` so the SLO1 OUTCOME view is non-empty for the course, and it
+ * surfaces there — on the outcome axis — rather than here on the content axis.
+ * A class family that no unit claims is permitted: the invariants require a
+ * family to live in at most one unit, not that every class family live in one.
  */
 const TAXONOMY: Record<string, ClassUnit[]> = {
   "MIS 200": [
@@ -136,11 +148,9 @@ const TAXONOMY: Record<string, ClassUnit[]> = {
       title: "Competitive strategy with IS",
       covers: ["Value chain", "Five Forces", "Competing with IS"],
       blurb:
-        "Appraising a proposed technology initiative and recommending a course of action — strategy applied to an IS investment.",
-      families: ["mis200-is-problem-solving"],
+        "Porter's generic strategies, the Five Forces, and how an information system changes a firm's competitive position.",
+      families: ["mis200-competitive-strategy"],
       source: "Unit 2 quiz and practice set",
-      caveat:
-        "These items are a synthetic extension, not an ingest of Exam 1. Every item on that paper is forced-choice, and MIS 200 reinforces problem-solving without examining it there; this raises the course's technology-investment material to the level of appraising and recommending. A score here is not comparable to a student cohort's Exam 1 performance, because no such performance exists.",
     },
     {
       key: "spreadsheets-data-analysis",
@@ -159,7 +169,8 @@ const TAXONOMY: Record<string, ClassUnit[]> = {
       covers: ["Network effects", "Two-sided platforms", "Platform strategy"],
       blurb:
         "Direct and indirect network effects, and what a platform does and does not do.",
-      families: [],
+      families: ["mis200-platform-network"],
+      source: "Unit 4 quiz and practice set",
     },
     {
       key: "levels-of-is-use",
@@ -168,7 +179,8 @@ const TAXONOMY: Record<string, ClassUnit[]> = {
       covers: ["Operational systems", "Managerial systems", "Strategic systems"],
       blurb:
         "Strategic, tactical and operational use of information systems — decided by the scope and horizon of a decision, not the seniority of whoever makes it.",
-      families: [],
+      families: ["mis200-levels-of-is-use"],
+      source: "Unit 5 quiz and practice set",
     },
   ],
 };
