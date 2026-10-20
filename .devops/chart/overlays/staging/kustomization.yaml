@@ -71,3 +71,34 @@ patches:
       - op: replace
         path: /spec/resources/requests/storage
         value: 2Gi
+  # ── RUN-EXECUTION AUTH ARMED (D-49 section 6) ─────────────────────────────
+  # Gate `POST /runs` behind a bearer token; reads stay public (the public
+  # results view is the product — docs/sensitive-material.md section 1). Scoped
+  # to THIS overlay rather than base on purpose: base/deployments.yaml's
+  # IDA_AUTH_TOKENS secretKeyRef is shared by ALL overlays, but dev + preview
+  # never seed the Vault key (preview's ida-llm-secret is platform-owned and
+  # carries only mock creds), so arming in base would park their api pods in
+  # CreateContainerConfigError. staging + prod are the only envs that seed the
+  # token, so the mode flag and the env ref live in those two overlays.
+  #
+  # ORDER AT SYNC: the Vault key must be seeded (see app-secret.externalsecret
+  # .yaml) BEFORE this syncs. The ref is not `optional: true` and the api
+  # refuses to boot under auth_mode=token with no tokens — both failures are
+  # loud (CreateContainerConfigError / readiness fail), never a silent open gate.
+  - target: { kind: ConfigMap, name: ida-llm-config }
+    patch: |-
+      - op: add
+        path: /data/IDA_AUTH_MODE
+        value: token
+  # containers[0] on the api Deployment is `api` (its only container; `migrate`
+  # is an initContainer). Append the token ref to that container's env.
+  - target: { kind: Deployment, name: ida-llm-api }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: IDA_AUTH_TOKENS
+          valueFrom:
+            secretKeyRef:
+              name: ida-llm-secret
+              key: IDA_AUTH_TOKENS

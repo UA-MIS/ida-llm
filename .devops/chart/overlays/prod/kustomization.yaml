@@ -54,6 +54,40 @@ images:
     newName: harbor.capstone.uamishub.com/ida-llm/ida-llm-agile
     newTag: "0.1.12"
 
-# No `patches:`. Every prod value lives in base, where it is read by anyone
-# reviewing the chart rather than reconstructed from a diff. Hosts, replicas,
-# storage and the mock-model-off setting are all base defaults.
+# ── RUN-EXECUTION AUTH ARMED (D-49 section 6) — THE ONE prod PATCH ────────────
+# prod otherwise carries NO patches: every prod value lives in base, where a
+# reviewer reads it directly rather than reconstructing it from a diff (hosts,
+# replicas, storage, mock-model-off are all base defaults). Arming run-auth is
+# the deliberate exception.
+#
+# Scoped here (not base) because base/deployments.yaml's IDA_AUTH_TOKENS
+# secretKeyRef is shared by ALL overlays, but dev + preview never seed the Vault
+# key (preview's ida-llm-secret is platform-owned, mock creds only) — arming in
+# base would park their api pods in CreateContainerConfigError. staging + prod
+# are the only envs that seed the token, so the mode flag and the env ref live
+# in those two overlays. Gate is on `POST /runs` only; reads stay public (the
+# public results view is the product — docs/sensitive-material.md section 1).
+#
+# ORDER AT SYNC: the Vault key must be seeded (see app-secret.externalsecret
+# .yaml) BEFORE this syncs. The ref is not `optional: true` and the api refuses
+# to boot under auth_mode=token with no tokens — both failures are loud
+# (CreateContainerConfigError / readiness fail), never a silent open gate. prod
+# is human-promoted (promote-to-prod.yaml), so this never auto-applies.
+patches:
+  - target: { kind: ConfigMap, name: ida-llm-config }
+    patch: |-
+      - op: add
+        path: /data/IDA_AUTH_MODE
+        value: token
+  # containers[0] on the api Deployment is `api` (its only container; `migrate`
+  # is an initContainer). Append the token ref to that container's env.
+  - target: { kind: Deployment, name: ida-llm-api }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: IDA_AUTH_TOKENS
+          valueFrom:
+            secretKeyRef:
+              name: ida-llm-secret
+              key: IDA_AUTH_TOKENS
