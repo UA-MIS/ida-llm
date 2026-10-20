@@ -255,8 +255,8 @@ for container in containers:
 # ---- secrets are never literals ----------------------------------------------
 for container in containers:
     for entry in container.get("env", []):
-        if entry["name"].endswith(("_KEY", "_SECRET", "_URL", "_TOKEN", "_PASSWORD")):
-            if entry["name"] in ("DATABASE_URL",) or entry["name"].endswith(("_KEY", "_TOKEN", "_PASSWORD")):
+        if entry["name"].endswith(("_KEY", "_SECRET", "_URL", "_TOKEN", "_TOKENS", "_PASSWORD")):
+            if entry["name"] in ("DATABASE_URL",) or entry["name"].endswith(("_KEY", "_SECRET", "_TOKEN", "_TOKENS", "_PASSWORD")):
                 check("value" not in entry,
                       f"{container['name']}: {entry['name']} comes from a secretKeyRef, not a literal")
 
