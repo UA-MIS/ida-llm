@@ -462,7 +462,20 @@ spec:
           type: RuntimeDefault
       containers:
         - name: minio
-          image: harbor.capstone.uamishub.com/dockerhub-proxy/minio/minio:RELEASE.2025-09-07T16-13-09Z
+          # REPIN (incident 2026-10-20): the previous pin
+          # `dockerhub-proxy/minio/minio:RELEASE.2025-09-07T16-13-09Z` returns
+          # NotFound — MinIO stopped publishing to Docker Hub and moved to
+          # quay.io, so the pull-through proxy has nothing to cache (verified:
+          # dockerhub-proxy/minio/minio has 0 artifacts; the identical tag runs
+          # fine from quay.io in the `minio` namespace). chart-render requires a
+          # harbor.capstone.uamishub.com/* image and kyverno requires it signed,
+          # so quay.io direct is not an option. This repins to the signed
+          # base-images project at the SAME version.
+          # ⚠ BLOCKED: requires platform to first mirror+cosign-sign
+          # minio/minio:RELEASE.2025-09-07T16-13-09Z into base-images at this
+          # exact path (base-images currently has NO minio). Confirm the path
+          # with platform before merge.
+          image: harbor.capstone.uamishub.com/base-images/minio/minio:RELEASE.2025-09-07T16-13-09Z
           args: ["server", "/data", "--address", ":9000"]
           env:
             # The app creates the `run-artifacts` bucket itself on first write, so
