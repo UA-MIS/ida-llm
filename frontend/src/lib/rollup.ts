@@ -226,8 +226,24 @@ function tierOf(rollup: ModelRollup): number {
 export function rollupByModel(board: LeaderboardResponse): ModelRollup[] {
   const byKey = new Map<string, ModelTaskEntry[]>();
 
+  // (task_id, model_key) pairs already taken, with the timestamp of the one
+  // kept — so a duplicate row can only ever be superseded by a NEWER one.
+  const seen = new Map<string, { bucket: ModelTaskEntry[]; index: number }>();
+
   for (const task of board.tasks) {
-    for (const result of task.results) {
+    for (const rawResult of task.results) {
+      // ⚠ A MEASUREMENT THE PLATFORM MARKS NOT-SCORABLE NEVER REACHES AN
+      // AGGREGATE. `mis200-is-problem-solving` is judged by an LLM that is not
+      // switched on in this deployment, yet an old judged run left a score
+      // (0.925) on its row. Folded into a headline it dragged a class whose every
+      // scorable task is 1.0 down to "99%" while the drill-down — which only
+      // lists the scorable units — said 100%. Every downstream filter already
+      // reads "mean_score null or scored_count 0" as "not measured", so the one
+      // place to enforce this is here, where entries are born: the row stays
+      // (coverage and cost still count it) but contributes no score, ever.
+      const result: ModelResult = task.scorable
+        ? rawResult
+        : { ...rawResult, mean_score: null, scored_count: 0 };
       const entry: ModelTaskEntry = {
         task_id: task.task_id,
         task_title: task.title,
@@ -239,9 +255,26 @@ export function rollupByModel(board: LeaderboardResponse): ModelRollup[] {
         in_benchmark: task.in_benchmark,
         result,
       };
-      const bucket = byKey.get(result.model_key);
-      if (bucket) bucket.push(entry);
-      else byKey.set(result.model_key, [entry]);
+      let bucket = byKey.get(result.model_key);
+      if (!bucket) {
+        bucket = [];
+        byKey.set(result.model_key, bucket);
+      }
+      // ⚠ ONLY THE LATEST RUN PER (TASK, MODEL) COUNTS. The API already reduces
+      // to the newest finished run per pair in SQL; this is the belt to that
+      // brace, so a superseded run can never be averaged back in if a payload
+      // ever carries two.
+      const pair = `${task.task_id}\u0000${result.model_key}`;
+      const prior = seen.get(pair);
+      if (prior) {
+        const kept = prior.bucket[prior.index]!;
+        if ((result.measured_at ?? "") > (kept.result.measured_at ?? "")) {
+          prior.bucket[prior.index] = entry;
+        }
+        continue;
+      }
+      seen.set(pair, { bucket, index: bucket.length });
+      bucket.push(entry);
     }
   }
 

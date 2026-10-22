@@ -225,7 +225,7 @@ describe("level 3 — the course units that define a class", () => {
     expect(cells[columnOf("Platform & network")]!.querySelector(".cg-score")).toBeNull();
   });
 
-  it("keeps the confidence tell beside every score it shows", async () => {
+  it("shows only the percentage in a score cell — no sample count, no confidence pips", async () => {
     await renderLevel(
       () => ClassPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
       measuredBoard(),
@@ -233,11 +233,23 @@ describe("level 3 — the course units that define a class", () => {
     const measured = Array.from(document.querySelectorAll("td.cg-measured"));
     expect(measured.length).toBeGreaterThan(0);
     for (const cell of measured) {
-      expect(
-        cell.querySelector(".cg-confidence .confidence-pips"),
-        "a score is shown with no tell for how much it can bear",
-      ).not.toBeNull();
+      expect(cell.querySelector(".cg-sub")).toBeNull();
+      expect(cell.querySelector(".confidence-pips")).toBeNull();
+      expect(cell.querySelector(".cg-score")!.textContent).toMatch(/^\d+%$/);
     }
+  });
+
+  it("puts the ramp legend below the models grid", async () => {
+    await renderLevel(
+      () => ClassPage({ params: Promise.resolve({ major: MAJOR, course: "mis-200" }) }),
+      measuredBoard(),
+    );
+    const table = document.querySelector("table.cg-grid")!;
+    const legend = document.querySelector(".cg-legend")!;
+    expect(
+      table.compareDocumentPosition(legend) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "the legend renders above the grid",
+    ).toBeTruthy();
   });
 
   it("discloses a seeded score above the grid, same words as every other level", async () => {

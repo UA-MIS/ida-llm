@@ -199,19 +199,6 @@ export interface ModelSummary {
   tags: string[];
 }
 
-export interface SampleTranscript {
-  run_id: string;
-  task_id: string;
-  sample_id: string;
-  model_key: string;
-  messages: { role: string; content: string }[];
-  completion: string;
-  usage: TokenUsage;
-  latency_ms: number;
-  request_id: string | null;
-  raw_response: Record<string, unknown>;
-}
-
 // ---------------------------------------------------------------------------
 // The results view (`GET /leaderboard`)
 //
@@ -440,6 +427,11 @@ export interface MajorView {
    * none catalogued yet — a real absence, not a bug.
    */
   subject_codes: string[];
+  /**
+   * An informal short label (`BCS`, `RE`) for a major with no catalogued subject
+   * code — NOT a registrar prefix. Optional: an older API omits it.
+   */
+  display_code?: string | null;
   catalog: string | null;
   /** `catalog` / `core-only` / `none` — how far the class list got. */
   class_source: string;

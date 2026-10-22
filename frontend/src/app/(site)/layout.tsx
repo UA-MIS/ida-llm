@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import { ThemeToggle } from "@/components/theme-toggle";
-import { resolveVersion } from "@/lib/version";
 
 /**
  * The product chrome: a quiet wordmark header, the column every page reads
@@ -24,11 +23,6 @@ export default function SiteLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // ⚠ Resolved, never typed. This badge used to be a hardcoded `v0.1.4` that no
-  // release step ever wrote to — see lib/version.ts for both halves of the
-  // wiring and for why the fallback is loudly labelled rather than empty.
-  const version = resolveVersion();
-
   return (
     <>
       {/* ⚠ QA-25. The first focusable thing on every tool page, invisible
@@ -46,8 +40,10 @@ export default function SiteLayout({
           in globals.css carry the page width and padding. */}
       {/* ⚠ THE BRAND IS THE WAY HOME. The mockup's masthead: a terracotta
           dot-in-circle mark, the product name, and the college under it — the
-          whole thing a link to `/`. The version badge rides quietly beside it,
-          and the light/dark toggle sits at the far right. */}
+          whole thing a link to `/`. The light/dark toggle sits at the far right,
+          vertically centred on the mark. (The build-version pill was removed
+          from the header for the advisory-board demo; `lib/version.ts` still
+          resolves the build string for anything that wants it.) */}
       <header className="site-header">
         <Link href="/" className="brand" aria-label="Coursework Benchmark — home">
           <span className="brand-mark" aria-hidden="true">
@@ -58,12 +54,6 @@ export default function SiteLayout({
             <span className="brand-sub">Culverhouse College of Business</span>
           </span>
         </Link>
-        <span
-          className={`badge badge-version${version.identified ? "" : " badge-version-unknown"}`}
-          title={version.detail}
-        >
-          {version.label}
-        </span>
         <ThemeToggle />
       </header>
       <main id="main-content">{children}</main>

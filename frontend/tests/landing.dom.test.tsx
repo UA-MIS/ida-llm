@@ -56,6 +56,15 @@ describe("the by-major grid", () => {
     expect(headings).toContain("GBA");
   });
 
+  it("shows acronyms only in the majors row — no full-name subtext", async () => {
+    await renderLanding();
+    expect(document.querySelectorAll("thead .xp-col-heading").length).toBeGreaterThan(0);
+    expect(document.querySelector("thead .xp-col-name"), "a full name sits under an acronym").toBeNull();
+    expect(document.querySelector("table.xp-matrix-acronyms")).not.toBeNull();
+    // Still reachable by assistive tech and on hover.
+    expect(document.querySelector("thead .xp-col-link .sr-only")!.textContent).toMatch(/\w/);
+  });
+
   it("renders a measured score as a whole-number percent", async () => {
     await renderLanding();
     const score = document.querySelector("td.cg-measured .cg-score");

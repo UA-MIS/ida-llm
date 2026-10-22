@@ -63,6 +63,11 @@
           "description": "The course prefixes this major's classes carry. Recorded for the reader, not used to derive class lists: a class belongs to a major because it is listed, never because a regex matched.",
           "items": { "type": "string", "pattern": "^[A-Z]{2,4}$" }
         },
+        "display_code": {
+          "type": "string",
+          "pattern": "^[A-Z]{2,5}$",
+          "description": "An INFORMAL short label for a grid column header, for a major with no catalogued subject code. Not a registrar prefix: never used to match, derive or attribute a class. subject_codes stays catalog-only."
+        },
         "catalog": { "type": "string", "minLength": 1 },
         "class_source": {
           "type": "string",

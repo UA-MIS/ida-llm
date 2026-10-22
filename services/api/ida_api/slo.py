@@ -278,6 +278,11 @@ class MajorView(BaseModel):
     falling back to ``name`` there is showing a real absence, not a bug.
     """
 
+    display_code: str | None = None
+    """An informal short label (``BCS``, ``RE``) for a major with no catalogued
+    subject code. NOT a registrar prefix -- ``subject_codes`` stays catalog-only;
+    a client prefers ``subject_codes``, then this, then ``name``."""
+
     catalog: str | None = None
     class_source: str
     """``catalog`` / ``core-only`` / ``none`` -- how far the class list got.
@@ -537,6 +542,7 @@ def _load_majors(
                 name=major.name,
                 department=major.department,
                 subject_codes=list(major.subject_codes),
+                display_code=major.display_code,
                 catalog=major.catalog,
                 class_source=major.class_source,
                 class_source_label=major.class_source_label,

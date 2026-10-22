@@ -11,7 +11,7 @@
  * outranks Marketing or that MIS 200 matters more than MIS 466.
  *
  * ⚠ THE SAME GRID AS `/compare` — not a lookalike. The cells, the heat ramp,
- * the confidence pips and the two empty glyphs come from
+ * the heat ramp and the two empty marks come from
  * `components/score-grid.tsx`, which `/compare` renders too, and the cells are
  * classified by `classifyCell` in lib/matrix.ts, which `/compare` also uses.
  * Nothing here re-implements a rule; if the two pages ever disagree about what
@@ -39,7 +39,7 @@
  * almost all of it empty-column filler — so it was removed. The reason still
  * rides each column as an `sr-only` span inside its header (see `ColumnHeader`),
  * so assistive tech still hears it, and the single key line under the grid still
- * explains the "–"/"◇" glyphs for everyone.
+ * explains the slash/"◇" marks for everyone.
  */
 
 import Link from "next/link";
@@ -55,9 +55,11 @@ const ALL_MODELS = "All models";
 function ColumnHeader({
   entity,
   badge,
+  acronymOnly,
 }: {
   entity: MatrixEntityColumn;
   badge?: React.ReactNode;
+  acronymOnly?: boolean;
 }) {
   return (
     <th
@@ -82,7 +84,10 @@ function ColumnHeader({
             title, the unit's title. Shown now (the mockup's design), where it was
             once aria-only, because the grid is a handful of columns wide, not
             fourteen, and the name is what a reader scans for. */}
-        {entity.heading && entity.heading !== entity.columnLabel ? (
+        {acronymOnly && entity.heading !== entity.columnLabel ? (
+          <span className="sr-only">{entity.heading}</span>
+        ) : null}
+        {!acronymOnly && entity.heading && entity.heading !== entity.columnLabel ? (
           <span className="xp-col-name">{entity.heading}</span>
         ) : null}
         {/* ⚠ WHAT THIS UNIT COVERS — the class page's whole point. A unit column
@@ -123,12 +128,20 @@ export function ExploreMatrixGrid({
   badgeFor,
   /** The model a cell click carried down from the level above, if any. */
   focusModel,
+  acronymOnly,
 }: {
   matrix: ExploreMatrix;
   columnKind: string;
   overallLabel: string;
   badgeFor?: (entity: MatrixEntityColumn) => React.ReactNode;
   focusModel?: string | null;
+  /**
+   * Column headers show the short code alone, with no full-name subtext beneath
+   * it. The front door's majors row uses this: eleven acronyms read at a glance
+   * and lay out evenly, while a gray name under each wrapped onto two lines. The
+   * full name is still the link's `title` and its screen-reader text.
+   */
+  acronymOnly?: boolean;
 }) {
   // English plural for the column-kind word. A naive `+ "s"` turned "class"
   // into "classs" in the grid caption; a sibilant ending (-s, -x, -z, -ch, -sh)
@@ -139,10 +152,8 @@ export function ExploreMatrixGrid({
   const columnWord = columnKind.toLowerCase();
   return (
     <>
-      <RampLegend />
-
       <div className="table-scroll">
-        <table className="cg-grid xp-matrix">
+        <table className={`cg-grid xp-matrix${acronymOnly ? " xp-matrix-acronyms" : ""}`}>
           <caption className="sr-only">
             {`Every model against every ${columnWord} on this level. `}
             {`Models are rows, strongest first; ${pluralise(columnWord)} are columns, `}
@@ -154,7 +165,12 @@ export function ExploreMatrixGrid({
                 Model
               </th>
               {matrix.entities.map((entity) => (
-                <ColumnHeader key={entity.key} entity={entity} badge={badgeFor?.(entity)} />
+                <ColumnHeader
+                  key={entity.key}
+                  entity={entity}
+                  badge={badgeFor?.(entity)}
+                  acronymOnly={acronymOnly}
+                />
               ))}
               <th scope="col" className="cg-col-overall">
                 {overallLabel}
@@ -247,7 +263,7 @@ export function ExploreMatrixGrid({
                   href={entity.href}
                 />
               ))}
-              <td className="cg-cell cg-unmeasured" aria-hidden="true">
+              <td className="cg-cell cg-blank" aria-hidden="true">
                 {/* The crossing of "every model" with "every column" is not a
                     number anyone should read: it would average across majors
                     that share nothing. Left deliberately blank rather than
@@ -258,14 +274,16 @@ export function ExploreMatrixGrid({
         </table>
       </div>
 
+      {/* ⚠ BELOW THE MODELS, NOT ABOVE. The ramp legend explains the colours of
+          the grid it follows; it used to head the page and push the models down. */}
+      <RampLegend />
+
       {/* ⚠ THE KEY IS ON THE PAGE, NOT ONLY IN A TOOLTIP. Two glyphs carry two
           different claims, and a reader who cannot hover — or who simply does
           not — must still be able to tell them apart. One line, under the grid
           it explains, in the same words `lib/explore.ts` uses everywhere else. */}
       <p className="muted xp-matrix-key">
-        <span className="xp-key-mark" aria-hidden="true">
-          –
-        </span>{" "}
+        <span className="xp-key-mark xp-key-slash" aria-hidden="true" />{" "}
         {NOT_MEASURED} — nothing has been run for that pairing, which is not a
         zero.{" "}
         <span className="xp-key-mark" aria-hidden="true">
