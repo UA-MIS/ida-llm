@@ -89,7 +89,7 @@ models:
   #
   # THE ONLY HOSTED (PAID) MODEL THAT MAY BE ENABLED IN THIS FILE. The guard test
   # `test_only_the_mock_is_enabled` in packages/harness/tests/
-  # test_registry_examples.py allows exactly {mock, luna, qwen-local} and fails the PR that
+  # test_registry_examples.py allows exactly {mock, luna, qwen-local, claude-*} and fails the PR that
   # enables anything else. Read that test before adding a second one.
   #
   # ⚠ WHAT THE BUDGET IS. The key behind OPENAI_API_KEY is scoped to this model
@@ -253,6 +253,104 @@ models:
       input_usd_per_mtok: 0.0           # self-hosted: no per-token cost
       output_usd_per_mtok: 0.0
 
+  # --- Claude Opus 5 / Sonnet 5 / Haiku 4.5 (Anthropic Messages API), ENABLED
+  # -- TESTING ONLY, NO SPEND CAP ---------------------------------------------
+  #
+  # Real hosted models so the dashboard grid carries real Claude rows. Served by
+  # the native `anthropic_compat` client (AnthropicMessagesClient) -- no code of
+  # their own. Nothing is scored until a run is made against the real API.
+  #
+  # ⚠ NO HARD CAP. Unlike luna's key, the ANTHROPIC_API_KEY behind these has no
+  # provider-side spend limit. They carry the `testing-only` tag so the nightly
+  # sweeps skip them (IDA_SWEEP_EXCLUDE_TAGS, default "testing-only"; see
+  # `sweepable_model_keys` in services/runner/ida_runner/sweeps.py). Removing it
+  # schedules unattended spend -- do the arithmetic first (docs/calibration.md).
+  #
+  # ⚠ SAMPLING. Opus 5 / Sonnet 5 reject a non-default temperature/top_p with a
+  # 400, so 1.0/1.0 is the only accepted value (the client omits both). Haiku 4.5
+  # would accept 0.0 but is kept at the same values so the three rows compare.
+  #
+  # ⚠ THE OUTPUT CAP IS SHARED WITH THINKING on Opus 5 / Sonnet 5 (adaptive
+  # thinking is on by default). A very low cap can leave no text block; the
+  # client returns "" for that, which a scorer grades 0 -- keep 4096.
+  #
+  # PRICING retrieved 2026-10-22 from the Claude API model table (USD per
+  # million tokens, standard tier, no caching/batch discount).
+  - key: claude-opus-5
+    display_name: Claude Opus 5
+    base_url: https://api.anthropic.com/v1
+    api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, anthropic, frontier, testing-only]
+    serving:
+      model_id: claude-opus-5
+      serving_stack: anthropic_compat
+      serving_version: null             # provider does not report one
+      quantization: unknown             # hosted APIs never tell us
+      revision: null                    # no snapshot pinning offered
+      context_window: 1000000
+      hardware: null
+      sampling:
+        temperature: 1.0                # API default; the client omits it
+        top_p: 1.0
+        max_tokens: 4096
+        seed: null                      # the Messages API has no seed
+    cost:
+      input_usd_per_mtok: 5.00
+      output_usd_per_mtok: 25.00
+
+  - key: claude-sonnet-5
+    display_name: Claude Sonnet 5
+    base_url: https://api.anthropic.com/v1
+    api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, anthropic, frontier, testing-only]
+    serving:
+      model_id: claude-sonnet-5
+      serving_stack: anthropic_compat
+      serving_version: null             # provider does not report one
+      quantization: unknown             # hosted APIs never tell us
+      revision: null                    # no snapshot pinning offered
+      context_window: 1000000
+      hardware: null
+      sampling:
+        temperature: 1.0                # API default; the client omits it
+        top_p: 1.0
+        max_tokens: 4096
+        seed: null                      # the Messages API has no seed
+    cost:
+      input_usd_per_mtok: 2.00
+      output_usd_per_mtok: 10.00
+
+  - key: claude-haiku-4-5
+    display_name: Claude Haiku 4.5
+    base_url: https://api.anthropic.com/v1
+    api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, anthropic, frontier, testing-only]
+    serving:
+      model_id: claude-haiku-4-5-20251001
+      serving_stack: anthropic_compat
+      serving_version: null             # provider does not report one
+      quantization: unknown             # hosted APIs never tell us
+      revision: null                    # no snapshot pinning offered
+      context_window: 200000
+      hardware: null
+      sampling:
+        temperature: 1.0                # API default; the client omits it
+        top_p: 1.0
+        max_tokens: 4096
+        seed: null                      # the Messages API has no seed
+    cost:
+      input_usd_per_mtok: 1.00
+      output_usd_per_mtok: 5.00
+
   # --- campus vLLM ("Sparks"), DEFERRED AND DISABLED ------------------------
   #
   # Present, wired and off. `SPARKS_BASE_URL` is empty in every environment: the
@@ -331,31 +429,7 @@ models:
   #
   # Pricing retrieved 2026-08-25.
   #
-  # - key: claude-opus-5
-  #   display_name: Claude Opus 5
-  #   base_url: https://api.anthropic.com/v1
-  #   api_key_env: ANTHROPIC_API_KEY              # TODO-PLACEHOLDER(vault-path):
-  #                                               # secret/data/capstone-ida/<env>/anthropic
-  #   enabled: true
-  #   timeout_s: 120
-  #   max_retries: 4
-  #   tags: [cloud, frontier, baseline, anthropic]
-  #   serving:
-  #     model_id: claude-opus-5                   # exact id sent in the body
-  #     serving_stack: anthropic_compat
-  #     serving_version: null                     # provider does not report one
-  #     quantization: unknown                     # hosted APIs never tell us
-  #     revision: null                            # no snapshot pinning offered
-  #     context_window: 1000000
-  #     hardware: null
-  #     sampling:
-  #       temperature: 1.0                        # see SAMPLING note above
-  #       top_p: 1.0
-  #       max_tokens: 2048                        # REQUIRED by the Messages API
-  #       seed: null                              # unsupported; see SEED note
-  #   cost:
-  #     input_usd_per_mtok: 5.00
-  #     output_usd_per_mtok: 25.00
+  # (claude-opus-5 is live above; copy its entry for any other Claude model.)
   #
   # - key: claude-sonnet-4-6
   #   display_name: Claude Sonnet 4.6

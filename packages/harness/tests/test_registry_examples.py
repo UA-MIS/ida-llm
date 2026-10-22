@@ -78,7 +78,7 @@ def test_the_file_actually_contains_examples() -> None:
     every parametrised test below vacuously pass."""
     assert len(EXAMPLES) >= 4
     keys = [key for key, _ in EXAMPLES]
-    assert "claude-opus-5" in keys, "the Anthropic example is the point of this story"
+    assert "claude-sonnet-4-6" in keys, "an Anthropic example is the point of this story"
     assert "gpt-5" in keys, "so is the OpenAI one"
 
 
@@ -132,13 +132,15 @@ class TestAnthropicExamplesRespectTheMessagesApi:
     def test_the_flagship_example_uses_api_default_sampling(self) -> None:
         """Opus 5 rejects a non-default temperature/top_p with a 400, so an
         example carrying the benchmark default of 0.0 would fail on first use."""
-        text = next(t for k, t in EXAMPLES if k == "claude-opus-5")
-        sampling = _parse(text).serving.sampling
+        from ida_core.registry import load_registry
+
+        sampling = load_registry(MODELS_YAML).get("claude-opus-5").serving.sampling
         assert sampling.temperature == 1.0
         assert sampling.top_p == 1.0
 
 
-ALLOWED_ENABLED_KEYS = {"mock", "luna", "qwen-local"}
+CLAUDE_KEYS = {"claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"}
+ALLOWED_ENABLED_KEYS = {"mock", "luna", "qwen-local"} | CLAUDE_KEYS
 """The only entries that may be `enabled: true` in the live ``models.yaml``.
 
 ``mock`` is free and deterministic.  ``luna`` is deliberately enabled (issue
@@ -146,6 +148,8 @@ ALLOWED_ENABLED_KEYS = {"mock", "luna", "qwen-local"}
 cap, for TESTING ONLY** -- it exists so the real provider path can be exercised
 end to end, and it is not the finished product's budget.  ``qwen-local`` is the
 team's self-hosted endpoint: free per token, so it adds no credit-card exposure.
+The ``claude-*`` trio are real Anthropic models on a key with NO hard spend cap,
+so they are tagged ``testing-only`` (see TestClaudeEntriesAreHeldOutOfSweeps).
 
 Everything else stays off.  Widening this set is a decision with a credit-card
 consequence, so it is written here, once, rather than implied by the absence of
@@ -180,9 +184,9 @@ class TestLiveFileIsUnchangedInSpirit:
             for entry in registry.models
             if entry.enabled and entry.base_url.startswith("https://")
         }
-        # qwen-local is https but self-hosted and free; what this pins is that
-        # no PAID hosted model is enabled besides luna.
-        assert hosted_and_on - {"qwen-local"} == {"luna"}
+        # qwen-local is https but self-hosted and free; the claude-* trio are
+        # paid but pinned individually (and sweep-excluded) below.
+        assert hosted_and_on - {"qwen-local"} - CLAUDE_KEYS == {"luna"}
 
     def test_the_budget_capped_entry_is_tagged_as_such(self) -> None:
         """The $25 cap is an OpenAI-side setting nothing in this repo can read.
@@ -260,8 +264,11 @@ class TestPreflightOverAuthoredEntries:
     def test_the_flagship_anthropic_example_is_warning_free_too(self) -> None:
         """Opus 5 rejects non-default sampling outright, so the example we hand
         people must be clean at BOTH severities, not merely non-erroring."""
-        text = next(t for k, t in EXAMPLES if k == "claude-opus-5")
-        assert check_entry(_parse(text)) == []
+        from ida_core.registry import load_registry
+
+        registry = load_registry(MODELS_YAML)
+        for key in sorted(CLAUDE_KEYS):
+            assert check_entry(registry.get(key)) == [], key
 
     def test_the_sonnet_4_6_example_warns_and_that_is_correct(self) -> None:
         """It deliberately sets temperature 0.0 because 4.6 still accepts
@@ -282,3 +289,36 @@ class TestQwenLocalEntry:
         extra = load_registry(MODELS_YAML).get("qwen-local").serving.extra
         assert extra["stream"] is True
         assert extra["chat_template_kwargs"] == {"enable_thinking": False}
+
+
+class TestClaudeEntriesAreHeldOutOfSweeps:
+    """The Anthropic key has no provider-side cap, unlike luna's. The only thing
+    stopping a nightly sweep from spending it is the ``testing-only`` tag."""
+
+    @pytest.mark.parametrize("key", sorted(CLAUDE_KEYS))
+    def test_tagged_testing_only_and_wired_to_the_messages_client(self, key: str) -> None:
+        from ida_core.registry import load_registry
+
+        entry = load_registry(MODELS_YAML).get(key)
+        assert "testing-only" in entry.tags
+        assert entry.serving.serving_stack == ServingStack.ANTHROPIC_COMPAT
+        assert entry.base_url == "https://api.anthropic.com/v1"
+        assert entry.api_key_env == "ANTHROPIC_API_KEY"
+        assert entry.serving.sampling.seed is None
+        assert entry.cost.input_usd_per_mtok > 0
+        assert entry.cost.output_usd_per_mtok > 0
+
+    def test_pricing_matches_the_published_rates(self) -> None:
+        from ida_core.registry import load_registry
+
+        registry = load_registry(MODELS_YAML)
+        rates = {
+            k: (registry.get(k).cost.input_usd_per_mtok, registry.get(k).cost.output_usd_per_mtok)
+            for k in CLAUDE_KEYS
+        }
+        assert rates == {
+            "claude-opus-5": (5.0, 25.0),
+            "claude-sonnet-5": (2.0, 10.0),
+            "claude-haiku-4-5": (1.0, 5.0),
+        }
+        assert registry.get("claude-haiku-4-5").serving.model_id == "claude-haiku-4-5-20251001"
