@@ -110,6 +110,8 @@ models:
         top_p: 0.95
         max_tokens: 4096
         seed: null
+      extra:
+        stream: true                  # Cloudflare cuts non-streamed responses at ~30s
     cost:
       input_usd_per_mtok: 0.0
       output_usd_per_mtok: 0.0
