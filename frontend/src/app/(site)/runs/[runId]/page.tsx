@@ -15,7 +15,6 @@ import { classifyRun, classifySample } from "@/lib/outcome";
 import { FACET_CAPTION, groupSamples, type SampleGroup } from "@/lib/samples";
 import type { ResultRecord, RunRecord, ServingConfig } from "@/lib/types";
 import { SAMPLE_FACET_LABEL, sampleFacets } from "@/lib/trust";
-import { Transcript } from "./transcript";
 
 export const dynamic = "force-dynamic";
 
@@ -231,6 +230,17 @@ function SampleFacets({ metadata }: { metadata: Record<string, unknown> | undefi
   );
 }
 
+/**
+ * ⚠ NO QUESTION OR ANSWER TEXT RENDERS HERE, AND THAT IS A SECURITY PROPERTY.
+ * We cannot publish the benchmark's questions, the models' answers or the answer
+ * key (a published key stops measuring anything once it is scraped). The row
+ * therefore shows the verdict and the numbers and NOTHING the scorer or the model
+ * wrote: `score.explanation` is deliberately not rendered, because the
+ * programmatic scorers print the compared values ("got 'X', want 'Y'" — the
+ * model's answer AND the gold answer), and a judge's rationale quotes the answer.
+ * A failed attempt shows only that it failed; the provider's error text can echo
+ * the request. `tests/no-qa-exposure.test.ts` pins all of this.
+ */
 function ResultRow({
   result,
   metadata,
@@ -239,43 +249,26 @@ function ResultRow({
   metadata: Record<string, unknown> | undefined;
 }) {
   return (
-    <>
-      <tr>
-        <td className="mono">
-          {result.sample_id}
-          {result.cached ? (
-            <span className="muted" title="served from cache: no cost, no latency">
-              {" "}
-              (cached)
-            </span>
-          ) : null}
-          <SampleFacets metadata={metadata} />
-        </td>
-        <td>
-          <OutcomeLabel result={result} />
-        </td>
-        <td className="num">{formatScore(result.score?.value ?? null)}</td>
-        <td className="muted" style={{ fontSize: "0.85rem" }}>
-          {result.error ?? result.score?.explanation ?? "—"}
-          {result.archive_error ? (
-            <div style={{ color: "var(--pending)" }}>
-              transcript not archived: {result.archive_error}
-            </div>
-          ) : null}
-        </td>
-        <td className="num mono">
-          {result.usage.prompt_tokens + result.usage.completion_tokens}
-        </td>
-        <td className="num">{formatLatency(result.latency_ms)}</td>
-      </tr>
-      {result.transcript_uri ? (
-        <tr>
-          <td colSpan={6} style={{ paddingTop: 0 }}>
-            <Transcript runId={result.run_id} sampleId={result.sample_id} />
-          </td>
-        </tr>
-      ) : null}
-    </>
+    <tr>
+      <td className="mono">
+        {result.sample_id}
+        {result.cached ? (
+          <span className="muted" title="served from cache: no cost, no latency">
+            {" "}
+            (cached)
+          </span>
+        ) : null}
+        <SampleFacets metadata={metadata} />
+      </td>
+      <td>
+        <OutcomeLabel result={result} />
+      </td>
+      <td className="num">{formatScore(result.score?.value ?? null)}</td>
+      <td className="num mono">
+        {result.usage.prompt_tokens + result.usage.completion_tokens}
+      </td>
+      <td className="num">{formatLatency(result.latency_ms)}</td>
+    </tr>
   );
 }
 
@@ -283,8 +276,7 @@ function ResultRow({
  * One group of samples, collapsible, with its own mean.
  *
  * ⚠ WHY `<details>` AND NOT A CLIENT COMPONENT. The whole run view is server-
- * rendered and the transcripts inside it already carry the only client JS on the
- * page. A native disclosure keeps the collapse working before hydration, keeps
+ * rendered and carries no client JS of its own. A native disclosure keeps the collapse working before hydration, keeps
  * it keyboard-accessible for free, and keeps Ctrl-F over a closed group working
  * in the browsers that support it — none of which a `useState` toggle would.
  */
@@ -328,7 +320,6 @@ function SampleGroupSection({
               <th>Sample</th>
               <th>Outcome</th>
               <th className="num">Score</th>
-              <th>Explanation</th>
               <th className="num">Tokens</th>
               <th className="num">Latency</th>
             </tr>
@@ -405,7 +396,10 @@ export default async function RunDetailPage({
 
       {run.error ? (
         <div className="notice notice-error">
-          <strong>Run failed:</strong> <span className="mono">{run.error}</span>
+          {/* The runner's error text is deliberately not shown: a provider's
+              failure message can echo the request, i.e. the question. The run
+              id above is what an operator looks the cause up by. */}
+          <strong>Run failed.</strong> Nothing here could be marked.
         </div>
       ) : null}
 

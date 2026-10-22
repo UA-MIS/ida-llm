@@ -25,6 +25,7 @@ majors:
   name: Business Cyber Security
   department: Information Systems, Statistics and Management Science
   subject_codes: []
+  display_code: BCS
   catalog: https://catalog.ua.edu/undergraduate/business/information-systems-statistics-management-science/business-cyber-security-bs/
   class_source: none
   classes: []
@@ -187,6 +188,7 @@ majors:
   name: Real Estate
   department: Economics, Finance, and Legal Studies
   subject_codes: []
+  display_code: RE
   catalog: https://catalog.ua.edu/undergraduate/business/economics-finance-legal-studies/real-estate-bs/
   class_source: none
   classes: []

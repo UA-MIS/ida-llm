@@ -84,7 +84,7 @@ export default async function LandingPage() {
       <DemonstrationNotice when={matrix.demonstration.any} text={matrix.demonstration.notice} />
 
       {matrix.available ? (
-        <ExploreMatrixGrid matrix={matrix} columnKind="Major" overallLabel="Overall" />
+        <ExploreMatrixGrid matrix={matrix} columnKind="Major" overallLabel="Overall" acronymOnly />
       ) : (
         <p className="muted">{matrix.unavailable_reason}</p>
       )}

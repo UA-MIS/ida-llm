@@ -1445,22 +1445,6 @@ body:has(.ld) { background: var(--ld-paper); }
   color: var(--cell-text); text-decoration: none;
 }
 a.cg-score:hover { text-decoration: underline; }
-/* The coverage fraction under the score — the mockup's "6/8". De-emphasised by
-   SIZE and WEIGHT, never by a colour the ramp would eat: it carries the cell's
-   dark ink (`--cell-text`), which stays AA on every step, rather than a muted
-   grey that drops below it on the strong top tints. */
-.cg-sub {
-  display: block; font-size: 0.72rem; font-weight: 600; color: var(--cell-text);
-  margin-top: 0.15rem; font-variant-numeric: tabular-nums;
-}
-
-/* The confidence tell inside a grid cell: pips only, label hidden. The words
-   are already in the cell's `title` and its sr-only sentence, and a wrapped
-   "Low confidence" in every cell would turn the grid into prose. */
-.cg-confidence { display: block; margin-top: 0.2rem; }
-.cg-confidence .confidence { font-size: 0; gap: 0; }
-.cg-confidence .confidence-pips { gap: 2px; }
-.cg-confidence .pip { width: 5px; height: 5px; }
 
 /* A column the footer refuses to call, and the reason it refused. */
 .cg-foot-note { display: block; font-size: 0.68rem; font-style: italic; }
@@ -1469,11 +1453,29 @@ a.cg-score:hover { text-decoration: underline; }
    "Not measured yet" is a dashed outline on the bare page — the mockup's cue for
    a square nothing has run for, visibly NOT a zero and NOT a filled score. */
 .cg-unmeasured {
-  background: transparent; color: var(--faint);
+  /* The empty mark: a thin diagonal slash corner to corner. A gradient, not a
+     glyph, so it spans the box at any size; `--border-strong` is already tuned
+     for both themes, which keeps it subtle but readable on light and dark. */
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 0.75px), var(--border-strong) calc(50% - 0.75px),
+    var(--border-strong) calc(50% + 0.75px), transparent calc(50% + 0.75px)
+  );
+  color: var(--faint);
   /* A dashed inset outline, not a border — so it does not add a pixel of box and
      shift the dashed empties out of line with the filled, borderless cells. */
   outline: 1.5px dashed var(--border-strong); outline-offset: -1.5px;
   border-radius: 10px;
+}
+/* The bottom-right crossing of "All models" and "Overall" — deliberately blank,
+   with no slash: it is not a missing measurement, it is a cell that is not asked. */
+.cg-blank { background: transparent; }
+.xp-key-slash {
+  display: inline-block; width: 0.9rem; height: 0.9rem; vertical-align: -0.15rem;
+  border: 1px solid var(--border-strong); border-radius: 3px;
+  background: linear-gradient(to top right, transparent calc(50% - 0.5px),
+    var(--border-strong) calc(50% - 0.5px), var(--border-strong) calc(50% + 0.5px),
+    transparent calc(50% + 0.5px));
 }
 .cg-out-of-scope {
   /* Hatched rather than merely pale: "we did not measure this, on purpose"
@@ -2388,6 +2390,16 @@ a.cg-score:hover { text-decoration: underline; }
 .xp-col-link:hover .xp-col-go { color: var(--accent); }
 .xp-col-badges { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.3rem; max-width: 13ch; }
 .xp-col-badges .badge { white-space: normal; font-size: 0.68rem; }
+
+/* ⚠ THE MAJORS ROW: ACRONYMS ONLY. No gray full-name subtext, so each header is a
+   single short line — `nowrap`, an even share of the table, never two lines.
+   The arrow rides beside the code (the grid's second track), and the "Overall"
+   header lines up with its siblings. */
+.xp-matrix-acronyms .xp-col,
+.xp-matrix-acronyms .cg-col-overall { white-space: nowrap; }
+.xp-matrix-acronyms .xp-col-link { max-width: none; align-items: center; }
+.xp-matrix-acronyms .xp-col-heading { font-size: 1rem; }
+.xp-matrix-acronyms .cg-col-overall { vertical-align: bottom; text-align: left; }
 
 /* The bottom edge marks the KIND of column — measured, nothing run yet, or out
    of scope by the curriculum's own account. --accent is the interactive token

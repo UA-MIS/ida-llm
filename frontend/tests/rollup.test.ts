@@ -614,3 +614,58 @@ describe("summariseDemonstration", () => {
     );
   });
 });
+
+describe("measurements the platform marks not-scorable", () => {
+  // The 99%-vs-100% bug: every scorable MIS 200 task scored 1.0, but an old
+  // judged run of `mis200-is-problem-solving` (task.scorable === false) still
+  // carried 0.925, and it was averaged into the headline.
+  const scorableTask = task({
+    task_id: "mis200-is-concepts/l1",
+    has_results: true,
+    results: [result({ mean_score: 1, scored_count: 10, sample_count: 10 })],
+  });
+  const judgedTask = task({
+    task_id: "mis200-is-problem-solving",
+    scorable: false,
+    unscorable_reason: "requires an LLM judge",
+    has_results: true,
+    results: [
+      result({
+        mean_score: 0.925,
+        scored_count: 10,
+        sample_count: 10,
+        measured_at: "2026-09-28T12:00:00Z",
+      }),
+    ],
+  });
+
+  it("never lets a not-scorable task into any aggregate", () => {
+    const [rollup] = rollupByModel(board([scorableTask, judgedTask]));
+    expect(rollup!.overall.score).toBe(1);
+    expect(rollup!.overall.measured_tasks).toBe(1);
+    // Still covered (and costed): the row exists, it just carries no score.
+    expect(rollup!.overall.covered_tasks).toBe(2);
+    const slo = rollupByOutcome(rollup!, board([scorableTask, judgedTask])).find((r) => r.slo === "SLO2");
+    expect(slo!.aggregate.score).toBe(1);
+  });
+
+  it("scores nothing at all when the only measurement is not-scorable", () => {
+    const [rollup] = rollupByModel(board([judgedTask]));
+    expect(rollup!.overall.score).toBeNull();
+  });
+
+  it("counts only the latest run per task and model", () => {
+    const stale = task({
+      task_id: "mis200-is-concepts/l1",
+      has_results: true,
+      results: [
+        result({ mean_score: 0.5, run_id: "old", measured_at: "2026-08-01T00:00:00Z" }),
+        result({ mean_score: 1, run_id: "new", measured_at: "2026-09-01T00:00:00Z" }),
+        result({ mean_score: 0.2, run_id: "older", measured_at: "2026-07-01T00:00:00Z" }),
+      ],
+    });
+    const [rollup] = rollupByModel(board([stale]));
+    expect(rollup!.entries).toHaveLength(1);
+    expect(rollup!.overall.score).toBe(1);
+  });
+});

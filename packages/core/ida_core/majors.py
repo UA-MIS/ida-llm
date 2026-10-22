@@ -135,6 +135,14 @@ class Major(BaseModel):
     Security student takes, and a derivation would have to decide that silently.
     """
 
+    display_code: str | None = None
+    """An INFORMAL short label for a column header (``BCS``, ``RE``).
+
+    ⚠ NOT A CATALOG CODE.  ``subject_codes`` stays catalog-only; this exists so
+    a major with no registrar prefix still has an acronym to show.  It is never
+    used to match, derive or attribute a class.
+    """
+
     catalog: str | None = None
     class_source: Literal["catalog", "core-only", "none"]
     classes: list[MajorClass] = Field(default_factory=list)

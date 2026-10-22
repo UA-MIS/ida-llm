@@ -29,6 +29,7 @@ import {
   cellHref,
 } from "@/lib/explore-matrix";
 import { buildClasses, findClass } from "@/lib/explore";
+import { formatScore } from "@/lib/format";
 import type { LeaderboardResponse } from "@/lib/types";
 
 const MIS = "management-information-systems";
@@ -467,5 +468,33 @@ describe("unit breakdown — the class page's content axis", () => {
     const matrix = buildUnitMatrix(b, klass, MIS, "spreadsheets-data-analysis");
     expect(matrix.entities.map((e) => e.key)).toEqual(["spreadsheets-data-analysis"]);
     expect(matrix.entities[0]!.overall.score).toBeCloseTo(0.8);
+  });
+});
+
+describe("the headline cell agrees with the drill-down (99% vs 100%)", () => {
+  it("ignores a not-scorable task's stale score, and still never rounds 99.6% up", () => {
+    const b = board([
+      task({
+        task_id: "mis200-is-concepts/l1",
+        family: "mis200-is-concepts",
+        slo: "SLO2",
+        has_results: true,
+        results: [result({ model_key: "sol", display_name: "Sol", mean_score: 1, scored_count: 10 })],
+      }),
+      task({
+        task_id: "mis200-is-problem-solving",
+        family: "mis200-is-concepts",
+        slo: "SLO2",
+        scorable: false,
+        has_results: true,
+        results: [result({ model_key: "sol", display_name: "Sol", mean_score: 0.925, scored_count: 10 })],
+      }),
+    ]);
+    const matrix = buildMajorMatrix(b);
+    const cell = matrix.models.find((m) => m.model_key === "sol")!.cells.find((c) => c.status === "measured")!;
+    expect(cell.score).toBe(1);
+    expect(formatScore(cell.score)).toBe("100%");
+    // The ceiling rule is untouched: a genuine 0.9958 is still 99%.
+    expect(formatScore(0.9958)).toBe("99%");
   });
 });

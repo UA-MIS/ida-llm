@@ -23,7 +23,6 @@ import type {
   LeaderboardResponse,
   RunDetail,
   RunListResponse,
-  SampleTranscript,
   TaskDetail,
 } from "./types";
 
@@ -56,8 +55,7 @@ async function getJson<T>(path: string, revalidateSeconds = 0): Promise<T> {
     });
   } catch (cause) {
     // Status 0 means the request never reached the api -- DNS, connection
-    // refused, timeout. Callers distinguish it from a real HTTP status; the
-    // transcript proxy turns it into a 502, which is what it actually is.
+    // refused, timeout. Callers can tell it from a real HTTP status.
     throw new ApiError(
       `Could not reach the API at ${url}: ${cause instanceof Error ? cause.message : String(cause)}`,
       0,
@@ -78,15 +76,6 @@ export function listRuns(limit = 50): Promise<RunListResponse> {
 
 export function getRun(runId: string): Promise<RunDetail> {
   return getJson<RunDetail>(`/runs/${encodeURIComponent(runId)}`);
-}
-
-export function getTranscript(
-  runId: string,
-  sampleId: string,
-): Promise<SampleTranscript> {
-  return getJson<SampleTranscript>(
-    `/runs/${encodeURIComponent(runId)}/results/${encodeURIComponent(sampleId)}/transcript`,
-  );
 }
 
 /**

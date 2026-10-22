@@ -585,13 +585,14 @@ export function findOutcome(tile: ClassTile, slo: string): OutcomeTile | undefin
  * `curriculum/majors.yaml`'s own `subject_codes` field — the prefixes the
  * registrar prints on the course, e.g. `["MIS"]`. Joining rather than picking
  * one covers a major with more than one prefix without deciding which wins.
- * Falling back to the full `name` for an empty list (Business Cyber Security,
- * Real Estate — neither has a catalogued prefix of its own) is a real
- * admission that no code exists, not a bug: inventing one would be exactly
- * the kind of transcription this file's provenance rule forbids.
+ * When the catalog has no prefix for a major (Business Cyber Security, Real
+ * Estate) it falls back to `display_code` — a SEPARATE, informal acronym the
+ * catalog file records on purpose, so `subject_codes` stays catalog-only — and
+ * only then to the full `name`.
  */
 export function codeForMajor(view: MajorView): string {
-  return view.subject_codes.length > 0 ? view.subject_codes.join("/") : view.name;
+  if (view.subject_codes.length > 0) return view.subject_codes.join("/");
+  return view.display_code || view.name;
 }
 
 function buildMajorTile(

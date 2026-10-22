@@ -55,6 +55,14 @@
 # the entire product, and a refactor that dropped it out of every major's class
 # list would empty the demonstration path without failing anything else.
 #
+# SUBJECT CODES vs DISPLAY CODES. `subject_codes` is CATALOG-ONLY: the course
+# prefixes the registrar prints (AC, MIS, ...). A major with no catalogued prefix
+# of its own (Business Cyber Security, Real Estate) keeps `subject_codes: []`.
+# `display_code` is a separate, INFORMAL short label used only so a grid column
+# header has an acronym to show instead of a long name -- it is not a registrar
+# code and is never used to match, derive or attribute a class. The frontend's
+# `codeForMajor` prefers `subject_codes`, then `display_code`, then the name.
+#
 # PROVENANCE. The eleven majors, their owning departments and the MIS course
 # numbers and titles were read from the University of Alabama undergraduate
 # catalog on the date in `retrieved` (see `source`, and the per-major `catalog`
@@ -106,6 +114,7 @@ majors:
     name: Business Cyber Security
     department: Information Systems, Statistics and Management Science
     subject_codes: []
+    display_code: BCS  # informal; not a catalogued prefix
     catalog: https://catalog.ua.edu/undergraduate/business/information-systems-statistics-management-science/business-cyber-security-bs/
     class_source: none
     # Its coursework is taught under the MIS subject code (MIS 460/462/464/466),
@@ -288,6 +297,7 @@ majors:
     name: Real Estate
     department: Economics, Finance, and Legal Studies
     subject_codes: []
+    display_code: RE  # informal; not a catalogued prefix
     catalog: https://catalog.ua.edu/undergraduate/business/economics-finance-legal-studies/real-estate-bs/
     class_source: none
     classes: []

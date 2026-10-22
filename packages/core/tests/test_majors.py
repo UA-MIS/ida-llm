@@ -310,3 +310,13 @@ def test_task_families_default_to_empty(tmp_path) -> None:
     assert MajorClass(course="MIS 200").task_families == []
     taxonomy = _load(tmp_path, _document())
     assert taxonomy.get("management-information-systems").classes[0].task_families == []
+
+
+def test_informal_display_codes_stay_out_of_the_catalog_codes(majors: Majors) -> None:
+    """``display_code`` is informal; ``subject_codes`` must stay catalog-only."""
+    by_id = {m.id: m for m in majors.majors}
+    for major_id, code in (("business-cyber-security", "BCS"), ("real-estate", "RE")):
+        assert by_id[major_id].display_code == code
+        assert by_id[major_id].subject_codes == []
+    # A major with a catalogued prefix needs no informal one.
+    assert by_id["management-information-systems"].display_code is None

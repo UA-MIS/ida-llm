@@ -28,8 +28,9 @@ import {
   levelLabel,
   NO_TASKS_FOR_CLASS,
   slugify,
+  codeForMajor,
 } from "@/lib/explore";
-import type { LeaderboardResponse } from "@/lib/types";
+import type { LeaderboardResponse, MajorView } from "@/lib/types";
 
 const MIS = "management-information-systems";
 const GEN = "general-business";
@@ -435,5 +436,31 @@ describe("level 4 — the evidence", () => {
     const evidence = buildEvidence(b, mis200, findOutcome(mis200, "SLO2")!);
     expect(evidence.ranked.map((r) => r.model_key)).toEqual(["sol", "luna"]);
     expect(evidence.unranked.map((r) => r.model_key)).toEqual(["dim"]);
+  });
+});
+
+describe("codeForMajor", () => {
+  const base: MajorView = {
+    id: "x",
+    name: "Business Cyber Security",
+    department: "d",
+    subject_codes: [],
+    catalog: null,
+    class_source: "none",
+    class_source_label: "",
+    classes: [],
+  };
+
+  it("prefers the catalogued subject codes", () => {
+    expect(codeForMajor({ ...base, subject_codes: ["MIS"], display_code: "ZZ" })).toBe("MIS");
+  });
+
+  it("falls back to the informal display_code before the name", () => {
+    expect(codeForMajor({ ...base, display_code: "BCS" })).toBe("BCS");
+  });
+
+  it("falls back to the name only when there is neither", () => {
+    expect(codeForMajor(base)).toBe("Business Cyber Security");
+    expect(codeForMajor({ ...base, display_code: null })).toBe("Business Cyber Security");
   });
 });

@@ -24,10 +24,8 @@
 
 import Link from "next/link";
 
-import { ConfidenceTell } from "@/components/trust-badges";
 import { formatScore } from "@/lib/format";
 import { RAMP_STEPS, type MatrixCell } from "@/lib/matrix";
-import { confidenceLabel } from "@/lib/rollup";
 
 /** The ramp legend. Also the only place the step boundaries are stated. */
 export function RampLegend() {
@@ -44,8 +42,7 @@ export function RampLegend() {
         <span>100%</span>
       </span>
       <span className="muted cg-legend-note">
-        Stronger colour means a higher score, not a better model — how much to
-        trust a number is the confidence pips, which are a separate thing.
+        Stronger colour means a higher score, not a better model.
       </span>
     </div>
   );
@@ -97,25 +94,6 @@ export function ScoreCell({
         ) : (
           <span className="cg-score">{formatScore(cell.score)}</span>
         )}
-        <span className="cg-sub">
-          {cell.measuredTasks}/{cell.tasksAvailable}
-        </span>
-        {/* ⚠ THE PIPS THE PAGE TELLS YOU TO LOOK FOR. Three separate pieces of
-            copy — the legend, the how-to-read panel, and the stylesheet's own
-            comment — point the reader at a confidence tell beside each number,
-            and the cell once drew the score and nothing else. A reader who
-            follows the instructions and finds nothing concludes they have
-            misread the page, which is the one thing a grid cannot afford.
-            Compact here (`cg-confidence` drops the word, keeps the pips)
-            because the grid is dense and the label would wrap every cell — the
-            full wording stays in the title and the sr-only sentence. */}
-        <span className="cg-confidence">
-          <ConfidenceTell
-            confidence={cell.confidence}
-            label={confidenceLabel(cell.confidence)}
-            reason={`${confidenceLabel(cell.confidence)}. How much weight this number can bear — how it was marked, over how many attempts, and whether anything failed. It is about the measurement, not about the model.`}
-          />
-        </span>
         <span className="sr-only">{label}</span>
       </td>
     );
@@ -123,15 +101,17 @@ export function ScoreCell({
 
   /* ⚠ AN EMPTY CELL IS STILL A STATEMENT, so it is drawn as one. A blank square
      in a grid reads as zero to almost everyone; a dash with a reason behind it
-     does not. The two empty kinds get different glyphs because they are
-     different claims — see lib/matrix.ts. */
+     does not. The two empty kinds are drawn differently because they are
+     different claims — see lib/matrix.ts. "Not measured yet" is a thin diagonal
+     slash through the box (pure CSS, `.cg-unmeasured`), so there is no glyph to
+     draw; the out-of-scope kind keeps its ◇ on a hatched ground. */
   const notBenchmarkable = cell.status === "not_benchmarkable";
   return (
     <td
       className={`cg-cell ${notBenchmarkable ? "cg-out-of-scope" : "cg-unmeasured"}`}
       title={label}
     >
-      <span aria-hidden="true">{notBenchmarkable ? "◇" : "–"}</span>
+      {notBenchmarkable ? <span aria-hidden="true">◇</span> : null}
       <span className="sr-only">{label}</span>
     </td>
   );

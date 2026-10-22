@@ -120,11 +120,13 @@ describe("no source links a removed route", () => {
 });
 
 describe("the chrome sits below the landing", () => {
-  it("keeps the wordmark, version badge, and a footer route to methodology", () => {
+  it("keeps the wordmark and a footer route to methodology", () => {
     const site = SOURCES.find(([path]) => path.startsWith("(site)") && path.endsWith("layout.tsx"));
     expect(site).toBeDefined();
     const body = site![1];
-    expect(body).toContain("resolveVersion");
+    // The build-version pill is gone from the header on purpose.
+    expect(body).not.toContain("resolveVersion");
+    expect(body).not.toContain("badge-version");
     // The wordmark doubles as the way home.
     expect(body).toContain('href="/"');
     // "How we test" survives in the footer, not the removed top nav.
