@@ -139,7 +139,22 @@ class TestAnthropicExamplesRespectTheMessagesApi:
         assert sampling.top_p == 1.0
 
 
-CLAUDE_KEYS = {"claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"}
+CLAUDE_KEYS = {
+    "claude-fable-5-1",
+    "claude-fable-5",
+    "claude-opus-5-5",
+    "claude-opus-5",
+    "claude-opus-4-8",
+    "claude-opus-4-7",
+    "claude-opus-4-6",
+    "claude-opus-4-5",
+    "claude-sonnet-5-5",
+    "claude-sonnet-5",
+    "claude-sonnet-4-6",
+    "claude-sonnet-4-5",
+    "claude-haiku-5-5",
+    "claude-haiku-4-5",
+}
 ALLOWED_ENABLED_KEYS = {"mock", "luna", "qwen-local"} | CLAUDE_KEYS
 """The only entries that may be `enabled: true` in the live ``models.yaml``.
 
@@ -148,7 +163,7 @@ ALLOWED_ENABLED_KEYS = {"mock", "luna", "qwen-local"} | CLAUDE_KEYS
 cap, for TESTING ONLY** -- it exists so the real provider path can be exercised
 end to end, and it is not the finished product's budget.  ``qwen-local`` is the
 team's self-hosted endpoint: free per token, so it adds no credit-card exposure.
-The ``claude-*`` trio are real Anthropic models on a key with NO hard spend cap,
+The ``claude-*`` entries are real Anthropic models on a key with NO hard spend cap,
 so they are tagged ``testing-only`` (see TestClaudeEntriesAreHeldOutOfSweeps).
 
 Everything else stays off.  Widening this set is a decision with a credit-card
@@ -317,8 +332,19 @@ class TestClaudeEntriesAreHeldOutOfSweeps:
             for k in CLAUDE_KEYS
         }
         assert rates == {
+            "claude-fable-5-1": (10.0, 50.0),
+            "claude-fable-5": (10.0, 50.0),
+            "claude-opus-5-5": (4.0, 20.0),
             "claude-opus-5": (5.0, 25.0),
+            "claude-opus-4-8": (5.0, 25.0),
+            "claude-opus-4-7": (5.0, 25.0),
+            "claude-opus-4-6": (5.0, 25.0),
+            "claude-opus-4-5": (5.0, 25.0),
+            "claude-sonnet-5-5": (2.0, 10.0),
             "claude-sonnet-5": (2.0, 10.0),
+            "claude-sonnet-4-6": (3.0, 15.0),
+            "claude-sonnet-4-5": (3.0, 15.0),
+            "claude-haiku-5-5": (0.1, 0.5),
             "claude-haiku-4-5": (1.0, 5.0),
         }
         assert registry.get("claude-haiku-4-5").serving.model_id == "claude-haiku-4-5-20251001"
