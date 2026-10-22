@@ -78,6 +78,16 @@ data:
   # that lives in one workflow file is a rule somebody's next workflow forgets.
   MOCK_MODEL_BASE_URL: ""
 
+  # ── HIDE THE TEST STUB FROM THE PUBLIC VIEW ─────────────────────────────────
+  # Models carrying any of these tags are withheld from GET /models, the
+  # leaderboard, Explore and the recommender (Settings.public_hide_tags). It is a
+  # VIEW filter, not a disable: runs, sweeps and CI still see the model. Base
+  # carries the PROD value (hide `mock`); dev and preview patch it to empty so
+  # the demo and the tracer keep showing the stub. A ConfigMap value rather than
+  # a dev-only file override because chart-render forbids those in prod, and
+  # because one image is promoted byte-identically across environments.
+  IDA_PUBLIC_HIDE_TAGS: "mock"
+
   # ── SPARKS: WIRED, UNSET, AND THAT IS THE CURRENT DESIGN ────────────────────
   # The campus-hosted vLLM endpoint. Deliberately empty: the cluster's egress
   # policy opens :443 to the internet but NOT a route to Sparks (deferred by owner

@@ -240,6 +240,20 @@ class Settings(BaseSettings):
     :attr:`sweep_exclude_tags` -- x 8 scorable tasks = 8), so tripping it means
     something is wrong, not that the suite grew."""
 
+    public_hide_tags: str = ""
+    """Comma-separated ``models.yaml`` tags whose models the PUBLIC read API hides.
+
+    Hides a model from ``GET /models``, the leaderboard (and so Explore and the
+    recommender, which are built from it). It does NOT disable the model: the
+    runner, sweeps, ``?include_disabled=true`` and the stored runs are untouched,
+    so CI, ``make dev`` and the tracer bullet keep using ``mock``.
+
+    Empty by default so every local/CI process sees everything. The ConfigMap
+    carries the PROD value (``mock``) in base and the dev and preview overlays
+    patch it back to empty -- the same shape as ``MOCK_MODEL_BASE_URL``, and for
+    the same reason: one image is promoted byte-identically, so "does this
+    environment show the test stub" has to be a runtime value, not a file."""
+
     sweep_max_samples: int = 2000
     """Most *samples* one sweep may enqueue.  Beyond this the sweep REFUSES.
 
@@ -382,6 +396,13 @@ class Settings(BaseSettings):
         """
         return frozenset(
             part.strip().lower() for part in self.sweep_exclude_tags.split(",") if part.strip()
+        )
+
+    @property
+    def public_hide_tag_set(self) -> frozenset[str]:
+        """:attr:`public_hide_tags` parsed the same way as :attr:`sweep_exclude_tag_set`."""
+        return frozenset(
+            part.strip().lower() for part in self.public_hide_tags.split(",") if part.strip()
         )
 
     @field_validator("log_level", mode="after")

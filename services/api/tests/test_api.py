@@ -224,7 +224,7 @@ class TestHealth:
 class TestModelsEndpoint:
     def test_lists_enabled_models(self, client: TestClient) -> None:
         models = client.get("/models").json()
-        assert [m["key"] for m in models] == ["mock", "luna"]
+        assert [m["key"] for m in models] == ["mock", "luna", "qwen-local"]
 
     def test_a_disabled_model_is_not_offered(self, client: TestClient) -> None:
         """`sparks-local` is unreachable from this cluster. Listing it would let

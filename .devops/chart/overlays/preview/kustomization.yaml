@@ -107,6 +107,11 @@ patches:
       - op: replace
         path: /data/MOCK_MODEL_BASE_URL
         value: http://ida-llm-mock-model
+      # The stub is the whole point of dev and preview: show it. Prod and staging
+      # inherit base's `mock` and hide it from the public view.
+      - op: replace
+        path: /data/IDA_PUBLIC_HIDE_TAGS
+        value: ""
   # ⚠ THE NIGHTLY SWEEPS ARE SUSPENDED IN PREVIEWS. Left running, every open PR
   # would fire three benchmark sweeps a night, against a namespace with no quota.
   # This is the single most expensive thing a preview could do by accident.

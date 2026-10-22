@@ -631,3 +631,45 @@ class TestMalformedUsageIsAPermanentError:
             # No seed: this client refuses one outright (that is a different test).
             seedless = SamplingParams(temperature=0.0, max_tokens=64)
             assert client.complete(MESSAGES, seedless).usage.total_tokens == 0
+
+
+class TestThinkingOutputIsNeverScored:
+    """A thinking model's chain of thought must not reach the scorer: exact match
+    against ``42`` would fail on ``<think>...</think>42``."""
+
+    @staticmethod
+    def _body(content, finish="stop"):
+        return {
+            "choices": [
+                {"message": {"role": "assistant", "content": content}, "finish_reason": finish}
+            ]
+        }
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("42", "42"),
+            ("\n\n42", "\n\n42"),  # untagged content is untouched (scorer strips)
+            ("<think>17+25 is 42</think>\n\n42", "42"),
+            ("<THINK>a</THINK><think>b</think>42", "42"),
+            ("reasoning without opener</think>\n42", "42"),
+            ("<think>a\nmulti\nline</think>42", "42"),
+        ],
+    )
+    def test_inline_think_blocks_are_removed(self, model_entry, raw, expected) -> None:
+        with _client(model_entry, lambda r: httpx.Response(200, json=self._body(raw))) as c:
+            assert c.complete(MESSAGES, SAMPLING).content == expected
+
+    def test_reasoning_content_field_is_ignored(self, model_entry) -> None:
+        body = self._body("\n\n42")
+        body["choices"][0]["message"]["reasoning_content"] = "17+25=42"
+        with _client(model_entry, lambda r: httpx.Response(200, json=body)) as c:
+            assert c.complete(MESSAGES, SAMPLING).content.strip() == "42"
+
+    def test_unterminated_think_on_length_is_an_error_not_a_zero(self, model_entry) -> None:
+        body = self._body("<think>still thinking", finish="length")
+        with (
+            _client(model_entry, lambda r: httpx.Response(200, json=body)) as c,
+            pytest.raises(PermanentModelError, match="EMPTY answer"),
+        ):
+            c.complete(MESSAGES, SAMPLING)

@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 
 from ida_api.deps import AppContext
 from ida_api.recommend import QUESTIONS_BY_ID, applicable_questions
-from ida_core.contracts import ScorerKind
+from ida_core.contracts import ModelRegistry, ScorerKind
 
 
 def recommend(client: TestClient, answers: dict) -> dict:
@@ -214,6 +214,27 @@ class TestRefusalOnThinContext:
         assert response.status_code == 422
 
 
+def _without_local_models(context: AppContext) -> None:
+    """Switch `qwen-local` off, restoring the premise these tests state.
+
+    They were written when the only campus/free model (`sparks-local`) was
+    disabled, so a hard "stay on campus" or "no per-use cost" constraint left
+    nothing eligible. `qwen-local` is a genuine free on-campus-tagged model, so
+    with it enabled the engine rightly says "no evidence yet" instead; that
+    path is covered by TestEvidenceGate.
+    """
+    object.__setattr__(
+        context,
+        "registry",
+        ModelRegistry(
+            models=[
+                m.model_copy(update={"enabled": False}) if m.key == "qwen-local" else m
+                for m in context.registry.models
+            ]
+        ),
+    )
+
+
 class TestHardConstraints:
     def test_ferpa_hard_requirement_refuses_rather_than_offering_a_cloud_model(
         self, client: TestClient, context: AppContext
@@ -226,6 +247,7 @@ class TestHardConstraints:
         footnote -- would break the one promise that makes this project
         trustworthy with student work, so we return nothing and say why.
         """
+        _without_local_models(context)
         seed_run(context, task_id=QUIZ_TASK, model_key="luna", mean_score=0.95)
         body = recommend(
             client,
@@ -247,6 +269,7 @@ class TestHardConstraints:
         self, client: TestClient, context: AppContext
     ) -> None:
         """The cautious reading is the only safe default, and we say we took it."""
+        _without_local_models(context)
         seed_run(context, task_id=QUIZ_TASK, model_key="luna", mean_score=0.95)
         body = recommend(
             client,
@@ -280,6 +303,7 @@ class TestHardConstraints:
     def test_free_only_excludes_the_paid_model(
         self, client: TestClient, context: AppContext
     ) -> None:
+        _without_local_models(context)
         seed_run(context, task_id=QUIZ_TASK, model_key="luna", mean_score=0.95)
         body = recommend(client, {**COMPLETE_TEACHING_ANSWERS, "budget": "free_or_local_only"})
         assert body["status"] == "no_eligible_model"

@@ -43,6 +43,7 @@ tests can make backoff deterministic without patching the clock globally.
 from __future__ import annotations
 
 import random
+import re
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -329,6 +330,34 @@ class BaseChatClient(ABC):
         raise PermanentModelError(message, status_code=response.status_code)
 
 
+_THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+_THINK_UNCLOSED_RE = re.compile(r"<think>.*\Z", re.DOTALL | re.IGNORECASE)
+
+
+def strip_thinking(content: str) -> str:
+    """Remove inline ``<think>...</think>`` blocks, leaving only the answer.
+
+    Also drops a lone leading ``...</think>`` (chat templates that open the tag
+    in the prompt) and an unterminated ``<think>`` tail (truncated mid-thought),
+    which leaves an empty answer for the caller to refuse rather than score.
+    Content without any tag is returned untouched.
+    """
+    if "think>" not in content.lower():
+        return content
+    out = _THINK_BLOCK_RE.sub("", content)
+    head, sep, tail = out.partition("</think>")
+    if sep and "<think>" not in head.lower():
+        out = tail
+    return _THINK_UNCLOSED_RE.sub("", out).strip()
+
+
+def _finish_reason(body: dict) -> str | None:
+    try:
+        return body["choices"][0].get("finish_reason")
+    except (KeyError, IndexError, TypeError, AttributeError):
+        return None
+
+
 class OpenAICompatibleClient(BaseChatClient):
     """Chat-completions client for any OpenAI-compatible endpoint.
 
@@ -366,6 +395,15 @@ class OpenAICompatibleClient(BaseChatClient):
             payload["stop"] = sampling.stop
         return payload
 
+    def _empty_on_length_message(self) -> str:
+        return (
+            f"{self.entry.key} returned an EMPTY answer after stopping on 'length': the "
+            f"output budget was consumed (by thinking, or an unterminated <think> block) "
+            f"before any answer was produced. That is a missing measurement, not a 0.0. "
+            f"Raise serving.sampling.max_tokens (currently "
+            f"{self.entry.serving.sampling.max_tokens})."
+        )
+
     def _parse(self, body: dict, latency_ms: float, request_id: str | None) -> ChatCompletion:
         """Extract content + usage from an OpenAI-shaped response body."""
         try:
@@ -381,6 +419,13 @@ class OpenAICompatibleClient(BaseChatClient):
             raise PermanentModelError(
                 f"{self.entry.key} returned non-string content of type {type(content).__name__}"
             )
+        # Thinking models served without a reasoning parser leave their chain of
+        # thought inline as <think>...</think>. Scoring that would break exact
+        # match, so only the answer is kept. (Servers WITH a parser put the
+        # thinking in `reasoning_content` and never reach this.)
+        content = strip_thinking(content)
+        if not content.strip() and _finish_reason(body) == "length":
+            raise PermanentModelError(self._empty_on_length_message())
 
         # Mirrors the Anthropic client: a flaky local server (vLLM, llama.cpp)
         # returning a non-dict `usage` must land in the same
@@ -491,8 +536,8 @@ class OpenAIReasoningClient(OpenAICompatibleClient):
             payload["stop"] = sampling.stop
         return payload
 
-    def _parse(self, body: dict, latency_ms: float, request_id: str | None) -> ChatCompletion:
-        """Inherited parsing, plus one refusal the plain client must not make.
+    def _empty_on_length_message(self) -> str:
+        """The wording of the base client's empty-answer-on-``length`` refusal.
 
         ``max_completion_tokens`` is shared between reasoning tokens and the
         visible answer.  When the budget is too small the model spends all of it
@@ -514,16 +559,7 @@ class OpenAIReasoningClient(OpenAICompatibleClient):
         * a missing ``finish_reason`` -- several OpenAI-compatible servers omit
           it -- is not evidence of truncation and is left alone.
         """
-        completion = super()._parse(body, latency_ms, request_id)
-        if completion.content:
-            return completion
-        try:
-            finish_reason = body["choices"][0].get("finish_reason")
-        except (KeyError, IndexError, TypeError, AttributeError):
-            return completion
-        if finish_reason != "length":
-            return completion
-        raise PermanentModelError(
+        return (
             f"{self.entry.key} returned an EMPTY answer after stopping on 'length': the "
             f"reasoning budget was consumed before any visible output was produced. This is "
             f"not a score of 0.0, it is a missing measurement. Raise "
