@@ -12,7 +12,7 @@
 # the committed `models.yaml`, and never see a demo key.
 #
 # WHAT IS IN IT.
-#   * The real entries -- `mock`, `luna`, `qwen-local`, `sparks-local` -- COPIED verbatim from
+#   * The real entries -- `mock`, `luna`, `qwen-local`, the `claude-*` entries, `sparks-local` -- COPIED verbatim from
 #     models.yaml. `tools/tests/test_dev_registry.py` parses both files and
 #     fails if any real entry here differs from models.yaml, so this file cannot
 #     silently drift from the source of truth. The long rationale comments in
@@ -117,6 +117,81 @@ models:
     cost:
       input_usd_per_mtok: 0.0
       output_usd_per_mtok: 0.0
+
+  - key: claude-opus-5
+    display_name: Claude Opus 5
+    base_url: https://api.anthropic.com/v1
+    api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, anthropic, frontier, testing-only]
+    serving:
+      model_id: claude-opus-5
+      serving_stack: anthropic_compat
+      serving_version: null             # provider does not report one
+      quantization: unknown             # hosted APIs never tell us
+      revision: null                    # no snapshot pinning offered
+      context_window: 1000000
+      hardware: null
+      sampling:
+        temperature: 1.0                # API default; the client omits it
+        top_p: 1.0
+        max_tokens: 4096
+        seed: null                      # the Messages API has no seed
+    cost:
+      input_usd_per_mtok: 5.00
+      output_usd_per_mtok: 25.00
+
+  - key: claude-sonnet-5
+    display_name: Claude Sonnet 5
+    base_url: https://api.anthropic.com/v1
+    api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, anthropic, frontier, testing-only]
+    serving:
+      model_id: claude-sonnet-5
+      serving_stack: anthropic_compat
+      serving_version: null             # provider does not report one
+      quantization: unknown             # hosted APIs never tell us
+      revision: null                    # no snapshot pinning offered
+      context_window: 1000000
+      hardware: null
+      sampling:
+        temperature: 1.0                # API default; the client omits it
+        top_p: 1.0
+        max_tokens: 4096
+        seed: null                      # the Messages API has no seed
+    cost:
+      input_usd_per_mtok: 2.00
+      output_usd_per_mtok: 10.00
+
+  - key: claude-haiku-4-5
+    display_name: Claude Haiku 4.5
+    base_url: https://api.anthropic.com/v1
+    api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, anthropic, frontier, testing-only]
+    serving:
+      model_id: claude-haiku-4-5-20251001
+      serving_stack: anthropic_compat
+      serving_version: null             # provider does not report one
+      quantization: unknown             # hosted APIs never tell us
+      revision: null                    # no snapshot pinning offered
+      context_window: 200000
+      hardware: null
+      sampling:
+        temperature: 1.0                # API default; the client omits it
+        top_p: 1.0
+        max_tokens: 4096
+        seed: null                      # the Messages API has no seed
+    cost:
+      input_usd_per_mtok: 1.00
+      output_usd_per_mtok: 5.00
 
   - key: sparks-local
     display_name: Campus vLLM (Sparks)
