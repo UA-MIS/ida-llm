@@ -204,22 +204,19 @@ models:
   # the Sparks placeholder's reproducibility fields (hardware, model id) and tie
   # two machines to one registry key.
   #
-  # ⚠ IT IS A THINKING MODEL. By default it reasons before answering; the server
-  # splits that into `message.reasoning_content` and leaves `message.content` as
-  # the answer alone (with leading whitespace, which the scorer's `strip`
-  # removes). The client reads `content` only, and additionally drops any inline
-  # <think>...</think> block should a server ever leave it in `content`. The
-  # output cap is SHARED with thinking, hence 4096; an empty answer that stopped
-  # on `length` is raised as an error, never scored 0.0.
+  # ⚠ THINKING IS OFF, BY DECISION. It is a thinking-capable model and by default
+  # reasons before answering (the server puts that in `reasoning_content`). The
+  # owner reports it changes nothing in these answers while costing ~4x latency,
+  # so `extra.chat_template_kwargs.enable_thinking: false` switches it off. That
+  # setting is recorded with every result; runs with it on are not comparable.
+  # The client still reads `content` only and drops any inline <think> block, and
+  # an empty answer that stopped on `length` is an error, never a 0.0.
   #
   # ⚠ CLOUDFLARE. The hostname is proxied, and Cloudflare cuts a NON-streaming
   # response at ~30s; a thinking 27B can exceed that on a long answer. So
   # `extra.stream: true` makes the client use server-sent events and fold the
   # chunks back into one response before scoring (OpenAICompatibleClient.
-  # _attempt_stream). Thinking is deliberately LEFT ON -- it is the model's
-  # real behaviour and streaming removes the timeout. If throughput matters
-  # more, add `chat_template_kwargs: {enable_thinking: false}` under `extra`
-  # (recorded with every result, so such runs are never confused with these).
+  # _attempt_stream), kept as a safety net now that thinking is off.
   #
   # ⚠ SAMPLING. 0.6/0.95 is Qwen's recommended thinking-mode setting; greedy
   # decoding is documented to make reasoning loop. Not bit-reproducible, so no
@@ -232,9 +229,9 @@ models:
     base_url: https://local-llm.uamishub.com/v1
     api_key_env: LOCAL_LLM_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
-    timeout_s: 300                      # thinking inflates time to completion
+    timeout_s: 180
     max_retries: 3
-    tags: [local, open-weights, thinking]
+    tags: [local, open-weights]
     serving:
       model_id: qwen3.8-27b             # exact id from GET /v1/models
       serving_stack: vllm
@@ -246,10 +243,12 @@ models:
       sampling:
         temperature: 0.6
         top_p: 0.95
-        max_tokens: 4096                # shared with thinking; endpoint max 8192
+        max_tokens: 1024                # answers only (thinking is off); endpoint max 8192
         seed: null
       extra:
         stream: true                  # Cloudflare cuts non-streamed responses at ~30s
+        chat_template_kwargs:
+          enable_thinking: false        # see the THINKING note above
     cost:
       input_usd_per_mtok: 0.0           # self-hosted: no per-token cost
       output_usd_per_mtok: 0.0

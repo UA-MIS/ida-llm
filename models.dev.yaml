@@ -94,9 +94,9 @@ models:
     base_url: https://local-llm.uamishub.com/v1
     api_key_env: LOCAL_LLM_API_KEY
     enabled: true
-    timeout_s: 300
+    timeout_s: 180
     max_retries: 3
-    tags: [local, open-weights, thinking]
+    tags: [local, open-weights]
     serving:
       model_id: qwen3.8-27b
       serving_stack: vllm
@@ -108,10 +108,12 @@ models:
       sampling:
         temperature: 0.6
         top_p: 0.95
-        max_tokens: 4096
+        max_tokens: 1024
         seed: null
       extra:
         stream: true                  # Cloudflare cuts non-streamed responses at ~30s
+        chat_template_kwargs:
+          enable_thinking: false        # see the THINKING note above
     cost:
       input_usd_per_mtok: 0.0
       output_usd_per_mtok: 0.0

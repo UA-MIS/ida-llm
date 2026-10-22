@@ -271,3 +271,14 @@ class TestPreflightOverAuthoredEntries:
         problems = check_entry(_parse(text))
         assert [p.severity for p in problems] == ["warning"]
         assert errors(problems) == []
+
+
+class TestQwenLocalEntry:
+    def test_streams_and_has_thinking_off(self) -> None:
+        """Cloudflare cuts non-streamed responses at ~30s, and the owner decided
+        thinking stays off; both live in `extra` so they are recorded per result."""
+        from ida_core.registry import load_registry
+
+        extra = load_registry(MODELS_YAML).get("qwen-local").serving.extra
+        assert extra["stream"] is True
+        assert extra["chat_template_kwargs"] == {"enable_thinking": False}
