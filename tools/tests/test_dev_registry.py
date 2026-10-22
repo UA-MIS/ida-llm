@@ -89,6 +89,4 @@ def test_claude_versions_are_grouped_into_families_from_data():
     by_key = {m.key: m for m in entries}
     # Luna and Qwen are their own rows, after the Claude families.
     assert by_key["luna"].family is None and by_key["qwen-local"].family is None
-    assert by_key["luna"].display_order > max(
-        m.display_order for m in entries if m.family
-    )
+    assert by_key["luna"].display_order > max(m.display_order for m in entries if m.family)
