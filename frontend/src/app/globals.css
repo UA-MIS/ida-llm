@@ -1427,7 +1427,15 @@ body:has(.ld) { background: var(--ld-paper); }
 
 .cg-cell {
   text-align: center; vertical-align: middle; padding: 0.55rem 0.35rem;
-  border-radius: 10px; min-width: 4.25rem; min-height: 3.25rem;
+  border-radius: 10px; min-width: 5.25rem;
+  /* ⚠ THE SQUARE IS EXPLICIT NOW. The cell used to get its ~84px height from the
+     percent, the "x/x" count and the confidence pips stacked inside it; those
+     are gone, and without this the cell collapses to a thin strip. 5.27rem is
+     the old rendered height (measured, 84.3px at 16px) — kept as a floor so the
+     measured and the empty (slash) boxes are the same size. `height`, not
+     `min-height`: browsers ignore min-height on a table cell, and a cell's
+     `height` already behaves as a floor the content can grow past. */
+  height: 5.27rem;
   transition: box-shadow 0.18s ease, transform 0.18s ease;
 }
 /* A measured cell lifts on hover — the mockup's cue that a score opens its
@@ -1512,7 +1520,7 @@ a.cg-score:hover { text-decoration: underline; }
 @media (max-width: 760px) {
   .cg-grid { font-size: 0.8rem; }
   .cg-corner { min-width: 9rem; }
-  .cg-cell { min-width: 3.4rem; }
+  .cg-cell { min-width: 3.4rem; height: 5.18rem; }
 }
 
 /* ===========================================================================
