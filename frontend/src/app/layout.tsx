@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Figtree } from "next/font/google";
+import localFont from "next/font/local";
 
 import "./globals.css";
 
@@ -10,26 +10,33 @@ import "./globals.css";
  */
 
 /**
- * ⚠ ONE FAMILY, SELF-HOSTED AT BUILD TIME. The "Organic" design the human's
- * mockup specifies uses Figtree for everything — body text and headings alike,
- * headings simply set at weight 700. `next/font/google` downloads it during
- * `next build` and serves it same-origin under `/_next/static/media`, so the
- * browser makes NO request to fonts.gstatic.com at runtime (no third party
- * watching who reads the page, no render-blocking round trip, and nothing for a
- * future CSP to break). The cost is that `next build` needs egress to
- * fonts.gstatic.com — the Docker build already reaches the network for `npm ci`,
- * so this adds no new class of dependency; an airgapped build would fail here and
- * the fix is `next/font/local` with the .woff2 vendored in.
+ * ⚠ ONE FAMILY, VENDORED IN THE REPO. The "Organic" design the human's mockup
+ * specifies uses Figtree for everything — body text and headings alike, headings
+ * simply set at weight 700. The variable-weight latin .woff2 files live in
+ * `./fonts` (SIL OFL 1.1, licence alongside) and `next/font/local` serves them
+ * same-origin under `/_next/static/media`, so the browser makes NO request to
+ * fonts.gstatic.com at runtime AND `next build` needs no egress either. This
+ * replaced `next/font/google`, whose build-time fetch flaked in CI
+ * ("next/font: Cannot read properties of null") and blocked a release.
  *
  * ⚠ THE VARIABLE NAME IS THE CONTRACT. `--font-body` is consumed throughout
  * globals.css; `--font-display` is aliased to it there (headings are the same
  * family, heavier), so renaming this silently drops the page to the fallback.
  */
-const figtree = Figtree({
-  subsets: ["latin"],
+const figtree = localFont({
+  src: [
+    {
+      path: "./fonts/figtree-latin-wght-normal.woff2",
+      weight: "300 900",
+      style: "normal",
+    },
+    {
+      path: "./fonts/figtree-latin-wght-italic.woff2",
+      weight: "300 900",
+      style: "italic",
+    },
+  ],
   display: "swap",
-  weight: ["400", "500", "600", "700"],
-  style: ["normal", "italic"],
   variable: "--font-body",
 });
 
