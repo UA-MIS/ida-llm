@@ -308,6 +308,8 @@ class TestTheRealConfigMapIsUsable:
             # models.yaml entry grades subjective tasks; unset means they stay
             # unscored, which is why it is set explicitly rather than defaulted.
             "IDA_JUDGE_MODEL_KEY",
+            # Settings.public_hide_tags: models hidden from the public read API.
+            "IDA_PUBLIC_HIDE_TAGS",
         }
         not_ours = {
             "API_URL",  # the frontend reads this, server-side (Node, not Python)

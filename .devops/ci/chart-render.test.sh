@@ -172,6 +172,14 @@ else:
     check(mock and mock["spec"]["replicas"] == 0, f"{env}: mock-model is scaled to zero")
     check(mock_url == "", f"{env}: MOCK_MODEL_BASE_URL is empty (real providers)")
 
+# The test stub is hidden from the PUBLIC view everywhere except dev/preview.
+hide_tags = (config or {}).get("data", {}).get("IDA_PUBLIC_HIDE_TAGS", None)
+if env in ("dev", "preview"):
+    check(hide_tags == "", f"{env}: IDA_PUBLIC_HIDE_TAGS is empty (the mock stays visible)")
+else:
+    check(hide_tags is not None and "mock" in hide_tags.split(","),
+          f"{env}: IDA_PUBLIC_HIDE_TAGS hides the mock stub from the public view")
+
 # Sparks stays unset everywhere until the egress route exists.
 check((config or {}).get("data", {}).get("SPARKS_BASE_URL", "") == "",
       "SPARKS_BASE_URL is empty (no egress route yet)")

@@ -316,6 +316,11 @@ spec:
                 secretKeyRef:
                   name: ida-llm-secret
                   key: OPENAI_API_KEY
+            - name: LOCAL_LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ida-llm-secret
+                  key: LOCAL_LLM_API_KEY
             - name: SPARKS_API_KEY
               valueFrom:
                 secretKeyRef:

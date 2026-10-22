@@ -83,7 +83,7 @@ only**; ESO materializes them.
 
 | Secret | Source | Keys |
 |---|---|---|
-| `ida-llm-secret` | `secret/tenants/ida-llm/<env>/app` | `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `SPARKS_API_KEY` |
+| `ida-llm-secret` | `secret/tenants/ida-llm/<env>/app` | `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `SPARKS_API_KEY`, `LOCAL_LLM_API_KEY` (added by the portal bot PR) |
 | `ida-llm-db` | `secret/tenants/ida-llm/<env>/database` | assembled into `DATABASE_URL` |
 
 Seed or rotate a value:

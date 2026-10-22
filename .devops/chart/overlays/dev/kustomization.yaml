@@ -69,6 +69,11 @@ patches:
       - op: replace
         path: /data/MOCK_MODEL_BASE_URL
         value: http://ida-llm-mock-model
+      # The stub is the whole point of dev and preview: show it. Prod and staging
+      # inherit base's `mock` and hide it from the public view.
+      - op: replace
+        path: /data/IDA_PUBLIC_HIDE_TAGS
+        value: ""
       # ── DEV-ONLY REGISTRY OVERRIDE ──────────────────────────────────────────
       # Point the API/runner at the dev registry (real entries + synthetic demo
       # models) so the dev site shows the ~7-model populated grid. Set ONLY here:

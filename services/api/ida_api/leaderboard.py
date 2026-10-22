@@ -409,12 +409,22 @@ def _ordered_slos(boards: list[TaskLeaderboard], curriculum: CurriculumView) -> 
     return known + unknown
 
 
+def hidden_model_keys(
+    registry_models: list[ModelEntry], hide_tags: frozenset[str]
+) -> frozenset[str]:
+    """Keys of the models carrying any of ``hide_tags`` (``IDA_PUBLIC_HIDE_TAGS``)."""
+    if not hide_tags:
+        return frozenset()
+    return frozenset(m.key for m in registry_models if hide_tags & {t.lower() for t in m.tags})
+
+
 def build_leaderboard(
     session: Session,
     *,
     specs: list[TaskSpec],
     registry_by_key: dict[str, ModelEntry],
     curriculum: CurriculumView,
+    hidden_keys: frozenset[str] = frozenset(),
 ) -> LeaderboardResponse:
     """Aggregate the newest finished run per (task, model) into the results view.
 
@@ -426,9 +436,15 @@ def build_leaderboard(
     process at startup, not once per request -- and so a test can exercise both
     the "curriculum available" and "curriculum missing" paths without touching
     the filesystem.
+
+    ``hidden_keys`` are models withheld from the public view (the test stub on
+    prod); their runs are dropped before any row, count or ranking is built, so
+    nothing downstream can leak them.
     """
     spec_ids = [spec.id for spec in specs]
     rows = latest_terminal_run_per_pair(session, task_ids=spec_ids)
+    if hidden_keys:
+        rows = [r for r in rows if run_row_to_record(r).model_key not in hidden_keys]
     runs_by_task: dict[str, list[RunRecord]] = {}
     for row in rows:
         record = run_row_to_record(row)

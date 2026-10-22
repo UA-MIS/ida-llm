@@ -138,13 +138,14 @@ class TestAnthropicExamplesRespectTheMessagesApi:
         assert sampling.top_p == 1.0
 
 
-ALLOWED_ENABLED_KEYS = {"mock", "luna"}
+ALLOWED_ENABLED_KEYS = {"mock", "luna", "qwen-local"}
 """The only entries that may be `enabled: true` in the live ``models.yaml``.
 
 ``mock`` is free and deterministic.  ``luna`` is deliberately enabled (issue
 #48) against an OpenAI key that is **scoped to that model and carries a $25 hard
 cap, for TESTING ONLY** -- it exists so the real provider path can be exercised
-end to end, and it is not the finished product's budget.
+end to end, and it is not the finished product's budget.  ``qwen-local`` is the
+team's self-hosted endpoint: free per token, so it adds no credit-card exposure.
 
 Everything else stays off.  Widening this set is a decision with a credit-card
 consequence, so it is written here, once, rather than implied by the absence of
@@ -179,7 +180,9 @@ class TestLiveFileIsUnchangedInSpirit:
             for entry in registry.models
             if entry.enabled and entry.base_url.startswith("https://")
         }
-        assert hosted_and_on == {"luna"}
+        # qwen-local is https but self-hosted and free; what this pins is that
+        # no PAID hosted model is enabled besides luna.
+        assert hosted_and_on - {"qwen-local"} == {"luna"}
 
     def test_the_budget_capped_entry_is_tagged_as_such(self) -> None:
         """The $25 cap is an OpenAI-side setting nothing in this repo can read.

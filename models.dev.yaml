@@ -12,7 +12,7 @@
 # the committed `models.yaml`, and never see a demo key.
 #
 # WHAT IS IN IT.
-#   * The real entries -- `mock`, `luna`, `sparks-local` -- COPIED verbatim from
+#   * The real entries -- `mock`, `luna`, `qwen-local`, `sparks-local` -- COPIED verbatim from
 #     models.yaml. `tools/tests/test_dev_registry.py` parses both files and
 #     fails if any real entry here differs from models.yaml, so this file cannot
 #     silently drift from the source of truth. The long rationale comments in
@@ -88,6 +88,33 @@ models:
     cost:
       input_usd_per_mtok: 0.20
       output_usd_per_mtok: 1.20
+
+  - key: qwen-local
+    display_name: Qwen 3.8 27B (local)
+    base_url: https://local-llm.uamishub.com/v1
+    api_key_env: LOCAL_LLM_API_KEY
+    enabled: true
+    timeout_s: 300
+    max_retries: 3
+    tags: [local, open-weights, thinking]
+    serving:
+      model_id: qwen3.8-27b
+      serving_stack: vllm
+      serving_version: vllm 0.30.0
+      quantization: unknown
+      revision: null
+      context_window: 253952
+      hardware: null
+      sampling:
+        temperature: 0.6
+        top_p: 0.95
+        max_tokens: 4096
+        seed: null
+      extra:
+        stream: true                  # Cloudflare cuts non-streamed responses at ~30s
+    cost:
+      input_usd_per_mtok: 0.0
+      output_usd_per_mtok: 0.0
 
   - key: sparks-local
     display_name: Campus vLLM (Sparks)

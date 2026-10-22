@@ -17,6 +17,7 @@ import pytest
 
 from ida_core.artifacts import LocalArtifactStore
 from ida_core.config import repo_root
+from ida_core.contracts import ModelRegistry
 from ida_core.db import create_all, make_engine, make_session_factory
 from ida_core.queue import InMemoryQueue
 from ida_core.registry import load_registry
@@ -33,7 +34,19 @@ def session_factory(tmp_path):
 
 @pytest.fixture
 def registry():
-    return load_registry(repo_root() / "models.yaml")
+    """The shipped registry with `qwen-local` switched off.
+
+    The sweep/budget tests count runs against the {mock, luna} pair they were
+    written for; `qwen-local` is a real, free, sweepable model and would double
+    every expected figure. Its own sweep behaviour is not under test here.
+    """
+    shipped = load_registry(repo_root() / "models.yaml")
+    return ModelRegistry(
+        models=[
+            m.model_copy(update={"enabled": False}) if m.key == "qwen-local" else m
+            for m in shipped.models
+        ]
+    )
 
 
 @pytest.fixture

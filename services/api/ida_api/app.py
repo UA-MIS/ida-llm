@@ -44,7 +44,12 @@ from sqlalchemy import text
 from ida_api import __version__
 from ida_api.auth import Principal, current_principal, validate_auth_config
 from ida_api.deps import AppContext, build_context, get_context
-from ida_api.leaderboard import LeaderboardResponse, build_leaderboard, task_family
+from ida_api.leaderboard import (
+    LeaderboardResponse,
+    build_leaderboard,
+    hidden_model_keys,
+    task_family,
+)
 from ida_api.recommend import (
     QUESTIONS,
     IntakeQuestion,
@@ -282,7 +287,8 @@ def create_app(context: AppContext | None = None) -> FastAPI:
         include_disabled: bool = Query(False, description="Include entries with enabled: false"),
     ) -> list[ModelSummary]:
         """The parsed ``models.yaml``, with API keys and key values never exposed."""
-        entries = ctx.registry.models
+        hidden = hidden_model_keys(ctx.registry.models, ctx.settings.public_hide_tag_set)
+        entries = [e for e in ctx.registry.models if e.key not in hidden]
         if not include_disabled:
             entries = [e for e in entries if e.enabled]
         return [ModelSummary.from_entry(e) for e in entries]
@@ -589,6 +595,9 @@ def create_app(context: AppContext | None = None) -> FastAPI:
                 specs=specs,
                 registry_by_key=registry_by_key,
                 curriculum=ctx.curriculum,
+                hidden_keys=hidden_model_keys(
+                    ctx.registry.models, ctx.settings.public_hide_tag_set
+                ),
             )
 
     @app.get("/curriculum", response_model=CurriculumView, tags=["results"])
@@ -655,17 +664,19 @@ def create_app(context: AppContext | None = None) -> FastAPI:
 
         specs = list(ctx.catalog.all())
         registry_by_key = {entry.key: entry for entry in ctx.registry.models}
+        hidden = hidden_model_keys(ctx.registry.models, ctx.settings.public_hide_tag_set)
         with session_scope(ctx.session_factory) as session:
             board = build_leaderboard(
                 session,
                 specs=specs,
                 registry_by_key=registry_by_key,
                 curriculum=ctx.curriculum,
+                hidden_keys=hidden,
             )
         return evaluate(
             request.answers,
             boards=board.tasks,
-            registry=list(ctx.registry.models),
+            registry=[m for m in ctx.registry.models if m.key not in hidden],
         )
 
     @app.get("/runs/{run_id}/results/{sample_id}/transcript", tags=["runs"])

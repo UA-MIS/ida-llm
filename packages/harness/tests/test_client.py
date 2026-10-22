@@ -6,6 +6,8 @@ explicitly here -- moving a status code between the buckets should break a test.
 
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 
@@ -631,3 +633,137 @@ class TestMalformedUsageIsAPermanentError:
             # No seed: this client refuses one outright (that is a different test).
             seedless = SamplingParams(temperature=0.0, max_tokens=64)
             assert client.complete(MESSAGES, seedless).usage.total_tokens == 0
+
+
+class TestThinkingOutputIsNeverScored:
+    """A thinking model's chain of thought must not reach the scorer: exact match
+    against ``42`` would fail on ``<think>...</think>42``."""
+
+    @staticmethod
+    def _body(content, finish="stop"):
+        return {
+            "choices": [
+                {"message": {"role": "assistant", "content": content}, "finish_reason": finish}
+            ]
+        }
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("42", "42"),
+            ("\n\n42", "\n\n42"),  # untagged content is untouched (scorer strips)
+            ("<think>17+25 is 42</think>\n\n42", "42"),
+            ("<THINK>a</THINK><think>b</think>42", "42"),
+            ("reasoning without opener</think>\n42", "42"),
+            ("<think>a\nmulti\nline</think>42", "42"),
+        ],
+    )
+    def test_inline_think_blocks_are_removed(self, model_entry, raw, expected) -> None:
+        with _client(model_entry, lambda r: httpx.Response(200, json=self._body(raw))) as c:
+            assert c.complete(MESSAGES, SAMPLING).content == expected
+
+    def test_reasoning_content_field_is_ignored(self, model_entry) -> None:
+        body = self._body("\n\n42")
+        body["choices"][0]["message"]["reasoning_content"] = "17+25=42"
+        with _client(model_entry, lambda r: httpx.Response(200, json=body)) as c:
+            assert c.complete(MESSAGES, SAMPLING).content.strip() == "42"
+
+    def test_unterminated_think_on_length_is_an_error_not_a_zero(self, model_entry) -> None:
+        body = self._body("<think>still thinking", finish="length")
+        with (
+            _client(model_entry, lambda r: httpx.Response(200, json=body)) as c,
+            pytest.raises(PermanentModelError, match="EMPTY answer"),
+        ):
+            c.complete(MESSAGES, SAMPLING)
+
+
+def _sse(*events: object) -> bytes:
+    lines = [f"data: {e if isinstance(e, str) else json.dumps(e)}\n\n" for e in events]
+    return "".join(lines).encode()
+
+
+class TestStreaming:
+    """`serving.extra.stream` folds an SSE response back into one completion
+    (Cloudflare cuts non-streamed responses at ~30s)."""
+
+    @staticmethod
+    def _entry(model_entry: ModelEntry, **extra) -> ModelEntry:
+        serving = model_entry.serving.model_copy(update={"extra": {"stream": True, **extra}})
+        return model_entry.model_copy(update={"serving": serving})
+
+    STREAM = _sse(
+        {"id": "c1", "model": "m", "choices": [{"delta": {"role": "assistant"}}]},
+        {"id": "c1", "choices": [{"delta": {"reasoning_content": "17+25"}}]},
+        {"id": "c1", "choices": [{"delta": {"content": "\n\n4"}}]},
+        {"id": "c1", "choices": [{"delta": {"content": "2"}, "finish_reason": "stop"}]},
+        {"id": "c1", "choices": [], "usage": {"prompt_tokens": 9, "completion_tokens": 5}},
+        "[DONE]",
+    )
+
+    def test_chunks_are_accumulated_and_thinking_dropped(self, model_entry) -> None:
+        seen = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.update(json.loads(request.content))
+            return httpx.Response(200, content=self.STREAM)
+
+        with _client(self._entry(model_entry), handler) as c:
+            result = c.complete(MESSAGES, SAMPLING)
+        assert seen["stream"] is True
+        assert seen["stream_options"] == {"include_usage": True}
+        assert result.content.strip() == "42"
+        assert (result.usage.prompt_tokens, result.usage.completion_tokens) == (9, 5)
+        assert result.request_id == "c1"
+
+    def test_chat_template_kwargs_are_forwarded(self, model_entry) -> None:
+        seen = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.update(json.loads(request.content))
+            return httpx.Response(200, content=self.STREAM)
+
+        entry = self._entry(model_entry, chat_template_kwargs={"enable_thinking": False})
+        with _client(entry, handler) as c:
+            c.complete(MESSAGES, SAMPLING)
+        assert seen["chat_template_kwargs"] == {"enable_thinking": False}
+
+    def test_not_streaming_unless_the_entry_asks(self, model_entry) -> None:
+        seen = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.update(json.loads(request.content))
+            return httpx.Response(200, json=OK_BODY)
+
+        with _client(model_entry, handler) as c:
+            c.complete(MESSAGES, SAMPLING)
+        assert seen["stream"] is False
+        assert "stream_options" not in seen
+
+    def test_http_errors_are_classified_like_the_plain_path(self, model_entry) -> None:
+        with (
+            _client(self._entry(model_entry), lambda r: httpx.Response(401, json={})) as c,
+            pytest.raises(PermanentModelError),
+        ):
+            c.complete(MESSAGES, SAMPLING)
+
+    def test_a_503_is_retried(self, model_entry) -> None:
+        calls = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls.append(1)
+            if len(calls) == 1:
+                return httpx.Response(503, json={})
+            return httpx.Response(200, content=self.STREAM)
+
+        with _client(self._entry(model_entry), handler) as c:
+            assert c.complete(MESSAGES, SAMPLING).content.strip() == "42"
+        assert len(calls) == 2
+
+    def test_mid_stream_error_is_transient(self, model_entry) -> None:
+        body = _sse({"id": "c", "choices": [{"delta": {"content": "4"}}]}, {"error": "boom"})
+        entry = self._entry(model_entry).model_copy(update={"max_retries": 0})
+        with (
+            _client(entry, lambda r: httpx.Response(200, content=body)) as c,
+            pytest.raises(TransientModelError, match="mid-stream"),
+        ):
+            c.complete(MESSAGES, SAMPLING)

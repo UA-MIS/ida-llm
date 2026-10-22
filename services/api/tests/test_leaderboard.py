@@ -762,3 +762,27 @@ class TestDemonstrationData:
         )
         row = board_for(client.get("/leaderboard").json(), VERIFIABLE_TASK)["results"][0]
         assert row["demonstration"] is True
+
+
+class TestPublicHideTags:
+    """``IDA_PUBLIC_HIDE_TAGS`` withholds the test stub from the public view
+    (prod, staging) without disabling it for CI, dev or the tracer."""
+
+    def test_default_shows_the_mock_everywhere(self, client: TestClient) -> None:
+        assert "mock" in {m["key"] for m in client.get("/models").json()}
+
+    def test_hidden_from_models_leaderboard_and_recommender(
+        self, client: TestClient, context: AppContext
+    ) -> None:
+        seed_run(context, task_id=VERIFIABLE_TASK, model_key="luna", mean_score=0.4)
+        seed_run(context, task_id=VERIFIABLE_TASK, model_key="mock", mean_score=0.9)
+        context.settings.public_hide_tags = "mock"
+
+        assert "mock" not in {m["key"] for m in client.get("/models").json()}
+        assert "mock" not in {m["key"] for m in client.get("/models?include_disabled=true").json()}
+        board = board_for(client.get("/leaderboard").json(), VERIFIABLE_TASK)
+        assert [r["model_key"] for r in board["results"]] == ["luna"]
+
+    def test_hiding_does_not_disable_the_model(self, context: AppContext) -> None:
+        context.settings.public_hide_tags = "mock"
+        assert "mock" in context.registry.enabled_keys()

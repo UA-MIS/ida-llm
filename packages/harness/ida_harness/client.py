@@ -42,7 +42,9 @@ tests can make backoff deterministic without patching the clock globally.
 
 from __future__ import annotations
 
+import json
 import random
+import re
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -329,6 +331,34 @@ class BaseChatClient(ABC):
         raise PermanentModelError(message, status_code=response.status_code)
 
 
+_THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+_THINK_UNCLOSED_RE = re.compile(r"<think>.*\Z", re.DOTALL | re.IGNORECASE)
+
+
+def strip_thinking(content: str) -> str:
+    """Remove inline ``<think>...</think>`` blocks, leaving only the answer.
+
+    Also drops a lone leading ``...</think>`` (chat templates that open the tag
+    in the prompt) and an unterminated ``<think>`` tail (truncated mid-thought),
+    which leaves an empty answer for the caller to refuse rather than score.
+    Content without any tag is returned untouched.
+    """
+    if "think>" not in content.lower():
+        return content
+    out = _THINK_BLOCK_RE.sub("", content)
+    head, sep, tail = out.partition("</think>")
+    if sep and "<think>" not in head.lower():
+        out = tail
+    return _THINK_UNCLOSED_RE.sub("", out).strip()
+
+
+def _finish_reason(body: dict) -> str | None:
+    try:
+        return body["choices"][0].get("finish_reason")
+    except (KeyError, IndexError, TypeError, AttributeError):
+        return None
+
+
 class OpenAICompatibleClient(BaseChatClient):
     """Chat-completions client for any OpenAI-compatible endpoint.
 
@@ -364,7 +394,100 @@ class OpenAICompatibleClient(BaseChatClient):
             payload["seed"] = sampling.seed
         if sampling.stop:
             payload["stop"] = sampling.stop
+        # Opt-in per entry through `serving.extra` (recorded with every result):
+        #   stream: true               -- see _attempt_stream
+        #   chat_template_kwargs: {..} -- vLLM chat-template switches, e.g.
+        #                                 {"enable_thinking": false}
+        extra = self.entry.serving.extra
+        if extra.get("stream"):
+            payload["stream"] = True
+            payload["stream_options"] = {"include_usage": True}
+        if extra.get("chat_template_kwargs"):
+            payload["chat_template_kwargs"] = extra["chat_template_kwargs"]
         return payload
+
+    def _attempt(self, payload: dict) -> ChatCompletion:
+        if payload.get("stream"):
+            return self._attempt_stream(payload)
+        return super()._attempt(payload)
+
+    def _attempt_stream(self, payload: dict) -> ChatCompletion:
+        """One completion over server-sent events, accumulated into a whole body.
+
+        WHY. The campus endpoint sits behind Cloudflare, which cuts a
+        NON-streaming response at ~30s. A 27B model that thinks can exceed that
+        on a long answer; streamed bytes keep the connection alive. The chunks
+        are folded back into the single body `_parse` already understands, so
+        everything downstream (think-stripping, usage, scoring) is unchanged.
+        `reasoning_content` deltas are consumed but not kept: thinking is not
+        the answer.
+        """
+        started = time.perf_counter()
+        content: list[str] = []
+        finish_reason = None
+        usage: dict | None = None
+        chunk_id = None
+        model = None
+        try:
+            with self._client.stream("POST", self.PATH, json=payload) as response:
+                if response.status_code >= 400:
+                    response.read()
+                    self._raise_for_status(response)
+                request_id = response.headers.get(self.REQUEST_ID_HEADER)
+                for line in response.iter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data)
+                    except ValueError as exc:
+                        raise PermanentModelError(
+                            f"{self.entry.key} sent a non-JSON stream chunk: {data[:200]!r}"
+                        ) from exc
+                    if not isinstance(chunk, dict):
+                        continue
+                    if chunk.get("error"):
+                        raise TransientModelError(
+                            f"{self.entry.key} errored mid-stream: {str(chunk['error'])[:200]}"
+                        )
+                    chunk_id = chunk.get("id") or chunk_id
+                    model = chunk.get("model") or model
+                    if isinstance(chunk.get("usage"), dict):
+                        usage = chunk["usage"]
+                    for choice in chunk.get("choices") or []:
+                        delta = choice.get("delta") or {}
+                        if isinstance(delta.get("content"), str):
+                            content.append(delta["content"])
+                        finish_reason = choice.get("finish_reason") or finish_reason
+        except httpx.TimeoutException as exc:
+            raise TransientModelError(f"timeout calling {self.entry.key}: {exc}") from exc
+        except httpx.TransportError as exc:
+            raise TransientModelError(f"transport error calling {self.entry.key}: {exc}") from exc
+        latency_ms = (time.perf_counter() - started) * 1000.0
+        body = {
+            "id": chunk_id,
+            "model": model,
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "".join(content)},
+                    "finish_reason": finish_reason,
+                }
+            ],
+            "usage": usage or {},
+        }
+        return self._parse(body, latency_ms, request_id)
+
+    def _empty_on_length_message(self) -> str:
+        return (
+            f"{self.entry.key} returned an EMPTY answer after stopping on 'length': the "
+            f"output budget was consumed (by thinking, or an unterminated <think> block) "
+            f"before any answer was produced. That is a missing measurement, not a 0.0. "
+            f"Raise serving.sampling.max_tokens (currently "
+            f"{self.entry.serving.sampling.max_tokens})."
+        )
 
     def _parse(self, body: dict, latency_ms: float, request_id: str | None) -> ChatCompletion:
         """Extract content + usage from an OpenAI-shaped response body."""
@@ -381,6 +504,13 @@ class OpenAICompatibleClient(BaseChatClient):
             raise PermanentModelError(
                 f"{self.entry.key} returned non-string content of type {type(content).__name__}"
             )
+        # Thinking models served without a reasoning parser leave their chain of
+        # thought inline as <think>...</think>. Scoring that would break exact
+        # match, so only the answer is kept. (Servers WITH a parser put the
+        # thinking in `reasoning_content` and never reach this.)
+        content = strip_thinking(content)
+        if not content.strip() and _finish_reason(body) == "length":
+            raise PermanentModelError(self._empty_on_length_message())
 
         # Mirrors the Anthropic client: a flaky local server (vLLM, llama.cpp)
         # returning a non-dict `usage` must land in the same
@@ -491,8 +621,8 @@ class OpenAIReasoningClient(OpenAICompatibleClient):
             payload["stop"] = sampling.stop
         return payload
 
-    def _parse(self, body: dict, latency_ms: float, request_id: str | None) -> ChatCompletion:
-        """Inherited parsing, plus one refusal the plain client must not make.
+    def _empty_on_length_message(self) -> str:
+        """The wording of the base client's empty-answer-on-``length`` refusal.
 
         ``max_completion_tokens`` is shared between reasoning tokens and the
         visible answer.  When the budget is too small the model spends all of it
@@ -514,16 +644,7 @@ class OpenAIReasoningClient(OpenAICompatibleClient):
         * a missing ``finish_reason`` -- several OpenAI-compatible servers omit
           it -- is not evidence of truncation and is left alone.
         """
-        completion = super()._parse(body, latency_ms, request_id)
-        if completion.content:
-            return completion
-        try:
-            finish_reason = body["choices"][0].get("finish_reason")
-        except (KeyError, IndexError, TypeError, AttributeError):
-            return completion
-        if finish_reason != "length":
-            return completion
-        raise PermanentModelError(
+        return (
             f"{self.entry.key} returned an EMPTY answer after stopping on 'length': the "
             f"reasoning budget was consumed before any visible output was produced. This is "
             f"not a score of 0.0, it is a missing measurement. Raise "
