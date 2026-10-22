@@ -1494,7 +1494,7 @@ a.cg-score:hover { text-decoration: underline; }
 /* --- the legend ---------------------------------------------------------- */
 .cg-legend {
   display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.75rem;
-  margin: 0 0 1.1rem; font-size: 0.78rem;
+  margin: 1rem 0 1.1rem; font-size: 0.78rem;
 }
 .cg-legend-label { color: var(--muted); font-weight: 600; }
 .cg-legend-ramp { display: inline-flex; gap: 2px; }

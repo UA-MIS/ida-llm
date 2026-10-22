@@ -60,6 +60,7 @@ describe("the by-major grid", () => {
     await renderLanding();
     expect(document.querySelectorAll("thead .xp-col-heading").length).toBeGreaterThan(0);
     expect(document.querySelector("thead .xp-col-name"), "a full name sits under an acronym").toBeNull();
+    expect(document.querySelector("thead .xp-col-eyebrow"), "an eyebrow sits over an acronym").toBeNull();
     expect(document.querySelector("table.xp-matrix-acronyms")).not.toBeNull();
     // Still reachable by assistive tech and on hover.
     expect(document.querySelector("thead .xp-col-link .sr-only")!.textContent).toMatch(/\w/);

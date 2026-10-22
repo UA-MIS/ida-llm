@@ -71,3 +71,46 @@ describe("no question/answer content is reachable from the public frontend", () 
     }
   });
 });
+
+import { redactResult, redactRun } from "@/lib/redact";
+import { classifySample } from "@/lib/outcome";
+import type { ResultRecord, RunDetail } from "@/lib/types";
+
+describe("redactRun", () => {
+  const leaky = {
+    id: "r1",
+    run_id: "run",
+    task_id: "t",
+    sample_id: "s1",
+    score: {
+      scorer: "exact_match",
+      value: 0,
+      passed: false,
+      explanation: "exact match: got 'WRONG', want 'GOLD-KEY'",
+      criteria: [{ name: "c", value: 1, weight: 1, explanation: "quotes GOLD-KEY" }],
+      details: { normalised_target: "GOLD-KEY" },
+    },
+    scorable: true,
+    error: "provider echoed the prompt: WHAT IS THE QUESTION",
+    transcript_uri: "s3://b/k",
+    archive_error: "failed writing PROMPT-TEXT",
+  } as unknown as ResultRecord;
+
+  it("leaves no answer, gold answer, prompt echo or archive pointer in the payload", () => {
+    const out = redactRun({
+      run: { id: "run", error: "boom: PROMPT-TEXT" } as RunDetail["run"],
+      results: [leaky],
+    });
+    const wire = JSON.stringify(out);
+    for (const secret of ["GOLD-KEY", "WRONG", "WHAT IS THE QUESTION", "PROMPT-TEXT", "s3://"]) {
+      expect(wire, `${secret} survived redaction`).not.toContain(secret);
+    }
+  });
+
+  it("still classifies an errored sample as an error and keeps the score", () => {
+    const out = redactResult(leaky);
+    expect(classifySample(out)).toBe("error");
+    expect(out.score?.value).toBe(0);
+    expect(redactResult({ ...leaky, error: null }).error).toBeNull();
+  });
+});
