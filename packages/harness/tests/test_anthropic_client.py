@@ -233,8 +233,25 @@ class TestResponseParsing:
         assert result.content == "42"
         assert result.raw["content"][0]["type"] == "thinking"
 
+    def test_empty_answer_on_max_tokens_is_an_error_not_a_zero(self, anthropic_entry) -> None:
+        body = dict(
+            OK_BODY,
+            content=[{"type": "thinking", "thinking": "", "signature": "sig"}],
+            stop_reason="max_tokens",
+        )
+        with (
+            _client(anthropic_entry, lambda r: httpx.Response(200, json=body)) as client,
+            pytest.raises(PermanentModelError, match="max_tokens"),
+        ):
+            client.complete(MESSAGES, SAMPLING)
+
+    def test_text_answer_on_max_tokens_is_kept(self, anthropic_entry) -> None:
+        body = dict(OK_BODY, stop_reason="max_tokens")
+        with _client(anthropic_entry, lambda r: httpx.Response(200, json=body)) as client:
+            assert client.complete(MESSAGES, SAMPLING).content == "Response text here"
+
     def test_empty_content_is_honest_emptiness_not_an_error(self, anthropic_entry) -> None:
-        """A refusal, or a max_tokens stop with only a thinking block."""
+        """A refusal (not a max_tokens stop, which is an error above)."""
         body = dict(OK_BODY, content=[], stop_reason="refusal")
         with _client(anthropic_entry, lambda r: httpx.Response(200, json=body)) as client:
             assert client.complete(MESSAGES, SAMPLING).content == ""

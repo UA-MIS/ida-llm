@@ -135,10 +135,18 @@ class AnthropicMessagesClient(BaseChatClient):
                 )
             texts.append(text)
 
-        # An empty content list is honest emptiness, not an error: a refusal or
-        # a max_tokens stop with only a thinking block both produce one, and a
-        # scorer seeing "" is the truthful outcome.
         content = "".join(texts)
+        # Thinking shares max_tokens with the answer. A stop on the cap with no
+        # text means the budget went on thinking: that is a missing measurement,
+        # and returning "" would let a scorer grade it 0.0. (A refusal, or any
+        # other empty stop, stays honest emptiness.)
+        if not content.strip() and body.get("stop_reason") == "max_tokens":
+            raise PermanentModelError(
+                f"{self.entry.key} returned an EMPTY answer after stopping on 'max_tokens': "
+                f"the output budget was consumed (by thinking) before any answer was produced. "
+                f"That is a missing measurement, not a 0.0. Raise serving.sampling.max_tokens "
+                f"(currently {self.entry.serving.sampling.max_tokens})."
+            )
 
         raw_usage = body.get("usage") or {}
         if not isinstance(raw_usage, dict):
