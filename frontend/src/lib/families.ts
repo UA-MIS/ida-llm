@@ -1,35 +1,25 @@
 /**
  * Collapse model versions into family rows, from registry data.
  *
- * ⚠ NEVER AN AVERAGE. A family is not a model: averaging Opus 4.5 and Opus 5.5
- * would invent a score nothing was ever measured at. A family cell is either the
- * one value every measured member shares, or the honest range `min–max%`.
- *
- * ⚠ THE COLOUR IS THE MINIMUM, so a family never looks better than its weakest
- * version. Members with no result are left out of the range; a family none of
- * whose members has a result shows the ordinary empty cell.
- *
- * ⚠ BOTH ENDS OF THE RANGE GO THROUGH `formatScoreValue`, so a 99.58% member
- * prints as 99%, never 100%. Membership is the registry's `family` field, never
- * a string match on a name.
+ * ⚠ THE COLLAPSED ROW IS THE FAMILY'S NEWEST MODEL, NOT A SUMMARY OF THE FAMILY.
+ * Newest is the member with the lowest registry `display_order`. Every cell of
+ * the collapsed row is that one model's own cell, so it can never print a number
+ * no model was measured at: no range, no average, no best-of-family per column.
+ * If the newest model has no result for a column, that cell is the ordinary
+ * empty one; an older version's score is never substituted. Membership is the
+ * registry's `family` field, never a string match on a name.
  */
 
-import { formatScoreValue } from "./format";
-import { rampStep, type MatrixCell } from "./matrix";
 import type { MatrixModelRow } from "./explore-matrix";
 
 export interface FamilyRow {
   kind: "family";
   /** The registry `family` key. */
   key: string;
-  /** "Claude Opus · 6 versions". */
-  label: string;
-  /** Newest first (registry `display_order`). */
-  members: MatrixModelRow[];
-  cells: FamilyCell[];
-  overall: FamilyCell;
-  /** Any member's numbers here were seeded rather than measured. */
-  seeded: boolean;
+  /** The family's newest model: the collapsed row. */
+  newest: MatrixModelRow;
+  /** Every other member, newest first: the rows the expander reveals. */
+  earlier: MatrixModelRow[];
 }
 
 export interface SingleRow {
@@ -39,53 +29,7 @@ export interface SingleRow {
 
 export type DisplayRow = FamilyRow | SingleRow;
 
-/** "96–100%", or "100%" when every measured member agrees. */
-export function formatScoreRange(low: number, high: number): string {
-  const lo = formatScoreValue(low);
-  const hi = formatScoreValue(high);
-  if (lo === hi) return hi;
-  return `${lo.slice(0, -1)}–${hi}`;
-}
-
-/** The text a family cell prints, or null when it should be an empty cell. */
-export function familyCellText(cells: MatrixCell[]): string | null {
-  const scores = cells
-    .filter((c) => c.status === "measured" && c.score !== null)
-    .map((c) => c.score as number);
-  if (scores.length === 0) return null;
-  return formatScoreRange(Math.min(...scores), Math.max(...scores));
-}
-
-export interface FamilyCell {
-  cell: MatrixCell;
-  /** Overrides the cell's printed score; absent for an empty cell. */
-  text?: string;
-}
-
-export function collapseCells(cells: MatrixCell[], familyLabel: string): FamilyCell {
-  const measured = cells.filter((c) => c.status === "measured" && c.score !== null);
-  if (measured.length === 0) {
-    // Every member empty: the same verdict for each (benchmarkability is a
-    // property of the column), so the first one is the family's.
-    return { cell: cells[0]! };
-  }
-  const lowest = measured.reduce((a, b) => ((b.score as number) < (a.score as number) ? b : a));
-  const text = familyCellText(cells)!;
-  const scores = measured.map((c) => c.score as number);
-  const same = text === formatScoreValue(Math.max(...scores));
-  return {
-    text,
-    cell: {
-      ...lowest,
-      step: rampStep(lowest.score as number),
-      // No single run is "the" run of a family.
-      runId: null,
-      reason:
-        `${familyLabel}: ${same ? text : `${text} across the ${measured.length} measured versions`}` +
-        `${same ? "" : "; the colour follows the lowest"}. Open the row to see each version.`,
-    },
-  };
-}
+const orderOf = (row: MatrixModelRow) => row.display_order ?? Number.MAX_SAFE_INTEGER;
 
 /**
  * Group `rows` (already in display order) into family rows and single rows.
@@ -107,25 +51,9 @@ export function groupFamilies(rows: MatrixModelRow[]): DisplayRow[] {
     }
     if (done.has(row.family)) continue;
     done.add(row.family);
-    const name = row.family_display_name ?? row.family;
-    const label = `${name} · ${members.length} versions`;
-    out.push({
-      kind: "family",
-      key: row.family,
-      label,
-      members,
-      cells: row.cells.map((_, i) =>
-        collapseCells(
-          members.map((m) => m.cells[i]!),
-          name,
-        ),
-      ),
-      overall: collapseCells(
-        members.map((m) => m.overallCell),
-        name,
-      ),
-      seeded: members.some((m) => m.seeded),
-    });
+    // Stable sort, so members without a `display_order` keep their given order.
+    const [newest, ...earlier] = [...members].sort((a, b) => orderOf(a) - orderOf(b));
+    out.push({ kind: "family", key: row.family, newest: newest!, earlier });
   }
   return out;
 }

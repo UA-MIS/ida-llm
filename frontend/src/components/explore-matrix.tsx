@@ -125,6 +125,69 @@ function ColumnHeader({
   );
 }
 
+function ModelCells({
+  model,
+  matrix,
+  overallLabel,
+}: {
+  model: MatrixModelRow;
+  matrix: ExploreMatrix;
+  overallLabel: string;
+}) {
+  return (
+    <>
+      {model.cells.map((cell, index) => {
+        const entity = matrix.entities[index]!;
+        return (
+          <ScoreCell
+            key={entity.key}
+            cell={cell}
+            rowLabel={model.display_name}
+            columnLabel={entity.heading}
+            href={cellHref(entity, model.model_key)}
+          />
+        );
+      })}
+
+      {/* This model across the whole level — the number its position in the
+          sort is built from, shown so the ranking can be checked rather than
+          taken on trust. */}
+      <ScoreCell
+        cell={model.overallCell}
+        rowLabel={model.display_name}
+        columnLabel={overallLabel}
+      />
+    </>
+  );
+}
+
+function ModelName({ model }: { model: MatrixModelRow }) {
+  return (
+    <>
+      {/* ⚠ THE ROW HEADER IS THE MODEL'S OWN PAGE. It is the third click
+          target and the one a reader reaches for after they have found a
+          model they like: not "how does it do here", which the row already
+          says, but "how does it do everywhere, and what does it cost". */}
+      <Link href={model.href} className="xp-model-link">
+        {model.display_name}
+      </Link>
+      {model.seeded ? (
+        <span className="cg-model-sub">
+          <DemonstrationBadge />
+        </span>
+      ) : null}
+      {!model.recommendable ? (
+        <span
+          className="cg-model-sub muted"
+          title="A deterministic test stub. Shown because it is a real row, never ranked."
+        >
+          test stub
+        </span>
+      ) : null}
+    </>
+  );
+}
+
 function ModelRow({
   model,
   matrix,
@@ -155,49 +218,9 @@ function ModelRow({
       }
     >
       <th scope="row" className="cg-model xp-model">
-        {/* ⚠ THE ROW HEADER IS THE MODEL'S OWN PAGE. It is the third click
-            target and the one a reader reaches for after they have found a
-            model they like: not "how does it do here", which the row already
-            says, but "how does it do everywhere, and what does it cost". */}
-        <Link href={model.href} className="xp-model-link">
-          {model.display_name}
-        </Link>
-        {model.seeded ? (
-          <span className="cg-model-sub">
-            <DemonstrationBadge />
-          </span>
-        ) : null}
-        {!model.recommendable ? (
-          <span
-            className="cg-model-sub muted"
-            title="A deterministic test stub. Shown because it is a real row, never ranked."
-          >
-            test stub
-          </span>
-        ) : null}
+        <ModelName model={model} />
       </th>
-
-      {model.cells.map((cell, index) => {
-        const entity = matrix.entities[index]!;
-        return (
-          <ScoreCell
-            key={entity.key}
-            cell={cell}
-            rowLabel={model.display_name}
-            columnLabel={entity.heading}
-            href={cellHref(entity, model.model_key)}
-          />
-        );
-      })}
-
-      {/* This model across the whole level — the number its position in the
-          sort is built from, shown so the ranking can be checked rather than
-          taken on trust. */}
-      <ScoreCell
-        cell={model.overallCell}
-        rowLabel={model.display_name}
-        columnLabel={overallLabel}
-      />
+      <ModelCells model={model} matrix={matrix} overallLabel={overallLabel} />
     </tr>
   );
 }
@@ -240,7 +263,7 @@ export function ExploreMatrixGrid({
         <table className={`cg-grid xp-matrix${acronymOnly ? " xp-matrix-acronyms" : ""}`}>
           <caption className="sr-only">
             {`Every model against every ${columnWord} on this level. `}
-            {`Models are rows, versions of one family grouped under a single row; ${pluralise(columnWord)} are columns, `}
+            {`Models are rows; a family shows its newest model, with earlier versions behind its expander; ${pluralise(columnWord)} are columns, `}
             {"in the order the catalogue publishes them."}
           </caption>
           <thead>
@@ -275,33 +298,26 @@ export function ExploreMatrixGrid({
               ) : (
                 <FamilyGroup
                   key={display.key}
-                  label={display.label}
-                  defaultOpen={display.members.some((m) => m.model_key === focusModel)}
-                  summary={
-                    <>
-                      {display.cells.map((fc, index) => {
-                        const entity = matrix.entities[index]!;
-                        return (
-                          <ScoreCell
-                            key={entity.key}
-                            cell={fc.cell}
-                            text={fc.text}
-                            rowLabel={display.label}
-                            columnLabel={entity.heading}
-                            href={fc.text ? entity.href : undefined}
-                          />
-                        );
-                      })}
-                      <ScoreCell
-                        cell={display.overall.cell}
-                        text={display.overall.text}
-                        rowLabel={display.label}
-                        columnLabel={overallLabel}
-                      />
-                    </>
+                  name={<ModelName model={display.newest} />}
+                  earlierCount={display.earlier.length}
+                  rowClassName={
+                    [
+                      display.newest.recommendable ? "" : "row-muted",
+                      display.newest.model_key === focusModel ? "xp-model-focused" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ") || undefined
+                  }
+                  defaultOpen={display.earlier.some((m) => m.model_key === focusModel)}
+                  cells={
+                    <ModelCells
+                      model={display.newest}
+                      matrix={matrix}
+                      overallLabel={overallLabel}
+                    />
                   }
                 >
-                  {display.members.map((model) => (
+                  {display.earlier.map((model) => (
                     <ModelRow
                       key={model.model_key}
                       model={model}
