@@ -12,6 +12,7 @@ import {
   shortSha,
 } from "@/lib/format";
 import { classifyRun, classifySample } from "@/lib/outcome";
+import { redactRun } from "@/lib/redact";
 import { FACET_CAPTION, groupSamples, type SampleGroup } from "@/lib/samples";
 import type { ResultRecord, RunRecord, ServingConfig } from "@/lib/types";
 import { SAMPLE_FACET_LABEL, sampleFacets } from "@/lib/trust";
@@ -348,7 +349,9 @@ export default async function RunDetailPage({
 
   let detail;
   try {
-    detail = await getRun(runId);
+    // Redacted at the door — see lib/redact.ts. Nothing below can leak what it
+    // never receives.
+    detail = redactRun(await getRun(runId));
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) notFound();
     throw error;

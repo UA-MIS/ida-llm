@@ -76,7 +76,7 @@ function ColumnHeader({
         {/* Suppressed when it would just repeat the label — a class column's
             eyebrow IS its code, and "MIS 200 / MIS 200" is a stutter, not a
             hierarchy. */}
-        {entity.eyebrow && entity.eyebrow !== entity.columnLabel ? (
+        {!acronymOnly && entity.eyebrow && entity.eyebrow !== entity.columnLabel ? (
           <span className="xp-col-eyebrow">{entity.eyebrow}</span>
         ) : null}
         <span className="xp-col-heading">{entity.columnLabel}</span>
