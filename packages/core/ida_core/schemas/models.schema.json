@@ -101,7 +101,10 @@
         "timeout_s": { "type": "number", "exclusiveMinimum": 0 },
         "max_retries": { "type": "integer", "minimum": 0, "maximum": 10 },
         "enabled": { "type": "boolean" },
-        "tags": { "type": "array", "items": { "type": "string" } }
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "family": { "type": ["string", "null"] },
+        "family_display_name": { "type": ["string", "null"] },
+        "display_order": { "type": ["integer", "null"] }
       }
     }
   }

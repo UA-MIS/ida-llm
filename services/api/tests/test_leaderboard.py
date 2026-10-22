@@ -786,3 +786,24 @@ class TestPublicHideTags:
     def test_hiding_does_not_disable_the_model(self, context: AppContext) -> None:
         context.settings.public_hide_tags = "mock"
         assert "mock" in context.registry.enabled_keys()
+
+
+class TestModelFamilyIsCarried:
+    """The grids collapse versions into family rows from DATA, not hardcoded names."""
+
+    def test_registry_family_reaches_the_leaderboard_row(
+        self, context: AppContext, client: TestClient
+    ) -> None:
+        seed_run(context, task_id=VERIFIABLE_TASK, model_key="claude-opus-5-5", mean_score=0.9)
+        seed_run(context, task_id=VERIFIABLE_TASK, model_key="luna", mean_score=0.8)
+        rows = {
+            r["model_key"]: r
+            for r in board_for(client.get("/leaderboard").json(), VERIFIABLE_TASK)["results"]
+        }
+        opus = rows["claude-opus-5-5"]
+        assert opus["family"] == "claude-opus"
+        assert opus["family_display_name"] == "Claude Opus"
+        assert opus["display_order"] is not None
+        # A model with no family is its own single row.
+        assert rows["luna"]["family"] is None
+        assert rows["luna"]["family_display_name"] is None

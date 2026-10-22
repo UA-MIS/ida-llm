@@ -262,6 +262,9 @@ class TestModelsEndpoint:
         assert set(model) == {
             "key",
             "display_name",
+            "family",
+            "family_display_name",
+            "display_order",
             "base_url",
             "enabled",
             "requires_api_key",

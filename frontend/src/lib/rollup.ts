@@ -186,6 +186,11 @@ export function aggregate(entries: ModelTaskEntry[]): ScoreAggregate {
 export interface ModelRollup {
   model_key: string;
   display_name: string;
+  /** Registry grouping: versions sharing a `family` collapse into one grid row. */
+  family?: string | null;
+  family_display_name?: string | null;
+  /** Registry position on the grids (ascending); null sorts after every ordered model. */
+  display_order?: number | null;
   model_tags: string[];
   data_residency: DataResidency;
   data_residency_label: string;
@@ -293,6 +298,9 @@ export function rollupByModel(board: LeaderboardResponse): ModelRollup[] {
     rollups.push({
       model_key: modelKey,
       display_name: identity.display_name,
+      family: identity.family ?? null,
+      family_display_name: identity.family_display_name ?? null,
+      display_order: identity.display_order ?? null,
       model_tags: identity.model_tags,
       data_residency: identity.data_residency,
       data_residency_label: identity.data_residency_label,

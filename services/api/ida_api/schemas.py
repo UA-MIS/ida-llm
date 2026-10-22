@@ -42,6 +42,9 @@ class ModelSummary(BaseModel):
 
     key: str
     display_name: str
+    family: str | None = None
+    family_display_name: str | None = None
+    display_order: int | None = None
     base_url: str
     enabled: bool
     requires_api_key: bool
@@ -57,6 +60,9 @@ class ModelSummary(BaseModel):
         return cls(
             key=entry.key,
             display_name=entry.display_name,
+            family=entry.family,
+            family_display_name=entry.family_display_name,
+            display_order=entry.display_order,
             base_url=entry.base_url,
             enabled=entry.enabled,
             requires_api_key=entry.api_key_env is not None,

@@ -64,3 +64,31 @@ def test_demo_models_cannot_reach_a_paid_api():
             f"{key} must route to the mock endpoint, not {entry.base_url_env!r}"
         )
         assert entry.serving.serving_stack.value == "mock", f"{key} must use the mock serving stack"
+
+
+def test_claude_versions_are_grouped_into_families_from_data():
+    """Family membership is a registry field, so the grids never hardcode names."""
+    from collections import defaultdict
+
+    entries = load_registry(PROD).models
+    families = defaultdict(list)
+    for m in entries:
+        if m.family:
+            assert m.family_display_name, f"{m.key} has a family but no family_display_name"
+            families[m.family].append(m)
+    assert {k: len(v) for k, v in families.items()} == {
+        "claude-fable": 2,
+        "claude-opus": 6,
+        "claude-sonnet": 4,
+        "claude-haiku": 2,
+    }
+    for members in families.values():
+        assert len({m.family_display_name for m in members}) == 1
+    orders = [m.display_order for m in entries if m.display_order is not None]
+    assert len(orders) == len(set(orders)), "display_order must be unique"
+    by_key = {m.key: m for m in entries}
+    # Luna and Qwen are their own rows, after the Claude families.
+    assert by_key["luna"].family is None and by_key["qwen-local"].family is None
+    assert by_key["luna"].display_order > max(
+        m.display_order for m in entries if m.family
+    )
