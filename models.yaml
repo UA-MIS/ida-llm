@@ -157,6 +157,7 @@ models:
     # and it does not belong in the name of the model. The duplicated "Luna" went
     # with it.
     display_name: Luna (OpenAI GPT-5.6)
+    display_order: 50
     base_url: https://api.openai.com/v1
     api_key_env: OPENAI_API_KEY         # Vault: secret/tenants/ida-llm/<env>/app
                                         # -> Secret `ida-llm-secret`. See
@@ -226,6 +227,7 @@ models:
   # comes from Vault via ESO like every other key. Free: self-hosted.
   - key: qwen-local
     display_name: Qwen 3.8 27B (local)
+    display_order: 60
     base_url: https://local-llm.uamishub.com/v1
     api_key_env: LOCAL_LLM_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
@@ -284,6 +286,9 @@ models:
   # no task comes close, so the base rate is the honest one.
   - key: claude-fable-5-1
     display_name: Claude Fable 5.1
+    family: claude-fable
+    family_display_name: Claude Fable
+    display_order: 10
     base_url: https://api.anthropic.com/v1
     api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
@@ -309,6 +314,9 @@ models:
 
   - key: claude-fable-5
     display_name: Claude Fable 5
+    family: claude-fable
+    family_display_name: Claude Fable
+    display_order: 11
     base_url: https://api.anthropic.com/v1
     api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
@@ -334,6 +342,9 @@ models:
 
   - key: claude-opus-5-5
     display_name: Claude Opus 5.5
+    family: claude-opus
+    family_display_name: Claude Opus
+    display_order: 20
     base_url: https://api.anthropic.com/v1
     api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
@@ -359,6 +370,9 @@ models:
 
   - key: claude-opus-5
     display_name: Claude Opus 5
+    family: claude-opus
+    family_display_name: Claude Opus
+    display_order: 21
     base_url: https://api.anthropic.com/v1
     api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
@@ -384,6 +398,9 @@ models:
 
   - key: claude-opus-4-8
     display_name: Claude Opus 4.8
+    family: claude-opus
+    family_display_name: Claude Opus
+    display_order: 22
     base_url: https://api.anthropic.com/v1
     api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
@@ -409,6 +426,9 @@ models:
 
   - key: claude-opus-4-7
     display_name: Claude Opus 4.7
+    family: claude-opus
+    family_display_name: Claude Opus
+    display_order: 23
     base_url: https://api.anthropic.com/v1
     api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
@@ -434,6 +454,9 @@ models:
 
   - key: claude-opus-4-6
     display_name: Claude Opus 4.6
+    family: claude-opus
+    family_display_name: Claude Opus
+    display_order: 24
     base_url: https://api.anthropic.com/v1
     api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
@@ -459,6 +482,9 @@ models:
 
   - key: claude-opus-4-5
     display_name: Claude Opus 4.5
+    family: claude-opus
+    family_display_name: Claude Opus
+    display_order: 25
     base_url: https://api.anthropic.com/v1
     api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
@@ -484,6 +510,9 @@ models:
 
   - key: claude-sonnet-5-5
     display_name: Claude Sonnet 5.5
+    family: claude-sonnet
+    family_display_name: Claude Sonnet
+    display_order: 30
     base_url: https://api.anthropic.com/v1
     api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
@@ -509,6 +538,9 @@ models:
 
   - key: claude-sonnet-5
     display_name: Claude Sonnet 5
+    family: claude-sonnet
+    family_display_name: Claude Sonnet
+    display_order: 31
     base_url: https://api.anthropic.com/v1
     api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
@@ -534,6 +566,9 @@ models:
 
   - key: claude-sonnet-4-6
     display_name: Claude Sonnet 4.6
+    family: claude-sonnet
+    family_display_name: Claude Sonnet
+    display_order: 32
     base_url: https://api.anthropic.com/v1
     api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
@@ -559,6 +594,9 @@ models:
 
   - key: claude-sonnet-4-5
     display_name: Claude Sonnet 4.5
+    family: claude-sonnet
+    family_display_name: Claude Sonnet
+    display_order: 33
     base_url: https://api.anthropic.com/v1
     api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
@@ -584,6 +622,9 @@ models:
 
   - key: claude-haiku-5-5
     display_name: Claude Haiku 5.5
+    family: claude-haiku
+    family_display_name: Claude Haiku
+    display_order: 40
     base_url: https://api.anthropic.com/v1
     api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
@@ -609,6 +650,9 @@ models:
 
   - key: claude-haiku-4-5
     display_name: Claude Haiku 4.5
+    family: claude-haiku
+    family_display_name: Claude Haiku
+    display_order: 41
     base_url: https://api.anthropic.com/v1
     api_key_env: ANTHROPIC_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true

@@ -361,6 +361,21 @@ class ModelEntry(BaseModel):
     enabled: bool = True
     tags: list[str] = Field(default_factory=list)
 
+    family: str | None = None
+    """Grouping key for the public grids (e.g. ``claude-opus``).  Entries sharing
+    a family collapse into one expandable row; ``None`` means the model is its
+    own single row."""
+
+    family_display_name: str | None = None
+    """The family row's label (e.g. ``Claude Opus``).  Required in practice
+    wherever :attr:`family` is set; every member carries it so no code has to
+    hardcode a name."""
+
+    display_order: int | None = None
+    """Position on the public grids, ascending; a family sits where its first
+    member does and members run in this order (newest first).  ``None`` sorts
+    after every ordered model."""
+
     @model_validator(mode="after")
     def _has_somewhere_to_send_the_request(self) -> ModelEntry:
         """An entry with neither a literal endpoint nor a variable naming one is

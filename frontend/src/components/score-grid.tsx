@@ -62,6 +62,7 @@ export function ScoreCell({
   rowLabel,
   columnLabel,
   href,
+  text,
 }: {
   cell: MatrixCell;
   rowLabel: string;
@@ -80,6 +81,8 @@ export function ScoreCell({
    * one of them.
    */
   href?: string;
+  /** What to print instead of the cell's own score — a family's `96–100%`. */
+  text?: string;
 }) {
   const label = `${rowLabel} on ${columnLabel}: ${cell.reason}`;
   const target = href ?? (cell.runId ? `/runs/${encodeURIComponent(cell.runId)}` : null);
@@ -89,10 +92,10 @@ export function ScoreCell({
       <td className={`cg-cell cg-measured cg-step-${cell.step}`} title={label}>
         {target ? (
           <Link href={target} className="cg-score">
-            {formatScore(cell.score)}
+            {text ?? formatScore(cell.score)}
           </Link>
         ) : (
-          <span className="cg-score">{formatScore(cell.score)}</span>
+          <span className="cg-score">{text ?? formatScore(cell.score)}</span>
         )}
         <span className="sr-only">{label}</span>
       </td>

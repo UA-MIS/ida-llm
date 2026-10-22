@@ -132,6 +132,7 @@ export default async function ClassesPage({
           matrix={matrix}
           columnKind="Class"
           overallLabel="All classes"
+          acronymOnly
           focusModel={focus?.model_key ?? null}
         />
       )}

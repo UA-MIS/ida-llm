@@ -54,9 +54,14 @@ describe("no question/answer content is reachable from the public frontend", () 
 
   it("ships no client component that is handed run content", () => {
     const clients = ALL.filter((f) => /^\s*["']use client["']/.test(read(f))).map((f) => f.slice(SRC.length));
-    // The theme toggle and the error boundary hold no data. A new entry here
+    // The theme toggle, the error boundary and the family expander (handed only
+    // pre-rendered score cells and a label) hold no data. A new entry here
     // needs a deliberate look at what props cross the server/client boundary.
-    expect(clients.sort()).toEqual(["/app/error.tsx", "/components/theme-toggle.tsx"]);
+    expect(clients.sort()).toEqual([
+      "/app/error.tsx",
+      "/components/family-group.tsx",
+      "/components/theme-toggle.tsx",
+    ]);
   });
 
   it("never renders a scorer's or judge's explanation, or a per-sample error string", () => {

@@ -47,7 +47,14 @@ import Link from "next/link";
 import { RampLegend, ScoreCell } from "@/components/score-grid";
 import { DemonstrationBadge } from "@/components/trust-badges";
 import { NOT_MEASURED, NOT_TEXT_MEASURABLE } from "@/lib/explore";
-import { cellHref, type ExploreMatrix, type MatrixEntityColumn } from "@/lib/explore-matrix";
+import { FamilyGroup } from "@/components/family-group";
+import {
+  cellHref,
+  type ExploreMatrix,
+  type MatrixEntityColumn,
+  type MatrixModelRow,
+} from "@/lib/explore-matrix";
+import { groupFamilies } from "@/lib/families";
 
 /** The label the trailing summary row carries, in the header and in its cells. */
 const ALL_MODELS = "All models";
@@ -118,6 +125,83 @@ function ColumnHeader({
   );
 }
 
+function ModelRow({
+  model,
+  matrix,
+  overallLabel,
+  focusModel,
+  indent,
+}: {
+  model: MatrixModelRow;
+  matrix: ExploreMatrix;
+  overallLabel: string;
+  focusModel?: string | null;
+  indent?: boolean;
+}) {
+  return (
+    <tr
+      className={
+        [
+          model.recommendable ? "" : "row-muted",
+          // ⚠ MARKED, NEVER MOVED. The focused model keeps its place in the
+          // ranking: promoting the row a reader clicked would make the order
+          // say "this is the best model" when all it means is "this is the one
+          // you came from".
+          model.model_key === focusModel ? "xp-model-focused" : "",
+          indent ? "xp-family-member" : "",
+        ]
+          .filter(Boolean)
+          .join(" ") || undefined
+      }
+    >
+      <th scope="row" className="cg-model xp-model">
+        {/* ⚠ THE ROW HEADER IS THE MODEL'S OWN PAGE. It is the third click
+            target and the one a reader reaches for after they have found a
+            model they like: not "how does it do here", which the row already
+            says, but "how does it do everywhere, and what does it cost". */}
+        <Link href={model.href} className="xp-model-link">
+          {model.display_name}
+        </Link>
+        {model.seeded ? (
+          <span className="cg-model-sub">
+            <DemonstrationBadge />
+          </span>
+        ) : null}
+        {!model.recommendable ? (
+          <span
+            className="cg-model-sub muted"
+            title="A deterministic test stub. Shown because it is a real row, never ranked."
+          >
+            test stub
+          </span>
+        ) : null}
+      </th>
+
+      {model.cells.map((cell, index) => {
+        const entity = matrix.entities[index]!;
+        return (
+          <ScoreCell
+            key={entity.key}
+            cell={cell}
+            rowLabel={model.display_name}
+            columnLabel={entity.heading}
+            href={cellHref(entity, model.model_key)}
+          />
+        );
+      })}
+
+      {/* This model across the whole level — the number its position in the
+          sort is built from, shown so the ranking can be checked rather than
+          taken on trust. */}
+      <ScoreCell
+        cell={model.overallCell}
+        rowLabel={model.display_name}
+        columnLabel={overallLabel}
+      />
+    </tr>
+  );
+}
+
 export function ExploreMatrixGrid({
   matrix,
   /** What one column IS, for the corner cell — "Major", "Class", "Outcome". */
@@ -156,7 +240,7 @@ export function ExploreMatrixGrid({
         <table className={`cg-grid xp-matrix${acronymOnly ? " xp-matrix-acronyms" : ""}`}>
           <caption className="sr-only">
             {`Every model against every ${columnWord} on this level. `}
-            {`Models are rows, strongest first; ${pluralise(columnWord)} are columns, `}
+            {`Models are rows, versions of one family grouped under a single row; ${pluralise(columnWord)} are columns, `}
             {"in the order the catalogue publishes them."}
           </caption>
           <thead>
@@ -179,69 +263,57 @@ export function ExploreMatrixGrid({
           </thead>
 
           <tbody>
-            {matrix.models.map((model) => (
-              <tr
-                key={model.model_key}
-                className={
-                  [
-                    model.recommendable ? "" : "row-muted",
-                    // ⚠ MARKED, NEVER MOVED. The focused model keeps its place
-                    // in the ranking: promoting the row a reader clicked would
-                    // make the order say "this is the best model" when all it
-                    // means is "this is the one you came from".
-                    model.model_key === focusModel ? "xp-model-focused" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ") || undefined
-                }
-              >
-                <th scope="row" className="cg-model xp-model">
-                  {/* ⚠ THE ROW HEADER IS THE MODEL'S OWN PAGE. It is the third
-                      click target and the one a reader reaches for after they
-                      have found a model they like: not "how does it do here",
-                      which the row already says, but "how does it do
-                      everywhere, and what does it cost". */}
-                  <Link href={model.href} className="xp-model-link">
-                    {model.display_name}
-                  </Link>
-                  {model.seeded ? (
-                    <span className="cg-model-sub">
-                      <DemonstrationBadge />
-                    </span>
-                  ) : null}
-                  {!model.recommendable ? (
-                    <span
-                      className="cg-model-sub muted"
-                      title="A deterministic test stub. Shown because it is a real row, never ranked."
-                    >
-                      test stub
-                    </span>
-                  ) : null}
-                </th>
-
-                {model.cells.map((cell, index) => {
-                  const entity = matrix.entities[index]!;
-                  return (
-                    <ScoreCell
-                      key={entity.key}
-                      cell={cell}
-                      rowLabel={model.display_name}
-                      columnLabel={entity.heading}
-                      href={cellHref(entity, model.model_key)}
-                    />
-                  );
-                })}
-
-                {/* This model across the whole level — the number its position
-                    in the sort is built from, shown so the ranking can be
-                    checked rather than taken on trust. */}
-                <ScoreCell
-                  cell={model.overallCell}
-                  rowLabel={model.display_name}
-                  columnLabel={overallLabel}
+            {groupFamilies(matrix.models).map((display) =>
+              display.kind === "single" ? (
+                <ModelRow
+                  key={display.row.model_key}
+                  model={display.row}
+                  matrix={matrix}
+                  overallLabel={overallLabel}
+                  focusModel={focusModel}
                 />
-              </tr>
-            ))}
+              ) : (
+                <FamilyGroup
+                  key={display.key}
+                  label={display.label}
+                  defaultOpen={display.members.some((m) => m.model_key === focusModel)}
+                  summary={
+                    <>
+                      {display.cells.map((fc, index) => {
+                        const entity = matrix.entities[index]!;
+                        return (
+                          <ScoreCell
+                            key={entity.key}
+                            cell={fc.cell}
+                            text={fc.text}
+                            rowLabel={display.label}
+                            columnLabel={entity.heading}
+                            href={fc.text ? entity.href : undefined}
+                          />
+                        );
+                      })}
+                      <ScoreCell
+                        cell={display.overall.cell}
+                        text={display.overall.text}
+                        rowLabel={display.label}
+                        columnLabel={overallLabel}
+                      />
+                    </>
+                  }
+                >
+                  {display.members.map((model) => (
+                    <ModelRow
+                      key={model.model_key}
+                      model={model}
+                      matrix={matrix}
+                      overallLabel={overallLabel}
+                      focusModel={focusModel}
+                      indent
+                    />
+                  ))}
+                </FamilyGroup>
+              ),
+            )}
 
             {/* ⚠ THE SUMMARY IS A ROW IN THE SAME TABLE AS ITS EVIDENCE. The
                 old tile grid put an entity's overall number on a card and its

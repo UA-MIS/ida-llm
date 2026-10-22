@@ -148,6 +148,11 @@ export interface MatrixEntityColumn {
 export interface MatrixModelRow {
   model_key: string;
   display_name: string;
+  /** Registry grouping: versions sharing a `family` collapse into one grid row. */
+  family?: string | null;
+  family_display_name?: string | null;
+  /** Registry position on the grids (ascending); null sorts after every ordered model. */
+  display_order?: number | null;
   /** False for test stubs. Shown — they are real rows — but never ranked. */
   recommendable: boolean;
   /** Every score this model contributed to this level was seeded, not measured. */
@@ -321,6 +326,9 @@ function buildModelRows(
     return {
       model_key: model.model_key,
       display_name: model.display_name,
+      family: model.family ?? null,
+      family_display_name: model.family_display_name ?? null,
+      display_order: model.display_order ?? null,
       recommendable: model.recommendable,
       // Scoped to THIS level, not the whole board: a model measured for real
       // here must not carry an "illustrative" badge because something it was
@@ -351,6 +359,12 @@ function buildModelRows(
     // the axis that now reads as a ranking.
     const stub = Number(b.recommendable) - Number(a.recommendable);
     if (stub !== 0) return stub;
+    // The registry's own order, when it states one: a fixed, reader-chosen order
+    // (families, then newest-first within a family) beats a score ranking, which
+    // the grid no longer implies. Models without one keep the coverage order.
+    const order =
+      (a.display_order ?? Number.MAX_SAFE_INTEGER) - (b.display_order ?? Number.MAX_SAFE_INTEGER);
+    if (order !== 0) return order;
     const coverage = b.measuredCount - a.measuredCount;
     if (coverage !== 0) return coverage;
     return (b.overall.score ?? 0) - (a.overall.score ?? 0);

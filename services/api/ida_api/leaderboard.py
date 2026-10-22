@@ -143,6 +143,10 @@ class ModelResult(BaseModel):
 
     model_key: str
     display_name: str
+    family: str | None = None
+    family_display_name: str | None = None
+    display_order: int | None = None
+    """Registry grouping/ordering for the public grids; see ``ModelEntry``."""
     model_tags: list[str] = Field(default_factory=list)
     data_residency: DataResidency
     data_residency_label: str
@@ -332,6 +336,9 @@ def build_task_leaderboard(
             ModelResult(
                 model_key=run.model_key,
                 display_name=entry.display_name if entry else run.model_key,
+                family=entry.family if entry else None,
+                family_display_name=entry.family_display_name if entry else None,
+                display_order=entry.display_order if entry else None,
                 model_tags=list(entry.tags) if entry else [],
                 data_residency=residency,
                 data_residency_label=RESIDENCY_LABEL[residency],
