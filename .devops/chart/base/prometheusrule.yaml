@@ -1,0 +1,110 @@
+# Restart-rate alerting — the gap that let a pod restart 12 times unnoticed.
+#
+# ⚠ BLOCKED ON A PLATFORM CHANGE — DO NOT MERGE THIS BEFORE IT LANDS.
+# The tenant AppProject `ida-llm` whitelists `monitoring.coreos.com/ServiceMonitor`
+# but NOT `monitoring.coreos.com/PrometheusRule`. ArgoCD refuses to sync a kind
+# outside namespaceResourceWhitelist, so merging this first would leave every
+# ida-llm Application unable to sync. platform-infra must add one line:
+#     - group: monitoring.coreos.com
+#       kind: PrometheusRule
+# to the project's namespaceResourceWhitelist. THEN merge this.
+# (Our RBAC does allow creating PrometheusRules directly -- `kubectl auth can-i
+# create prometheusrules -n ida-llm-prod` is yes -- but everything here is
+# ArgoCD-managed with selfHeal, so a hand-applied rule is not the shipped path.)
+#
+# ── WHY THIS EXISTS, AND WHY THE PLATFORM'S RULES DO NOT COVER IT ────────────
+#
+# Prod Redis restarted 12 times over three days (dev 8, staging 6) and NOTHING
+# alerted. Two independent reasons, both structural:
+#
+#  1. IT NEVER CRASHED. Its liveness probe timed out, so kubelet stopped it
+#     GRACEFULLY: SIGTERM, clean shutdown, exit 0, reason "Completed". The pod
+#     never entered CrashLoopBackOff. The platform's `KubePodCrashLooping` fires
+#     on kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"},
+#     which this shape never produces. A crashloop alert cannot see a pod that
+#     restarts cleanly, and "restarting cleanly, forever" is still an outage.
+#
+#  2. TENANT NAMESPACES ARE EXCLUDED BY DESIGN. The platform's
+#     `PodCrashLoopOrImagePullBackOff` carries
+#         namespace!~"lab-.*|.*-(dev|staging|prod)"
+#     and every one of our namespaces matches `.*-prod` / `.*-dev` /
+#     `.*-staging`. That exclusion is deliberate -- tenants own their own
+#     alerting -- so this is our job, not a platform gap to report.
+#
+# Prometheus discovers this with no ceremony: the Prometheus CR sets
+# ruleSelector={} and ruleNamespaceSelector={} (both match-all), the same reason
+# servicemonitor.yaml next door needs no special labelling. The `release` label
+# is set anyway to match the convention every other rule on the cluster follows.
+#
+# ── WHY TWO ALERTS AND NOT ONE ───────────────────────────────────────────────
+# The incident had two shapes and a single threshold catches only one of them:
+# a BURST (two restarts inside ninety minutes on 2026-08-27) and a slow DRIP
+# (twelve over three days, ~0.17/hour -- far under any per-hour threshold, and
+# precisely the shape that stayed invisible). One alert for each.
+#
+# ── SCOPE ────────────────────────────────────────────────────────────────────
+# This object ships from base, so each env overlay deploys its own copy. The
+# expressions are scoped to our three namespaces rather than to "the namespace I
+# am installed in" -- a PromQL expression has no way to reference that. The three
+# copies therefore evaluate identically and produce identical label sets, which
+# Alertmanager deduplicates into one notification. If a reviewer prefers exactly
+# one copy, move this file from base/ to the prod overlay; the expressions do not
+# change either way.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ida-llm-workload-health
+  labels:
+    app.kubernetes.io/name: ida-llm
+    app.kubernetes.io/component: monitoring
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: ida-llm.workload-restarts
+      rules:
+        # The flapping case: something is wrong right now.
+        - alert: IdaLlmPodRestartBurst
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace=~"ida-llm-(dev|staging|prod)"
+              }[1h]
+            ) > 2
+          for: 5m
+          labels:
+            severity: warning
+            platform.capstone/team: ida-llm
+          annotations:
+            summary: >-
+              {{ $labels.namespace }}/{{ $labels.pod }} container
+              {{ $labels.container }} restarted more than twice in an hour
+            description: >-
+              {{ $value | printf "%.0f" }} restarts in the last hour. This fires
+              for CLEAN restarts too -- a container killed by a failing liveness
+              probe exits 0/Completed and never reaches CrashLoopBackOff, so the
+              cluster's crashloop alerts stay silent. Check
+              `kubectl -n {{ $labels.namespace }} describe pod {{ $labels.pod }}`
+              for "Liveness probe failed" events and the container's lastState
+              exit code before assuming a crash.
+        # The slow drip: the shape that hid for three days.
+        - alert: IdaLlmPodRestartingPersistently
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace=~"ida-llm-(dev|staging|prod)"
+              }[24h]
+            ) > 5
+          for: 30m
+          labels:
+            severity: warning
+            platform.capstone/team: ida-llm
+          annotations:
+            summary: >-
+              {{ $labels.namespace }}/{{ $labels.pod }} container
+              {{ $labels.container }} has restarted repeatedly over 24h
+            description: >-
+              {{ $value | printf "%.0f" }} restarts in 24h. A rate too low to
+              trip the burst alert but too high to be healthy -- this is the
+              pattern that went unnoticed for three days. A steadily climbing
+              restart count with no CrashLoopBackOff usually means a probe is
+              killing a working process, not that the process is failing.
