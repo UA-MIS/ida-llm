@@ -90,34 +90,35 @@ models:
       input_usd_per_mtok: 0.20
       output_usd_per_mtok: 1.20
 
+  # real: copied from models.yaml (drift-guarded by tools/tests/test_dev_registry.py)
   - key: qwen-local
     display_name: Qwen 3.8 27B (local)
     display_order: 60
     base_url: https://local-llm.uamishub.com/v1
-    api_key_env: LOCAL_LLM_API_KEY
+    base_url_env: LOCAL_LLM_BASE_URL    # set on the GB10; unset in-cluster
+    api_key_env: LOCAL_LLM_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
     timeout_s: 180
     max_retries: 3
-    tags: [local, open-weights]
+    tags: [local, campus, open-weights]
     serving:
-      model_id: qwen3.8-27b
-      serving_stack: vllm
-      serving_version: vllm 0.30.0
-      quantization: unknown
-      revision: null
-      context_window: 253952
-      hardware: null
+      model_id: qwen3.8-27b             # LiteLLM alias, from GET /v1/models
+      serving_stack: ollama
+      serving_version: ollama 0.34.4    # GET /api/version, probed 2026-11-12
+      quantization: int4
+      revision: qwen3.8:27b-mtp-q4_K_M  # the exact ollama tag behind the alias
+      context_window: 262144
+      hardware: 1x Dell Pro Max GB10 (DGX-Spark-class), 128GB unified
       sampling:
         temperature: 0.6
         top_p: 0.95
-        max_tokens: 1024
+        max_tokens: 1024                # answers only; endpoint max 8192
         seed: null
       extra:
-        stream: true                  # Cloudflare cuts non-streamed responses at ~30s
-        chat_template_kwargs:
-          enable_thinking: false        # see the THINKING note above
+        stream: true                    # REQUIRED on the Cloudflare route; inert on-box
+        server_side_thinking: false     # RECORD ONLY -- enforced in litellm-config.yaml
     cost:
-      input_usd_per_mtok: 0.0
+      input_usd_per_mtok: 0.0           # self-hosted: no per-token cost
       output_usd_per_mtok: 0.0
 
   - key: claude-fable-5-1
@@ -511,32 +512,6 @@ models:
     cost:
       input_usd_per_mtok: 1.00
       output_usd_per_mtok: 5.00
-
-  - key: sparks-local
-    display_name: Campus vLLM (Sparks)
-    base_url_env: SPARKS_BASE_URL
-    base_url: ""
-    api_key_env: SPARKS_API_KEY
-    enabled: false
-    timeout_s: 300
-    max_retries: 3
-    tags: [local, campus, open-weights, deferred]
-    serving:
-      model_id: TODO-PLACEHOLDER-sparks-model-id
-      serving_stack: vllm
-      serving_version: null
-      quantization: unknown
-      revision: null
-      context_window: 32768
-      hardware: 1x DGX Spark GB10 128GB unified
-      sampling:
-        temperature: 0.0
-        top_p: 1.0
-        max_tokens: 2048
-        seed: 20260101
-    cost:
-      input_usd_per_mtok: 0.0
-      output_usd_per_mtok: 0.0
 
   # ---- synthetic demonstration models (DEV ONLY) ----
   # All route to the mock endpoint ($0), residency UNKNOWN, numbers are

@@ -192,65 +192,113 @@ models:
       input_usd_per_mtok: 0.20
       output_usd_per_mtok: 1.20
 
-  # --- Qwen 3.8 27B, served by the team's own OpenAI-compatible endpoint -----
+  # --- Qwen 3.8 27B on the GB10 appliance -- THE ONE LOCAL MACHINE ----------
   #
-  # Probed 2026-10-22: GET /v1/models lists exactly one model, `qwen3.8-27b`
-  # (max_input_tokens 253952, max_output_tokens 8192), behind vLLM 0.30.0
-  # (system_fingerprint `vllm-0.30.0-...`). Plain chat-completions, so it takes
-  # the default client -- `serving_stack: vllm` -- and needs no code of its own.
-  # Why a new entry and not a repoint of `sparks-local`: that entry is the
-  # DGX-Spark hardware, env-indirect on purpose and deliberately failing fast
-  # while its egress route is deferred. This is a different box, behind a public
-  # :443 hostname the tenant egress policy already allows. Repointing would erase
-  # the Sparks placeholder's reproducibility fields (hardware, model id) and tie
-  # two machines to one registry key.
+  # ⚠ THIS ENTRY AND THE OLD `sparks-local` WERE THE SAME MACHINE. Until
+  # 2026-11-12 this file carried TWO entries for ONE box: `qwen-local`, whose
+  # comment claimed it was "a different box" from "the DGX-Spark hardware", and
+  # `sparks-local`, a disabled placeholder for that supposed second machine.
+  # There is exactly one: `promaxgb10-d62a`, a Dell Pro Max with GB10
+  # (DGX-Spark-class, 128GB unified memory), and `local-llm.uamishub.com` IS
+  # that box. The tailnet has no other. They are consolidated here and
+  # `sparks-local` is deleted -- its reproducibility fields (`hardware`, the
+  # exact model id) are carried below, which is the only thing that
+  # placeholder existed to hold.
   #
-  # ⚠ THINKING IS OFF, BY DECISION. It is a thinking-capable model and by default
-  # reasons before answering (the server puts that in `reasoning_content`). The
-  # owner reports it changes nothing in these answers while costing ~4x latency,
-  # so `extra.chat_template_kwargs.enable_thinking: false` switches it off. That
-  # setting is recorded with every result; runs with it on are not comparable.
-  # The client still reads `content` only and drops any inline <think> block, and
-  # an empty answer that stopped on `length` is an error, never a 0.0.
+  # ⚠ SERVING STACK IS OLLAMA, NOT vLLM. Probed live 2026-11-12:
+  # `GET /api/version` -> `{"version":"0.34.4"}`; `ollama show` ->
+  # `qwen3.8:27b-mtp-q4_K_M`, architecture qwen35, 27.3B parameters, context
+  # length 262144, quantization Q4_K_M, resident 100% GPU. The box switched off
+  # vLLM on 2026-10-24; `gb10-vllm` is `Exited(137)` and the host now runs
+  # `ollama.service` natively (not as a container). This entry recorded
+  # `serving_stack: vllm` / `serving_version: vllm 0.30.0` until 2026-11-12 --
+  # for a harness that stamps its serving stack onto every stored result, that
+  # was a CORRECTNESS bug, not a stale comment.
   #
-  # ⚠ CLOUDFLARE. The hostname is proxied, and Cloudflare cuts a NON-streaming
-  # response at ~30s; a thinking 27B can exceed that on a long answer. So
-  # `extra.stream: true` makes the client use server-sent events and fold the
-  # chunks back into one response before scoring (OpenAICompatibleClient.
-  # _attempt_stream), kept as a safety net now that thinking is off.
+  # Already-stored results were NOT rewritten, and did not need to be: every
+  # `qwen-local` run in dev (0), staging (1) and prod (28) is dated 2026-10-22,
+  # two days BEFORE the switch, so `vllm 0.30.0` is the correct label for all
+  # of them. If a run appears here dated on or after 2026-10-24 carrying
+  # `vllm`, THAT one is mislabelled -- report it, do not silently rewrite it.
   #
-  # ⚠ SAMPLING. 0.6/0.95 is Qwen's recommended thinking-mode setting; greedy
-  # decoding is documented to make reasoning loop. Not bit-reproducible, so no
-  # seed is recorded (same stance as `luna`).
+  # ⚠ WHAT ANSWERS IS LiteLLM, NOT OLLAMA DIRECTLY -- and `model_id` reflects
+  # that. Verified: `GET /v1/models` lists `qwen3.8-27b-base`, `qwen3.8-27b`,
+  # `nomic-embed-text`. Those are LiteLLM ALIASES, which is why `model_id`
+  # below is NOT the ollama tag. Ollama itself has NO authentication, so
+  # addressing :11434 directly would bypass keys, teams, budgets and quota
+  # entirely; LiteLLM is the metered, attributed front door and the only route
+  # this entry may use.
   #
-  # The key is LOCAL_LLM_API_KEY, IP-whitelisted at the endpoint; in-cluster it
-  # comes from Vault via ESO like every other key. Free: self-hosted.
+  # ⚠ THINKING IS OFF SERVER-SIDE NOW, AND THIS FILE NO LONGER ENFORCES IT.
+  # The old `extra.chat_template_kwargs.enable_thinking: false` was a *vLLM*
+  # chat-template switch. Ollama does not read it, so after 2026-10-24 it was a
+  # setting that LOOKED enforced and did nothing. Thinking-off now lives in
+  # `think: false` in the appliance's `litellm-config.yaml`. The honest
+  # consequence, stated rather than hidden: the harness no longer controls
+  # thinking per request, so an edit to the appliance config changes results
+  # without this file moving. That is exactly why that config is now
+  # git-reconciled (`platform-infra appliances/gb10/reconcile.sh`) instead of
+  # being hand-edited on the box -- which is where it genuinely lived until
+  # now. `server_side_thinking` below is a RECORD of that setting, NOT a
+  # request parameter: `OpenAICompatibleClient._payload` forwards only
+  # `stream` and `chat_template_kwargs` out of `extra`, so any other key here
+  # rides along with each result as documentation and can never be a control.
+  # Do not add `think:` here expecting it to do something -- it would not be
+  # sent.
+  #
+  # ⚠ CLOUDFLARE / `stream: true` IS KEPT. It is still REQUIRED on the public
+  # route: `local-llm.uamishub.com` is Cloudflare-proxied and cuts a
+  # non-streamed response (~100s). It is harmless on the on-box route, where
+  # there is no Cloudflare at all. Do not remove it while the cluster tenant
+  # still serves this entry.
+  #
+  # ⚠ SAMPLING. 0.6/0.95 is Qwen's recommended setting; greedy decoding is
+  # documented to make its reasoning loop. Not bit-reproducible, so no seed is
+  # recorded (same stance as `luna`).
+  #
+  # `base_url_env` is the relocation seam. On the GB10 the stack sets
+  # `LOCAL_LLM_BASE_URL=http://litellm:4000/v1` and reaches LiteLLM over the
+  # appliance's own docker network (verified from a container on
+  # `gb10-appliance_default`: HTTP 401, i.e. reachable and auth-gated). It is
+  # UNSET in-cluster, so the literal below still applies there and the live
+  # tenant is unaffected by this change.
   - key: qwen-local
     display_name: Qwen 3.8 27B (local)
     display_order: 60
     base_url: https://local-llm.uamishub.com/v1
+    base_url_env: LOCAL_LLM_BASE_URL    # set on the GB10; unset in-cluster
     api_key_env: LOCAL_LLM_API_KEY      # Vault: secret/tenants/ida-llm/<env>/app
     enabled: true
     timeout_s: 180
     max_retries: 3
-    tags: [local, open-weights]
+    # `campus` is inherited from the deleted `sparks-local`: this really is
+    # campus-owned hardware, and ON_CAMPUS_TAGS (services/api) derives the
+    # FERPA-relevant residency claim from these tags.
+    tags: [local, campus, open-weights]
     serving:
-      model_id: qwen3.8-27b             # exact id from GET /v1/models
-      serving_stack: vllm
-      serving_version: vllm 0.30.0      # from the response's system_fingerprint
-      quantization: unknown             # the endpoint does not say
-      revision: null
-      context_window: 253952
-      hardware: null                    # not disclosed by the endpoint
+      model_id: qwen3.8-27b             # LiteLLM alias, from GET /v1/models
+      serving_stack: ollama
+      serving_version: ollama 0.34.4    # GET /api/version, probed 2026-11-12
+      # Q4_K_M is a mixed 4-bit k-quant. `int4` is the nearest value this
+      # schema's enum permits (none|fp8|int8|int4|awq|gptq|unknown); the EXACT
+      # scheme is carried by `revision` below. Widening that enum is a
+      # core-contract change with stored `serving_config` blobs behind it and
+      # does not belong in a relocation PR.
+      quantization: int4
+      revision: qwen3.8:27b-mtp-q4_K_M  # the exact ollama tag behind the alias
+      # The model's true window (`ollama show`, and LiteLLM's num_ctx).
+      # LiteLLM splits it 253952 input + 8192 output; this field records the
+      # window, not the input budget.
+      context_window: 262144
+      hardware: 1x Dell Pro Max GB10 (DGX-Spark-class), 128GB unified
       sampling:
         temperature: 0.6
         top_p: 0.95
-        max_tokens: 1024                # answers only (thinking is off); endpoint max 8192
+        max_tokens: 1024                # answers only; endpoint max 8192
         seed: null
       extra:
-        stream: true                  # Cloudflare cuts non-streamed responses at ~30s
-        chat_template_kwargs:
-          enable_thinking: false        # see the THINKING note above
+        stream: true                    # REQUIRED on the Cloudflare route; inert on-box
+        server_side_thinking: false     # RECORD ONLY -- enforced in litellm-config.yaml
     cost:
       input_usd_per_mtok: 0.0           # self-hosted: no per-token cost
       output_usd_per_mtok: 0.0
@@ -675,51 +723,6 @@ models:
     cost:
       input_usd_per_mtok: 1.00
       output_usd_per_mtok: 5.00
-
-  # --- campus vLLM ("Sparks"), DEFERRED AND DISABLED ------------------------
-  #
-  # Present, wired and off. `SPARKS_BASE_URL` is empty in every environment: the
-  # tenant egress policy opens :443 to the internet and opens NO ROUTE to campus
-  # hardware (deliberately -- see infra/inference/README.md, which names the
-  # exact netpol block and the three ways to get it wrong).
-  #
-  # Because the endpoint is env-indirect and there is no literal fallback,
-  # selecting this entry today fails immediately with "SPARKS_BASE_URL is unset
-  # or empty" rather than hanging on a connect timeout to a host that is not
-  # routable. Turning it on is a value in Vault plus one netpol block -- no code
-  # change and no edit to this file.
-  #
-  # ⚠ The CronJob sweeps receive ANTHROPIC_API_KEY and OPENAI_API_KEY but NOT
-  # SPARKS_API_KEY. A nightly sweep that selects this model fails on an unset key
-  # before it reaches the (correct) "no route" error.
-  - key: sparks-local
-    # "deferred" is already carried structurally by `enabled: false` and the
-    # `deferred` tag below, which is where a machine-readable status belongs.
-    # Repeating it inside the public label only made the label worse.
-    display_name: Campus vLLM (Sparks)
-    base_url_env: SPARKS_BASE_URL
-    base_url: ""                        # no fallback ON PURPOSE: fail loudly, never guess
-    api_key_env: SPARKS_API_KEY
-    enabled: false
-    timeout_s: 300                      # local models are slower to first token
-    max_retries: 3
-    tags: [local, campus, open-weights, deferred]
-    serving:
-      model_id: TODO-PLACEHOLDER-sparks-model-id
-      serving_stack: vllm
-      serving_version: null             # TODO-PLACEHOLDER(vllm-version): pin at deploy time
-      quantization: unknown             # knowable once the endpoint exists; not guessed now
-      revision: null
-      context_window: 32768
-      hardware: 1x DGX Spark GB10 128GB unified
-      sampling:
-        temperature: 0.0
-        top_p: 1.0
-        max_tokens: 2048
-        seed: 20260101                  # vLLM honours seed; hosted APIs mostly do not
-    cost:
-      input_usd_per_mtok: 0.0           # self-hosted: no per-token cost
-      output_usd_per_mtok: 0.0
 
   # --- EXAMPLES: uncomment when there are credits and a tag to run them ----
   #
