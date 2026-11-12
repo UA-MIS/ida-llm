@@ -296,14 +296,46 @@ class TestPreflightOverAuthoredEntries:
 
 
 class TestQwenLocalEntry:
-    def test_streams_and_has_thinking_off(self) -> None:
-        """Cloudflare cuts non-streamed responses at ~30s, and the owner decided
-        thinking stays off; both live in `extra` so they are recorded per result."""
+    def test_streams_and_records_the_real_serving_stack(self) -> None:
+        """`stream: true` is still REQUIRED on the Cloudflare-proxied public
+        route, which cuts a non-streamed response. It stays.
+
+        `chat_template_kwargs: {enable_thinking: false}` does NOT. That was a
+        *vLLM* chat-template switch, and the box moved to Ollama on 2026-10-24,
+        which does not read it -- so it was a knob that looked enforced and did
+        nothing. Thinking-off now lives server-side in the appliance's
+        litellm-config.yaml. Asserting its ABSENCE is the point: re-adding it
+        would reintroduce a setting that silently has no effect.
+        """
         from ida_core.registry import load_registry
 
         extra = load_registry(MODELS_YAML).get("qwen-local").serving.extra
         assert extra["stream"] is True
-        assert extra["chat_template_kwargs"] == {"enable_thinking": False}
+        assert "chat_template_kwargs" not in extra, (
+            "a vLLM-only switch must not reappear now that Ollama serves this model"
+        )
+
+    def test_the_serving_record_matches_what_actually_answers(self) -> None:
+        """This entry's serving metadata is stamped onto every stored result, so
+        a stale value is a falsified measurement, not a stale comment. It read
+        `vllm 0.30.0` for 19 days after the box switched to Ollama.
+
+        Probed live 2026-11-12: GET /api/version -> 0.34.4, and `ollama show`
+        reports qwen3.8:27b-mtp-q4_K_M / Q4_K_M / context 262144.
+        """
+        from ida_core.contracts import ServingStack
+        from ida_core.registry import load_registry
+
+        serving = load_registry(MODELS_YAML).get("qwen-local").serving
+        assert serving.serving_stack == ServingStack.OLLAMA
+        assert serving.serving_version is not None
+        assert serving.serving_version.startswith("ollama "), (
+            "the recorded version must name the stack that actually answers"
+        )
+        assert "vllm" not in serving.serving_version.lower()
+        # The exact quant scheme the enum cannot express lives in `revision`.
+        assert serving.revision == "qwen3.8:27b-mtp-q4_K_M"
+        assert serving.context_window == 262144
 
 
 class TestClaudeEntriesAreHeldOutOfSweeps:

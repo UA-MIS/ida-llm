@@ -1789,10 +1789,20 @@ class TestScheduledSweepsRespectExcludeTags:
         assert "luna" not in keys
 
     def test_a_disabled_model_never_appears_regardless_of_tags(self, ctx) -> None:
-        """`sparks-local` is disabled AND untagged by the exclude list. Enabled-ness
-        is still the first gate."""
+        """Enabled-ness is the FIRST gate, before any tag filtering.
+
+        The subject used to be `sparks-local`, deleted on 2026-11-12 as a
+        duplicate of `qwen-local` (one box, two entries). With the key gone the
+        assertion became trivially true and tested nothing, so it now uses
+        `qwen-local`, which THIS MODULE's `registry` fixture disables on purpose
+        -- and it first asserts the entry is actually present, so the test
+        cannot silently go vacuous the same way again.
+        """
+        assert any(m.key == "qwen-local" for m in ctx.registry.models), (
+            "fixture precondition: the disabled subject must exist in the registry"
+        )
         keys, _ = self._keys(ctx, sweep_exclude_tags="")
-        assert "sparks-local" not in keys
+        assert "qwen-local" not in keys
 
     def test_rebenchmark_does_not_enqueue_the_held_back_model(self, ctx) -> None:
         """The end-to-end statement: no queue message names luna."""

@@ -244,10 +244,38 @@ class TestModelsEndpoint:
             "claude-haiku-4-5",
         ]
 
-    def test_a_disabled_model_is_not_offered(self, client: TestClient) -> None:
-        """`sparks-local` is unreachable from this cluster. Listing it would let
-        the UI enqueue a run that can only fail."""
-        assert "sparks-local" not in {m["key"] for m in client.get("/models").json()}
+    def test_a_disabled_model_is_not_offered(self, context: AppContext) -> None:
+        """Listing a disabled model would let the UI enqueue a run that can only
+        fail.
+
+        This test used to assert the absence of `sparks-local`, the one disabled
+        entry the shipped registry happened to contain. That entry was deleted
+        on 2026-11-12 (it duplicated `qwen-local` -- same box), which left the
+        assertion TRIVIALLY TRUE: a key that exists nowhere is absent from every
+        response, so the test went on passing while testing nothing at all.
+
+        It now disables an entry EXPLICITLY, so the filter is exercised whatever
+        models.yaml happens to contain, and asserts both directions.
+        """
+        import dataclasses
+
+        from fastapi.testclient import TestClient as _TestClient
+
+        from ida_api.app import create_app
+        from ida_core.registry import ModelRegistry
+
+        registry = ModelRegistry(
+            models=[
+                m.model_copy(update={"enabled": False}) if m.key == "qwen-local" else m
+                for m in context.registry.models
+            ]
+        )
+        client = _TestClient(create_app(dataclasses.replace(context, registry=registry)))
+
+        assert "qwen-local" not in {m["key"] for m in client.get("/models").json()}
+        assert "qwen-local" in {
+            m["key"] for m in client.get("/models?include_disabled=true").json()
+        }, "include_disabled=true must still surface it, or the filter is just hiding it"
 
     def test_no_key_material_is_exposed(self, client: TestClient) -> None:
         """`luna` is the first listed model with a real key behind it. The
