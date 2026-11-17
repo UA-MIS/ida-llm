@@ -211,6 +211,17 @@ spec:
             httpGet: { path: /readyz, port: http }
             initialDelaySeconds: 5
             periodSeconds: 10
+          # STARTUP PROBE. The goldilocks VPA (mode Initial) shrinks NEW pods to
+          # its steady-state recommendation (~15m cpu request / 75m limit), but the
+          # api's boot (registry + task-catalog load) burns several CPU-seconds, so
+          # under that limit it takes 80-100s to start listening. The liveness
+          # probe below (20s delay, 3 x 20s) killed it mid-boot -> CrashLoopBackOff
+          # on every fresh pod (seen on staging and prod at v1.1.0). Liveness and
+          # readiness are held off until this passes; allows up to 5 minutes.
+          startupProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+            failureThreshold: 60
           livenessProbe:
             # /healthz does NOT — see the file header.
             httpGet: { path: /healthz, port: http }
