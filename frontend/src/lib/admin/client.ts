@@ -23,6 +23,15 @@ const FRIENDLY: Record<number, string> = {
   503: "The admin service is not switched on yet. Ask an operator.",
 };
 
+/**
+ * Callers name the API path itself (`/admin/models/x`), exactly as the
+ * contract publishes it; the BFF lives one level down at `/admin/api/...`.
+ */
+export function bffUrl(path: string): string {
+  if (!path.startsWith("/admin/")) throw new Error(`adminApi: expected an /admin/ API path, got ${path}`);
+  return `/admin/api${path.slice("/admin".length)}`;
+}
+
 export async function adminApi<T = unknown>(
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
@@ -40,7 +49,7 @@ export async function adminApi<T = unknown>(
 
   let response: Response;
   try {
-    response = await fetch(`/admin/api/${path.replace(/^\/+/, "")}`, { method, headers, body, credentials: "same-origin" });
+    response = await fetch(bffUrl(path), { method, headers, body, credentials: "same-origin" });
   } catch {
     return { ok: false, status: 0, error: { code: "conflict", message: FRIENDLY[0]! } };
   }
