@@ -24,7 +24,14 @@ function files(dir: string): string[] {
 
 /** `/admin/models/${key}/test?x=1` and `/admin/models/{key}/test` both → `/admin/models/*\/test`. */
 export function normalise(path: string): string {
-  const bare = path.split("?")[0]!.replace(/\$\{[^}]*\}/g, "*").replace(/\{[^}]*\}/g, "*");
+  // An interpolation glued to the previous segment (`/admin/models${query}`) is
+  // a query-string suffix, not a path segment: drop it. One after a "/" is a
+  // path parameter: a wildcard.
+  const bare = path
+    .replace(/(?<!\/)\$\{[^}]*\}/g, "")
+    .replace(/\$\{[^}]*\}/g, "*")
+    .split("?")[0]!
+    .replace(/\{[^}]*\}/g, "*");
   return ("/" + bare.replace(/^\/+/, "")).replace(/^\/(?!admin\/)/, "/admin/").replace(/\/+$/, "");
 }
 
@@ -35,14 +42,21 @@ export function usedPaths(): string[] {
     .filter((f) => /\.(ts|tsx)$/.test(f));
   const found = new Set<string>();
   const patterns = [
-    /adminGet<[^>]*>\(\s*[`"']([^`"']+)[`"']/g,
-    /adminGet\(\s*[`"']([^`"']+)[`"']/g,
-    /adminFetch\(\s*[`"'](\/admin\/[^`"']+)[`"']/g,
-    /adminApi(?:<[^>]*>)?\(\s*"[A-Z]+",\s*[`"']([^`"']+)[`"']/g,
+    // Template literals may contain quotes inside `${…}`, so they are matched to the closing backtick.
+    /adminGet(?:<[^>]*>)?\(\s*(?:`([^`]+)`|"([^"]+)")/g,
+    /adminFetch\(\s*(?:`(\/admin\/[^`]+)`|"(\/admin\/[^"]+)")/g,
+    /adminApi(?:<[^>]*>)?\(\s*"[A-Z]+",\s*(?:`([^`]+)`|"([^"]+)")/g,
   ];
   for (const f of sources) {
     const body = readFileSync(f, "utf8");
-    for (const re of patterns) for (const m of body.matchAll(re)) found.add(normalise(m[1]!));
+    for (const re of patterns) {
+      for (const m of body.matchAll(re)) {
+        const raw = (m[1] ?? m[2])!;
+        // A path built from a variable cannot be checked; refuse it so every call stays auditable.
+        if (raw.startsWith("${")) throw new Error(`${f}: admin API path must start with a literal "/admin/…", got ${raw}`);
+        found.add(normalise(raw));
+      }
+    }
   }
   return [...found].sort();
 }
@@ -51,6 +65,7 @@ describe("the admin console calls only routes the API publishes", () => {
   it("normalises interpolations and templates alike", () => {
     expect(normalise("/admin/models/${encodeURIComponent(key)}/test?x=1")).toBe("/admin/models/*/test");
     expect(normalise("models/{key}/test")).toBe("/admin/models/*/test");
+    expect(normalise('/admin/models${archived ? "?include_archived=true" : ""}')).toBe("/admin/models");
   });
 
   it("finds the paths it uses", () => {

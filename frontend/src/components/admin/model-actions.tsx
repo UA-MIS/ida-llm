@@ -14,12 +14,11 @@ export function ModelActions({ model }: { model: AdminModel }) {
   const router = useRouter();
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
-  const path = `/admin/models/${encodeURIComponent(model.key)}`;
 
   async function test() {
     setTesting(true);
     setResult(null);
-    const res = await adminApi<ModelTestResult>("POST", `${path}/test`);
+    const res = await adminApi<ModelTestResult>("POST", `/admin/models/${encodeURIComponent(model.key)}/test`);
     setTesting(false);
     if (!res.ok) setResult({ ok: false, text: res.error.message });
     else if (res.data.ok) setResult({ ok: true, text: `Connected. The model answered in ${Math.round(res.data.latency_ms)} ms.` });
@@ -56,7 +55,7 @@ export function ModelActions({ model }: { model: AdminModel }) {
             confirmLabel="Archive model"
             typeToConfirm={model.key}
             onConfirm={async () => {
-              const res = await adminApi("DELETE", path, { version: model.version });
+              const res = await adminApi("DELETE", `/admin/models/${encodeURIComponent(model.key)}`, { version: model.version });
               if (!res.ok) return res.error.message;
               router.push("/admin/models?archived=done");
               router.refresh();
