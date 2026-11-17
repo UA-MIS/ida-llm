@@ -182,8 +182,10 @@ majors:
   classes:
   - course: OM 300
     task_families:
-    - demo-om300-u1
-    - demo-om300-u2
+    - om300-exam1-ops-forecasting
+    - om300-exam2-project-quality-spc
+    - om300-exam3-inventory-eoq-lean
+    - om300-exam4-ops-analytics
 - id: real-estate
   name: Real Estate
   department: Economics, Finance, and Legal Studies

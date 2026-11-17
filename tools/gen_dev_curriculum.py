@@ -39,8 +39,11 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 # (title, covers, blurb, slo). The family for unit N of a class is
 # demo-<ckey>-u<N>, derived below, so the spec is the only thing to edit.
 #
-# MIS 200 is ABSENT on purpose: it is the one REAL class, its units live in the
-# committed frontend taxonomy and its families are real. These are the OTHER
+# MIS 200 and OM 300 are ABSENT on purpose: they are the REAL classes, their units
+# live in the committed frontend taxonomy and their families are real. (OM 300 had
+# demo-om300-u1/u2 here until its four exam families landed; a demo entry for it
+# would be merged over the real units on dev and would shadow them, so it must not
+# come back.) These are the OTHER
 # classes the dev site fills with illustrative data. Every class here already
 # exists in curriculum/majors.yaml; MIS 221 / MIS 330 are the only two the real
 # coverage map does not list, so they get a dev-only coverage row (below).
@@ -156,20 +159,6 @@ DEMO_UNITS: dict[str, list[tuple[str, list[str], str, str]]] = {
             ["Consumer behaviour", "Market research", "Cultural context"],
             "Reading a market and the buyers in it, in their own context.",
             "SLO4",
-        ),
-    ],
-    "OM 300": [
-        (
-            "Process analysis",
-            ["Process flow", "Bottlenecks", "Capacity"],
-            "Reading a process as a flow and finding where it is constrained.",
-            "SLO2",
-        ),
-        (
-            "Quality and operations",
-            ["Quality concepts", "Inventory basics", "Operations strategy"],
-            "The concepts that govern how operations are run and improved.",
-            "SLO9",
         ),
     ],
     "MIS 221": [

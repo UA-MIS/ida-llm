@@ -64,9 +64,9 @@ USE_MODE_TAG_PREFIX = "use-mode:"
 SLO_METADATA_KEY = "slo"
 USE_MODE_METADATA_KEY = "use_mode"
 
-_SLO_FAMILY_PREFIX_RE = re.compile(r"^(mis200-|slo-?\d)")
+_SLO_FAMILY_PREFIX_RE = re.compile(r"^(mis200-|om300-|slo-?\d)")
 """Matches the leading path segment of a task id that names an SLO-benchmark
-family: ``mis200-*`` (the course-specific exam counterparts) or ``slo<N>-*`` /
+family: ``mis200-*`` / ``om300-*`` (the course-specific exam counterparts) or ``slo<N>-*`` /
 ``slo-<N>-*`` (the general per-outcome ladders, both spellings in use --
 compare ``tasks/slo1-problem-solving`` with ``tasks/slo-6-ethical-reasoning``).
 

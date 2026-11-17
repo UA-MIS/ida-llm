@@ -1,0 +1,91 @@
+# om300-exam3 rung 2 of 6. Same forced-choice shape as rung 1 but over inventory
+# management concepts: inventory type, safety stock, ABC basis, what an inventory model
+# answers, EOQ assumptions. Adds near-miss distractors (e.g. 'eliminate' vs 'reduce' the
+# chance of stockout) and an 'all of these' option.
+version: 1
+id: om300-exam3-inventory-eoq-lean/l2-inventory-concepts
+title: OM 300 Exam 3 -- inventory management concepts
+description: >
+  Five five-option items over inventory concepts: stage-of-completion
+  inventory types, the purpose of safety stock, the ABC classification
+  basis, the two questions an inventory model answers, and the EOQ
+  assumptions (including an all-of-the-above key). Guessing floor 0.20.
+
+  Provenance: every scenario, option and number was written for this file.
+  The skills assessed derive from the course's Exam 3 blueprint; no exam
+  stem, option, scenario, number or answer key is reproduced, and no exam
+  asset is committed.
+kind: verifiable
+domain: operations-management
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate operations-
+  management examination. Exactly one option is correct. You may reason
+  briefly first, but you must then put the letter of the correct option
+  alone on the last line, with no punctuation and no other text on that
+  line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", om300-exam3-inventory-eoq-lean, om300, ladder-l2, inventory, forced-choice, business-knowledge]
+samples:
+  - id: finished-goods-category
+    input: >-
+      Pallets of packaged laundry detergent sit in a distribution center,
+      complete and awaiting customer orders, and are recorded as company
+      assets. Which type of inventory are they? A) Raw material inventory B)
+      Work-in-process inventory C) Maintenance/repair/operating inventory D)
+      Safety stock inventory E) Finished goods inventory
+    # E. Complete end item held for sale. Safety stock is a purpose (buffer), not a stage; here the pallets are simply finished goods.
+    target: "E"
+    metadata: { skill: inventory-types, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: safety-stock-purpose
+    input: >-
+      Why does a retailer hold safety stock for a product whose weekly
+      demand and supplier lead time both vary? A) To guarantee that a
+      stockout can never occur B) To lower the chance of running out when
+      demand or lead time turns out higher than expected C) To make up for
+      units that arrive damaged D) To remove the need to count inventory E)
+      To protect against a permanent fall in demand
+    # B. Safety stock reduces (not eliminates) the probability of stockout from variability in demand/lead time. A is the absolute-claim trap.
+    target: "B"
+    metadata: { skill: safety-stock, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: abc-basis
+    input: >-
+      A warehouse ranks its items by yearly usage multiplied by unit cost,
+      then labels the top slice 'A', the middle 'B' and the rest 'C'. What
+      does this classification rest on? A) Annual dollar volume B) Quality
+      rating C) Units currently on hand D) Shelf life E) Unit price alone
+    # A. ABC analysis = annual dollar volume (usage x cost). D is unrelated; E (unit price alone) is the tempting partial answer.
+    target: "A"
+    metadata: { skill: abc-analysis, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: two-basic-questions
+    input: >-
+      An inventory model is built to tell a manager two things. Which pair
+      does a typical inventory model answer? A) When to order and how much
+      to order B) How much to order and what service level to promise C)
+      Which supplier to pick and when to pay D) Ordering cost and the
+      carrying cost E) What to produce and where to store it
+    # A. Timing and quantity of orders. E/D name costs (inputs to the model), not the questions answered.
+    target: "A"
+    metadata: { skill: inventory-model-questions, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: eoq-assumption-all
+    input: >-
+      The basic EOQ model rests on several assumptions. Choose the option
+      that most completely answers: which of the statements below are
+      assumptions of the basic EOQ model? A) Annual demand is known and steady B) Each order
+      arrives all at once, with a known lead time C) Per-unit price does not
+      change with order size D) Ordering and holding are the only costs that
+      vary with order size E) All of these are assumptions of the basic EOQ
+      model
+    # E. Stem asks for the option covering every applicable statement, so a single true statement (A-D) is incomplete. All four listed statements are standard EOQ assumptions (known constant demand; instantaneous receipt, known lead time; no quantity discounts; setup and holding the only variable costs).
+    target: "E"
+    metadata: { skill: eoq-assumptions, provenance: synthetic, slo: SLO9, use_mode: capability }

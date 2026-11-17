@@ -30,9 +30,10 @@
 # the outcomes behind it -> the evidence. A class listed here that the coverage
 # grid does not mark is NOT an error and must never be rendered as one: it means
 # the published map does not map that course, so the level below it is honestly
-# empty rather than invented. Today MIS 200 is the only class anywhere in this
-# file with a scored benchmark behind it; every other class in every other major
-# reads "not measured yet", which is the truth and is meant to stay visible.
+# empty rather than invented. Today MIS 200 and OM 300 are the only classes
+# anywhere in this file with a scored benchmark behind them; every other class in
+# every other major reads "not measured yet", which is the truth and is meant to
+# stay visible.
 #
 # WHAT MAKES A CLASS "MEASURED". A class carries `task_families`: the families
 # whose results are about that class's own material. A class that lists none can
@@ -292,6 +293,25 @@ majors:
     class_source: core-only
     classes:
       - course: OM 300
+        # Title and credit hours are deliberately NOT restated: this major is
+        # `core-only`, so no catalog transcription backs a catalog title or hours
+        # here, and the slo.yaml coverage row already carries the catalog's title
+        # ("Introduction to Operations Management") -- see TITLE PRECEDENCE at the
+        # top of this file. Restating it would be a second copy that could drift.
+        #
+        # ⚠ THE SECOND MEASURED CLASS. One family per exam of the course, each
+        # authored from that exam's content areas (concepts and counts are in
+        # `tasks/om300-exams-mapping.md`). The same attribution rule as MIS 200
+        # applies: results are filed by OUTCOME, so listing these is what keeps
+        # OM 300's score from being shown under AC 210, ST 260, FI 302 and the
+        # rest of the classes the map marks against SLO2 and SLO9. Each family is
+        # exactly one unit in `frontend/src/lib/units.ts` (a partition, no family
+        # in two units); Exam 4 is the cumulative final.
+        task_families:
+          - om300-exam1-ops-forecasting
+          - om300-exam2-project-quality-spc
+          - om300-exam3-inventory-eoq-lean
+          - om300-exam4-ops-analytics
 
   - id: real-estate
     name: Real Estate

@@ -1,0 +1,93 @@
+# rung 3: one- and two-step productivity arithmetic. Adds CHOOSING the right
+# inputs (ignore irrelevant facts, include every priced input in a
+# multifactor measure) and computing a percent change.
+version: 1
+id: om300-exam1-ops-forecasting/l3-productivity
+title: OM 300 Exam 1 -- single- and multifactor productivity
+description: >
+  Five items: labor productivity with distractor facts, multifactor
+  productivity with a per-unit material cost, a percent change in
+  multifactor productivity (including a decrease), and a percent change in labor
+  productivity from two before/after states. Tolerance 0.01 for two-decimal
+  rounding; the nearest wrong method is at least 0.2 away on every item.
+
+  Provenance: every scenario, number and distractor was written for this file.
+  The skill targets derive from the course's Exam 1 blueprint (OM 300,
+  Introduction to Operations Management), but no exam stem, number or answer key
+  is reproduced, and no exam asset is committed. No student work and no
+  textbook content.
+kind: verifiable
+domain: operations-management
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory
+  operations-management examination. Use exactly the convention and rounding the
+  item names. Put the final numeric answer alone on the last line, with no units,
+  no percent sign, no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  tolerance: 0.01
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam1-ops-forecasting, om300, ladder-l3, productivity, calculation, quantitative-literacy]
+samples:
+  - id: labor-productivity-with-distractors
+    input: >-
+      A print shop produced 3,150 posters last month. It employs 9 workers who
+      each worked 152 hours, the shop is open 10 hours a day, it paid $610 for
+      electricity, and its ink and paper cost $1.20 per poster. Compute labor
+      productivity in posters per labor-hour, rounded to two decimal places.
+    # labor-hours = 9*152 = 1368; 3150/1368 = 2.3026 -> 2.30
+    # Wrong: per worker 3150/9 = 350; per hours open etc. far away.
+    target: "2.30"
+    metadata: { skill: labor-productivity, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: multifactor-productivity-three-inputs
+    input: >-
+      A workshop made 2,450 units. It used 6 workers paid $14 per hour for 160
+      hours each, spent $820 on energy, and paid $0.55 per unit for materials.
+      Compute multifactor productivity as units of output per $1,000 of total
+      input cost, rounded to two decimal places.
+    # labor 6*14*160 = 13440; materials 0.55*2450 = 1347.5; energy 820;
+    # inputs = 15607.5; 2450/15607.5*1000 = 156.976 -> 156.98
+    # Wrong (omit per-unit materials): 2450/14260*1000 = 171.81, 14.8 away.
+    target: "156.98"
+    metadata: { skill: multifactor-productivity, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: multifactor-productivity-delivery
+    input: >-
+      A courier company completed 5,200 deliveries. It used 12 drivers paid $18
+      per hour for 150 hours each, spent $4,300 on fuel, and paid $0.25 per
+      delivery for packaging. Compute multifactor productivity as deliveries
+      per $1,000 of total input cost, rounded to two decimal places.
+    # labor 12*18*150 = 32400; packaging 0.25*5200 = 1300; fuel 4300;
+    # inputs = 38000; 5200/38000*1000 = 136.842 -> 136.84
+    # Wrong (omit packaging): 5200/36700*1000 = 141.69, 4.8 away.
+    target: "136.84"
+    metadata: { skill: multifactor-productivity, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: percent-change-multifactor-decrease
+    input: >-
+      A plant's multifactor productivity was 36.40 before a process change and
+      31.85 after it. What is the percent change in multifactor productivity,
+      expressed in percent (write 4.25 for a 4.25% change, not 0.0425) and
+      rounded to two decimal places? Use a negative number for a decrease.
+    # (31.85 - 36.40)/36.40 = -0.125 -> -12.50 (percent form pinned in stem;
+    # fraction -0.13 would be wrong)
+    # Wrong base (divide by new value): -14.29, 1.79 away.
+    target: "-12.50"
+    metadata: { skill: percent-change-productivity, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: percent-change-labor-productivity
+    input: >-
+      Last week a line produced 1,240 units using 800 labor-hours. After
+      retraining it produced 1,330 units using 760 labor-hours. What is the
+      percent change in labor productivity (units per labor-hour), expressed
+      in percent (write 4.25 for a 4.25% change, not 0.0425) and rounded to
+      two decimal places?
+    # old = 1240/800 = 1.55; new = 1330/760 = 1.75; (1.75-1.55)/1.55 = 12.903%
+    # -> 12.90 (percent form pinned in stem; fraction 0.13 would be wrong)
+    # Wrong (output change only): 7.26, 5.6 away.
+    target: "12.90"
+    metadata: { skill: percent-change-productivity, provenance: synthetic, slo: SLO2, use_mode: capability }

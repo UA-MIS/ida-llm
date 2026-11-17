@@ -1,0 +1,91 @@
+# om300-exam3 rung 5 of 6. The EOQ chain: EOQ itself, holding as % of cost, then
+# quantities derived from Q (annual setup cost, average inventory, orders per year, total cost).
+# Adds an intermediate quantity and a unit trap (monthly demand).
+version: 1
+id: om300-exam3-inventory-eoq-lean/l5-eoq-calculations
+title: OM 300 Exam 3 -- EOQ and quantities derived from it
+description: >
+  Six calculations built on the basic EOQ model: the order quantity
+  (including holding cost as a percent of unit cost) and the quantities
+  derived from it - annual setup cost with monthly demand, average
+  inventory, orders per year, and total annual cost. Each needs an
+  intermediate Q.
+
+  Provenance: every scenario, option and number was written for this file.
+  The skills assessed derive from the course's Exam 3 blueprint; no exam
+  stem, option, scenario, number or answer key is reproduced, and no exam
+  asset is committed.
+kind: verifiable
+domain: operations-management
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory
+  operations-management quiz. Use the standard textbook formula the item
+  names, keep full precision until the end, and round the final result to
+  two decimal places. Put the final numeric answer alone on the last line,
+  with no units, no currency symbol, no percent sign, no label and no other
+  text on that line.
+scorer:
+  kind: numeric_match
+  # Two decimals but Q may be rounded before use (drift <= 0.01 here); tolerance 0.05. Smallest gap to a wrong method is 154.9, three thousand times tolerance.
+  tolerance: 0.05
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam3-inventory-eoq-lean, om300, ladder-l5, eoq, calculation, quantitative-literacy]
+samples:
+  - id: eoq-basic
+    input: >-
+      A print shop uses 3,200 reams of paper a year. Each order costs $18 to
+      place and holding a ream for a year costs $2.50. Compute the economic
+      order quantity (reams).
+    # sqrt(2x3200x18/2.5)=sqrt(46080)=214.6625 -> 214.66. Wrong: forgot sqrt -> 46080; using S as H swap -> sqrt(2*3200*2.5/18)=29.8.
+    target: "214.66"
+    metadata: { skill: eoq, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: eoq-holding-as-percent
+    input: >-
+      A gadget seller needs 12,500 units a year, pays $30 per unit, and
+      estimates holding at 20% of unit cost per year. Each order costs $42.
+      Compute the EOQ (units).
+    # H = 0.20x30 = 6.00; EOQ = sqrt(2x12500x42/6)=sqrt(175000)=418.33. Wrong: H=30 -> 187.08 (231 away); H=0.2 -> 2291.
+    target: "418.33"
+    metadata: { skill: eoq, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: annual-setup-cost-at-eoq
+    input: >-
+      A cafe uses 450 kg of beans per month. Each order costs $35 and
+      holding costs $3.20 per kg per year. Under the EOQ model, what is the
+      annual ordering (setup) cost in dollars?
+    # D=5,400; Q=sqrt(2x5400x35/3.2)=343.69; setup=(5400/343.69)x35=549.91 (= holding cost at EOQ).
+    # Wrong: using monthly D=450 -> 45.83 (504 away).
+    target: "549.91"
+    metadata: { skill: annual-setup-cost, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: average-inventory-eoq
+    input: >-
+      A hardware store sells 7,800 boxes of screws a year, with a $24
+      ordering cost and $3.90 annual holding cost per box. Under the EOQ
+      model, what is the average inventory held (boxes)?
+    # Q=sqrt(2x7800x24/3.9)=sqrt(96000)=309.84; average = Q/2 = 154.92. Wrong: reporting Q -> 309.84 (154.92 away).
+    target: "154.92"
+    metadata: { skill: average-inventory, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: orders-per-year-eoq
+    input: >-
+      A clinic uses 6,000 boxes of gloves a year; ordering costs $50 and
+      holding costs $4 per box per year. Under EOQ, how many orders should
+      it place per year?
+    # Q=sqrt(2x6000x50/4)=387.30; N=D/Q=6000/387.298=15.4919 -> 15.49. Wrong: reporting Q (371.8 away); 6000/50=120.
+    target: "15.49"
+    metadata: { skill: orders-per-year, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: total-annual-cost-eoq
+    input: >-
+      A school buys 5,000 packs of markers a year at $30 per order with
+      $2.40 holding cost per pack per year. What is the minimum total annual
+      cost of ordering plus holding (dollars)?
+    # Q=sqrt(2x5000x30/2.4)=353.55; setup=(5000/353.55)x30=424.26; holding=(353.55/2)x2.4=424.26; total=848.53.
+    # Wrong: counting only one component -> 424.26 (424 away).
+    target: "848.53"
+    metadata: { skill: total-cost-eoq, provenance: synthetic, slo: SLO2, use_mode: capability }

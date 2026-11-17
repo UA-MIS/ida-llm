@@ -1,0 +1,85 @@
+# om300-exam3 rung 4 of 6. One-formula inventory metrics: turnover, percent of assets,
+# holding cost from a percentage, reorder point (incl. a monthly-demand unit trap).
+# Adds: pick the right two figures from a table that carries extra decoys (revenue, assets).
+version: 1
+id: om300-exam3-inventory-eoq-lean/l4-inventory-metrics
+title: OM 300 Exam 3 -- inventory turnover, assets committed, holding cost, reorder point
+description: >
+  Five single-step calculations: inventory turnover (COGS basis, with
+  revenue as a decoy), percent of assets invested in inventory, holding cost
+  from a percent-of-cost rate, and reorder point with annual and monthly
+  demand. Distance to nearest wrong method is recorded beside each target.
+
+  Provenance: every scenario, option and number was written for this file.
+  The skills assessed derive from the course's Exam 3 blueprint; no exam
+  stem, option, scenario, number or answer key is reproduced, and no exam
+  asset is committed.
+kind: verifiable
+domain: operations-management
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory
+  operations-management quiz. Use the standard textbook formula the item
+  names, keep full precision until the end, and round the final result to
+  two decimal places. Put the final numeric answer alone on the last line,
+  with no units, no currency symbol, no percent sign, no label and no other
+  text on that line.
+scorer:
+  kind: numeric_match
+  # Two decimal places -> 0.005 max rounding error; the closest wrong answers are >= 5.4 (percent-assets without x100), over 500 times tolerance.
+  tolerance: 0.01
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam3-inventory-eoq-lean, om300, ladder-l4, inventory-metrics, calculation, quantitative-literacy]
+samples:
+  - id: turnover-cogs-basis
+    input: >-
+      A regional bakery chain reports net revenue of $4,980,000, cost of
+      goods sold of $3,215,400, average inventory of $428,700 and total
+      assets of $3,870,000. Compute its inventory turnover for the year
+      (times per year).
+    # COGS / avg inventory = 3,215,400 / 428,700 = 7.5003 -> 7.50.
+    # Wrong method (revenue / avg inv) = 4,980,000/428,700 = 11.62, 4.1 away.
+    target: "7.5"
+    metadata: { skill: inventory-turnover, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: percent-assets-in-inventory
+    input: >-
+      A tool distributor holds average inventory of $214,500 against total
+      assets of $3,870,000 and annual COGS of $2,750,000. What percent of
+      its assets is committed to inventory? Give the percentage as a plain
+      number (e.g. 12.34 for 12.34%).
+    # 214,500 / 3,870,000 = 0.055426 -> 5.54 (%). Wrong: forgetting x100 gives 0.06 (5.48 away);
+    # using COGS/assets = 71.06.
+    target: "5.54"
+    metadata: { skill: percent-assets, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: holding-cost-from-percentage
+    input: >-
+      A boutique pays $14.50 per unit for a scarf and estimates annual
+      carrying cost at 18% of unit cost. What is the annual holding cost per
+      unit, in dollars?
+    # 0.18 x 14.50 = 2.61. Wrong: 14.50/0.18 = 80.56; 0.18 not converted -> 261.
+    target: "2.61"
+    metadata: { skill: holding-cost, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: reorder-point-working-days
+    input: >-
+      A florist sells 9,640 vases a year and is open 300 days a year.
+      Supplier lead time is 6 days. What is the reorder point (units),
+      assuming constant demand and no safety stock?
+    # d = 9640/300 = 32.1333/day; ROP = 32.1333 x 6 = 192.80.
+    # Wrong: dividing by 365 -> 158.47 (34.33 away).
+    target: "192.8"
+    metadata: { skill: reorder-point, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: reorder-point-monthly-demand
+    input: >-
+      A pet-supply shop sells 450 bags of feed per month and operates 250
+      days per year. Lead time is 3 days. Compute the reorder point in bags
+      (no safety stock).
+    # D = 450x12 = 5,400; d = 5,400/250 = 21.6/day; ROP = 21.6x3 = 64.80.
+    # Wrong: using 450/250 = 1.8/day -> 5.40 (59.4 away); ROP=450x3 -> 1350.
+    target: "64.8"
+    metadata: { skill: reorder-point, provenance: synthetic, slo: SLO2, use_mode: capability }

@@ -1,0 +1,81 @@
+# rung 4: weighted factor rating (weighted scores). Adds a weighted sum over
+# several factors, an implied weight, and a comparison across alternatives.
+version: 1
+id: om300-exam1-ops-forecasting/l4-weighted-factor-rating
+title: OM 300 Exam 1 -- weighted factor rating
+description: >
+  Four items on scoring alternatives against weighted factors: a plain
+  weighted sum, one with an implied remaining weight, one with a 4-factor
+  table where the weighted winner differs from the unweighted winner, and one
+  weighted score for a single option. Tolerance 0.01; nearest wrong method
+  (unweighted mean, or the wrong option) is 0.2 or more away.
+
+  Provenance: every scenario, number and distractor was written for this file.
+  The skill targets derive from the course's Exam 1 blueprint (OM 300,
+  Introduction to Operations Management), but no exam stem, number or answer key
+  is reproduced, and no exam asset is committed. No student work and no
+  textbook content.
+kind: verifiable
+domain: operations-management
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory
+  operations-management examination. Use exactly the convention and rounding the
+  item names. Put the final numeric answer alone on the last line, with no units,
+  no percent sign, no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  tolerance: 0.01
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam1-ops-forecasting, om300, ladder-l4, weighted-factor-rating, calculation, quantitative-literacy]
+samples:
+  - id: weighted-score-four-factors
+    input: >-
+      A cafe is rating a coffee supplier on four factors weighted 0.35 for
+      price, 0.25 for roast quality, 0.25 for delivery reliability and 0.15 for
+      organic certification. The supplier scores 6, 9, 4 and 8 on these factors
+      (in that order) on a 1-10 scale. What is its weighted score, rounded to
+      two decimal places?
+    # 0.35*6 = 2.10; 0.25*9 = 2.25; 0.25*4 = 1.00; 0.15*8 = 1.20; total 6.55
+    # Wrong (unweighted mean 6.75): 0.20 away.
+    target: "6.55"
+    metadata: { skill: weighted-factor-score, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: weighted-score-implied-weight
+    input: >-
+      A clinic scores a lab vendor on four factors. Turnaround time carries
+      weight 0.30, cost 0.30 and accuracy 0.20; the fourth factor, courier
+      service, carries whatever weight is needed for the weights to sum to
+      1.00. The vendor scores 7 on turnaround, 5 on cost, 9 on accuracy and 6
+      on courier service. What is its weighted score, rounded to two decimal
+      places?
+    # courier weight = 1 - 0.80 = 0.20; 2.1 + 1.5 + 1.8 + 1.2 = 6.60
+    # Wrong (courier weight dropped): 5.40, 1.2 away; unweighted mean 6.75,
+    # 0.15 away (thin but outside the 0.01 tolerance).
+    target: "6.60"
+    metadata: { skill: implied-weight, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: highest-weighted-score
+    input: >-
+      Three suppliers P, Q and R are rated on four factors weighted 0.45
+      (price), 0.30 (quality), 0.15 (speed) and 0.10 (service), each scored
+      1-10. P scores 8, 4, 6, 5. Q scores 5, 9, 7, 8. R scores 9, 7, 3, 6. What
+      is the highest weighted score among the three, rounded to two decimal
+      places?
+    # P = 3.60+1.20+0.90+0.50 = 6.20; Q = 2.25+2.70+1.05+0.80 = 6.80;
+    # R = 4.05+2.10+0.45+0.60 = 7.20 -> max 7.20
+    # Unweighted means: P 5.75, Q 7.25, R 6.25 -> unweighted winner is Q, so
+    # the wrong method gives 6.80 (or 7.25), 0.4 or more away.
+    target: "7.20"
+    metadata: { skill: weighted-factor-comparison, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: weighted-score-three-factors
+    input: >-
+      A site-selection team weights three factors 0.50 (labor cost), 0.30
+      (transport access) and 0.20 (tax climate). A candidate city scores 8, 6
+      and 3 on them. What is its weighted score, rounded to two decimal places?
+    # 4.00 + 1.80 + 0.60 = 6.40; unweighted mean 5.67, 0.73 away.
+    target: "6.40"
+    metadata: { skill: weighted-factor-score, provenance: synthetic, slo: SLO2, use_mode: capability }

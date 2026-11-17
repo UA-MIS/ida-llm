@@ -1,0 +1,61 @@
+# om300-exam4-ops-analytics, rung 4 of 8 -- model selection plus unit conversion
+#
+# EVERY ITEM IS SYNTHETIC: scenarios, wording and numbers were written for this
+# file; the skill targets follow the course's Exam 4 blueprint.
+version: 1
+id: om300-exam4-ops-analytics/l4-inventory-models
+title: OM 300 Exam 4 -- EOQ and EPQ inventory models
+kind: verifiable
+domain: operations-management
+description: >
+  Five items on the economic order quantity and economic production quantity
+  models: EOQ, orders per year, total annual cost at a non-optimal order size,
+  total annual cost at the EOQ from monthly demand, and EPQ. Items convert
+  monthly demand to annual and choose between the EOQ and EPQ formulas.
+
+  Provenance: every scenario and number is synthetic, authored for this file.
+  The skill targets derive from the course's Exam 4 blueprint; no exam wording,
+  scenario, number or answer key is reproduced.
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory operations-management exam. Use the formula and convention the item names. Round as the item instructs. Put the final numeric answer alone on the last line, with no units, no currency symbol, no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  tolerance: 0.01
+  normalisation: { strip: true, collapse_whitespace: true, take_last_line: true }
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam4-ops-analytics, om300, ladder-l4, inventory, quantitative-literacy]
+samples:
+  - id: eoq-basic
+    input: |-
+      A florist's annual demand for a vase is 2,350 units, each order costs $18.40 to place, and holding costs $5.15 per unit per year. Using the EOQ model, what is the economic order quantity? Round to two decimal places.
+    # EOQ = sqrt(2*2350*18.40/5.15) = sqrt(86480/5.15) = sqrt(16792.23) = 129.5848 -> 129.58.
+    # Wrong: omit the 2: sqrt(D*S/H) = 91.63 (gap 37.9).
+    target: "129.58"
+    metadata: { skill: eoq, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: eoq-orders-per-year
+    input: |-
+      A florist's annual demand for a vase is 2,350 units, each order costs $18.40 and holding costs $5.15 per unit per year. If the florist orders the EOQ each time, how many orders are placed per year (annual demand divided by EOQ)? Keep the EOQ unrounded in the calculation and round only the final answer to two decimal places.
+    # EOQ 129.5848. 2350/129.5848 = 18.1348 -> 18.13.
+    # Wrong: using EOQ 91.63 gives 25.65; reporting EOQ 129.58. Dividing by the rounded EOQ 129.58 gives 18.1355 -> 18.14 (on the tolerance edge), hence the no-intermediate-rounding instruction.
+    target: "18.13"
+    metadata: { skill: eoq, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: total-cost-nonoptimal-q
+    input: |-
+      A florist's annual demand for a vase is 2,350 units, each order costs $18.40 and holding costs $5.15 per unit per year. Compute the total annual ordering-plus-holding cost if the florist always orders 200 units at a time. Round to two decimal places.
+    # Ordering: 2350/200*18.40 = 11.75*18.40 = 216.20. Holding: 200/2*5.15 = 515.00. Total 731.20.
+    # Wrong: cost at EOQ = 667.36 (gap 63.8).
+    target: "731.20"
+    metadata: { skill: total-cost, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: total-cost-at-eoq-monthly
+    input: |-
+      A product sells 310 units per month. An order costs $25 to place, and holding costs $3.50 per unit per year. The EOQ model applies. What is the total annual cost (ordering plus holding only) when ordering the EOQ? Round to two decimal places.
+    # D = 310*12 = 3720. EOQ = sqrt(2*3720*25/3.5) = 230.527. TC = (D/Q)*S + (Q/2)*H = 806.846 -> 806.85 (the two halves are equal at EOQ).
+    # Wrong: monthly D in the EOQ formula gives 232.92 (gap 574).
+    target: "806.85"
+    metadata: { skill: total-cost, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: epq-production-run
+    input: |-
+      A plant makes its own subassembly in batches. Annual demand is 15,000 units, setup cost is $45 per batch, holding cost is $1.60 per unit per year, the line produces 240 units per day when running, and the assembly line uses 60 units per day. What is the economic production quantity (EPQ)? Round to two decimal places.
+    # EPQ = sqrt(2*D*S/(H*(1-d/p))) = sqrt(1,350,000/(1.6*0.75)) = sqrt(1,125,000) = 1060.66.
+    # Wrong: plain EOQ 918.56 (gap 142).
+    target: "1060.66"
+    metadata: { skill: epq, provenance: synthetic, slo: SLO2, use_mode: capability }

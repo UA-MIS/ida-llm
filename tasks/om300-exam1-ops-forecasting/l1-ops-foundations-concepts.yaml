@@ -1,0 +1,156 @@
+# om300-exam1-ops-forecasting, rung 1: recall of operations-management
+# foundations and strategy vocabulary. Floor rung: single-concept recall,
+# five options, so the guessing floor is 0.20.
+version: 1
+id: om300-exam1-ops-forecasting/l1-ops-foundations-concepts
+title: OM 300 Exam 1 -- operations foundations and strategy concepts
+description: >
+  Eight five-option items on what operations management is and covers, the
+  core organisational functions, productivity, mission versus strategy,
+  competing on quick response, product-life-cycle stages and the risks of
+  outsourcing. Distractors are neighbouring concepts, not unrelated terms.
+
+  Provenance: every scenario, option, number and distractor was written for this
+  file. The skill targets derive from the course's Exam 1 blueprint (OM 300,
+  Introduction to Operations Management), but no exam stem, option, scenario,
+  number or answer key is reproduced, and no exam asset is committed. No student
+  work and no textbook content.
+kind: verifiable
+domain: operations-management
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate introductory
+  operations-management examination. Exactly one option is correct. You may
+  reason briefly first, but you must then put the letter of the correct option
+  alone on the last line, with no punctuation and no other text on that line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", om300-exam1-ops-forecasting, om300, ladder-l1, operations-management, forced-choice, business-knowledge]
+samples:
+  - id: productivity-improvement-case
+    input: >-
+      A laundry measures productivity as pieces cleaned per labor-hour. Which
+      single change would raise its productivity?
+      A) Labor-hours rise 12% and pieces cleaned rise 12%
+      B) Labor-hours fall 10% and pieces cleaned stay the same
+      C) Labor-hours stay the same and pieces cleaned fall 5%
+      D) Labor-hours rise 8% and pieces cleaned rise 3%
+      E) None of the above
+    # B. Productivity = output / input. A: ratio unchanged. B: same output over
+    # fewer hours -> up. C: down. D: 1.03/1.08 < 1 -> down. D is the trap for
+    # anyone who reads "output rose" as "productivity rose".
+    target: "B"
+    metadata: { skill: productivity-definition, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: scope-of-operations-management
+    input: >-
+      A hospital, a regional bank and a steel mill each want to apply
+      operations-management techniques to their daily work. Which statement is
+      correct?
+      A) The techniques are meant for the steel mill only
+      B) The techniques suit the hospital and the bank but not the steel mill
+      C) The techniques suit the steel mill and the bank but not the hospital
+      D) The techniques apply to all three, because every organization
+         produces goods or services
+      E) The techniques apply only to organizations with a factory floor
+    # D. OM is the management of the transformation of inputs into goods or
+    # services, so it applies to manufacturers and service providers alike.
+    target: "D"
+    metadata: { skill: scope-of-om, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: three-core-functions
+    input: >-
+      A new community theatre company has people running its productions (the
+      operations function) and a treasurer keeping its books (the
+      finance/accounting function). Which function completes the set of three
+      that every organization must perform?
+      A) Human resources
+      B) Purchasing
+      C) Marketing
+      D) Research and development
+      E) Quality control
+    # C. The three functions common to all organizations are operations,
+    # marketing and finance/accounting. HR, purchasing, R&D and quality control
+    # are all real activities but are not the three-function core.
+    target: "C"
+    metadata: { skill: core-organizational-functions, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: mission-statement-purpose
+    input: >-
+      A food bank rewrites its mission statement. Which describes the purpose
+      such a statement serves?
+      A) It lists the organization's departments and reporting lines
+      B) It states why the organization exists and what it contributes to
+         society
+      C) It sets next quarter's sales targets
+      D) It describes the process by which each department gets its work done
+      E) It is mainly a tool for improving employee morale
+    # B. A mission defines the organization's purpose; A is structure, C is a
+    # target, D is a process description, E is a side effect at best.
+    target: "B"
+    metadata: { skill: mission-purpose, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: quick-response-example
+    input: >-
+      Which of the following best shows a firm competing on QUICK RESPONSE?
+      A) A bakery reduces flour waste to below the industry average
+      B) A shoe brand's pairs rarely come back with defects
+      C) A fashion label moves a new jacket design from sketch to store shelf in
+         three weeks, while rivals need ten
+      D) A parcel service runs its trucks at a higher fill rate than rivals
+      E) A phone maker spends more on television advertising than rivals
+    # C. Quick response = speed (design-to-market, delivery lead time). A is
+    # cost, B is quality, D is capacity use (cost), E is marketing.
+    target: "C"
+    metadata: { skill: competitive-priority-speed, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: life-cycle-introduction-stage
+    input: >-
+      A firm's new wearable device has just reached the market. Its design
+      changes often, production runs are short, and unit costs are high. Which
+      product-life-cycle stage is it in?
+      A) Introduction
+      B) Growth
+      C) Maturity
+      D) Decline
+      E) Saturation
+    # A. Frequent design changes, short runs and high unit cost are the
+    # introduction-stage profile; E is not a life-cycle stage in this framework.
+    target: "A"
+    metadata: { skill: product-life-cycle-stages, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: life-cycle-cost-minimization
+    input: >-
+      In one industry, rival products are now almost indistinguishable, total
+      capacity exceeds demand, and managers are pruning low-margin items from
+      the line while trimming capacity. Which stage is the industry in, and
+      what is the operations emphasis?
+      A) Introduction; product design and development
+      B) Growth; forecasting and capacity expansion
+      C) Maturity; standardisation and longer production runs
+      D) Decline; cost minimization
+      E) Growth; frequent product changes
+    # D. Little differentiation + overcapacity + line pruning = decline, where
+    # cost control dominates. C is the near neighbour (maturity also stresses
+    # cost) but maturity is not marked by overcapacity and shrinking the line.
+    target: "D"
+    metadata: { skill: product-life-cycle-strategy, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: outsourcing-not-an-advantage
+    input: >-
+      A software firm hands its customer-support operation to an outside
+      vendor. All of the following are advantages of outsourcing EXCEPT:
+      A) lower operating cost through the vendor's scale
+      B) access to specialist technology the firm does not own
+      C) management attention freed for the firm's core competencies
+      D) fewer fixed assets on the firm's own books
+      E) the risk that the vendor learns the firm's know-how and later competes
+         with it
+    # E. It is a risk of outsourcing, not an advantage; A-D are advantages.
+    target: "E"
+    metadata: { skill: outsourcing-tradeoffs, provenance: synthetic, slo: SLO9, use_mode: capability }

@@ -1,0 +1,54 @@
+# om300-exam4-ops-analytics, rung 5 of 8 -- table constant selection plus two-stage computation
+#
+# EVERY ITEM IS SYNTHETIC: scenarios, wording and numbers were written for this
+# file; the skill targets follow the course's Exam 4 blueprint.
+version: 1
+id: om300-exam4-ops-analytics/l5-xbar-r-charts
+title: OM 300 Exam 4 -- X-bar and R control chart limits
+kind: verifiable
+domain: operations-management
+description: >
+  Four items on mean and range control charts: R-chart upper limit, X-bar
+  lower limit, X-bar upper limit and an R-chart lower limit that is zero. The prompt supplies the
+  control-chart constants; the model must pick the column for the stated sample
+  size and average the sample statistics first.
+
+  Provenance: every scenario and number is synthetic, authored for this file.
+  The skill targets derive from the course's Exam 4 blueprint; no exam wording,
+  scenario, number or answer key is reproduced.
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory operations-management exam. Use the formula and convention the item names. Round as the item instructs. Put the final numeric answer alone on the last line, with no units, no currency symbol, no label and no other text on that line. Use the constants supplied in the item.
+scorer:
+  kind: numeric_match
+  tolerance: 0.01
+  normalisation: { strip: true, collapse_whitespace: true, take_last_line: true }
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam4-ops-analytics, om300, ladder-l5, spc, quantitative-literacy]
+samples:
+  - id: r-chart-ucl
+    input: |-
+      A bottler samples 5 bottles per hour and records the sample range of fill volume. Five hourly ranges are: 2.4, 3.1, 1.8, 2.9, 3.6. Control-chart constants by sample size n: n=5 -> A2 0.577, D3 0, D4 2.114; n=6 -> A2 0.483, D3 0, D4 2.004; n=8 -> A2 0.373, D3 0.136, D4 1.864. Compute the upper control limit of the R chart (UCL = D4 times the average range). Round to two decimal places.
+    # Rbar = 13.8/5 = 2.76. n=5 -> D4 2.114. UCL = 2.76*2.114 = 5.8346 -> 5.83.
+    # Wrong: n=6 constant gives 5.53 (gap 0.30); n=8 constant gives 5.15 (gap 0.69).
+    target: "5.83"
+    metadata: { skill: r-chart, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: xbar-lcl-n6
+    input: |-
+      A machine shop samples 6 parts per shift. Over six shifts the sample means were 48.2, 51.6, 49.9, 50.7, 47.6, 52.3 and the sample ranges were 2.2, 3.4, 1.9, 2.8, 3.1, 2.6. Control-chart constants by sample size n: n=5 -> A2 0.577; n=6 -> A2 0.483; n=8 -> A2 0.373. Compute the three-sigma lower control limit of the X-bar chart (grand mean minus A2 times average range). Round to two decimal places.
+    # xbarbar = 300.3/6 = 50.05. Rbar = 16/6 = 2.6667. LCL = 50.05 - 0.483*2.6667 = 50.05 - 1.288 = 48.762 -> 48.76.
+    # Wrong: n=5 constant A2 0.577 gives 48.51 (gap 0.25); n=8 constant 49.06 (gap 0.30).
+    target: "48.76"
+    metadata: { skill: xbar-chart, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: xbar-ucl-n6
+    input: |-
+      A machine shop samples 6 parts per shift. Over six shifts the sample means were 48.2, 51.6, 49.9, 50.7, 47.6, 52.3 and the sample ranges were 2.2, 3.4, 1.9, 2.8, 3.1, 2.6. Control-chart constants by sample size n: n=5 -> A2 0.577; n=6 -> A2 0.483; n=8 -> A2 0.373. Compute the three-sigma upper control limit of the X-bar chart (grand mean plus A2 times average range). Round to two decimal places.
+    # xbarbar 50.05, Rbar 2.6667, A2 0.483 -> 50.05 + 1.288 = 51.338 -> 51.34.
+    # Wrong: n=5 constant gives 51.59 (gap 0.25); n=8 gives 51.05 (gap 0.29).
+    target: "51.34"
+    metadata: { skill: xbar-chart, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: r-chart-lcl-small-n
+    input: |-
+      A lab samples 5 specimens per batch and records each batch's range. Six batch ranges were 1.2, 0.8, 1.6, 1.1, 0.9, 1.4. Control-chart constants by sample size n: n=5 -> D3 0, D4 2.114; n=8 -> D3 0.136, D4 1.864. Compute the lower control limit of the R chart (D3 times the average range). Round to two decimal places.
+    # Rbar = 7.0/6 = 1.1667. n=5 -> D3 = 0, LCL = 0 -> 0.00.
+    # Wrong: n=8 constant gives 0.16 (gap 0.16, 16x tolerance).
+    target: "0"
+    metadata: { skill: r-chart, provenance: synthetic, slo: SLO2, use_mode: capability }

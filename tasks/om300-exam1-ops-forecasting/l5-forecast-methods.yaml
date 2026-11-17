@@ -1,0 +1,95 @@
+# rung 5: apply a named forecasting method. Adds MULTI-STEP method execution
+# (chronological ordering, weight ordering, recursive smoothing, seasonal
+# index) rather than a single arithmetic step.
+version: 1
+id: om300-exam1-ops-forecasting/l5-forecast-methods
+title: OM 300 Exam 1 -- naive, moving-average, weighted, smoothing and seasonal forecasts
+description: >
+  Six items, one per method: naive forecast from an unordered list, 3-period
+  moving average, 4-period moving average, weighted moving average (with the
+  weight order stated), two-step exponential smoothing, and a seasonally
+  adjusted monthly forecast. Tolerance 0.01; the nearest wrong method is 2 or
+  more away on every item except the naive item, whose wrong answer is far.
+
+  Provenance: every scenario, number and distractor was written for this file.
+  The skill targets derive from the course's Exam 1 blueprint (OM 300,
+  Introduction to Operations Management), but no exam stem, number or answer key
+  is reproduced, and no exam asset is committed. No student work and no
+  textbook content.
+kind: verifiable
+domain: operations-management
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory
+  operations-management examination. Use exactly the convention and rounding the
+  item names. Put the final numeric answer alone on the last line, with no units,
+  no percent sign, no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  tolerance: 0.01
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam1-ops-forecasting, om300, ladder-l5, forecasting, calculation, quantitative-literacy]
+samples:
+  - id: naive-forecast-unordered-list
+    input: >-
+      Monthly unit sales, listed alphabetically by month: April 101, February
+      95, January 120, March 134. Using the naive method, what is the forecast
+      for May?
+    # Chronological order Jan, Feb, Mar, Apr -> latest actual is April = 101.
+    # Wrong (last listed): 134.
+    target: "101"
+    metadata: { skill: naive-forecast, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: three-period-moving-average
+    input: >-
+      A shop's demand for months January through June was 32, 41, 27, 38, 45
+      and 30 units. Using a three-month moving average, forecast July demand,
+      rounded to two decimal places.
+    # (38+45+30)/3 = 113/3 = 37.667 -> 37.67
+    # Wrong (all six months): 35.50, 2.2 away.
+    target: "37.67"
+    metadata: { skill: moving-average, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: four-period-moving-average
+    input: >-
+      Weekly demand for weeks 1 to 6 was 210, 185, 240, 225, 200 and 255.
+      Using a four-week moving average, forecast week 7, rounded to two decimal
+      places.
+    # last four = 240, 225, 200, 255; sum 920; /4 = 230.00
+    # Wrong (three-week MA): 226.67, 3.3 away.
+    target: "230.00"
+    metadata: { skill: moving-average, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: weighted-moving-average-ordered
+    input: >-
+      A call centre received 66, 74 and 58 calls per hour in three consecutive
+      hours (oldest first, most recent last). Use a 3-period weighted moving
+      average with weights 0.5 on the most recent hour, 0.3 on the middle hour
+      and 0.2 on the oldest hour. What is the forecast for the next hour,
+      rounded to two decimal places?
+    # 0.5*58 = 29.0; 0.3*74 = 22.2; 0.2*66 = 13.2; total 64.40
+    # Wrong (weights reversed): 33 + 22.2 + 11.6 = 66.80, 2.4 away.
+    target: "64.40"
+    metadata: { skill: weighted-moving-average, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: exponential-smoothing-two-steps
+    input: >-
+      A firm's forecast for period 1 was 120 units. Actual demand was 130 in
+      period 1 and 118 in period 2. Using exponential smoothing with alpha =
+      0.4, what is the forecast for period 3, rounded to two decimal places?
+    # F2 = 120 + 0.4*(130-120) = 124; F3 = 124 + 0.4*(118-124) = 121.60
+    # Wrong (stop after one step): 124.00, 2.4 away.
+    target: "121.60"
+    metadata: { skill: exponential-smoothing, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: seasonal-monthly-forecast
+    input: >-
+      A product's annual demand is forecast at 2,640 units. The seasonal index
+      for March is 1.15. What is the seasonally adjusted forecast for March,
+      rounded to two decimal places?
+    # 2640/12 = 220; 220*1.15 = 253.00
+    # Wrong (no division by 12): 3036; wrong (no index): 220.
+    target: "253.00"
+    metadata: { skill: seasonal-index, provenance: synthetic, slo: SLO2, use_mode: capability }

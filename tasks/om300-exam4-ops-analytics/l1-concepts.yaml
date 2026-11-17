@@ -1,0 +1,256 @@
+# om300-exam4-ops-analytics, rung 1 of 8 -- concept recognition (forced choice).
+#
+# WHAT THIS RUNG MEASURES. Recall and recognition of introductory operations
+# management vocabulary: supply chains, strategy, quality, inventory, lean,
+# forecasting, process strategy and project crashing. Nothing is computed.
+# It is the floor of the ladder: a model that fails here has a format or
+# knowledge problem, not a calculation problem.
+#
+# EVERY ITEM IS SYNTHETIC. The concepts and the distractor strategy follow the
+# course blueprint; scenarios, wording, options and ordering were written for
+# this file (see tasks/mis200-exam1-mapping.md section 4).
+#
+# SCORING. exact_match on a single letter, last line, lowercase-insensitive.
+version: 1
+id: om300-exam4-ops-analytics/l1-concepts
+title: OM 300 Exam 4 -- operations management concept recognition
+kind: verifiable
+domain: operations-management
+description: >
+  Twenty single-best-answer items covering supply chains, competitive
+  strategy, quality, inventory, lean operations, forecasting methods, process
+  focus and project crashing. The answer is one option letter.
+
+  Provenance: every item is synthetic, authored for this file. The skill
+  targets derive from the course's Exam 4 blueprint; no exam wording,
+  scenario, option or answer key is reproduced.
+system_prompt: >-
+  You are answering an undergraduate introductory operations-management exam.
+  Choose the single best option. Put only the letter of your chosen option
+  (A, B, C, D or E) alone on the last line, with no other text on that line.
+scorer:
+  kind: exact_match
+  normalisation: { strip: true, collapse_whitespace: true, take_last_line: true, lowercase: true, strip_punctuation: true }
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", om300-exam4-ops-analytics, om300, ladder-l1, concepts, business-knowledge]
+samples:
+  - id: bullwhip-cause
+    input: |-
+      A cereal maker sees its orders from distributors swing far more widely than the steady shelf sales in grocery stores. Which explanation is best?
+      A. Grocers deliberately hide their true sales figures from distributors.
+      B. Consumers buy cereal in unpredictable seasonal waves.
+      C. Each stage forecasts from the orders of the stage below it, so small demand changes are amplified as they move upstream.
+      D. Manufacturers always produce a fixed quantity regardless of orders.
+      E. Transportation costs fall as order sizes grow, so every stage shrinks its orders.
+    # Bullwhip effect = amplification of demand variability upstream through distorted information (C). Others are not mechanisms.
+    target: "C"
+    metadata: { skill: supply-chain, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: lifecycle-growth
+    input: |-
+      A new line of smart thermostats has moved past its launch: sales are rising quickly every quarter, profits have just turned positive, and competitors are only beginning to enter. Which product life-cycle stage is it in, and what is a typical operations emphasis at that stage?
+      A. Introduction; product and process designs are still being worked out, and sales volumes are low.
+      B. Growth; forecasting and adding capacity become critical as demand expands rapidly.
+      C. Maturity; the design is standardised and defending market position on cost is critical.
+      D. Decline; cost control is critical as the market shrinks.
+      E. The stage cannot be inferred from sales and profit trends.
+    # Rapidly rising sales, profits just turning positive, competitors starting to enter = growth stage, where forecasting/capacity is critical (B).
+    # A is ruled out by "moved past its launch" and rising volume; C/D contradict rising sales.
+    target: "B"
+    metadata: { skill: strategy, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: low-cost-leadership
+    input: |-
+      Which of the following is the clearest example of competing on low-cost leadership?
+      A. A bakery adds a premium organic line with custom decorating.
+      B. A bakery cuts dough waste by redesigning its cutting patterns, lowering cost per tray below its rivals'.
+      C. A bakery promises delivery within one hour of the order.
+      D. A bakery spends heavily on a new advertising campaign.
+      E. A bakery hires a large team to invent new pastry flavours.
+    # Lower unit cost through waste reduction = cost leadership (B); others are differentiation (quality/response/innovation).
+    target: "B"
+    metadata: { skill: strategy, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: primary-functions
+    input: |-
+      A regional food bank gives away groceries and raises money from donors. Which set names the three functions that every organization, including this one, must perform?
+      A. Operations (producing the service), marketing (outreach and fundraising), and finance/accounting
+      B. Sales, quality control and purchasing
+      C. Operations, human resources and legal
+      D. Research and development, finance/accounting and purchasing
+      E. Marketing, human resources and information technology
+    # Three functions of every organisation: operations, marketing, finance/accounting (A).
+    target: "A"
+    metadata: { skill: operations-basics, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: quality-cost-hard-to-measure
+    input: |-
+      A retailer wants to put a dollar figure on the lost goodwill and future sales caused by customers who received defective goods and told others. Which category of quality cost is this, and why is it so hard to quantify?
+      A. Prevention cost; it is spread across many departments.
+      B. Appraisal cost; inspection time is rarely recorded.
+      C. Internal failure cost; scrap is hidden inside work-in-process.
+      D. External failure cost; the damage to reputation and later sales cannot be observed directly.
+      E. All four categories are equally easy to quantify.
+    # External failure costs (lost reputation) are the hardest to measure (D).
+    target: "D"
+    metadata: { skill: quality, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: emergency-transport-mode
+    input: |-
+      A hospital on a remote island needs emergency vaccine shipments from a mainland depot 4,000 km away, within hours. Which distribution mode best provides speed and reliability for such overseas emergency shipments?
+      A. Rail freight
+      B. Pipeline
+      C. Airfreight
+      D. Inland waterway barges
+      E. Trucking
+    # Airfreight = fast and reliable, expensive (C).
+    target: "C"
+    metadata: { skill: supply-chain, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: service-productivity-not-true
+    input: |-
+      Which of the following is NOT a reason why productivity gains tend to be harder to achieve in services than in manufacturing?
+      A. Many services are labor-intensive.
+      B. Quality of a service is often hard to measure.
+      C. Services frequently depend on individual professional judgment.
+      D. Services are often hard to automate.
+      E. Services typically need heavy investment in machinery relative to labor.
+    # Service ops are typically NOT capital intensive; E is the false reason.
+    target: "E"
+    metadata: { skill: operations-basics, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: jit-forced-problem-solving
+    input: |-
+      A plant manager deliberately lowers buffer stock so that hidden problems -- machine downtime, late suppliers, scrap -- surface immediately and must be solved, while concentrating on throughput. Which approach is described?
+      A. Just-in-time (JIT)
+      B. Material requirements planning (MRP)
+      C. ABC analysis
+      D. Economic order quantity
+      E. Safety-stock buffering
+    # JIT = continuous forced problem-solving via reduced inventory (A).
+    target: "A"
+    metadata: { skill: lean, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: few-suppliers-not-advantage
+    input: |-
+      Which of the following is NOT an advantage of buying from only a few suppliers?
+      A. Suppliers move down the learning curve, lowering transaction and production costs.
+      B. Suppliers better understand the buyer's end-customer goals.
+      C. Suppliers are more willing to share technical expertise.
+      D. The buyer is less exposed if any one supplier fails or raises prices.
+      E. Suppliers can reach economies of scale on the buyer's volume.
+    # Few suppliers INCREASE dependence/risk; D is the false advantage.
+    target: "D"
+    metadata: { skill: supply-chain, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: cycle-counting-frequency
+    input: |-
+      A warehouse starts a cycle-counting program. Which statement describes the approach correctly?
+      A. All records are verified once, at year end.
+      B. Every item is counted at the same frequency.
+      C. It removes the need for any inventory adjustment.
+      D. High-use or high-value items are counted more often than low-use items.
+      E. It is used to compute inventory turnover.
+    # Cycle counting: count frequently used/valuable items more often (D).
+    target: "D"
+    metadata: { skill: inventory, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: benchmarking-definition
+    input: |-
+      A hospital studies the emergency department with the fastest patient turnaround in the country and redesigns its own process along the same lines. This practice is called:
+      A. benchmarking.
+      B. employee empowerment.
+      C. continuous improvement.
+      D. reverse auction.
+      E. vertical integration.
+    # Benchmarking = modelling on best-in-class organisations (A).
+    target: "A"
+    metadata: { skill: quality, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: basic-inventory-questions
+    input: |-
+      The typical inventory model is built to answer which two basic questions?
+      A. How much to order and how long the supplier's contract should run
+      B. When to order and how much to order
+      C. What the carrying cost is and what the ordering cost is
+      D. Which supplier to use and when to place orders
+      E. How much safety stock to hold and how much to charge
+    # When to order and how much to order (B).
+    target: "B"
+    metadata: { skill: inventory, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: jury-executive-opinion
+    input: |-
+      A company's vice presidents of sales, finance and production meet and combine their judgments into one sales forecast for the coming year. This qualitative technique is called:
+      A. a jury of executive opinion.
+      B. the Delphi consumer panel.
+      C. exponential smoothing.
+      D. least-squares trend projection.
+      E. a market survey.
+    # Jury of executive opinion (A).
+    target: "A"
+    metadata: { skill: forecasting, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: product-focus-description
+    input: |-
+      Which phrase best describes a product-focused process?
+      A. Low volume, high variety, general-purpose equipment
+      B. Products made to individual customer order
+      C. High volume, low variety, high fixed cost and low variable cost per unit
+      D. Processes organised around work centers of similar equipment
+      E. Very low utilization of specialised machines
+    # Product focus: high volume, low variety, high fixed / low variable cost (C).
+    target: "C"
+    metadata: { skill: process-strategy, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: forecast-horizon-long-range
+    input: |-
+      A retailer is deciding whether to build a second distribution center. What type of forecast horizon is typically used for this kind of decision?
+      A. Daily scheduling horizon
+      B. Short-range, under three months
+      C. Medium-range, three months to a year
+      D. Long-range, three years or more
+      E. No horizon is needed for facility decisions
+    # Facility location/expansion/capex use long-range forecasts (D).
+    target: "D"
+    metadata: { skill: forecasting, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: natural-variation-true
+    input: |-
+      Which statement about natural (common-cause) variation in a process is correct?
+      A. It signals that a machine is broken.
+      B. It is eliminated entirely by sampling more often.
+      C. It is present in nearly every process and is tolerated, within limits, when the process is in control.
+      D. It only appears when the operator changes.
+      E. It makes a control chart unusable.
+    # Natural variations exist in every process and are acceptable in control (C).
+    target: "C"
+    metadata: { skill: quality, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: supply-chain-definition
+    input: |-
+      What term describes the global network of organizations and activities that provide a firm with goods and services?
+      A. Vendor tree
+      B. Supply chain
+      C. Provider grid
+      D. Value ledger
+      E. Sourcing pyramid
+    # Supply chain (B).
+    target: "B"
+    metadata: { skill: supply-chain, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: wip-false-statement
+    input: |-
+      Which statement about work-in-process (WIP) inventory is FALSE?
+      A. WIP exists because products take time to flow through the process.
+      B. Shortening flow time reduces WIP.
+      C. WIP is no longer raw material but not yet a finished product.
+      D. Most of the time a unit is 'being made' it is actually waiting.
+      E. Actual processing time is usually the largest share of a unit's flow time.
+    # False statement: run time is usually a SMALL share of flow time (E).
+    target: "E"
+    metadata: { skill: inventory, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: five-s-sort
+    input: |-
+      In the 5S lean housekeeping program, which pairing of step and purpose is correct?
+      A. Sort: remove items the work area does not need, exposing non-value-adding clutter.
+      B. Shine: eliminate inventory by shortening setups.
+      C. Standardize: increase variability so workers can choose their own methods.
+      D. Sustain: reduce the number of suppliers.
+      E. Simplify: calculate economic order quantities.
+    # Sort/segregate = remove unneeded items (A).
+    target: "A"
+    metadata: { skill: lean, provenance: synthetic, slo: SLO9, use_mode: capability }
+  - id: crashing-technique
+    input: |-
+      A project is three weeks behind schedule, and the manager will add overtime and extra crews to critical activities, at extra cost, to finish sooner. Which technique is this?
+      A. Crashing
+      B. Gantt charting
+      C. Exponential smoothing
+      D. Cycle counting
+      E. Beta-distribution estimation
+    # Crashing = shortening project duration by adding resources to critical activities (A).
+    target: "A"
+    metadata: { skill: project-management, provenance: synthetic, slo: SLO9, use_mode: capability }
