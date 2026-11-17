@@ -28,6 +28,7 @@ historical score from its task text.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import threading
@@ -373,15 +374,12 @@ def write_sources(session: Session, sources: ConfigSources, *, actor: str) -> di
     }
 
 
-def _acquire_seed_lock(session: Session) -> threading.Lock | None:
-    """Serialise seeders: a Postgres advisory lock held until this transaction
-    ends, or -- on SQLite, which has none -- an in-process lock the caller
-    releases."""
+def _acquire_seed_lock(session: Session) -> None:
+    """Serialise seeders on Postgres: an advisory lock held until THIS
+    transaction commits or rolls back, so a waiting seeder only proceeds once
+    the winner's rows are visible.  (SQLite: see :func:`ensure_seeded`.)"""
     if session.get_bind().dialect.name == "postgresql":
         session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": SEED_LOCK_KEY})
-        return None
-    _SQLITE_SEED_LOCK.acquire()
-    return _SQLITE_SEED_LOCK
 
 
 def record_revision(
@@ -412,44 +410,51 @@ def ensure_seeded(
     ``sources`` is injectable for tests; production reads the YAML."""
     if settings.config_source != "db":
         return False
+    # SQLite (tests, local) has no advisory locks. An in-process lock stands in,
+    # and it must wrap the WHOLE session scope -- released only after the
+    # commit -- or a waiter could check `is_seeded` before the winner's rows are
+    # visible. On Postgres the advisory lock is transaction-scoped, which gives
+    # the same guarantee across pods.
+    sqlite = str(session_factory.kw.get("bind").url).startswith("sqlite")
+    with _SQLITE_SEED_LOCK if sqlite else contextlib.nullcontext():
+        return _seed_once(session_factory, settings, sources)
+
+
+def _seed_once(session_factory, settings: Settings, sources: ConfigSources | None) -> bool:
     with session_scope(session_factory) as session:
-        held = _acquire_seed_lock(session)
-        try:
-            if is_seeded(session):
-                return False
-            sources = sources or read_yaml_sources(settings)
-            issues = validate_sources(sources)
-            errors = errors_of(issues)
-            if errors:
-                raise SeedError(
-                    f"refusing to seed: the YAML has {len(errors)} validation error(s)", errors
-                )
-            counts = write_sources(session, sources, actor=SEED_ACTOR)
-            revision = record_revision(
-                session,
-                actor=SEED_ACTOR,
-                source="seed",
-                summary="seeded from YAML: " + ", ".join(f"{v} {k}" for k, v in counts.items()),
-                seed_git_sha=sources.git_sha,
+        _acquire_seed_lock(session)
+        if is_seeded(session):
+            return False
+        sources = sources or read_yaml_sources(settings)
+        issues = validate_sources(sources)
+        errors = errors_of(issues)
+        if errors:
+            raise SeedError(
+                f"refusing to seed: the YAML has {len(errors)} validation error(s)", errors
             )
-            session.add(
-                AuditLogRow(
-                    actor_login=SEED_ACTOR,
-                    via_subject="system",
-                    action="config.seed",
-                    entity_type="config",
-                    entity_id=str(revision),
-                    after={"counts": counts, "origin": sources.origin},
-                    config_revision=revision,
-                )
+        counts = write_sources(session, sources, actor=SEED_ACTOR)
+        revision = record_revision(
+            session,
+            actor=SEED_ACTOR,
+            source="seed",
+            summary="seeded from YAML: " + ", ".join(f"{v} {k}" for k, v in counts.items()),
+            seed_git_sha=sources.git_sha,
+        )
+        session.add(
+            AuditLogRow(
+                actor_login=SEED_ACTOR,
+                via_subject="system",
+                action="config.seed",
+                entity_type="config",
+                entity_id=str(revision),
+                after={"counts": counts, "origin": sources.origin},
+                config_revision=revision,
             )
-            log.info(
-                "config: seeded revision %d from YAML (%s) -- origin %s",
-                revision,
-                counts,
-                sources.origin,
-            )
-            return True
-        finally:
-            if held is not None:
-                held.release()
+        )
+        log.info(
+            "config: seeded revision %d from YAML (%s) -- origin %s",
+            revision,
+            counts,
+            sources.origin,
+        )
+        return True
