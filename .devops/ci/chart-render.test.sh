@@ -210,10 +210,22 @@ else:
           f"{env}: the judge-calibration sweep gets the KEK")
     check({"AUTH_SECRET", "AUTH_DEX_SECRET", "IDA_ADMIN_TOKENS"} <= env_names(frontend),
           f"{env}: the frontend gets AUTH_SECRET, AUTH_DEX_SECRET and the admin bearer")
-    # Still DARK after C1: the console switch and the config source are flipped
-    # per environment in C2/C3, which update these two lines on purpose.
-    check("ADMIN_CONSOLE_ENABLED" not in cfg, f"{env}: ADMIN_CONSOLE_ENABLED is still unset (dark)")
-    check(cfg.get("IDA_CONFIG_SOURCE", "yaml") == "yaml", f"{env}: IDA_CONFIG_SOURCE is still yaml")
+    # The three admin flags move together, per environment (C2 dev, C3 staging,
+    # then prod). Add an env to FLIPPED in the same PR that patches its overlay;
+    # an unflipped env must stay fully dark. Prod joins only once it runs v1.2.0.
+    FLIPPED = {"dev"}
+    flags = {
+        "IDA_CONFIG_SOURCE": "db",
+        "ADMIN_CONSOLE_ENABLED": "true",
+        "IDA_TASKS_SPEC_GATED": "true",
+    }
+    if env in FLIPPED:
+        for k, v in flags.items():
+            check(cfg.get(k) == v, f"{env}: {k} is {v} (flipped)")
+    else:
+        check("ADMIN_CONSOLE_ENABLED" not in cfg, f"{env}: ADMIN_CONSOLE_ENABLED is still unset (dark)")
+        check(cfg.get("IDA_CONFIG_SOURCE", "yaml") == "yaml", f"{env}: IDA_CONFIG_SOURCE is still yaml")
+        check(cfg.get("IDA_TASKS_SPEC_GATED", "false") != "true", f"{env}: IDA_TASKS_SPEC_GATED is still off")
 check("IDA_ADMIN_TOKENS" not in env_names(runner), f"{env}: the runner never holds the admin bearer")
 
 # ---- the credit / campus-hardware safety switch -----------------------------
