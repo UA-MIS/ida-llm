@@ -1,7 +1,29 @@
 # Local model serving — running open models on our own hardware
 
-**Status: research + direction, no code (board #36, formerly framed as #52
-"Local-model serving research").** This answers three questions: which open
+> ## ⚠ SUPERSEDED IN PART (2026-11-12) — READ THIS FIRST
+>
+> This document was written when campus serving was prospective. It is now
+> live, and two of its load-bearing premises are false:
+>
+> * **There is ONE campus box, not a prospective "Sparks" tier plus a separate
+>   `qwen-local` endpoint.** `local-llm.uamishub.com` **is**
+>   `promaxgb10-d62a`, a DGX-Spark-class Dell Pro Max GB10. The `sparks-local`
+>   placeholder entry this document repeatedly refers to **no longer exists**;
+>   it was deleted as a duplicate and its reproducibility fields folded into
+>   `qwen-local`. `SPARKS_BASE_URL` / `SPARKS_API_KEY` are dead.
+> * **The serving stack is Ollama (0.34.4) behind LiteLLM, not vLLM.** The box
+>   switched on 2026-10-24. Anything below that reasons about vLLM flags,
+>   `--max-model-len` or a vLLM version is describing the past.
+>
+> The *analysis* below — candidate models, tiering, the privacy argument — is
+> still useful and is left intact rather than silently rewritten. Treat every
+> concrete claim about hardware, entries, variables or serving stack as
+> superseded by [`../infra/inference/README.md`](../infra/inference/README.md),
+> which is probed against the live endpoint. A full rewrite of this document is
+> outstanding follow-up, not done here.
+
+**Status (original): research + direction, no code (board #36, formerly framed
+as #52 "Local-model serving research").** This answers three questions: which open
 models are realistic candidates, how we would actually serve them, and how
 that connects to the privacy pitch this project is already making to
 researchers ([`docs/researcher-track.md`](researcher-track.md) §0 and §4). It

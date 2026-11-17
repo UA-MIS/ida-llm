@@ -288,12 +288,16 @@ class TestResidency:
     """The FERPA angle, surfaced from the registry rather than typed into a page."""
 
     def test_campus_models_are_marked_on_campus(self, client: TestClient) -> None:
+        """Repointed from `sparks-local` to `qwen-local` on 2026-11-12: the two
+        entries described the SAME box and were consolidated, so `qwen-local` is
+        now the only on-campus entry -- and, unlike the deleted placeholder, it
+        is one that actually answers."""
         entries = {m["key"]: m for m in client.get("/models?include_disabled=true").json()}
-        assert "local" in entries["sparks-local"]["tags"]
+        assert "campus" in entries["qwen-local"]["tags"]
 
     def test_residency_is_derived_from_registry_tags(self, context: AppContext) -> None:
         by_key = {e.key: e for e in context.registry.models}
-        assert data_residency(by_key["sparks-local"]) == "on_campus"
+        assert data_residency(by_key["qwen-local"]) == "on_campus"
         assert data_residency(by_key["luna"]) == "third_party"
         assert data_residency(by_key["mock"]) == "not_a_real_model"
 

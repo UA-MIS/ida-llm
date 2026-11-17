@@ -439,12 +439,39 @@ class TestResolveBaseUrl:
         registry = load_registry(repo_root() / "models.yaml")
         assert registry.get("mock").base_url_env == "MOCK_MODEL_BASE_URL"
 
-    def test_the_shipped_sparks_entry_is_present_disabled_and_fallback_free(self) -> None:
+    def test_the_one_local_box_has_exactly_one_entry(self) -> None:
+        """Replaces `test_the_shipped_sparks_entry_is_present_disabled_and_fallback_free`
+        (deleted 2026-11-12 with the `sparks-local` entry itself).
+
+        That entry was a placeholder for a SECOND campus box that does not
+        exist: `local-llm.uamishub.com` and the "DGX-Spark hardware" are one
+        machine, `promaxgb10-d62a`. Modelling one box as two meant a reader
+        could not tell which entry described the hardware actually answering.
+        The guard that matters now is the one this test states: there is exactly
+        ONE on-campus entry, and it carries the reproducibility fields the
+        placeholder existed to hold.
+        """
         registry = load_registry(repo_root() / "models.yaml")
-        sparks = registry.get("sparks-local")
-        assert sparks.enabled is False
-        assert sparks.base_url_env == "SPARKS_BASE_URL"
-        assert sparks.base_url == "", "no fallback: fail loudly rather than guess"
+        on_campus = [m for m in registry.models if "campus" in m.tags]
+        assert [m.key for m in on_campus] == ["qwen-local"], (
+            "exactly one entry may describe the single campus box"
+        )
+        entry = on_campus[0]
+        assert entry.serving.hardware is not None, "the hardware field must survive"
+        assert "GB10" in entry.serving.hardware
+        assert entry.serving.model_id and "PLACEHOLDER" not in entry.serving.model_id
+
+    def test_the_local_entry_keeps_its_relocation_seam(self) -> None:
+        """`base_url_env` is what lets ONE registry serve both the cluster
+        tenant (literal public hostname) and the GB10 stack (LiteLLM over the
+        appliance docker network) with no per-environment file. Dropping it
+        would pin the entry to the Cloudflare route and make the on-box
+        deployment need its own registry."""
+        entry = load_registry(repo_root() / "models.yaml").get("qwen-local")
+        assert entry.base_url_env == "LOCAL_LLM_BASE_URL"
+        assert entry.base_url == "https://local-llm.uamishub.com/v1", (
+            "the literal must remain as the in-cluster fallback"
+        )
 
 
 class TestOpenAIBaseNormalisation:

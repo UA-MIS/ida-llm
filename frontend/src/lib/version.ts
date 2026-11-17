@@ -71,3 +71,70 @@ export function resolveVersion(
       `shown is frontend/package.json's version (${packageVersion}) with a -dev suffix, which is deliberately not a release string.`,
   };
 }
+
+/**
+ * ── "WHAT IS DEPLOYED?", ANSWERABLE WITHOUT SSH ────────────────────────────
+ *
+ * On the GB10 appliance the images are BUILT ON THE BOX from the commit the
+ * reconciler fast-forwarded to, rather than pulled as a promoted Harbor digest
+ * (the box is aarch64 and every promoted image is amd64-only). That trade loses
+ * a property worth keeping: with a digest, "what is running" was answerable from
+ * the registry. `/api/version` replaces it.
+ *
+ * It reports BOTH images deliberately. Under build-on-the-box they are produced
+ * as a pair from one commit, so the useful failure to be able to see is them
+ * DISAGREEING — a half-applied deploy, or a rollback that moved one tag and not
+ * the other.
+ */
+export interface ApiIdentity {
+  reachable: boolean;
+  /** The api's own `IDA_VERSION`/package version, as it reports it. */
+  version?: string;
+  /** Baked into the python image by Dockerfile.python's GIT_SHA build-arg. */
+  gitSha?: string | null;
+  /** Why it could not be read. Present only when `reachable` is false. */
+  error?: string;
+}
+
+export interface DeployedIdentity {
+  frontend: BuildVersion;
+  api: ApiIdentity;
+  /**
+   * True only when both halves are known AND the frontend's build label is a
+   * prefix of the api's git SHA (the reconciler tags the frontend with the
+   * 12-char short SHA and bakes the full SHA into the python image).
+   *
+   * `null` means "cannot tell" — an unreachable api or an unidentified build —
+   * which is NOT the same as "they disagree" and must not be rendered as such.
+   */
+  consistent: boolean | null;
+}
+
+/**
+ * Pure: takes the already-fetched api health body, returns the payload.
+ *
+ * Separated from the route for the same reason `resolveVersion` takes its
+ * inputs as parameters — the branch that matters here is the FAILURE branch,
+ * and an untested fallback is the half that ships broken.
+ */
+export function buildDeployedIdentity(
+  frontend: BuildVersion,
+  apiBody: { version?: unknown; git_sha?: unknown } | null,
+  error?: string,
+): DeployedIdentity {
+  if (!apiBody) {
+    return {
+      frontend,
+      api: { reachable: false, error: error ?? "api did not respond" },
+      consistent: null,
+    };
+  }
+  const version = typeof apiBody.version === "string" ? apiBody.version : undefined;
+  const gitSha = typeof apiBody.git_sha === "string" ? apiBody.git_sha : null;
+
+  let consistent: boolean | null = null;
+  if (frontend.identified && gitSha) {
+    consistent = gitSha.startsWith(frontend.label);
+  }
+  return { frontend, api: { reachable: true, version, gitSha }, consistent };
+}

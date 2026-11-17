@@ -38,9 +38,38 @@ const read = (f: string) => readFileSync(f, "utf8");
 const code = (f: string) => read(f).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 describe("no question/answer content is reachable from the public frontend", () => {
-  it("has no route handler except the two ops endpoints", () => {
+  it("has no route handler except the three ops endpoints", () => {
+    // An ALLOWLIST, not a pattern: every route handler in this app is a public,
+    // unauthenticated surface, so adding one is a deliberate act that has to be
+    // recorded here. `version` joined healthz and metrics on 2026-11-12 for the
+    // GB10 relocation: images are now built on the box from the reconciled
+    // commit rather than pulled as promoted Harbor digests, and the frontend is
+    // the ONLY published surface there (the api is loopback-bound in every
+    // environment), so "what is deployed?" had nowhere else to be asked.
+    // The next test is what makes that safe.
     const handlers = ALL.filter((f) => /\/route\.ts$/.test(f)).map((f) => f.slice(SRC.length));
-    expect(handlers.sort()).toEqual(["/app/api/healthz/route.ts", "/app/api/metrics/route.ts"]);
+    expect(handlers.sort()).toEqual([
+      "/app/api/healthz/route.ts",
+      "/app/api/metrics/route.ts",
+      "/app/api/version/route.ts",
+    ]);
+  });
+
+  it("the ops endpoints cannot serve run, task or sample content", () => {
+    // The reason the allowlist above is allowed to grow at all. An ops endpoint
+    // earns its place only if it is structurally incapable of returning the
+    // thing this whole suite exists to keep off the public frontend -- so this
+    // asserts on the SOURCE, not on a response: no data-layer import, and no
+    // reference to runs/samples/tasks/transcripts.
+    for (const f of ALL.filter((p) => /\/app\/api\/.*\/route\.ts$/.test(p))) {
+      const body = code(f);
+      expect(body, `${f} reaches into the data layer`).not.toMatch(
+        /from "@\/lib\/(api|data|runs|tasks|samples)"/,
+      );
+      expect(body, `${f} names run or sample content`).not.toMatch(
+        /\brun(s)?\b|\bsample(s)?\b|\btask(s)?\b|transcript/i,
+      );
+    }
   });
 
   it("has no transcript proxy, viewer or fetcher left", () => {

@@ -116,9 +116,15 @@ particular: they select models **with no human present**, so a key that is
 missing only from `cronjobs.yaml` surfaces as a job that fails every night at
 02:00 and nowhere else.
 
-> The live example of exactly that: the CronJobs receive `ANTHROPIC_API_KEY` and
-> `OPENAI_API_KEY` but **not** `SPARKS_API_KEY`. Harmless while `sparks-local`
-> is disabled; a nightly failure the moment it is not.
+> The live example of exactly that USED to be `SPARKS_API_KEY`: the CronJobs
+> received `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` but not that one. It stopped
+> being an example on 2026-11-12, when `sparks-local` was deleted as a duplicate
+> of `qwen-local` (one box, two entries) and the variable became dead. The trap
+> itself is unchanged and still worth guarding: `ENABLED_KEY_VARS` in
+> `services/runner/tests/test_provider_keys.py` is computed FROM `models.yaml`,
+> so enabling a model whose key no CronJob projects fails the suite rather than
+> failing nightly at 02:00. That test also asserts the list is non-empty, so it
+> cannot pass vacuously.
 
 ---
 

@@ -97,9 +97,12 @@ A run is a message. The api validates it, writes the `queued` rows and pushes
 to Redis; a runner claims it, drives the harness against one model endpoint,
 and writes results back. Nothing else calls a model, and nothing else scores.
 
-**Dashed means built but not switched on today** — the judge, the cloud
-registry entries and Sparks are all code that ships and configuration that
-does not.
+**Dashed means built but not switched on today.** As of 2026-11-12 the campus
+box is no longer one of them: the local model is live, served by Ollama behind
+LiteLLM, and `qwen-local` is `enabled: true`. The old `sparks-local` entry was a
+placeholder for a SECOND campus box that never existed — it described the same
+machine — and has been deleted. See
+[`infra/inference/README.md`](infra/inference/README.md).
 
 ```mermaid
 flowchart TB
@@ -120,7 +123,7 @@ flowchart TB
   end
 
   cloud["cloud APIs · staging + prod<br/>Anthropic — native Messages client<br/>OpenAI — OpenAI-compatible client<br/>clients ship; registry entries still commented out"]
-  sparks["campus vLLM “Sparks”<br/>wired through settings, enabled: false"]
+  sparks["campus GB10 · promaxgb10-d62a<br/>Ollama 0.34.4 behind LiteLLM<br/>qwen3.8:27b-mtp-q4_K_M · enabled: true"]
 
   browser -->|"https · Ingress ida-llm"| fe
   browser -->|"https · Ingress ida-llm-agile"| agile
@@ -135,13 +138,13 @@ flowchart TB
   runner --> factory
   factory --> mock
   factory -.->|"reachable — egress allows :443 out"| cloud
-  factory -.->|"deferred — no egress route to campus"| sparks
+  factory -->|"https :443 — LiteLLM (keys, teams, budgets)"| sparks
   agile --> pg
   agile --> minio
   cloud ~~~ sparks
 
   classDef off stroke:#8a8a8a,stroke-dasharray:5 4,fill:#f2f2f2,color:#333
-  class judge,cloud,sparks off
+  class judge,cloud off
 ```
 
 ### How work reaches production
@@ -220,7 +223,7 @@ migrations/          Alembic (repo root — see alembic.ini)
 tools/               the task/model schema validator
 e2e/                 the tracer bullet, in two modes
 scripts/             one-shot local bootstrap for docker compose
-infra/               off-cluster inference notes (Sparks)
+infra/               off-cluster inference notes (the campus GB10 box)
 apps/agile/          the sprint board (self-contained; its own CI job)
 .devops/             the deploy contract  -> read .devops/README.md
 ```
@@ -477,12 +480,19 @@ blip into a rolling restart of every replica — that is how a small outage beco
 a large one. `services/api/tests/test_api.py` fails if `/healthz` starts needing
 a database.
 
-**The campus "Sparks" vLLM route is deliberately deferred, not forgotten.**
-`SPARKS_BASE_URL` is wired through settings, the ConfigMap and `models.yaml`, and
-is empty everywhere. The cluster's egress policy opens `:443` to the internet but
-opens **no route to Sparks**. Turning it on is a value here plus one block in
-`platform-infra/platform-services/ida-llm-egress/netpol.yaml`, which spells out
-the exact change and the three ways to get it wrong.
+**The campus model route is OPEN, and there is only one campus box.** It was
+reached all along: `local-llm.uamishub.com` is a public `:443` hostname, which
+the tenant egress policy already allows, and it resolves to `promaxgb10-d62a` —
+the very machine the disabled `sparks-local` entry was a placeholder for. The
+two entries were consolidated into `qwen-local` on 2026-11-12 and the netpol
+change previous versions of this file described is **not needed**.
+
+What answers is **Ollama 0.34.4 behind LiteLLM**, not vLLM — the box switched on
+2026-10-24, and this registry recorded `vllm 0.30.0` for 19 days afterwards.
+Since the serving stack is stamped onto every stored result, that was a
+correctness bug; it is fixed, and no stored run was mislabelled (all predate the
+switch). `SPARKS_BASE_URL`/`SPARKS_API_KEY` are now dead and are removed in the
+retirement pass. Full detail: [`infra/inference/README.md`](infra/inference/README.md).
 
 ---
 
