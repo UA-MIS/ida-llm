@@ -191,3 +191,20 @@ patches:
       - op: add
         path: /data/AUTH_DEX_ID
         value: ida-llm
+      # ── C3: THE FLIP (admin-console design §11.3), staging ────────────────────
+      # db: models, tasks and curriculum come from the database, seeded ONCE from
+      # the image's YAML on first boot (content_sha preserved, so no score moves).
+      # Rollback is one line: set this back to "yaml"; admin edits stay in the DB.
+      - op: add
+        path: /data/IDA_CONFIG_SOURCE
+        value: db
+      # The frontend serves /admin only when this is "true"; unset it is a 404.
+      - op: add
+        path: /data/ADMIN_CONSOLE_ENABLED
+        value: "true"
+      # Full task specs and transcripts need the author role. Flipped WITH the
+      # two above: the public run page reads /tasks/{id}/meta (B6), and both
+      # halves ship in the same images.
+      - op: add
+        path: /data/IDA_TASKS_SPEC_GATED
+        value: "true"
