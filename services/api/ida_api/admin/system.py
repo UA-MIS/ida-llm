@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 
 from ida_api.admin.deps import Admin, not_implemented
+from ida_api.admin.material import TASKS_SPEC_GATED
 from ida_api.admin.schemas import SystemGuards, SystemInfo
 from ida_api.deps import AppContext, get_context
 from ida_core.configdb.reader import current_revision
@@ -38,7 +39,7 @@ def get_system(_: Admin, ctx: AppContext = Depends(get_context)) -> SystemInfo:
         kek_configured=bool(settings.credentials_kek.strip()),
         kek_active_id=settings.credentials_kek_active_id,
         admin_group_hint=settings.admin_groups.strip() or None,
-        tasks_spec_gated=False,
+        tasks_spec_gated=TASKS_SPEC_GATED,
     )
 
 

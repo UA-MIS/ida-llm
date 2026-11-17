@@ -7641,7 +7641,7 @@
     },
     "/admin/material/upload": {
       "post": {
-        "description": "Preview (``commit=false``) or store a task YAML. Parsed with\n``yaml.safe_load`` only; the raw bytes reach object storage only after\nvalidation passes AND ``commit=true``.",
+        "description": "Preview (``commit=false``) or store a task YAML.\n\nParsed with ``yaml.safe_load`` only.  The raw bytes reach object storage\nonly after validation passes AND ``commit=true`` -- a rejected upload is\nnever persisted anywhere.",
         "operationId": "upload_material_admin_material_upload_post",
         "parameters": [
           {
@@ -12673,7 +12673,7 @@
     },
     "/admin/task-families/{key}": {
       "delete": {
-        "description": "Archive. 409 while a class or a unit references it.",
+        "description": "Archive.  409 while a class or a unit references it, or while it still\nhas live tasks (archive those first, so nothing disappears by surprise).",
         "operationId": "archive_task_family_admin_task_families__key__delete",
         "parameters": [
           {
@@ -12875,6 +12875,7 @@
         ]
       },
       "put": {
+        "description": "The key is immutable: task ids embed it.",
         "operationId": "update_task_family_admin_task_families__key__put",
         "parameters": [
           {
@@ -13298,6 +13299,7 @@
         ]
       },
       "post": {
+        "description": "``document.id`` must start with an existing family key.",
         "operationId": "create_task_admin_tasks_post",
         "parameters": [
           {
@@ -13685,6 +13687,7 @@
     },
     "/admin/tasks/{task_id}": {
       "delete": {
+        "description": "Archive: the task leaves the catalog; historical runs stay resolvable\nthrough ``task_revisions``.",
         "operationId": "archive_task_admin_tasks__task_id__delete",
         "parameters": [
           {
@@ -13886,7 +13889,7 @@
         ]
       },
       "get": {
-        "description": "UNREDACTED: prompts, targets, rubric.",
+        "description": "UNREDACTED: prompts, targets, rubric.  Admin is authenticated.",
         "operationId": "get_admin_task_admin_tasks__task_id__get",
         "parameters": [
           {
@@ -14077,7 +14080,7 @@
         ]
       },
       "put": {
-        "description": "The id is immutable; a rename is create + archive.",
+        "description": "The id is immutable; a rename is create + archive.  Writes a\n``task_revisions`` row.",
         "operationId": "replace_task_admin_tasks__task_id__put",
         "parameters": [
           {
@@ -14298,6 +14301,7 @@
     },
     "/admin/tasks/{task_id}/samples": {
       "post": {
+        "description": "Server-side sugar: append to ``document.samples``, re-validate the whole\ndocument.",
         "operationId": "add_sample_admin_tasks__task_id__samples_post",
         "parameters": [
           {
