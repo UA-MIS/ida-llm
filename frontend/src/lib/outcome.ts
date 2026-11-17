@@ -43,6 +43,8 @@ export function classifyRun(
   // A setup failure produces a failed run with no results at all.
   if (run.status === "failed") return "all-errored";
   if (results.length === 0) return "all-errored";
+  // Cancelled part-way: whatever it measured is incomplete, never a clean score.
+  if (run.status === "cancelled") return "partial";
 
   if (run.status === "partial" || run.error_count > 0) return "partial";
 

@@ -705,7 +705,7 @@ export function buildUnitMatrix(
   majorSlug: string,
   onlyKey?: string,
 ): ExploreMatrix {
-  const units = unitsFor(tile.code).filter((unit) => !onlyKey || unit.key === onlyKey);
+  const units = unitsFor(board.curriculum, tile.code).filter((unit) => !onlyKey || unit.key === onlyKey);
   return assemble(
     board,
     units.map((unit): EntitySpec => {

@@ -115,6 +115,7 @@ const CURRICULUM: CurriculumView = {
   coverage: [],
   majors: [],
   unassigned_core: [],
+  units: {},
 };
 
 function board(tasks: TaskLeaderboard[], overrides: Partial<LeaderboardResponse> = {}): LeaderboardResponse {
@@ -438,6 +439,7 @@ describe("rollupByOutcome", () => {
         coverage: [],
         majors: [],
         unassigned_core: [],
+        units: {},
       },
     });
     const rows = rollupByOutcome(findRollup(noCurriculum, "luna")!, noCurriculum);

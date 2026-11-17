@@ -397,6 +397,9 @@ tbody tr:hover { background: var(--surface); }
 }
 .badge-succeeded { color: var(--pass); border-color: currentColor; }
 .badge-failed    { color: var(--fail); border-color: currentColor; }
+/* An admin stopped the run (admin-console design §4.6): styled like failed,
+   because it is not evidence either. */
+.badge-cancelled { color: var(--fail); border-color: currentColor; }
 .badge-partial   { color: var(--pending); border-color: currentColor; }
 .badge-running,
 .badge-queued    { color: var(--pending); border-color: currentColor; }

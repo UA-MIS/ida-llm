@@ -155,7 +155,7 @@ export default async function EvidencePage({
   // ⚠ THE CLASS PAGE DRILLS INTO UNITS, so the common case here is a unit key
   // ("spreadsheets-data-analysis"). Its evidence is the one-column grid plus the
   // tasks behind it — see `UnitEvidence`.
-  const unit = findUnit(klass.code, slo);
+  const unit = findUnit(board.curriculum, klass.code, slo);
   if (unit) {
     return (
       <UnitEvidence
