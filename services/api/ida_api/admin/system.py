@@ -12,7 +12,6 @@ from fastapi.responses import Response
 from sqlalchemy import select
 
 from ida_api.admin.deps import Admin
-from ida_api.admin.material import TASKS_SPEC_GATED
 from ida_api.admin.schemas import SystemGuards, SystemInfo
 from ida_api.admin.service import admin_write, require_db_config
 from ida_api.deps import AppContext, get_context
@@ -48,7 +47,7 @@ def get_system(_: Admin, ctx: AppContext = Depends(get_context)) -> SystemInfo:
         kek_configured=bool(settings.credentials_kek.strip()),
         kek_active_id=settings.credentials_kek_active_id,
         admin_group_hint=settings.admin_groups.strip() or None,
-        tasks_spec_gated=TASKS_SPEC_GATED,
+        tasks_spec_gated=settings.tasks_spec_gated,
     )
 
 

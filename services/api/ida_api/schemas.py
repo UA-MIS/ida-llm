@@ -236,3 +236,47 @@ class TaskDetail(BaseModel):
             unscorable_reason=unscorable_reason,
             targets_redacted=not include_targets,
         )
+
+
+class SampleMeta(BaseModel):
+    """One sample's id and authored drill-down metadata -- no prompt, no target."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    metadata: dict = Field(default_factory=dict)
+
+
+class TaskMeta(BaseModel):
+    """``GET /tasks/{id}/meta``: what the PUBLIC run page needs, and nothing else.
+
+    No ``input``, no ``system_prompt``, no rubric, no ``target`` -- so it can stay
+    anonymous after ``IDA_TASKS_SPEC_GATED`` puts the full spec behind
+    ``author`` (PR B6).  Sample ``metadata`` is safe to publish: the validator
+    already refuses a target that leaks into it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    title: str
+    description: str
+    kind: TaskKind
+    domain: str
+    tags: list[str]
+    content_sha: str
+    sample_count: int
+    samples: list[SampleMeta]
+
+    @classmethod
+    def of(cls, spec: TaskSpec) -> TaskMeta:
+        return cls(
+            id=spec.id,
+            title=spec.title,
+            description=spec.description,
+            kind=spec.kind,
+            domain=spec.domain,
+            tags=list(spec.tags),
+            content_sha=spec.content_sha,
+            sample_count=len(spec.samples),
+            samples=[SampleMeta(id=s.id, metadata=dict(s.metadata)) for s in spec.samples],
+        )

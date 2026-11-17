@@ -439,6 +439,19 @@ class Settings(BaseSettings):
     cap on the testing key so the console never makes it easier to hit that
     cap than the CLI does."""
 
+    tasks_spec_gated: bool = False
+    """Require ``author`` on the FULL task spec (``GET /tasks/{id}``) and on the
+    transcript route (PR B6, design risk R10).
+
+    Both serve prompts to anyone who can reach the API.  Today that is only the
+    namespace (the API has no ingress), but once admins can add PRIVATE material
+    that containment is not enough -- so this flag gates them, and the admin
+    console refuses ``provenance=private`` until it is on.  The public site reads
+    ``GET /tasks/{id}/meta`` (metadata only) instead, which stays anonymous.
+
+    Off by default so merging changes nothing: turn it on per environment only
+    after that environment's frontend reads ``/meta``."""
+
     admin_upload_max_bytes: int = 1_048_576
     """Largest task YAML ``POST /admin/material/upload`` accepts (1 MiB).
 

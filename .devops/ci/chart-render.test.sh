@@ -158,6 +158,21 @@ if ingress:
         label = host.removesuffix(".capstone.uamishub.com")
         check("." not in label, f"host {host} is single-label (Cloudflare wildcard depth)")
 
+# ---- the API has NO ingress (admin-console F5 / design 4.6, R10) -------------
+# The public `GET /tasks/{id}` (prompts) and the whole /admin API are reachable
+# only in-namespace; that is what makes the frontend's admin bearer the only
+# way in. An Ingress backend pointing at the API would publish both. Checked
+# across EVERY rendered Ingress, not only the app's own.
+for ing in by_kind.get("Ingress", []):
+    backends = [
+        p.get("backend", {}).get("service", {}).get("name")
+        for r in ing.get("spec", {}).get("rules", [])
+        for p in (r.get("http") or {}).get("paths", [])
+    ]
+    default = ing.get("spec", {}).get("defaultBackend", {}).get("service", {}).get("name")
+    check("ida-llm-api" not in [*backends, default],
+          f"{env}: Ingress {ing['metadata']['name']} does not route to ida-llm-api")
+
 # ---- the credit / campus-hardware safety switch -----------------------------
 mock = named.get("ida-llm-mock-model")
 mock_url = (config or {}).get("data", {}).get("MOCK_MODEL_BASE_URL", "")

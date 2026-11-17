@@ -73,12 +73,6 @@ from ida_core.validation_suite import Issue, errors_of, validate_task
 
 router = APIRouter(tags=["admin: material"])
 
-TASKS_SPEC_GATED = False
-"""Whether the public ``GET /tasks/{id}`` has stopped serving prompts to anyone
-who can reach the API (PR B6).  Until it is, no family may be marked
-``private`` -- the material would be one in-cluster request from public
-(design risk R10).  ``GET /admin/system`` reports the same flag."""
-
 
 # ─────────────────────────────────────────────────────────────── helpers ──
 
@@ -203,14 +197,17 @@ def _family_view(session, row: TaskFamilyRow) -> TaskFamily:
     )
 
 
-def _refuse_private(provenance: str) -> None:
-    if provenance == "private" and not TASKS_SPEC_GATED:
+def _refuse_private(ctx: AppContext, provenance: str) -> None:
+    """No family may be marked ``private`` until the public task endpoint stops
+    serving prompts (``IDA_TASKS_SPEC_GATED``, design risk R10): until then the
+    material would be one in-cluster request from public."""
+    if provenance == "private" and not ctx.settings.tasks_spec_gated:
         raise validation_failed(
             [
                 Issue(
                     "provenance",
-                    "private material cannot be added yet: the public task endpoint still "
-                    "serves prompts in-cluster (it is gated in a later release)",
+                    "private material cannot be added yet: this deployment's public task "
+                    "endpoint still serves prompts (IDA_TASKS_SPEC_GATED is off)",
                 )
             ]
         )
@@ -228,7 +225,7 @@ def list_task_families(_: Admin, ctx: AppContext = Depends(get_context)) -> list
 def create_task_family(
     body: TaskFamilyInput, admin: Admin, response: Response, ctx: AppContext = Depends(get_context)
 ) -> TaskFamily:
-    _refuse_private(body.provenance)
+    _refuse_private(ctx, body.provenance)
     with admin_write(
         ctx,
         admin,
@@ -266,7 +263,7 @@ def update_task_family(
     ctx: AppContext = Depends(get_context),
 ) -> TaskFamily:
     """The key is immutable: task ids embed it."""
-    _refuse_private(body.provenance)
+    _refuse_private(ctx, body.provenance)
     with admin_write(
         ctx,
         admin,

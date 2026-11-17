@@ -67,6 +67,7 @@ from ida_api.schemas import (
     ModelSummary,
     RunListResponse,
     TaskDetail,
+    TaskMeta,
     TaskSummary,
 )
 from ida_api.slo import CurriculumView, in_benchmark, slo_of, use_mode_of
@@ -320,6 +321,20 @@ def create_app(context: AppContext | None = None) -> FastAPI:
             for spec in ctx.catalog.all()
         ]
 
+    @app.get("/tasks/{task_id:path}/meta", response_model=TaskMeta, tags=["registry"])
+    def get_task_meta(task_id: str, ctx: AppContext = Depends(get_context)) -> TaskMeta:
+        """A task's metadata only -- titles, tags and each sample's id and
+        drill-down ``metadata`` -- with NO prompts and NO targets (PR B6).
+
+        What the public run page reads. Stays anonymous when
+        ``IDA_TASKS_SPEC_GATED`` puts the full spec behind ``author``.
+        Registered BEFORE ``/tasks/{task_id:path}``, which would otherwise
+        swallow ``.../meta`` as part of a task id."""
+        try:
+            return TaskMeta.of(ctx.catalog.get(task_id))
+        except KeyError:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, f"no task {task_id!r}") from None
+
     @app.get("/tasks/{task_id:path}", response_model=TaskDetail, tags=["registry"])
     def get_task(
         task_id: str,
@@ -348,7 +363,10 @@ def create_app(context: AppContext | None = None) -> FastAPI:
             spec = ctx.catalog.get(task_id)
         except KeyError:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"no task {task_id!r}") from None
-        if include_targets:
+        if include_targets or ctx.settings.tasks_spec_gated:
+            # Gated (IDA_TASKS_SPEC_GATED, PR B6): the prompts themselves are
+            # author-only, so private material is never one in-cluster request
+            # from public. The public site reads /tasks/{id}/meta instead.
             principal.require_role("author")
         return TaskDetail.of(
             spec,
@@ -616,13 +634,23 @@ def create_app(context: AppContext | None = None) -> FastAPI:
         )
 
     @app.get("/runs/{run_id}/results/{sample_id}/transcript", tags=["runs"])
-    def get_transcript(run_id: str, sample_id: str, ctx: AppContext = Depends(get_context)) -> dict:
+    def get_transcript(
+        run_id: str,
+        sample_id: str,
+        ctx: AppContext = Depends(get_context),
+        principal: Principal = Depends(current_principal),
+    ) -> dict:
         """Fetch an archived transcript from object storage.
 
         The API resolves the object key from the *path convention*, not from a
         user-supplied URI -- a client can never make this endpoint read an
         arbitrary object.
+
+        A transcript quotes the prompt, so under ``IDA_TASKS_SPEC_GATED`` it
+        needs ``author`` exactly as the full task spec does (PR B6).
         """
+        if ctx.settings.tasks_spec_gated:
+            principal.require_role("author")
         try:
             key = artifact_paths.sample_key(run_id, sample_id)
         except ValueError as exc:
