@@ -8,6 +8,7 @@
  * copies of a fixture drift.
  */
 
+import UNITS_SNAPSHOT from "./fixtures/units-taxonomy.snapshot.json";
 import type {
   CurriculumView,
   LeaderboardResponse,
@@ -93,7 +94,16 @@ export function task(overrides: Partial<TaskLeaderboard> = {}): TaskLeaderboard 
   };
 }
 
+/** The frozen real unit taxonomy, served-shape (absent source/caveat → null). */
+const SERVED_UNITS = Object.fromEntries(
+  Object.entries(UNITS_SNAPSHOT as Record<string, Array<Record<string, unknown>>>).map(([course, units]) => [
+    course,
+    units.map((u) => ({ ...u, source: u.source ?? null, caveat: u.caveat ?? null })),
+  ]),
+) as CurriculumView["units"];
+
 export const CURRICULUM: CurriculumView = {
+  units: SERVED_UNITS,
   available: true,
   unavailable_reason: null,
   program: "BScBA General Business (core)",

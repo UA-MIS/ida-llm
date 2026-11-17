@@ -3,9 +3,10 @@
 Three things this guards:
 
 1. FRESHNESS. The committed `tasks-dev/`, `curriculum/majors.dev.yaml`,
-   `curriculum/slo.dev.yaml` and `frontend/src/lib/demo-units.generated.ts` are
-   exactly what `tools/gen_dev_curriculum.py` produces. Hand-editing one of the
-   four without the others is the drift this exists to catch.
+   `curriculum/slo.dev.yaml` and `curriculum/units.dev.yaml` are exactly what
+   `tools/gen_dev_curriculum.py` produces. Hand-editing one of them without the
+   others is the drift this exists to catch. (The frontend's generated demo
+   unit file is gone: dev now serves its demo units from `units.dev.yaml`.)
 
 2. CONSISTENCY. The dev majors taxonomy, the dev coverage map and the dev task
    tree reconcile under the SAME rules `tools/validate_tasks.py` applies to the
@@ -61,7 +62,6 @@ def test_committed_dev_curriculum_is_freshly_generated(tmp_path):
     gen.write_tasks(tasks_dir)
     gen.write_majors_dev(tmp_path / "majors.dev.yaml")
     gen.write_slo_dev(tmp_path / "slo.dev.yaml")
-    gen.write_demo_units_ts(tmp_path / "demo-units.generated.ts")
     gen.write_units_dev(tmp_path / "units.dev.yaml")
 
     stale = []
@@ -82,10 +82,6 @@ def test_committed_dev_curriculum_is_freshly_generated(tmp_path):
         (tmp_path / "majors.dev.yaml", REPO / "curriculum" / "majors.dev.yaml"),
         (tmp_path / "slo.dev.yaml", REPO / "curriculum" / "slo.dev.yaml"),
         (tmp_path / "units.dev.yaml", REPO / "curriculum" / "units.dev.yaml"),
-        (
-            tmp_path / "demo-units.generated.ts",
-            REPO / "frontend" / "src" / "lib" / "demo-units.generated.ts",
-        ),
     ]
     for gen_file, com_file in pairs:
         if not com_file.is_file() or _read(gen_file) != _read(com_file):

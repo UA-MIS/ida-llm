@@ -23,7 +23,10 @@ export type RunStatus =
    *  survivors; `error_count` says how many are missing. */
   | "partial"
   /** The run measured nothing: setup failed, or every sample errored. */
-  | "failed";
+  | "failed"
+  /** Stopped by an admin before it finished. Terminal; never evidence on the
+   *  leaderboard. Any answers already received are kept and shown as partial. */
+  | "cancelled";
 
 export type TaskKind = "verifiable" | "subjective";
 
@@ -405,6 +408,25 @@ export interface CurriculumView {
   majors: MajorView[];
   /** Coverage courses no single major owns. Reachable, just not drilled into. */
   unassigned_core: UnassignedCourseView[];
+  /**
+   * Each class's units, in course order, keyed by course code (admin-console
+   * design §4.5). Served from the same configuration the admin console edits;
+   * it replaced the hardcoded `TAXONOMY` that used to live in `lib/units.ts`.
+   * A class with no units has NO key; see the helpers in `lib/units.ts`.
+   */
+  units: Record<string, UnitView[]>;
+}
+
+/** One unit of one class as the API serves it. Same field names as `ClassUnit`. */
+export interface UnitView {
+  key: string;
+  n: number;
+  title: string;
+  covers: string[];
+  blurb: string;
+  families: string[];
+  source: string | null;
+  caveat: string | null;
 }
 
 /**

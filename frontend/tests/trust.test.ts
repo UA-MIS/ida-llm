@@ -181,6 +181,7 @@ const CURRICULUM: CurriculumView = {
   coverage: [],
   majors: [],
   unassigned_core: [],
+  units: {},
 };
 
 const NO_CURRICULUM: CurriculumView = {
@@ -193,6 +194,7 @@ const NO_CURRICULUM: CurriculumView = {
   coverage: [],
   majors: [],
   unassigned_core: [],
+  units: {},
 };
 
 function task(overrides: Partial<TaskLeaderboard> = {}): TaskLeaderboard {

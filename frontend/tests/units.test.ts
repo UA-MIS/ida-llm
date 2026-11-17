@@ -23,6 +23,26 @@ import {
   unitTitle,
   unitsFor,
 } from "@/lib/units";
+import type { UnitView } from "@/lib/types";
+
+import DEMO_SNAPSHOT from "./fixtures/units-taxonomy-demo.snapshot.json";
+import SNAPSHOT from "./fixtures/units-taxonomy.snapshot.json";
+
+/**
+ * ⚠ THE TAXONOMY IS SERVED NOW, NOT HARDCODED (admin-console design §4.5).
+ * These tests used to read the `TAXONOMY` constant in `lib/units.ts`. They now
+ * read the frozen snapshot of that constant (`tests/fixtures/*.snapshot.json`,
+ * written before it was deleted; the backend's `test_units.py` pins
+ * `curriculum/units.yaml` to the same snapshot), shaped exactly as
+ * `CurriculumView.units` serves it: absent `source`/`caveat` become `null`.
+ * Every assertion below is the one that held against the old constant.
+ */
+type Snapshot = Record<string, Array<Omit<UnitView, "source" | "caveat"> & { source?: string; caveat?: string }>>;
+const served = (snap: Snapshot): Record<string, UnitView[]> =>
+  Object.fromEntries(Object.entries(snap).map(([course, units]) => [course, units.map((u) => ({ ...u, source: u.source ?? null, caveat: u.caveat ?? null }))]));
+const TAX = { units: served(SNAPSHOT as Snapshot) };
+/** What dev serves (`units.dev.yaml`): the real classes plus the demo ones. */
+const DEV_TAX = { units: served(DEMO_SNAPSHOT as Snapshot) };
 
 /** The families authored for MIS 200, per `tasks/mis200-*` and `majors.yaml`. */
 const MIS200_FAMILIES = [
@@ -49,9 +69,9 @@ const MIS200_UNIT_FAMILIES = [
 ];
 
 describe("every class's unit taxonomy", () => {
-  for (const course of coursesWithUnits()) {
+  for (const course of coursesWithUnits(TAX)) {
     describe(course, () => {
-      const units = unitsFor(course);
+      const units = unitsFor(TAX, course);
 
       it("has at least one unit", () => {
         expect(units.length).toBeGreaterThan(0);
@@ -109,12 +129,12 @@ describe("MIS 200 specifically", () => {
   const CLS = "MIS 200";
 
   it("is a class with a taxonomy", () => {
-    expect(hasUnits(CLS)).toBe(true);
-    expect(hasUnits("MIS 221")).toBe(false);
+    expect(hasUnits(TAX, CLS)).toBe(true);
+    expect(hasUnits(TAX, "MIS 221")).toBe(false);
   });
 
   it("breaks into five units in course order", () => {
-    expect(unitsFor(CLS).map((u) => u.title)).toEqual([
+    expect(unitsFor(TAX, CLS).map((u) => u.title)).toEqual([
       "Information systems & business models",
       "Competitive strategy with IS",
       "Spreadsheets & data analysis",
@@ -124,7 +144,7 @@ describe("MIS 200 specifically", () => {
   });
 
   it("references only families that were actually authored for the course", () => {
-    for (const u of unitsFor(CLS)) {
+    for (const u of unitsFor(TAX, CLS)) {
       for (const family of u.families) {
         expect(MIS200_FAMILIES, `${u.key} references an unknown family ${family}`).toContain(family);
       }
@@ -132,7 +152,7 @@ describe("MIS 200 specifically", () => {
   });
 
   it("claims every exam-content family in exactly one unit", () => {
-    const covered = unitsFor(CLS).flatMap((u) => u.families);
+    const covered = unitsFor(TAX, CLS).flatMap((u) => u.families);
     for (const family of MIS200_UNIT_FAMILIES) {
       expect(covered, `no unit claims ${family}`).toContain(family);
     }
@@ -143,48 +163,48 @@ describe("MIS 200 specifically", () => {
     // view non-empty) but is not one of Exam 1's content areas, so no unit
     // claims it — a class family may live in at most one unit, not necessarily
     // in one. See the header of `@/lib/units` and the mapping doc §6.
-    const covered = unitsFor(CLS).flatMap((u) => u.families);
+    const covered = unitsFor(TAX, CLS).flatMap((u) => u.families);
     expect(covered, "the SLO1 extension must not be a unit").not.toContain(
       "mis200-is-problem-solving",
     );
   });
 
   it("maps Unit 1 to the IS-concepts breadth family", () => {
-    expect(findUnit(CLS, "information-systems-business-models")!.families).toEqual([
+    expect(findUnit(TAX, CLS, "information-systems-business-models")!.families).toEqual([
       "mis200-is-concepts",
     ]);
   });
 
   it("maps Unit 2 to the competitive-strategy family, scorable and with no caveat", () => {
-    const unit = findUnit(CLS, "competitive-strategy-with-is")!;
+    const unit = findUnit(TAX, CLS, "competitive-strategy-with-is")!;
     expect(unit.n).toBe(2);
     expect(unit.families).toEqual(["mis200-competitive-strategy"]);
     // The competitive-strategy family is an honest adaptation of the exam's own
     // competitive-strategy section, so — unlike the SLO1 extension it replaces —
     // it needs no synthetic-extension caveat.
-    expect(unit.caveat).toBeUndefined();
+    expect(unit.caveat).toBeNull();
     expect(unit.source, "a scorable unit names its source").toBeTruthy();
   });
 
   it("maps Unit 3 to the spreadsheet family", () => {
-    expect(findUnit(CLS, "spreadsheets-data-analysis")!.families).toEqual([
+    expect(findUnit(TAX, CLS, "spreadsheets-data-analysis")!.families).toEqual([
       "mis200-spreadsheet-formulas",
     ]);
   });
 
   it("maps Unit 4 to platform economics and Unit 5 to levels of IS use", () => {
-    expect(findUnit(CLS, "platform-network-economics")!.families).toEqual([
+    expect(findUnit(TAX, CLS, "platform-network-economics")!.families).toEqual([
       "mis200-platform-network",
     ]);
-    expect(findUnit(CLS, "levels-of-is-use")!.families).toEqual([
+    expect(findUnit(TAX, CLS, "levels-of-is-use")!.families).toEqual([
       "mis200-levels-of-is-use",
     ]);
   });
 
   it("resolves a title case-insensitively and falls back to the raw key", () => {
-    expect(unitTitle(CLS, "spreadsheets-data-analysis")).toBe("Spreadsheets & data analysis");
-    expect(unitTitle(CLS, "SPREADSHEETS-DATA-ANALYSIS")).toBe("Spreadsheets & data analysis");
-    expect(unitTitle(CLS, "nonsense")).toBe("nonsense");
+    expect(unitTitle(TAX, CLS, "spreadsheets-data-analysis")).toBe("Spreadsheets & data analysis");
+    expect(unitTitle(TAX, CLS, "SPREADSHEETS-DATA-ANALYSIS")).toBe("Spreadsheets & data analysis");
+    expect(unitTitle(TAX, CLS, "nonsense")).toBe("nonsense");
   });
 });
 
@@ -192,8 +212,8 @@ describe("OM 300 specifically", () => {
   const CLS = "OM 300";
 
   it("is a class with a taxonomy of four units, one per exam, in course order", () => {
-    expect(hasUnits(CLS)).toBe(true);
-    expect(unitsFor(CLS).map((u) => u.title)).toEqual([
+    expect(hasUnits(TAX, CLS)).toBe(true);
+    expect(unitsFor(TAX, CLS).map((u) => u.title)).toEqual([
       "Strategy, productivity & forecasting",
       "Project management & quality control",
       "Inventory & lean operations",
@@ -202,7 +222,7 @@ describe("OM 300 specifically", () => {
   });
 
   it("maps each unit to exactly its own exam's family", () => {
-    expect(unitsFor(CLS).map((u) => u.families)).toEqual([
+    expect(unitsFor(TAX, CLS).map((u) => u.families)).toEqual([
       ["om300-exam1-ops-forecasting"],
       ["om300-exam2-project-quality-spc"],
       ["om300-exam3-inventory-eoq-lean"],
@@ -211,15 +231,43 @@ describe("OM 300 specifically", () => {
   });
 
   it("titles Unit 4 as the cumulative final, with no synthetic-extension caveat", () => {
-    const unit = findUnit(CLS, "cumulative-final")!;
+    const unit = findUnit(TAX, CLS, "cumulative-final")!;
     expect(unit.n).toBe(4);
-    expect(unit.caveat).toBeUndefined();
+    expect(unit.caveat).toBeNull();
   });
 
   it("shares no family with MIS 200", () => {
-    const mine = new Set(unitsFor(CLS).flatMap((u) => u.families));
-    for (const family of unitsFor("MIS 200").flatMap((u) => u.families)) {
+    const mine = new Set(unitsFor(TAX, CLS).flatMap((u) => u.families));
+    for (const family of unitsFor(TAX, "MIS 200").flatMap((u) => u.families)) {
       expect(mine.has(family)).toBe(false);
+    }
+  });
+});
+
+describe("the served taxonomy", () => {
+  it("treats a response with no units, or a class with no key, as having no units yet", () => {
+    expect(unitsFor(undefined, "MIS 200")).toEqual([]);
+    expect(unitsFor({} as { units: Record<string, UnitView[]> }, "MIS 200")).toEqual([]);
+    expect(hasUnits(TAX, "MIS 221")).toBe(false);
+    expect(unitTitle(null, "MIS 200", "intro")).toBe("intro");
+    expect(coursesWithUnits(undefined)).toEqual([]);
+  });
+
+  it("dev's set adds demo classes but serves MIS 200 and OM 300 exactly as the real set does", () => {
+    expect(unitsFor(DEV_TAX, "MIS 200")).toEqual(unitsFor(TAX, "MIS 200"));
+    expect(unitsFor(DEV_TAX, "OM 300")).toEqual(unitsFor(TAX, "OM 300"));
+    expect(coursesWithUnits(DEV_TAX).length).toBeGreaterThan(coursesWithUnits(TAX).length);
+  });
+
+  it("keeps the partition across the dev set too: one family, one unit", () => {
+    const owner = new Map<string, string>();
+    for (const course of coursesWithUnits(DEV_TAX)) {
+      for (const u of unitsFor(DEV_TAX, course)) {
+        for (const f of u.families) {
+          expect(owner.get(f), `${f} is in two units`).toBeUndefined();
+          owner.set(f, `${course}/${u.key}`);
+        }
+      }
     }
   });
 });

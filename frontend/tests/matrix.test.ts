@@ -120,6 +120,7 @@ const CURRICULUM: CurriculumView = {
   coverage: [],
   majors: [],
   unassigned_core: [],
+  units: {},
 };
 
 function board(tasks: TaskLeaderboard[]): LeaderboardResponse {
