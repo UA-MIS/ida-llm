@@ -148,6 +148,7 @@ def execute_job(
     record.started_at = utcnow()
     record.serving_config = serving
 
+    cancel = CancelCheck(session_factory, record.id)
     try:
         eval_log = run_task(
             task=spec,
@@ -161,6 +162,7 @@ def execute_job(
             completion_cache=completion_cache,
             client_factory=client_factory,
             judge=judge,
+            should_cancel=cancel,
         )
     except Exception as exc:  # setup-level failure: the whole run is bad
         log.exception("run %s failed during execution", record.id)
@@ -182,6 +184,10 @@ def execute_job(
     record.total_usage = total_usage
     record.total_cost_usd = sum(r.cost_usd for r in eval_log.results)
     record.error = eval_log.error
+    if eval_log.status is RunStatus.CANCELLED:
+        # Money already spent is still recorded above (usage, cost, results);
+        # the reason names who stopped it, from the cancel request itself.
+        record.error = f"{cancel.reason or 'cancelled'}; {eval_log.error}"
     record.started_at = eval_log.started_at
     record.finished_at = eval_log.finished_at
 
@@ -199,6 +205,52 @@ def execute_job(
         record.mean_score,
     )
     return record
+
+
+CANCEL_POLL_S = 5.0
+"""How often (at most) a running job asks the database whether it was
+cancelled: one cheap query per job per 5 s, never one per sample."""
+
+
+class CancelCheck:
+    """``should_cancel`` for :func:`ida_harness.runner.run_task` (AD-12).
+
+    Reads ``runs.cancel_requested_at``, throttled to one query per
+    :data:`CANCEL_POLL_S`.  The cancel endpoint writes the reason ("cancel
+    requested by <login>") into ``runs.error`` at the same time, which becomes
+    ``cancelled by <login>`` on the finished row."""
+
+    def __init__(self, session_factory, run_id: str, *, clock=time.monotonic) -> None:
+        self._session_factory = session_factory
+        self._run_id = run_id
+        self._clock = clock
+        self._checked_at = float("-inf")
+        self.requested = False
+        self.reason: str | None = None
+
+    def __call__(self) -> bool:
+        if self.requested:
+            return True
+        now = self._clock()
+        if now - self._checked_at < CANCEL_POLL_S:
+            return False
+        self._checked_at = now
+        try:
+            with session_scope(self._session_factory) as session:
+                row = get_run(session, self._run_id)
+                if row is not None and row.cancel_requested_at is not None:
+                    self.requested = True
+                    text = row.error or ""
+                    self.reason = (
+                        text.replace("cancel requested by", "cancelled by", 1)
+                        if text.startswith("cancel requested by")
+                        else "cancelled by an admin"
+                    )
+        except Exception:
+            # A database blip must not kill a paid-for run; it is checked
+            # again on the next sample.
+            log.exception("run %s: could not check for a cancel request", self._run_id)
+        return self.requested
 
 
 def _fail_run(session_factory, record: RunRecord, error: str) -> RunRecord:

@@ -3,15 +3,24 @@ backup of what it holds."""
 
 from __future__ import annotations
 
+import io
+import zipfile
+
+import yaml
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
+from sqlalchemy import select
 
-from ida_api.admin.deps import Admin, not_implemented
+from ida_api.admin.deps import Admin
 from ida_api.admin.material import TASKS_SPEC_GATED
 from ida_api.admin.schemas import SystemGuards, SystemInfo
+from ida_api.admin.service import admin_write, require_db_config
 from ida_api.deps import AppContext, get_context
+from ida_core.configdb import reader
 from ida_core.configdb.reader import current_revision
+from ida_core.configdb.tables import TaskFamilyRow
 from ida_core.db import session_scope
+from ida_core.units import units_document
 
 router = APIRouter(tags=["admin: system"])
 
@@ -58,9 +67,64 @@ def _current_revision(ctx: AppContext):
     responses={200: {"content": {"application/zip": {}}, "description": "the live config"}},
 )
 def export_config(
-    _: Admin,
+    admin: Admin,
     include_private: bool = Query(False, description="Include private families (audited)."),
+    ctx: AppContext = Depends(get_context),
 ) -> Response:
-    """A zip of the live config as YAML, for backup and for pulling admin edits
-    back into a dev fixture.  Private families only on request, and audited."""
-    raise not_implemented("GET /admin/export")
+    """A zip of the live config as YAML -- ``models.yaml``, ``tasks/<family>/
+    <name>.yaml``, ``curriculum/{slo,majors,units}.yaml`` -- for backup and for
+    pulling admin edits back into a dev fixture.
+
+    ``private`` families are left out unless ``include_private=true``: that
+    material must never reach the public repo by accident.  Every export is
+    audited (``config.export``), with whether private material was included."""
+    require_db_config(ctx)
+    buffer = io.BytesIO()
+    with session_scope(ctx.session_factory) as session:
+        private = set(
+            session.scalars(select(TaskFamilyRow.key).where(TaskFamilyRow.provenance == "private"))
+        )
+        tasks = [
+            (task_id, doc)
+            for task_id, doc in reader.task_documents(session)
+            if include_private or task_id.split("/", 1)[0] not in private
+        ]
+        files = {
+            "models.yaml": reader.models_document(session),
+            "curriculum/slo.yaml": reader.slo_document(session),
+            "curriculum/majors.yaml": reader.majors_document(session),
+            "curriculum/units.yaml": units_document(reader.units(session)),
+        }
+        revision, _ = current_revision(session)
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, doc in files.items():
+            if doc is not None:
+                archive.writestr(name, _yaml(doc))
+        for task_id, doc in tasks:
+            archive.writestr(f"tasks/{task_id}.yaml", _yaml(doc))
+    with admin_write(
+        ctx,
+        admin,
+        action="config.export",
+        entity_type="config",
+        entity_id=str(revision),
+        summary="export",
+        bumps_revision=False,
+    ) as w:
+        w.after = {
+            "include_private": include_private,
+            "tasks": len(tasks),
+            "private_families_excluded": [] if include_private else sorted(private),
+        }
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="ida-llm-config-r{revision}.zip"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+def _yaml(document) -> str:
+    return yaml.safe_dump(document, sort_keys=False, allow_unicode=True, width=100)

@@ -42,7 +42,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from sqlalchemy import text
 
-from ida_api import __version__
+from ida_api import __version__, runs_service
 from ida_api.admin import admin_router
 from ida_api.admin.deps import admin_validation_error_handler
 from ida_api.auth import Principal, current_principal, validate_auth_config
@@ -74,18 +74,14 @@ from ida_core import artifacts as artifact_paths
 from ida_core.configdb.crypto import parse_kek
 from ida_core.contracts import (
     RunDetail,
-    RunJobMessage,
-    RunRecord,
     RunRequest,
     RunStatus,
 )
-from ida_core.db import session_scope, utcnow
+from ida_core.db import session_scope
 from ida_core.gitmeta import build_identity, current_git_sha
-from ida_core.ids import new_id, new_run_id
 from ida_core.repositories import (
     count_results_for_run,
     count_runs,
-    create_run,
     get_run,
     list_results_for_run,
     list_runs,
@@ -386,85 +382,17 @@ def create_app(context: AppContext | None = None) -> FastAPI:
         runner and much harder to reason about.
         """
         principal.require_role("runner")
-
-        for task_id in request.task_ids:
-            if task_id not in ctx.catalog:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, f"no task {task_id!r}")
-        for model_key in request.model_keys:
-            try:
-                entry = ctx.registry.get(model_key)
-            except KeyError:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, f"no model {model_key!r}") from None
-            if not entry.enabled:
-                raise HTTPException(status.HTTP_409_CONFLICT, f"model {model_key!r} is disabled")
-
-        now = utcnow()
-        # One sweep id for the whole cross product (B9). Without it, "show me
-        # the comparison table for the sweep I just launched" is a string match
-        # on a nullable free-text label.
-        sweep_id = new_id("swp")
-        records: list[RunRecord] = []
-        messages: list[RunJobMessage] = []
-        for task_id in request.task_ids:
-            spec = ctx.catalog.get(task_id)
-            for model_key in request.model_keys:
-                run_id = new_run_id()
-                records.append(
-                    RunRecord(
-                        id=run_id,
-                        status=RunStatus.QUEUED,
-                        task_id=task_id,
-                        model_key=model_key,
-                        label=request.label,
-                        sweep_id=sweep_id,
-                        task_git_sha=ctx.git_sha,
-                        task_content_sha=spec.content_sha or None,
-                        harness_version=HARNESS_VERSION,
-                        sample_count=len(spec.samples),
-                        created_at=now,
-                    )
-                )
-                messages.append(
-                    RunJobMessage(
-                        run_id=run_id,
-                        task_id=task_id,
-                        model_key=model_key,
-                        sweep_id=sweep_id,
-                        sampling_override=request.sampling_override,
-                        enqueued_at=now,
-                    )
-                )
-
-        with session_scope(ctx.session_factory) as session:
-            for record in records:
-                create_run(session, record)
-
-        # Rows are committed above, before any message is pushed -- see the
-        # docstring. If a push fails partway we report how many actually landed
-        # rather than pretending all of them did; the un-pushed runs stay
-        # `queued` and are visibly re-drivable.
-        queued = 0
-        for message in messages:
-            try:
-                ctx.queue.enqueue(message)
-                queued += 1
-            except Exception:
-                log.exception(
-                    "queue push failed for run %s; %d of %d landed",
-                    message.run_id,
-                    queued,
-                    len(messages),
-                )
-                break
-
-        log.info(
-            "sweep %s: enqueued %d/%d run(s) for principal %s",
-            sweep_id,
-            queued,
-            len(records),
-            principal.subject,
+        # The body lives in ida_api.runs_service so the admin console's launch
+        # runs the identical code path (validation, ordering, accounting).
+        return runs_service.enqueue(
+            ctx,
+            task_ids=request.task_ids,
+            model_keys=request.model_keys,
+            label=request.label,
+            sampling_override=request.sampling_override,
+            harness_version=HARNESS_VERSION,
+            principal_subject=principal.subject,
         )
-        return EnqueueResponse(sweep_id=sweep_id, runs=records, queued=queued)
 
     @app.get("/runs", response_model=RunListResponse, tags=["runs"])
     def get_runs(
