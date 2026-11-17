@@ -10,12 +10,16 @@
  * rules are only the few the tests exercise.
  */
 
-import type { AdminModel, AdminModelInput, Credential, Issue, ModelFamily } from "@/lib/admin/types";
+import type { AdminModel, AdminModelInput, AdminTask, Credential, Issue, ModelFamily, TaskDocument, TaskFamily } from "@/lib/admin/types";
 
 export interface FakeState {
   models: AdminModel[];
   families: ModelFamily[];
   credentials: Credential[];
+  taskFamilies: TaskFamily[];
+  tasks: AdminTask[];
+  /** Raw upload bodies that were committed (the fake's "MinIO"). */
+  stored: string[];
   /** Every key ever sent to POST/PUT credentials. Tests assert it never renders. */
   receivedSecrets: string[];
 }
@@ -59,11 +63,38 @@ export function sampleModel(over: Partial<AdminModel> = {}): AdminModel {
   };
 }
 
+export function sampleTaskFamily(over: Partial<TaskFamily> = {}): TaskFamily {
+  return { key: "quiz", title: "Quiz", description: "", provenance: "synthetic", task_count: 1, sample_count: 2, classes: [], unit: null, archived_at: null, version: 1, ...over };
+}
+
+export function sampleTask(over: Partial<AdminTask> = {}): AdminTask {
+  const document: TaskDocument = {
+    version: 1,
+    id: "quiz/l1-add",
+    title: "Adding",
+    kind: "verifiable",
+    system_prompt: "Answer with a number.",
+    scorer: { kind: "numeric_match", tolerance: 0.01, normalisation: { strip: true } },
+    tags: ["quiz"],
+    samples: [
+      { id: "q1", input: "2+2?", target: "4" },
+      { id: "q2", input: "3+4?", target: "7", metadata: { skill: "addition" } },
+    ],
+  };
+  return {
+    id: "quiz/l1-add", family_key: "quiz", title: "Adding", kind: "verifiable", sample_count: 2, content_sha: "abc", source: "yaml_seed",
+    updated_at: "2026-11-17T12:00:00Z", updated_by: null, archived_at: null, version: 1, document, issues: [], ...over,
+  };
+}
+
 export function createFakeAdminApi(seed: Partial<FakeState> = {}) {
   const state: FakeState = {
     models: seed.models ?? [sampleModel()],
     families: seed.families ?? [],
     credentials: seed.credentials ?? [],
+    taskFamilies: seed.taskFamilies ?? [sampleTaskFamily()],
+    tasks: seed.tasks ?? [sampleTask()],
+    stored: [],
     receivedSecrets: [],
   };
   const calls: FakeCall[] = [];
@@ -179,7 +210,102 @@ export function createFakeAdminApi(seed: Partial<FakeState> = {}) {
       }
     }
 
+    if (resource === "task-families") {
+      if (method === "GET") return json(200, state.taskFamilies);
+      if (method === "POST") {
+        const input = body as TaskFamily;
+        const fam = sampleTaskFamily({ ...input, task_count: 0, sample_count: 0 });
+        state.taskFamilies.push(fam);
+        return json(201, fam);
+      }
+      const f = state.taskFamilies.find((x) => x.key === id);
+      if (!f) return problem(404, "not_found", "No such family.");
+      const stale = checkVersion(ifMatch, f);
+      if (stale) return stale;
+      if (method === "PUT") {
+        if ((body as TaskFamily).provenance === "private") {
+          return problem(422, "validation_failed", "Family failed validation", { issues: [{ path: "provenance", message: "private needs B6", severity: "error" }] });
+        }
+        return json(200, Object.assign(f, body, { version: f.version + 1 }));
+      }
+      if (method === "DELETE") {
+        if (f.classes.length) return problem(409, "conflict", `The family is used by ${f.classes.join(", ")}.`);
+        f.archived_at = "2026-11-17T13:00:00Z";
+        return json(204, undefined);
+      }
+    }
+
+    if (resource === "tasks") {
+      if (method === "GET" && !id) {
+        return json(200, state.tasks.map((t) => {
+          const summary: Partial<AdminTask> = { ...t };
+          delete summary.document;
+          delete summary.issues;
+          return summary;
+        }));
+      }
+      if (method === "POST" && id === "validate") {
+        const yaml = (body as { yaml?: string }).yaml ?? "";
+        if (yaml.includes("BROKEN")) return json(200, { ok: false, issues: [{ path: "line 3, col 1", message: "could not parse", severity: "error" }] });
+        return json(200, { ok: true, issues: [], sample_count: 2, content_sha: "def" });
+      }
+      if (method === "POST" && !id) {
+        const doc = (body as { document: TaskDocument }).document;
+        const issues: Issue[] = [];
+        if (doc.samples?.[0]?.target === "leak") issues.push({ path: "samples[0].target", message: "target leaks into metadata", severity: "error" });
+        if (String(doc.tags).includes("slo:typo")) issues.push({ path: "tags[1]", message: "unknown slo tag", severity: "error" });
+        if (issues.length) return problem(422, "validation_failed", "Task failed validation", { issues });
+        const task = sampleTask({ id: doc.id, family_key: doc.id.split("/")[0]!, title: doc.title, document: doc, source: "form", sample_count: doc.samples.length });
+        state.tasks.push(task);
+        return json(201, task);
+      }
+      // Task ids contain "/": everything up to an optional "samples" segment is the id.
+      const at = seg.indexOf("samples", 1);
+      const taskId = seg.slice(1, at < 0 ? undefined : at).join("/");
+      const sampleId = at < 0 ? undefined : seg[at + 1];
+      const t = state.tasks.find((x) => x.id === taskId);
+      if (!t) return problem(404, "not_found", "No such task.");
+      if (method === "GET" && at < 0) return json(200, t);
+      const stale = checkVersion(ifMatch, t);
+      if (stale) return stale;
+      const bump = (doc: TaskDocument) => {
+        Object.assign(t, { document: doc, version: t.version + 1, sample_count: doc.samples.length, title: doc.title });
+        return json(200, t);
+      };
+      if (at < 0 && method === "PUT") return bump((body as { document: TaskDocument }).document);
+      if (at < 0 && method === "DELETE") {
+        t.archived_at = "2026-11-17T13:00:00Z";
+        return json(204, undefined);
+      }
+      const sample = (body as { sample?: TaskDocument["samples"][number] } | undefined)?.sample;
+      if (sample && t.kind === "verifiable" && !sample.target) {
+        return problem(422, "validation_failed", "Task failed validation", { issues: [{ path: "samples[2].target", message: "verifiable sample needs a target", severity: "error" }] });
+      }
+      if (method === "POST") return bump({ ...t.document, samples: [...t.document.samples, sample!] });
+      if (method === "PUT") return bump({ ...t.document, samples: t.document.samples.map((s) => (s.id === sampleId ? sample! : s)) });
+      if (method === "DELETE") return bump({ ...t.document, samples: t.document.samples.filter((s) => s.id !== sampleId) });
+    }
+
     return problem(501, "not_implemented", "Not in the fake.");
+  }
+
+  async function upload(form: FormData): Promise<Response> {
+    const file = form.get("file") as Blob;
+    // jsdom's Blob has no .text(); FileReader works in both jsdom and browsers.
+    const text = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.readAsText(file);
+    });
+    const commit = form.get("commit") === "true";
+    calls.push({ method: "POST", path: "/material/upload", ifMatch: null, body: { mode: form.get("mode"), commit, text } });
+    if (text.includes("BROKEN")) return json(200, { ok: false, committed: false, issues: [{ path: "line 3, col 1", message: "could not parse", severity: "error" }] });
+    if (commit) state.stored.push(text);
+    const task = state.tasks[0]!;
+    return json(200, {
+      ok: true, committed: commit, issues: [], sample_count: 2, content_sha: "def",
+      task: { ...task, document: undefined }, diff: { samples_added: 1, samples_removed: 0, samples_changed: 2 },
+    });
   }
 
   const fetch = async (input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> => {
@@ -188,6 +314,7 @@ export function createFakeAdminApi(seed: Partial<FakeState> = {}) {
     const path = url.pathname.slice("/admin/api".length);
     const headers = new Headers(init.headers);
     const method = (init.method ?? "GET").toUpperCase();
+    if (init.body instanceof FormData) return upload(init.body);
     const body = typeof init.body === "string" && init.body ? JSON.parse(init.body) : undefined;
     calls.push({ method, path, ifMatch: headers.get("if-match"), body });
     return handle(method, path, headers.get("if-match"), body);
