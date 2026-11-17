@@ -62,6 +62,7 @@ def test_committed_dev_curriculum_is_freshly_generated(tmp_path):
     gen.write_majors_dev(tmp_path / "majors.dev.yaml")
     gen.write_slo_dev(tmp_path / "slo.dev.yaml")
     gen.write_demo_units_ts(tmp_path / "demo-units.generated.ts")
+    gen.write_units_dev(tmp_path / "units.dev.yaml")
 
     stale = []
     # task files
@@ -80,6 +81,7 @@ def test_committed_dev_curriculum_is_freshly_generated(tmp_path):
     pairs = [
         (tmp_path / "majors.dev.yaml", REPO / "curriculum" / "majors.dev.yaml"),
         (tmp_path / "slo.dev.yaml", REPO / "curriculum" / "slo.dev.yaml"),
+        (tmp_path / "units.dev.yaml", REPO / "curriculum" / "units.dev.yaml"),
         (
             tmp_path / "demo-units.generated.ts",
             REPO / "frontend" / "src" / "lib" / "demo-units.generated.ts",

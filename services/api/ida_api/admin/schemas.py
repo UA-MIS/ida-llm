@@ -157,9 +157,9 @@ class ModelFamilyUpdate(_Input):
 # ─────────────────────────────────────────────────────────────── models ──
 
 
-MODEL_KEY_PATTERN = r"^[a-z0-9][a-z0-9._-]*$"
-"""Registry keys: lower-case, digits, ``.``, ``_``, ``-``. Every key in
-``models.yaml`` already fits; enforcing it keeps keys URL-safe."""
+MODEL_KEY_PATTERN = r"^[a-z0-9][a-z0-9-]{0,63}$"
+"""Registry keys -- the SAME pattern ``models.schema.json`` enforces on
+``models.yaml``, so a key the console accepts is a key the registry accepts."""
 
 
 class AdminModelInput(_Input):

@@ -1,3 +1,6 @@
+# ⚠ Deployed environments with IDA_CONFIG_SOURCE=db are edited at /admin; this file
+# seeds a fresh database and drives local dev and CI. (Admin console, AD-6.)
+#
 # The model registry (D-13 -- the reproducibility decision;
 # the D-1..D-12 entries in the decision log are empty stubs).
 #

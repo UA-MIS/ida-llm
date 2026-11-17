@@ -174,6 +174,19 @@ class Settings(BaseSettings):
     Same dev-only override rationale as :attr:`majors_file`.
     """
 
+    units_file: str = ""
+    """Path to ``curriculum/units.yaml``.  Empty -> the default under the repo root.
+
+    Dev points it at ``curriculum/units.dev.yaml`` (real + demo classes), the
+    same dev-only override pattern as :attr:`majors_file`."""
+
+    config_refresh_s: float = 5.0
+    """How often (at most) a process in ``config_source=db`` asks Postgres for the
+    current config revision, rebuilding its snapshot when it moved (AD-9).
+
+    No restart, no pub/sub: an admin edit is live everywhere within this many
+    seconds, at the cost of one ``SELECT max(id)`` per process per interval."""
+
     runner_poll_timeout_s: int = 5
     """How long the runner blocks on the queue before re-checking for shutdown."""
 
@@ -535,6 +548,12 @@ class Settings(BaseSettings):
     def resolved_curriculum_file(self) -> Path | None:
         """The curriculum map override, or ``None`` to use the default location."""
         return Path(self.curriculum_file) if self.curriculum_file else None
+
+    def resolved_units_file(self) -> Path:
+        """The unit taxonomy: the override, else ``repo_root()/curriculum/units.yaml``."""
+        return (
+            Path(self.units_file) if self.units_file else repo_root() / "curriculum" / "units.yaml"
+        )
 
 
 def get_settings() -> Settings:

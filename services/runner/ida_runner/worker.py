@@ -71,6 +71,7 @@ from ida_core.repositories import (
     run_row_to_record,
 )
 from ida_harness.cache import CompletionCache
+from ida_harness.config_provider import ConfigProvider
 from ida_harness.judge import LLMJudge
 from ida_harness.runner import effective_serving_config, run_task
 from ida_harness.tasks import TaskCatalog
@@ -240,8 +241,16 @@ class Worker:
         reaper: Reaper | None = None,
         reaper_interval_s: float = 60.0,
         heartbeat_interval_s: float = 30.0,
+        config: ConfigProvider | None = None,
     ) -> None:
         self._queue = queue
+        # When a provider is given (IDA_CONFIG_SOURCE=db), EACH JOB reads one
+        # snapshot from it -- so a model or task added at /admin is runnable
+        # without a runner restart, and a job never sees half of an edit (the
+        # registry and catalog it uses come from the same revision). Without
+        # one, the registry/catalog passed in are used for every job, exactly
+        # as before.
+        self._config = config
         self._session_factory = session_factory
         self._registry = registry
         self._catalog = catalog
@@ -351,12 +360,16 @@ class Worker:
         turns "this pod fell over" into "another pod picks it up" instead of
         "that run is gone and its row says ``running`` forever".
         """
+        registry, catalog = self._registry, self._catalog
         try:
+            if self._config is not None:
+                snapshot = self._config.snapshot()  # ONE snapshot per job
+                registry, catalog = snapshot.registry, snapshot.catalog
             record = execute_job(
                 message,
                 session_factory=self._session_factory,
-                registry=self._registry,
-                catalog=self._catalog,
+                registry=registry,
+                catalog=catalog,
                 artifact_store=self._artifact_store,
                 git_sha=self._git_sha,
                 completion_cache=self._completion_cache,

@@ -326,6 +326,50 @@ def write_slo_dev(path: pathlib.Path) -> None:
     )
 
 
+DEMO_UNIT_SOURCE = "Illustrative demonstration set"
+DEMO_UNIT_CAVEAT = (
+    "Illustrative demonstration data for a class that has not yet had its own "
+    "tasks authored. The items are synthetic placeholders and the scores are "
+    "seeded, not measured."
+)
+
+
+def demo_units() -> dict[str, list[dict]]:
+    """The demo classes' units, in ``curriculum/units.yaml``'s shape."""
+    out: dict[str, list[dict]] = {}
+    for course, units in DEMO_UNITS.items():
+        out[course] = [
+            {
+                "key": unit_key(title),
+                "n": n,
+                "title": title,
+                "covers": list(covers),
+                "blurb": blurb,
+                "families": [family(course, n)],
+                "source": DEMO_UNIT_SOURCE,
+                "caveat": DEMO_UNIT_CAVEAT,
+            }
+            for n, (title, covers, blurb, _slo) in enumerate(units, start=1)
+        ]
+    return out
+
+
+def write_units_dev(path: pathlib.Path) -> None:
+    """``curriculum/units.dev.yaml``: the REAL unit taxonomy plus the demo classes.
+
+    What the dev overlay points ``IDA_UNITS_FILE`` at, so the demo units arrive
+    by the same seed/load path majors do -- replacing the frontend merge of
+    ``demo-units.generated.ts`` (admin-console design 4.5). Real classes come
+    first and are copied verbatim; a demo entry never shadows a real class
+    (``test_dev_curriculum`` pins that MIS 200 and OM 300 have none)."""
+    doc = yaml.safe_load((REPO / "curriculum" / "units.yaml").read_text())
+    for course, units in demo_units().items():
+        doc["classes"].setdefault(course, units)
+    path.write_text(
+        GENERATED_BANNER + yaml.safe_dump(doc, sort_keys=False, allow_unicode=True, width=100)
+    )
+
+
 def write_demo_units_ts(path: pathlib.Path) -> None:
     """Emit the frontend demo unit taxonomy consumed by lib/units.ts (dev gate)."""
     lines = [
@@ -376,10 +420,12 @@ def main() -> int:
     families = write_tasks(tasks_dir)
     write_majors_dev(REPO / "curriculum" / "majors.dev.yaml")
     write_slo_dev(REPO / "curriculum" / "slo.dev.yaml")
+    write_units_dev(REPO / "curriculum" / "units.dev.yaml")
     write_demo_units_ts(REPO / "frontend" / "src" / "lib" / "demo-units.generated.ts")
     print(f"wrote {len(families)} demo task families under {tasks_dir}")
     print(
-        "wrote curriculum/majors.dev.yaml, curriculum/slo.dev.yaml, frontend demo-units.generated.ts"
+        "wrote curriculum/majors.dev.yaml, curriculum/slo.dev.yaml, curriculum/units.dev.yaml, "
+        "frontend demo-units.generated.ts"
     )
     return 0
 

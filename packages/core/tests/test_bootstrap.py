@@ -13,21 +13,24 @@ from sqlalchemy import inspect
 from sqlalchemy.exc import OperationalError
 
 from ida_core.bootstrap import bootstrap_schema, wait_for_database
-from ida_core.db import make_engine
+from ida_core.db import Base, make_engine
+
+ALL_TABLES = set(Base.metadata.tables)
+"""runs + results, plus the admin configuration tables (``ida_core.configdb``)."""
 
 
 class TestBootstrapSchema:
-    def test_creates_both_tables(self, tmp_path) -> None:
+    def test_creates_every_table(self, tmp_path) -> None:
         url = f"sqlite+pysqlite:///{tmp_path / 'boot.db'}"
         bootstrap_schema(url)
-        assert set(inspect(make_engine(url)).get_table_names()) == {"runs", "results"}
+        assert set(inspect(make_engine(url)).get_table_names()) == ALL_TABLES
 
     def test_is_idempotent(self, tmp_path) -> None:
         """`make dev` re-runs it on every stack start."""
         url = f"sqlite+pysqlite:///{tmp_path / 'boot.db'}"
         bootstrap_schema(url)
         bootstrap_schema(url)
-        assert set(inspect(make_engine(url)).get_table_names()) == {"runs", "results"}
+        assert set(inspect(make_engine(url)).get_table_names()) == ALL_TABLES
 
 
 class TestWaitForDatabase:

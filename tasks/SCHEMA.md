@@ -1,5 +1,9 @@
 # Authoring tasks
 
+> **Deployed environments with `IDA_CONFIG_SOURCE=db` are edited at `/admin`; this
+> tree seeds a fresh database and drives local dev and CI.** The rules below are the
+> same in both places: the admin console runs the same validators on every save.
+
 **This is the one page you need to author a task family for IDA-LLM.** It
 assumes you have never seen this repository before. Read it top to bottom the
 first time; after that, use the contents below and the

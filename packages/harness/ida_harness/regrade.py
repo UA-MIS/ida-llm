@@ -461,7 +461,6 @@ def main(argv: list[str] | None = None) -> int:
     """
     from ida_core.artifacts import LocalArtifactStore, S3ArtifactStore
     from ida_core.config import get_settings
-    from ida_core.registry import load_registry
     from ida_harness.judge import build_judge
 
     args = _build_parser().parse_args(argv)
@@ -481,8 +480,17 @@ def main(argv: list[str] | None = None) -> int:
             region=settings.s3_region,
         )
 
-    registry = load_registry(settings.resolved_models_file())
-    catalog = TaskCatalog.from_directory(settings.resolved_tasks_dir())
+    # The same config the api and runner serve: YAML, or the live tables.
+    from ida_core.db import make_engine, make_session_factory
+    from ida_harness.config_provider import build_provider
+
+    session_factory = (
+        make_session_factory(make_engine(settings.database_url))
+        if settings.config_source == "db"
+        else None
+    )
+    snapshot = build_provider(settings, session_factory).snapshot()
+    registry, catalog = snapshot.registry, snapshot.catalog
     judge_key_name = args.judge_model or settings.judge_model_key
 
     with build_judge(registry, judge_key_name) as judge:

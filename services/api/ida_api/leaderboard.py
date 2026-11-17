@@ -416,13 +416,22 @@ def _ordered_slos(boards: list[TaskLeaderboard], curriculum: CurriculumView) -> 
     return known + unknown
 
 
+def is_publicly_hidden(entry: ModelEntry, hide_tags: frozenset[str]) -> bool:
+    """Is ``entry`` withheld from the PUBLIC read API?
+
+    The ONE rule, two triggers: the per-model ``hidden`` switch (set from the
+    admin console) or a tag in ``IDA_PUBLIC_HIDE_TAGS`` (the test stub on
+    prod).  Every public read goes through :func:`hidden_model_keys`, which
+    goes through here, so the two can never be honoured in different places.
+    """
+    return entry.hidden or bool(hide_tags & {t.lower() for t in entry.tags})
+
+
 def hidden_model_keys(
     registry_models: list[ModelEntry], hide_tags: frozenset[str]
 ) -> frozenset[str]:
-    """Keys of the models carrying any of ``hide_tags`` (``IDA_PUBLIC_HIDE_TAGS``)."""
-    if not hide_tags:
-        return frozenset()
-    return frozenset(m.key for m in registry_models if hide_tags & {t.lower() for t in m.tags})
+    """Keys of the models :func:`is_publicly_hidden` withholds."""
+    return frozenset(m.key for m in registry_models if is_publicly_hidden(m, hide_tags))
 
 
 def build_leaderboard(

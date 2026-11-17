@@ -641,6 +641,12 @@ has no ``mean_score``, and showing it beside finished ones would put a blank
 next to a real number for a reason ("still going") that the reader would
 naturally misread as the reason the platform uses blanks everywhere else
 ("nothing was measured").
+
+⚠ ``cancelled`` IS TERMINAL BUT DELIBERATELY ABSENT (unlike
+``ida_core.contracts.TERMINAL_RUN_STATUSES``, which the worker uses to ack a
+re-delivery).  A cancelled run is an admin's decision, not a measurement; if it
+were read here, cancelling a re-run would replace the pair's last real score
+with a blank -- the newest-run rule would let a non-event shadow evidence.
 """
 
 

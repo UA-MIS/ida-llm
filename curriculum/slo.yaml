@@ -1,3 +1,6 @@
+# ⚠ Deployed environments with IDA_CONFIG_SOURCE=db are edited at /admin; this file
+# seeds a fresh database and drives local dev and CI. (Admin console, AD-6.)
+#
 # The BScBA Student Learning Outcomes, and which core course teaches each one.
 #
 # WHY THIS FILE EXISTS. Every task under `tasks/` that claims to measure a

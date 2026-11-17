@@ -309,6 +309,25 @@ class UnassignedCourseView(BaseModel):
     reason: str
 
 
+class UnitView(BaseModel):
+    """One unit of one class, as served (AD-11).
+
+    The same field names as the frontend's ``ClassUnit``, which used to be a
+    hardcoded TypeScript taxonomy.  ``source``/``caveat`` are ``null`` when the
+    unit has none."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    n: int
+    title: str
+    covers: list[str] = Field(default_factory=list)
+    blurb: str = ""
+    families: list[str] = Field(default_factory=list)
+    source: str | None = None
+    caveat: str | None = None
+
+
 class CurriculumView(BaseModel):
     """``curriculum/slo.yaml``, projected for the dashboard.
 
@@ -348,6 +367,14 @@ class CurriculumView(BaseModel):
     unassigned_core: list[UnassignedCourseView] = Field(default_factory=list)
     """Coverage courses no major owns.  Reachable, just not drillable-into."""
 
+    units: dict[str, list[UnitView]] = Field(default_factory=dict)
+    """Course code -> that class's units, in course order (``curriculum/units.yaml``
+    or, in ``config_source=db``, the ``units`` table).
+
+    A class with no units is ABSENT, not an empty list -- the class page says
+    "no unit breakdown yet" rather than rendering an empty grid.  Independently
+    optional from the rest of this object, like ``majors``."""
+
     def outcome(self, outcome_id: str) -> OutcomeView | None:
         return next((o for o in self.outcomes if o.id == outcome_id), None)
 
@@ -385,11 +412,45 @@ UNAVAILABLE_NO_FILE = (
 )
 
 
+def _load_units_view(units_path: Path | str | None) -> dict[str, list[UnitView]]:
+    """``curriculum/units.yaml`` as served, or ``{}`` and a log line.
+
+    Never raises, for the reason :func:`load_curriculum_view` gives: a broken
+    taxonomy is the validator's problem (``make lint-tasks`` fails the PR), and
+    taking the results page down over it would trade a visible gap for an
+    outage."""
+    if units_path is None:
+        return {}
+    try:
+        from ida_core.units import load_units
+
+        return units_view_from(load_units(units_path))
+    except Exception:
+        log.exception("could not load the unit taxonomy at %s", units_path)
+        return {}
+
+
+def units_view_from(units: Any) -> dict[str, list[UnitView]]:
+    """``{course: [ida_core.units.Unit]}`` -> the served form.  Classes with no
+    units are dropped so the key is absent, not an empty list.
+
+    Keys are SORTED by course code, in both config modes: the file lists classes
+    in authoring order and the database has no such order, and a public payload
+    whose key order depended on which store served it could not be
+    byte-identical across the two."""
+    return {
+        course: [UnitView(**unit.model_dump()) for unit in units[course]]
+        for course in sorted(units)
+        if units[course]
+    }
+
+
 def load_curriculum_view(
     root: Path | str,
     *,
     curriculum_path: Path | str | None = None,
     majors_path: Path | str | None = None,
+    units_path: Path | str | None = None,
 ) -> CurriculumView:
     """Read ``curriculum/slo.yaml`` if this build can, and say so when it cannot.
 
@@ -403,8 +464,11 @@ def load_curriculum_view(
     locations under ``root`` are used, so staging and prod -- which never set
     them -- are byte-for-byte unchanged.
     """
+    units = _load_units_view(units_path)
     if not CURRICULUM_MODULE_AVAILABLE or _core_load_curriculum is None:
-        return CurriculumView(available=False, unavailable_reason=UNAVAILABLE_NO_MODULE)
+        return CurriculumView(
+            available=False, unavailable_reason=UNAVAILABLE_NO_MODULE, units=units
+        )
 
     path = (
         Path(curriculum_path)
@@ -416,7 +480,7 @@ def load_curriculum_view(
         )
     )
     if not Path(path).is_file():
-        return CurriculumView(available=False, unavailable_reason=UNAVAILABLE_NO_FILE)
+        return CurriculumView(available=False, unavailable_reason=UNAVAILABLE_NO_FILE, units=units)
 
     try:
         curriculum = _core_load_curriculum(path)
@@ -428,10 +492,37 @@ def load_curriculum_view(
                 f"curriculum/slo.yaml could not be loaded ({exc}). Outcome ids still "
                 "group results; run `make lint-tasks` to see the full report."
             ),
+            units=units,
         )
 
     majors, unassigned = _load_majors(root, curriculum, majors_path=majors_path)
+    return _available_view(curriculum, majors, unassigned, units)
 
+
+def curriculum_view_from(curriculum: Any, taxonomy: Any, units: Any) -> CurriculumView:
+    """The same projection, from already-parsed objects -- ``config_source=db``.
+
+    ``curriculum`` is an ``ida_core.curriculum.CurriculumMap`` (or ``None``),
+    ``taxonomy`` an ``ida_core.majors.Majors`` (or ``None``) and ``units`` the
+    ``{course: [Unit]}`` map -- exactly what :func:`load_curriculum_view` gets
+    from the files, now rebuilt from the database by the config provider.  ONE
+    projection (:func:`_available_view`, :func:`_majors_view`) serves both
+    modes, which is what makes the yaml/db parity test meaningful."""
+    units_view = units_view_from(units)
+    if curriculum is None:
+        return CurriculumView(
+            available=False, unavailable_reason=UNAVAILABLE_NO_FILE, units=units_view
+        )
+    majors, unassigned = _majors_view(taxonomy, curriculum) if taxonomy else ([], [])
+    return _available_view(curriculum, majors, unassigned, units_view)
+
+
+def _available_view(
+    curriculum: Any,
+    majors: list[MajorView],
+    unassigned: list[UnassignedCourseView],
+    units: dict[str, list[UnitView]],
+) -> CurriculumView:
     return CurriculumView(
         available=True,
         program=curriculum.program,
@@ -468,6 +559,7 @@ def load_curriculum_view(
         ],
         majors=majors,
         unassigned_core=unassigned,
+        units=units,
     )
 
 
@@ -514,7 +606,13 @@ def _load_majors(
     except Exception:
         log.exception("could not load the majors taxonomy at %s", path)
         return [], []
+    return _majors_view(taxonomy, curriculum)
 
+
+def _majors_view(
+    taxonomy: Any, curriculum: Any
+) -> tuple[list[MajorView], list[UnassignedCourseView]]:
+    """Project a parsed ``Majors`` -- shared by the file and database paths."""
     majors: list[MajorView] = []
     for major in taxonomy.majors:
         classes: list[MajorClassView] = []

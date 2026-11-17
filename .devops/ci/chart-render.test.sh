@@ -195,6 +195,7 @@ DEV_ONLY_OVERRIDES = {
     "IDA_MODELS_FILE": "/app/models.dev.yaml",
     "IDA_MAJORS_FILE": "/app/curriculum/majors.dev.yaml",
     "IDA_CURRICULUM_FILE": "/app/curriculum/slo.dev.yaml",
+    "IDA_UNITS_FILE": "/app/curriculum/units.dev.yaml",
     "IDA_TASKS_DIR": "/app/tasks-all",
     "IDA_DEMO_CURRICULUM": "1",
 }

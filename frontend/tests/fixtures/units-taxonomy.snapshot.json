@@ -1,0 +1,149 @@
+{
+  "MIS 200": [
+    {
+      "key": "information-systems-business-models",
+      "n": 1,
+      "title": "Information systems & business models",
+      "covers": [
+        "What an IS is",
+        "System types",
+        "Business-model basics"
+      ],
+      "blurb": "The vocabulary of information systems and the business models they enable — the breadth the first course is built on.",
+      "families": [
+        "mis200-is-concepts"
+      ],
+      "source": "Unit 1 quiz and practice set"
+    },
+    {
+      "key": "competitive-strategy-with-is",
+      "n": 2,
+      "title": "Competitive strategy with IS",
+      "covers": [
+        "Value chain",
+        "Five Forces",
+        "Competing with IS"
+      ],
+      "blurb": "Porter's generic strategies, the Five Forces, and how an information system changes a firm's competitive position.",
+      "families": [
+        "mis200-competitive-strategy"
+      ],
+      "source": "Unit 2 quiz and practice set"
+    },
+    {
+      "key": "spreadsheets-data-analysis",
+      "n": 3,
+      "title": "Spreadsheets & data analysis",
+      "covers": [
+        "Excel formulas",
+        "Functions",
+        "Analyzing business data"
+      ],
+      "blurb": "Authoring formulas over a supplied layout and reading a business dataset — the one content area MIS 200 is a programme assessment point for.",
+      "families": [
+        "mis200-spreadsheet-formulas"
+      ],
+      "source": "Unit 3 Excel exercises"
+    },
+    {
+      "key": "platform-network-economics",
+      "n": 4,
+      "title": "Platform & network economics",
+      "covers": [
+        "Network effects",
+        "Two-sided platforms",
+        "Platform strategy"
+      ],
+      "blurb": "Direct and indirect network effects, and what a platform does and does not do.",
+      "families": [
+        "mis200-platform-network"
+      ],
+      "source": "Unit 4 quiz and practice set"
+    },
+    {
+      "key": "levels-of-is-use",
+      "n": 5,
+      "title": "Levels of IS use in organizations",
+      "covers": [
+        "Operational systems",
+        "Managerial systems",
+        "Strategic systems"
+      ],
+      "blurb": "Strategic, tactical and operational use of information systems — decided by the scope and horizon of a decision, not the seniority of whoever makes it.",
+      "families": [
+        "mis200-levels-of-is-use"
+      ],
+      "source": "Unit 5 quiz and practice set"
+    }
+  ],
+  "OM 300": [
+    {
+      "key": "strategy-productivity-forecasting",
+      "n": 1,
+      "title": "Strategy, productivity & forecasting",
+      "covers": [
+        "Operations scope & strategy",
+        "Productivity",
+        "Weighted factor rating",
+        "Forecasting & MAD",
+        "Capacity & bottlenecks"
+      ],
+      "blurb": "What operations management is, how productivity is measured, how demand is forecast and how capacity and bottlenecks limit output.",
+      "families": [
+        "om300-exam1-ops-forecasting"
+      ],
+      "source": "Exam 1 content areas"
+    },
+    {
+      "key": "project-management-quality-control",
+      "n": 2,
+      "title": "Project management & quality control",
+      "covers": [
+        "Critical path & slack",
+        "Crashing",
+        "Quality & cost of quality",
+        "X-bar and R charts",
+        "p and c charts"
+      ],
+      "blurb": "Scheduling a project and shortening it, then the concepts and control charts used to keep quality in check.",
+      "families": [
+        "om300-exam2-project-quality-spc"
+      ],
+      "source": "Exam 2 content areas"
+    },
+    {
+      "key": "inventory-lean-operations",
+      "n": 3,
+      "title": "Inventory & lean operations",
+      "covers": [
+        "Supply-chain strategy",
+        "ABC analysis & safety stock",
+        "Inventory metrics",
+        "EOQ & EPQ",
+        "Lean, TPS & kanban"
+      ],
+      "blurb": "How a firm sources, holds and replenishes inventory, the order-quantity models, and the lean approach to removing waste.",
+      "families": [
+        "om300-exam3-inventory-eoq-lean"
+      ],
+      "source": "Exam 3 content areas"
+    },
+    {
+      "key": "cumulative-final",
+      "n": 4,
+      "title": "Cumulative final",
+      "covers": [
+        "Forecasting & error measures",
+        "Inventory models",
+        "Control charts",
+        "Project networks",
+        "Supply chain, lean & strategy"
+      ],
+      "blurb": "The cumulative final: forecasting, inventory models, control charts and project networks from across the course, plus supply-chain, lean and strategy fundamentals.",
+      "families": [
+        "om300-exam4-ops-analytics"
+      ],
+      "source": "Exam 4 content areas"
+    }
+  ]
+}
