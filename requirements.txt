@@ -36,6 +36,7 @@ psycopg[binary]~=3.2
 fastapi~=0.141.0
 uvicorn[standard]~=0.52.0
 prometheus-client~=0.26.0
+python-multipart~=0.0.20      # /admin/material/upload (FastAPI File()/Form())
 
 # --- infrastructure clients -------------------------------------------------
 redis~=5.1

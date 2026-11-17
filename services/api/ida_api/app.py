@@ -37,11 +37,14 @@ import os
 import time
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from sqlalchemy import text
 
 from ida_api import __version__
+from ida_api.admin import admin_router
+from ida_api.admin.deps import admin_validation_error_handler
 from ida_api.auth import Principal, current_principal, validate_auth_config
 from ida_api.deps import AppContext, build_context, get_context
 from ida_api.leaderboard import (
@@ -698,6 +701,17 @@ def create_app(context: AppContext | None = None) -> FastAPI:
                 status.HTTP_404_NOT_FOUND,
                 f"no transcript for run {run_id!r} sample {sample_id!r}",
             ) from None
+
+    # ------------------------------------------------------------- admin --
+    #
+    # Everything under /admin (the admin console's API). Gated at the ROUTER by
+    # `require_admin`, so no route in it can be reached without an admin bearer
+    # -- and with IDA_ADMIN_TOKENS unset (the default, and every environment
+    # until C1/C2) every one of them answers 503 `admin_disabled`. The public
+    # routes above are untouched by this block; the validation handler below
+    # only rewrites 422 bodies for /admin paths.
+    app.include_router(admin_router, prefix="/admin")
+    app.add_exception_handler(RequestValidationError, admin_validation_error_handler)
 
     return app
 
