@@ -157,3 +157,13 @@ def test_resolver_caches_per_version_and_touches_last_used(factory) -> None:
 def test_unknown_credential_is_a_missing_key(factory) -> None:
     with pytest.raises(MissingApiKeyError, match="does not exist"):
         DbCredentialResolver(factory, parse_kek(f"k1:{K1}")).get("nope")
+
+
+def test_unpadded_base64url_is_accepted() -> None:
+    """The deployed KEKs are 43 base64url characters with no '=' padding (what
+    `base64.urlsafe_b64encode(...).decode().rstrip('=')` and most generators
+    emit). The parser must take both forms of the same 32 bytes."""
+    padded = K1
+    unpadded = K1.rstrip("=")
+    assert len(unpadded) == 43
+    assert parse_kek(f"k1:{unpadded}").keys == parse_kek(f"k1:{padded}").keys
