@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from fastapi import status
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -35,6 +36,7 @@ from ida_harness.tasks import TaskCatalog
 
 SCOPE_MODELS = "models"
 SCOPE_TASKS = "tasks"
+SCOPE_CURRICULUM = "curriculum"
 
 
 def require_db_config(ctx: AppContext) -> None:
@@ -115,6 +117,28 @@ def validate_post_state(session: Session, scopes: set[str]) -> list[Issue]:
             TaskCatalog.from_documents(reader.task_documents(session))
         except Exception as exc:
             issues.append(Issue("catalog", str(exc)))
+    if SCOPE_CURRICULUM in scopes:
+        issues += curriculum_issues(session)
+    return issues
+
+
+def curriculum_issues(session: Session) -> list[Issue]:
+    """The curriculum map + majors taxonomy + units, as they would be committed:
+    the "MIS 200 must stay reachable" gate, every class nameable, class
+    families real, and both unit invariants."""
+    from ida_core.configdb.tables import TaskFamilyRow
+    from ida_core.validation_suite import parse_majors, validate_curriculum, validate_units
+
+    slo = reader.slo_document(session)
+    majors_doc = reader.majors_document(session)
+    families = set(
+        session.scalars(select(TaskFamilyRow.key).where(TaskFamilyRow.archived_at.is_(None)))
+    )
+    issues: list[Issue] = []
+    if slo is not None:
+        issues += validate_curriculum(slo, majors_doc, families)
+    majors = parse_majors(majors_doc)[1] if majors_doc is not None else None
+    issues += validate_units(reader.units(session), majors)
     return issues
 
 

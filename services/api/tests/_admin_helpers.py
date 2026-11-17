@@ -23,9 +23,28 @@ ACTOR = "octo-prof"
 HEADERS = {"Authorization": f"Bearer {ADMIN_TOKEN}", "X-IDA-Actor": ACTOR}
 
 
+def _database_url(tmp_path) -> str:
+    """SQLite by default. Set ``IDA_ADMIN_TEST_PG_URL`` (a Postgres server URL,
+    e.g. ``postgresql://ida:pw@127.0.0.1:55432/ida``) to run the admin suite
+    against a FRESH Postgres database per test instead -- SQLite does not
+    enforce foreign keys, and the unit invariants are FK-backed on Postgres."""
+    import os
+    import uuid
+
+    server = os.environ.get("IDA_ADMIN_TEST_PG_URL")
+    if not server:
+        return f"sqlite+pysqlite:///{tmp_path / 'admin.db'}"
+    import psycopg
+
+    name = f"admin_{uuid.uuid4().hex[:12]}"
+    with psycopg.connect(server, autocommit=True) as conn:
+        conn.execute(f'CREATE DATABASE "{name}"')
+    return server.rsplit("/", 1)[0] + f"/{name}"
+
+
 def admin_settings(tmp_path, **overrides) -> Settings:
     values = {
-        "database_url": f"sqlite+pysqlite:///{tmp_path / 'admin.db'}",
+        "database_url": _database_url(tmp_path),
         "artifact_backend": "local",
         "artifact_local_root": str(tmp_path / "artifacts"),
         "config_source": "db",

@@ -47,6 +47,7 @@ from ida_core.contracts import (
     EvalLog,
     ModelEntry,
     ResultRecord,
+    RunStatus,
     SampleTranscript,
     SamplingParams,
     ServingConfig,
@@ -107,6 +108,7 @@ def run_task(
     client: ModelClient | None = None,
     client_factory: Callable[[], ModelClient] | None = None,
     judge: LLMJudge | None = None,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> EvalLog:
     """Execute ``task`` against ``entry`` and return a structured eval log.
 
@@ -129,6 +131,11 @@ def run_task(
         Ignored for ``verifiable`` tasks: a task with a gold answer is graded by
         a program, and paying a model to re-decide it would be both slower and
         less accurate.
+    should_cancel:
+        Asked BEFORE each sample (AD-12).  ``True`` stops the run: no further
+        provider calls are made, the samples already finished are returned
+        (their spend is real and is recorded), and the eval log's status is
+        ``cancelled``.  ``None`` -- the default -- never cancels.
     """
     started_at = utcnow()
     serving = effective_serving_config(entry, sampling_override)
@@ -149,11 +156,21 @@ def run_task(
 
     results: list[ResultRecord] = []
     transcripts: list[SampleTranscript] = []
+    cancelled = False
 
     try:
         judged = task.kind is TaskKind.SUBJECTIVE and judge is not None
         scorer = build_scorer(task.scorer) if task.is_scorable else None
         for sample in task.samples:
+            if should_cancel is not None and should_cancel():
+                log.info(
+                    "run %s cancelled after %d of %d samples",
+                    run_id,
+                    len(results),
+                    len(task.samples),
+                )
+                cancelled = True
+                break
             repeat_index = 0  # repeated sampling (B7) is contract-ready, not yet emitted
             key = cache_key(
                 serving=serving,
@@ -315,13 +332,21 @@ def run_task(
         harness_version=build_identity(),
         # NOT hardcoded SUCCEEDED. A run where every sample errored measured
         # nothing and must not claim otherwise (B5).
-        status=terminal_status(sample_count=len(results), error_count=error_count),
+        status=(
+            RunStatus.CANCELLED
+            if cancelled
+            else terminal_status(sample_count=len(results), error_count=error_count)
+        ),
         results=results,
         transcripts=transcripts,
         started_at=started_at,
         finished_at=utcnow(),
     )
     eval_log.error = eval_log.error_summary()
+    if cancelled:
+        eval_log.error = f"cancelled after {len(results)} of {len(task.samples)} sample(s)" + (
+            f"; {eval_log.error}" if eval_log.error else ""
+        )
 
     if artifact_store is not None:
         try:

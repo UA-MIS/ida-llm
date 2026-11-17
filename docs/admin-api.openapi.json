@@ -3325,6 +3325,7 @@
   "paths": {
     "/admin/audit": {
       "get": {
+        "description": "Newest first.  The cursor is the last row id seen (ids only grow).",
         "operationId": "list_audit_admin_audit_get",
         "parameters": [
           {
@@ -3438,6 +3439,7 @@
             }
           },
           {
+            "description": "The last id of the previous page.",
             "in": "query",
             "name": "cursor",
             "required": false,
@@ -3450,6 +3452,7 @@
                   "type": "null"
                 }
               ],
+              "description": "The last id of the previous page.",
               "title": "Cursor"
             }
           },
@@ -3634,7 +3637,7 @@
     },
     "/admin/audit/events": {
       "post": {
-        "description": "Sign-in, denied and sign-out events from the frontend's Auth.js.",
+        "description": "Sign-in, denied and sign-out events from the frontend's Auth.js.\n\nThe ONLY record of a denied sign-in: a non-member never reaches any other\nroute.  The row is attributed to the login in the event (the person who\ntried), via the console's token.",
         "operationId": "record_auth_event_admin_audit_events_post",
         "parameters": [
           {
@@ -3821,6 +3824,7 @@
     },
     "/admin/classes": {
       "post": {
+        "description": "Revalidated against the curriculum map's coverage (the \"every coverage\ncourse is claimed\" gate).",
         "operationId": "create_class_admin_classes_post",
         "parameters": [
           {
@@ -4014,6 +4018,7 @@
     },
     "/admin/classes/{course}": {
       "delete": {
+        "description": "409 while the class has units; the coverage gate refuses deleting a\ncourse the curriculum map still lists (MIS 200 included).",
         "operationId": "delete_class_admin_classes__course__delete",
         "parameters": [
           {
@@ -4435,7 +4440,7 @@
     },
     "/admin/classes/{course}/task-families": {
       "put": {
-        "description": "409 ``conflict`` naming the unit if a removed family is still claimed.",
+        "description": "409 ``conflict`` naming the unit if a removed family is still claimed by\none of this class's units (invariant 2).",
         "operationId": "set_class_families_admin_classes__course__task_families_put",
         "parameters": [
           {
@@ -4850,6 +4855,7 @@
         ]
       },
       "post": {
+        "description": "Inserted at ``n`` (later units shift down).  Invariants are checked\nbefore the database constraint and reported as issues with readable text.",
         "operationId": "create_unit_admin_classes__course__units_post",
         "parameters": [
           {
@@ -5052,7 +5058,7 @@
     },
     "/admin/classes/{course}/units/reorder": {
       "post": {
-        "description": "Renumbers ``n`` 1..k in one transaction.",
+        "description": "Renumbers ``n`` 1..k in the given order, in one transaction.  The order\nmust name every unit of the class exactly once.",
         "operationId": "reorder_units_admin_classes__course__units_reorder_post",
         "parameters": [
           {
@@ -6063,6 +6069,7 @@
     },
     "/admin/curriculum/slo": {
       "get": {
+        "description": "The whole ``slo.yaml`` (outcomes, use modes, coverage) as YAML.",
         "operationId": "get_slo_admin_curriculum_slo_get",
         "parameters": [
           {
@@ -6244,6 +6251,7 @@
         ]
       },
       "put": {
+        "description": "Validated as ``slo.yaml`` (schema + model), then the whole curriculum\nsuite on the result -- so registrar data stays editable without code and\nstill cannot orphan a course.",
         "operationId": "put_slo_admin_curriculum_slo_put",
         "parameters": [
           {
@@ -6455,7 +6463,7 @@
     },
     "/admin/export": {
       "get": {
-        "description": "A zip of the live config as YAML, for backup and for pulling admin edits\nback into a dev fixture.  Private families only on request, and audited.",
+        "description": "A zip of the live config as YAML -- ``models.yaml``, ``tasks/<family>/\n<name>.yaml``, ``curriculum/{slo,majors,units}.yaml`` -- for backup and for\npulling admin edits back into a dev fixture.\n\n``private`` families are left out unless ``include_private=true``: that\nmaterial must never reach the public repo by accident.  Every export is\naudited (``config.export``), with whether private material was included.",
         "operationId": "export_config_admin_export_get",
         "parameters": [
           {
@@ -10250,6 +10258,7 @@
     },
     "/admin/runs": {
       "get": {
+        "description": "Newest first.  ``next_cursor`` is opaque; pass it back for the next page.",
         "operationId": "list_admin_runs_admin_runs_get",
         "parameters": [
           {
@@ -10733,7 +10742,7 @@
     },
     "/admin/runs/estimate": {
       "post": {
-        "description": "No write. The launcher calls it live (debounced).",
+        "description": "No write.  The launcher calls it live (debounced).",
         "operationId": "estimate_runs_admin_runs_estimate_post",
         "parameters": [
           {
@@ -11313,6 +11322,7 @@
     },
     "/admin/runs/{run_id}/results/{sample_id}/transcript": {
       "get": {
+        "description": "The archived transcript; the key comes from the path convention, never\nfrom a client-supplied URI.",
         "operationId": "get_admin_transcript_admin_runs__run_id__results__sample_id__transcript_get",
         "parameters": [
           {
@@ -11919,6 +11929,7 @@
     },
     "/admin/sweeps/{sweep_id}/cancel": {
       "post": {
+        "description": "Cancels every non-terminal run of the sweep.",
         "operationId": "cancel_sweep_admin_sweeps__sweep_id__cancel_post",
         "parameters": [
           {
@@ -14968,6 +14979,7 @@
     },
     "/admin/units/{unit_id}": {
       "delete": {
+        "description": "Later units move up one, so numbering stays 1..k.",
         "operationId": "delete_unit_admin_units__unit_id__delete",
         "parameters": [
           {
@@ -15389,6 +15401,7 @@
     },
     "/admin/units/{unit_id}/families": {
       "put": {
+        "description": "The focused \"assign families\" call.",
         "operationId": "set_unit_families_admin_units__unit_id__families_put",
         "parameters": [
           {
