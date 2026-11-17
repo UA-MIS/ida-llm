@@ -1,0 +1,110 @@
+# om300-exam3 rung 1 of 6. Forced-choice items over supply-chain strategy vocabulary:
+# cost strategy, keiretsu, vertical integration direction, blanket orders, the
+# bullwhip effect and transport mode. Floor rung: pure recognition. Backward and
+# forward integration are paired so a model that memorised one word fails one of them.
+version: 1
+id: om300-exam3-inventory-eoq-lean/l1-supply-chain-concepts
+title: OM 300 Exam 3 -- supply-chain strategy concepts
+description: >
+  Seven five-option items over supply-chain strategy: what a low-cost
+  strategy excludes, keiretsu, the direction of vertical integration (paired
+  items), blanket ordering, the bullwhip effect, and choosing a transport
+  mode. Five options, so the guessing floor is 0.20.
+
+  Provenance: every scenario, option and number was written for this file.
+  The skills assessed derive from the course's Exam 3 blueprint; no exam
+  stem, option, scenario, number or answer key is reproduced, and no exam
+  asset is committed.
+kind: verifiable
+domain: operations-management
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate operations-
+  management examination. Exactly one option is correct. You may reason
+  briefly first, but you must then put the letter of the correct option
+  alone on the last line, with no punctuation and no other text on that
+  line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", om300-exam3-inventory-eoq-lean, om300, ladder-l1, supply-chain, forced-choice, business-knowledge]
+samples:
+  - id: cost-strategy-contradiction
+    input: >-
+      A grocery wholesaler has chosen to compete on lowest delivered cost.
+      Which of the following moves would run AGAINST that supply chain
+      strategy? A) Pooling purchases with a few high-volume suppliers to win
+      price breaks B) Carrying as little stock as service allows C) Paying
+      for expedited premium freight on routine weekly replenishment D)
+      Selecting vendors mainly for their low landed cost E) Selling through
+      bulk-oriented, low-margin channel partners
+    # C. Rush freight on routine orders buys speed at a premium, which is the responsiveness/performance end of the trade-off. A, B, D, E are each standard low-cost levers (volume purchasing, lean stock, cost-based sourcing, cheap channels).
+    target: "C"
+    metadata: { skill: strategy-fit, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: affiliated-supplier-network
+    input: >-
+      In Japanese industry, a group of independent firms hold small stakes
+      in one another, share managers, and give each other first call on
+      purchasing and supply. Which term names this arrangement? A) Andon B)
+      Heijunka C) Kaizen D) Jidoka E) Keiretsu
+    # E. Keiretsu = affiliated firms with cross-ownership and preferred supplier ties. Distractors are Japanese lean terms (signal, leveling, improvement, autonomation) that name practices, not networks.
+    target: "E"
+    metadata: { skill: keiretsu, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: backward-integration-sawmill
+    input: >-
+      A furniture maker buys the sawmill that has always supplied its
+      lumber. This is best described as: A) Horizontal integration B)
+      Backward integration C) Forward integration D) Outsourcing E)
+      Postponement
+    # B. Acquiring a supplier = moving upstream = backward. Forward would be buying a retailer; horizontal a competitor.
+    target: "B"
+    metadata: { skill: vertical-integration, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: forward-integration-retail
+    input: >-
+      A coffee roaster opens and buys cafes through which it sells its own
+      beans directly to the public. This is an example of: A) Backward
+      integration B) Horizontal integration C) Blanket ordering D) Forward
+      integration E) A keiretsu
+    # D. Buying downstream channel (retail) = forward integration. Paired with backward-integration-sawmill so direction-of-flow is tested both ways.
+    target: "D"
+    metadata: { skill: vertical-integration, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: blanket-order-releases
+    input: >-
+      A bicycle assembler signs a one-year agreement with a tire vendor at a
+      fixed unit price, then sends small shipping releases as production
+      needs arise. Which practice is this? A) Cross-docking B) Drop shipping
+      C) Hedging D) Blanket ordering E) Postponement
+    # D. One long-term purchase agreement + releases against it = blanket order. Cross-docking moves goods dock to dock without storage; drop shipping ships from supplier to customer.
+    target: "D"
+    metadata: { skill: blanket-order, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: bullwhip-cause
+    input: >-
+      A snack brand sees its weekly orders from distributors swing far more
+      widely than shelf sales at stores. Which statement best explains this
+      pattern? A) Small shifts in demand are distorted as orders pass
+      upstream, so variability grows at each step B) Consumers deliberately
+      change their purchases weekly C) Transportation modes are mismatched
+      with product weight D) The brand has too few product variants E)
+      Safety stock is always set to zero in distributors
+    # A. Bullwhip effect: demand information distorts and amplifies as it moves upstream. Others are not causes of amplification.
+    target: "A"
+    metadata: { skill: bullwhip, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: overseas-emergency-mode
+    input: >-
+      A hospital on another continent, across an ocean from the supplier,
+      needs a shipment of cold-chain medicines within a day or two. Which distribution mode offers the speed and reliability
+      this calls for? A) Pipelines B) Waterways C) Railroads D) Trucking E)
+      Airfreight
+    # E. Airfreight is fastest/most reliable for urgent overseas shipments; others are slow or cannot cross oceans. Stem states the ocean crossing so trucking (cross-border by land) is not defensible.
+    target: "E"
+    metadata: { skill: transport-mode, provenance: synthetic, slo: SLO9, use_mode: capability }

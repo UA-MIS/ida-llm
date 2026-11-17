@@ -1,0 +1,222 @@
+# om300-exam2-project-quality-spc, rung 1 of 5: concept recognition.
+# Skill targets derive from the course's Exam 2 blueprint (project management,
+# quality concepts, SPC vocabulary). Every stem and option is written for this
+# file. Rung 2 adds forward/backward-pass arithmetic and crash cost; rung 3
+# variables control charts; rung 4 attribute charts; rung 5 sequencing and
+# chart-pattern reading.
+version: 1
+id: om300-exam2-project-quality-spc/l1-concepts
+title: "OM 300 Exam 2 rung 1: project, quality and SPC concepts"
+kind: verifiable
+domain: operations-management
+description: >-
+  Rung 1 of 5. Forced-choice recognition across the exam's three content
+  areas: project management and critical path, quality management concepts,
+  and control-chart vocabulary. The floor rung: no arithmetic. Provenance:
+  every item is synthetic, authored for this file; the skill targets derive
+  from the OM 300 Exam 2 blueprint (project scheduling and crashing, quality
+  concepts, statistical process control). No exam wording, scenario,
+  numbers, options or answer key are reproduced, and no student work or
+  textbook content is involved.
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate operations-
+  management examination. Exactly one option is correct. You may reason
+  briefly first, but you must then put the letter of the correct option
+  alone on the last line, with no punctuation and no other text on that
+  line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", om300-exam2-project-quality-spc, om300, ladder-l1, forced-choice, concepts, business-knowledge]
+samples:
+  - id: critical-path-property
+    input: >-
+      Which statement about the critical path of a project network is correct? A)
+      It is the path with the least total duration B) A network can never
+      have more than one C) Every activity on it has zero slack D) Its
+      length is the mean of all path lengths
+    # C: critical = longest path, so its activities have zero slack. The others reverse longest/shortest, deny ties, or invent an average.
+    target: "C"
+    metadata: { skill: critical-path-definition, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: tied-critical-paths
+    input: >-
+      Two different paths through a project network both have a total length of 31
+      days, and no path is longer. What follows? A) Only the path listed
+      first is critical B) Neither is critical C) The project must be
+      crashed D) Both paths are critical
+    # D: every path equal to the longest length is critical. 'Listed first' invents a tie-break; 'must be crashed' confuses having a critical path with needing to shorten it.
+    target: "D"
+    metadata: { skill: multiple-critical-paths, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: project-phases-not
+    input: >-
+      Which of the following is NOT a phase in the management of a project? A)
+      Planning B) Marketing the finished product C) Scheduling D)
+      Controlling
+    # B: the phases are planning, scheduling, controlling; marketing the output is not one.
+    target: "B"
+    metadata: { skill: project-phases, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: crashing-all-critical
+    input: >-
+      Every path in a project network has been crashed until all paths are
+      critical. Further shortening of the project: A) Is impossible B) Can
+      be done by shortening any single activity C) Is free D) Needs
+      simultaneous shortening on every critical path
+    # D: with all paths critical, shortening one path leaves another as long as before, so every path must be shortened together. 'Any single activity' is the trap.
+    target: "D"
+    metadata: { skill: crashing-parallel-paths, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: ethics-schedule-pressure
+    input: >-
+      Which of these is an ethical hazard commonly met in project work? A)
+      Reporting progress as ahead of plan to hide a slipping schedule B)
+      Holding a weekly status meeting C) Updating the work breakdown
+      structure D) Naming a project sponsor
+    # A: false status reporting to mask delay is the ethical hazard; the rest are routine practice.
+    target: "A"
+    metadata: { skill: project-ethics, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: quality-user-based
+    input: >-
+      A firm defines quality as whatever best fits the preferences of its
+      customers. Which view of quality is this? A) Manufacturing-based B)
+      Transcendent C) User-based D) Product-based
+    # C: fitness for customer preferences is the user-based view; manufacturing-based means conformance to specification.
+    target: "C"
+    metadata: { skill: quality-definitions, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: quality-manufacturing-based
+    input: >-
+      Defining quality as how closely each unit conforms to its engineering
+      specification is which view of quality? A) Transcendent B)
+      Manufacturing-based C) User-based D) Value-based
+    # B: conformance to specification is the manufacturing-based view.
+    target: "B"
+    metadata: { skill: quality-definitions, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: cost-of-quality-appraisal
+    input: >-
+      A plant pays inspectors to test finished batches before they ship. Among the
+      cost-of-quality categories this is: A) Prevention cost B) Internal
+      failure cost C) External failure cost D) Appraisal cost
+    # D: testing to find defects is appraisal. Prevention is spent to stop defects arising; internal failure is scrap or rework found before shipment.
+    target: "D"
+    metadata: { skill: cost-of-quality, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: cost-of-quality-external
+    input: >-
+      A customer returns a defective appliance under warranty and the firm
+      replaces it. This is chiefly: A) External failure cost B) Appraisal
+      cost C) Prevention cost D) Internal failure cost
+    # A: a defect that reaches the customer is an external failure cost.
+    target: "A"
+    metadata: { skill: cost-of-quality, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: cost-of-quality-prevention
+    input: >-
+      A firm funds extra operator training and a redesigned part so that fewer
+      defects occur at all. This spending is: A) Appraisal cost B)
+      Prevention cost C) Internal failure cost D) External failure cost
+    # B: money spent to reduce the chance of defects is prevention cost.
+    target: "B"
+    metadata: { skill: cost-of-quality, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: pareto-purpose
+    input: >-
+      A Pareto chart is mainly used to: A) Show how a measurement is distributed
+      over its range B) Plot a process over time against limits C) Rank
+      causes of defects by how often they occur D) Map the flow of material
+    # C: Pareto ranks problem categories by frequency. Distribution over a range describes a histogram; plotting against limits describes a control chart.
+    target: "C"
+    metadata: { skill: quality-tools, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: iso-9000
+    input: >-
+      Which body issues the ISO 9000 family of quality-management standards? A) A
+      national quality-award committee B) The International Organization for
+      Standardization C) Motorola D) A university research institute
+    # B: ISO 9000 is published by the International Organization for Standardization.
+    target: "B"
+    metadata: { skill: quality-standards, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: service-quality-courtesy
+    input: >-
+      A bank customer remarks that the staff were polite, friendly and respectful
+      of her time. Which determinant of service quality does this describe?
+      A) Tangibles B) Access C) Reliability D) Courtesy
+    # D: politeness and respect describe courtesy.
+    target: "D"
+    metadata: { skill: service-quality, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: assignable-variation
+    input: >-
+      Assignable (special-cause) variation is best described as variation that: A)
+      Has an identifiable cause that should be investigated B) Is inherent
+      in the process and cannot be removed C) Is always smaller than random
+      variation D) Signals that the process is in control
+    # A: assignable variation has a traceable cause. The 'inherent' description is random (common-cause) variation.
+    target: "A"
+    metadata: { skill: variation-types, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: chart-type-defective-share
+    input: >-
+      A call centre records, each day, the proportion of 200 sampled calls that
+      were handled incorrectly. Which control chart suits this? A) x-bar
+      chart B) R-chart C) c-chart D) p-chart
+    # D: proportion defective from a fixed-size sample is a p-chart. A c-chart counts defects per unit with no share-of-sample denominator.
+    target: "D"
+    metadata: { skill: chart-selection, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: chart-type-count-defects
+    input: >-
+      A glass maker counts the number of bubbles found in each sheet. Which
+      control chart is appropriate? A) p-chart B) x-bar chart C) c-chart D)
+      R-chart
+    # C: a count of defects per unit is a c-chart. A p-chart tracks the share of defective units, a different quantity.
+    target: "C"
+    metadata: { skill: chart-selection, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: chart-type-variables
+    input: >-
+      An engineer measures shaft diameter in millimetres on five shafts every hour
+      and wants to track both the centre and the spread. Which charts? A)
+      p-chart and c-chart B) x-bar and R charts C) c-chart alone D) p-chart
+      alone
+    # B: continuous measurements in subgroups of five call for x-bar (centre) and R (spread).
+    target: "B"
+    metadata: { skill: chart-selection, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: cpk-six-sigma
+    input: >-
+      In the usual statement of six-sigma quality (3.4 defects per million), which
+      capability index value is associated with the process? A) 1.0 B) 1.33
+      C) 1.67 D) 2.0
+    # D: the course convention pairs six sigma with an index of 2.0 (three-sigma = 1.0, four-sigma = 1.33, five-sigma = 1.67).
+    target: "D"
+    metadata: { skill: process-capability, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: poka-yoke
+    input: >-
+      A bakery fits a jig that physically prevents a tray from closing unless
+      exactly twelve rolls are loaded. This mistake-proofing device is
+      called: A) Kanban B) Pareto analysis C) Poka-yoke D) Benchmarking
+    # C: poka-yoke means fail-safing / mistake-proofing.
+    target: "C"
+    metadata: { skill: poka-yoke, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: sample-vs-number
+    input: >-
+      A technician weighs 6 cans from the line every hour for a 10-hour shift and
+      charts each hour's group. What are the sample size and the number of
+      samples? A) Size 10, number 6 B) Size 60, number 1 C) Size 6, number
+      10 D) Size 6, number 60
+    # C: n = 6 cans per sample, k = 10 samples. Swapping them or totalling the cans are the traps.
+    target: "C"
+    metadata: { skill: sample-size-vs-count, provenance: synthetic, slo: SLO9, use_mode: capability }

@@ -103,7 +103,21 @@ export interface ClassUnit {
  *   mis200-platform-network     → Unit 4 Platform & network economics         (SLO9)
  *   mis200-levels-of-is-use     → Unit 5 Levels of IS use in organizations    (SLO9)
  *
- * ⚠ FOUR OF THE FIVE UNITS ARE SLO9, AND THAT IS HONEST. Every non-spreadsheet
+ * OM 300 — the second measured class. Its four units are its four exams, one
+ * family each, in the order the course sits them:
+ *
+ *   om300-exam1-ops-forecasting       → Unit 1 Strategy, productivity & forecasting
+ *   om300-exam2-project-quality-spc   → Unit 2 Project management & quality control
+ *   om300-exam3-inventory-eoq-lean    → Unit 3 Inventory & lean operations
+ *   om300-exam4-ops-analytics         → Unit 4 Cumulative final
+ *
+ * Unit 4 is the cumulative final: it re-tests forecasting, inventory models,
+ * control charts and project networks from Units 1–3 and adds supply-chain and
+ * strategy fundamentals. That overlap is deliberate and the partition still
+ * holds — it is a different family, so no result row prints under two units. The
+ * concepts-and-counts mapping is `tasks/om300-exams-mapping.md`.
+ *
+ * ⚠ FOUR OF MIS 200'S FIVE UNITS ARE SLO9, AND THAT IS HONEST. Every non-spreadsheet
  * section of Exam 1 is forced-choice recognition, which `curriculum/slo.yaml`
  * and `tasks/mis200-exam1-mapping.md` §3 file under SLO9 (General Business
  * Knowledge), not SLO1. Unit 3 is the one SLO2 (Quantitative Literacy) section.
@@ -183,6 +197,72 @@ const TAXONOMY: Record<string, ClassUnit[]> = {
       source: "Unit 5 quiz and practice set",
     },
   ],
+  "OM 300": [
+    {
+      key: "strategy-productivity-forecasting",
+      n: 1,
+      title: "Strategy, productivity & forecasting",
+      covers: [
+        "Operations scope & strategy",
+        "Productivity",
+        "Weighted factor rating",
+        "Forecasting & MAD",
+        "Capacity & bottlenecks",
+      ],
+      blurb:
+        "What operations management is, how productivity is measured, how demand is forecast and how capacity and bottlenecks limit output.",
+      families: ["om300-exam1-ops-forecasting"],
+      source: "Exam 1 content areas",
+    },
+    {
+      key: "project-management-quality-control",
+      n: 2,
+      title: "Project management & quality control",
+      covers: [
+        "Critical path & slack",
+        "Crashing",
+        "Quality & cost of quality",
+        "X-bar and R charts",
+        "p and c charts",
+      ],
+      blurb:
+        "Scheduling a project and shortening it, then the concepts and control charts used to keep quality in check.",
+      families: ["om300-exam2-project-quality-spc"],
+      source: "Exam 2 content areas",
+    },
+    {
+      key: "inventory-lean-operations",
+      n: 3,
+      title: "Inventory & lean operations",
+      covers: [
+        "Supply-chain strategy",
+        "ABC analysis & safety stock",
+        "Inventory metrics",
+        "EOQ & EPQ",
+        "Lean, TPS & kanban",
+      ],
+      blurb:
+        "How a firm sources, holds and replenishes inventory, the order-quantity models, and the lean approach to removing waste.",
+      families: ["om300-exam3-inventory-eoq-lean"],
+      source: "Exam 3 content areas",
+    },
+    {
+      key: "cumulative-final",
+      n: 4,
+      title: "Cumulative final",
+      covers: [
+        "Forecasting & error measures",
+        "Inventory models",
+        "Control charts",
+        "Project networks",
+        "Supply chain, lean & strategy",
+      ],
+      blurb:
+        "The cumulative final: forecasting, inventory models, control charts and project networks from across the course, plus supply-chain, lean and strategy fundamentals.",
+      families: ["om300-exam4-ops-analytics"],
+      source: "Exam 4 content areas",
+    },
+  ],
 };
 
 /**
@@ -205,8 +285,8 @@ const TAXONOMY: Record<string, ClassUnit[]> = {
 const demoCurriculumEnabled = isDevDemoPreview;
 
 /** The taxonomy this request sees: the real one, plus the demo classes when the
- * dev gate is on. MIS 200 is only ever in the real set, so the merge cannot
- * shadow or alter it. */
+ * dev gate is on. MIS 200 and OM 300 are only ever in the real set, so the merge
+ * cannot shadow or alter them (the dev generator must not emit either). */
 function taxonomy(): Record<string, ClassUnit[]> {
   return demoCurriculumEnabled() ? { ...TAXONOMY, ...DEMO_TAXONOMY } : TAXONOMY;
 }

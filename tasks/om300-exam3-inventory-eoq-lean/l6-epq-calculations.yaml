@@ -1,0 +1,87 @@
+# om300-exam3 rung 6 of 6 (top). Production-order-quantity model: EPQ, maximum inventory,
+# runs per year, total annual cost (at EPQ and at a stated batch). Adds the (1-d/p) factor, a daily
+# demand derived from annual/working days, and a chained quantity. Hardest rung.
+version: 1
+id: om300-exam3-inventory-eoq-lean/l6-epq-calculations
+title: OM 300 Exam 3 -- EPQ model calculations
+description: >
+  Five calculations under the economic production quantity model: EPQ,
+  maximum inventory, optimal production runs per year, and total annual cost
+  both at the EPQ and at a stated batch size. All need the (1 - d/p) factor
+  and several need daily demand derived from annual demand.
+
+  Provenance: every scenario, option and number was written for this file.
+  The skills assessed derive from the course's Exam 3 blueprint; no exam
+  stem, option, scenario, number or answer key is reproduced, and no exam
+  asset is committed.
+kind: verifiable
+domain: operations-management
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory
+  operations-management quiz. Use the standard textbook formula the item
+  names, keep full precision until the end, and round the final result to
+  two decimal places. Put the final numeric answer alone on the last line,
+  with no units, no currency symbol, no percent sign, no label and no other
+  text on that line.
+scorer:
+  kind: numeric_match
+  # Rounding drift on intermediate Q <= 0.01; tolerance 0.05. Smallest gap to a wrong method is 2.68 (runs with EOQ Q), over fifty times tolerance.
+  tolerance: 0.05
+  normalisation:
+    strip: true
+    collapse_whitespace: true
+    take_last_line: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam3-inventory-eoq-lean, om300, ladder-l6, epq, calculation, quantitative-literacy]
+samples:
+  - id: epq-basic
+    input: >-
+      A bottler fills 18,000 cases a year for demand. Each setup costs $45
+      and holding costs $3 per case per year. The line produces 240 cases
+      per day and demand is 60 cases per day. Compute the economic
+      production quantity (cases).
+    # 1-d/p = 1-60/240 = 0.75; EPQ = sqrt(2x18000x45/(3x0.75)) = sqrt(720000)=848.53.
+    # Wrong: EOQ formula (no 1-d/p) -> 734.85 (113.7 away).
+    target: "848.53"
+    metadata: { skill: epq, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: epq-max-inventory
+    input: >-
+      A foundry runs 1,450 castings per production run. It produces 125 per
+      day and demand is 35 per day. Under the EPQ model, what is the maximum
+      inventory level (castings)?
+    # Imax = Q(1-d/p) = 1450 x (1-35/125) = 1450 x 0.72 = 1044. Wrong: Q/2 = 725; Q = 1450.
+    target: "1044"
+    metadata: { skill: max-inventory, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: epq-production-runs
+    input: >-
+      A candle maker sells 800 units a month and works 240 days a year.
+      Setup costs $60 per run, holding costs $5 per unit per year, and the
+      line makes 160 units per day. Using the optimal production quantity,
+      how many production runs per year?
+    # D=9,600; d=9600/240=40/day; 1-d/p = 0.75; Q=sqrt(2x9600x60/(5x0.75))=sqrt(307200)=554.26; runs=9600/554.26=17.32.
+    # Wrong: EOQ Q=480 -> 20.00 (2.68 away).
+    target: "17.32"
+    metadata: { skill: production-runs, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: epq-total-cost
+    input: >-
+      A printer needs 14,400 bundles of paper a year, works 300 days a year,
+      produces 120 per day, pays $75 per setup and $2.80 per unit per year
+      to hold. Using the EPQ, what is the annual total (setup + holding)
+      cost in dollars?
+    # d=48/day; 1-d/p=0.6; Q=sqrt(2x14400x75/(2.8x0.6))=1133.89; setup=(14400/1133.89)x75=952.47; holding=0.5x1133.89x2.8x0.6=952.47; total=1904.94.
+    # Wrong: plain EOQ model (no 1-d/p anywhere) -> 2459.27 (554 away); omitting (1-d/p) only in holding at the EPQ -> 2539.92.
+    target: "1904.94"
+    metadata: { skill: epq-total-cost, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: total-cost-chosen-q
+    input: >-
+      A packer needs 9,600 units a year, has $60 setups and $5 per unit
+      holding per year, and its line runs 160 per day against demand of 40
+      per day. It chooses a batch of 600 units. What is the total annual
+      setup plus holding cost (dollars)?
+    # setup=(9600/600)x60=960; holding=(600/2)x5x(1-40/160)=300x5x0.75=1125; total=2085.
+    # Wrong: ignoring (1-d/p) -> 2460 (375 away).
+    target: "2085"
+    metadata: { skill: total-cost-given-q, provenance: synthetic, slo: SLO2, use_mode: capability }

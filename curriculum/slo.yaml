@@ -197,6 +197,11 @@ use_modes:
 # MIS 200 is the target course for the first live run: SLO1 (R), SLO2 (A),
 # SLO9 (I). Those three families are the ones authored to full depth.
 #
+# OM 300 is the second measured class, with the same three outcomes marked
+# (SLO1 R, SLO2 A, SLO9 I). Its four exam families file their calculation items
+# under SLO2 and their forced-choice concept items under SLO9; SLO1 has no OM 300
+# family, so that cell reads "not measured yet" for the class.
+#
 # A course with a blank cell for an outcome simply omits the key. Absence means
 # "the published map does not mark this pair", not "level unknown".
 coverage:

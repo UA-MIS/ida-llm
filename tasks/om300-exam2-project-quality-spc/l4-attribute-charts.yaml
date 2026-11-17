@@ -1,0 +1,116 @@
+# om300-exam2-project-quality-spc, rung 4 of 5: attribute control charts.
+# Skill targets derive from the Exam 2 blueprint. All data are new.
+# TOLERANCE 0.0006: the loosest rounding any item asks is three decimals
+# (half-unit 0.0005). Every c-chart item is built so its exact answer is a
+# whole number, so the same tolerance is safe there. The nearest wrong method
+# is >= 0.0055 away on every p item (thinnest case noted) and >= 1 on c items.
+version: 1
+id: om300-exam2-project-quality-spc/l4-attribute-charts
+title: "OM 300 Exam 2 rung 4: p-chart and c-chart limits"
+kind: verifiable
+domain: operations-management
+description: >-
+  Rung 4 of 5. Attribute control charts: centre line p-bar from defect counts,
+  p-chart limits at a stated z, and c-chart limits at a stated number of
+  sigmas, including the convention that a negative lower limit is reported
+  as zero. Adds, over rung 3, deriving the centre line from raw counts and
+  handling the lower-limit floor. Provenance: every item is synthetic,
+  authored for this file; the skill targets derive from the OM 300 Exam 2
+  blueprint (project scheduling and crashing, quality concepts, statistical
+  process control). No exam wording, scenario, numbers, options or answer
+  key are reproduced, and no student work or textbook content is involved.
+system_prompt: >-
+  You are producing the answer key for an undergraduate operations-management
+  quiz. Use the convention and constants the item supplies. Round exactly as
+  the item says. Put the final numeric answer alone on the last line, with
+  no units, no currency symbol, no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  tolerance: 0.0006
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam2-project-quality-spc, om300, ladder-l4, calculation, control-charts, attribute-charts, quantitative-literacy]
+samples:
+  - id: p-bar-centre-line
+    input: >-
+      A line inspects 6 samples of 180 units. The defective counts were 6, 3, 11,
+      9, 4 and 7. What is the centre line p-bar of the p-chart, as a
+      proportion (not a percentage)? Round to three decimals.
+    # total defectives = 40; total inspected = 6*180 = 1080; p-bar = 40/1080 = 0.037037 -> 0.037. Wrong: averaging the counts and dividing by 100 gives 0.067; using 40/180 = 0.222.
+    target: "0.037"
+    metadata: { skill: p-bar, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: p-lcl-three-sigma
+    input: >-
+      A supplier's historical defect rate is 4.5%. Samples of 250 are taken. Using
+      z = 3, what is the lower control limit of the p-chart, as a proportion (not
+      a percentage)? Round to four decimals.
+    # s = sqrt(.045*.955/250) = 0.013111; LCL = .045 - 3(0.013111) = 0.005667 -> 0.0057. Thin case: using z = 2.58 gives 0.0112, 0.0055 away = ~9x the tolerance.
+    target: "0.0057"
+    metadata: { skill: p-limits, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: p-ucl-99pct
+    input: >-
+      A process historically yields 8% defectives. Samples of 160 are taken. Using
+      z = 2.58 (99% limits), what is the upper control limit of the p-chart,
+      as a proportion (not a percentage)? Round to four decimals.
+    # s = sqrt(.08*.92/160) = 0.021448; UCL = .08 + 2.58(0.021448) = 0.135335 -> 0.1353. Wrong: z = 3 gives 0.1443 (0.009 away).
+    target: "0.1353"
+    metadata: { skill: p-limits, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: p-lcl-99pct
+    input: >-
+      A process historically yields 12% defectives. Samples of 200 are taken.
+      Using z = 2.58 (99% limits), what is the lower control limit of the
+      p-chart, as a proportion (not a percentage)? Round to four decimals.
+    # s = sqrt(.12*.88/200) = 0.022978; LCL = .12 - 2.58(0.022978) = 0.060716 -> 0.0607. Wrong: z = 3 gives 0.0511 (0.0096 away).
+    target: "0.0607"
+    metadata: { skill: p-limits, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: p-lcl-floors-at-zero
+    input: >-
+      A process historically yields 2% defectives. Samples of 100 are taken. Using
+      z = 3, what is the lower control limit of the p-chart, as a proportion
+      (not a percentage)? If the computed value is negative, report 0.
+      Round to four decimals.
+    # s = sqrt(.02*.98/100) = 0.014; .02 - 3(0.014) = -0.022 -> negative, so report 0. Wrong: reporting -0.0220 (0.022 away).
+    target: "0"
+    metadata: { skill: p-limits-floor, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: c-ucl-three-sigma
+    input: >-
+      A help desk logged 144 complaints over 16 days. Treat the daily complaint
+      count as a c-chart count. Using three-sigma limits, what is the upper
+      control limit? Round to two decimals.
+    # c-bar = 144/16 = 9; sigma = sqrt 9 = 3; UCL = 9 + 3*3 = 18. Wrong: using total 144 as c-bar gives 144 + 36 = 180; using sigma = 9 gives 36.
+    target: "18"
+    metadata: { skill: c-limits, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: c-lcl-three-sigma
+    input: >-
+      A paint shop counted 240 blemishes over 15 panels. Treat each panel's count
+      as a c-chart value. Using three-sigma limits, what is the lower
+      control limit? Round to two decimals.
+    # c-bar = 240/15 = 16; sigma = 4; LCL = 16 - 12 = 4. Wrong: 16 - 4 = 12 (one sigma), or 16 - 16 = 0.
+    target: "4"
+    metadata: { skill: c-limits, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: c-lcl-four-sigma-floor
+    input: >-
+      A call line records 36 dropped calls over 9 days. Treat the daily count as a
+      c-chart value and use four-sigma limits. What is the lower control
+      limit? If the computed value is negative, report 0.
+    # c-bar = 36/9 = 4; sigma = 2; LCL = 4 - 4*2 = -4 -> negative, report 0. Wrong: reporting -4.
+    target: "0"
+    metadata: { skill: c-limits-floor, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: c-lcl-two-sigma
+    input: >-
+      A mail room logged 90 damaged parcels over 10 days. Treat the daily count as
+      a c-chart value and use two-sigma limits. What is the lower control
+      limit? Round to two decimals.
+    # c-bar = 90/10 = 9; sigma = 3; LCL = 9 - 2*3 = 3. Wrong: three-sigma gives 0; one-sigma gives 6.
+    target: "3"
+    metadata: { skill: c-limits, provenance: synthetic, slo: SLO2, use_mode: capability }

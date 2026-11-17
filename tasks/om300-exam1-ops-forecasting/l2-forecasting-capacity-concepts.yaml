@@ -1,0 +1,136 @@
+# om300-exam1-ops-forecasting, rung 2: adds DISCRIMINATION between close
+# neighbours (seasonality vs cycle, utilization vs efficiency, horizon vs
+# technique) in forecasting and capacity concepts.
+version: 1
+id: om300-exam1-ops-forecasting/l2-forecasting-capacity-concepts
+title: OM 300 Exam 1 -- forecasting and capacity concepts
+description: >
+  Seven five-option items on forecast time horizons, associative models, the
+  last step of the forecasting process, seasonal versus cyclical patterns,
+  why utilization sits below efficiency, and what does and does not help a
+  bottleneck. Each item pits two concepts that are easily confused.
+
+  Provenance: every scenario, option, number and distractor was written for this
+  file. The skill targets derive from the course's Exam 1 blueprint (OM 300,
+  Introduction to Operations Management), but no exam stem, option, scenario,
+  number or answer key is reproduced, and no exam asset is committed. No student
+  work and no textbook content.
+kind: verifiable
+domain: operations-management
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate introductory
+  operations-management examination. Exactly one option is correct. You may
+  reason briefly first, but you must then put the letter of the correct option
+  alone on the last line, with no punctuation and no other text on that line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", om300-exam1-ops-forecasting, om300, ladder-l2, forecasting, capacity, forced-choice, business-knowledge]
+samples:
+  - id: long-range-horizon
+    input: >-
+      A retailer is deciding where to build a distribution centre that will
+      open in four years, and needs a demand outlook to support the decision.
+      What kind of forecast fits?
+      A) A short-range forecast
+      B) A medium-range forecast
+      C) A long-range forecast
+      D) A naive forecast
+      E) A moving-average forecast
+    # C. Facility location and capital planning use long-range horizons. D and E
+    # are techniques, not horizons, and a naive method is weak for 4 years.
+    target: "C"
+    metadata: { skill: forecast-horizon, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: associative-model
+    input: >-
+      An analyst predicts monthly umbrella sales from the previous month's
+      rainfall and the advertising budget. Which family of technique is this?
+      A) Exponential smoothing
+      B) Weighted moving average
+      C) Naive method
+      D) Associative (causal) model
+      E) Time-series decomposition
+    # D. Predicting demand from other variables related to it is an associative
+    # model; A-C and E use only the series' own history.
+    target: "D"
+    metadata: { skill: associative-vs-time-series, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: last-step-of-forecasting
+    input: >-
+      A team has decided what the forecast is for, chosen the items and the
+      horizon, selected a model and produced the forecast. What is the final
+      step of the forecasting process?
+      A) Decide how the forecast will be used
+      B) Select the items to be forecasted
+      C) Choose the time horizon
+      D) Make the forecast
+      E) Validate the results and implement them
+    # E. The sequence ends with validating and implementing; D is the step the
+    # team has already completed.
+    target: "E"
+    metadata: { skill: forecasting-process-order, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: seasonality-pattern
+    input: >-
+      A garden centre's sales rise every spring and fall every winter, with the
+      same shape each year. Which time-series behaviour is this?
+      A) Trend
+      B) Random variation
+      C) Seasonality
+      D) Cycle
+      E) Outlier
+    # C. A pattern repeating on a fixed calendar period (a year) is
+    # seasonality. D is the near neighbour: cycles have irregular, multi-year
+    # length.
+    target: "C"
+    metadata: { skill: time-series-components, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: cycle-pattern
+    input: >-
+      A construction supplier's demand swells and shrinks over several years in
+      step with the wider economy, and the swings last anywhere from three to
+      seven years. Which time-series behaviour is this?
+      A) Seasonality
+      B) Trend
+      C) Random variation
+      D) Cycle
+      E) Naive pattern
+    # D. Irregular multi-year swings tied to the economy are a cycle, not
+    # seasonality (fixed calendar period).
+    target: "D"
+    metadata: { skill: time-series-components, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: utilization-below-efficiency
+    input: >-
+      A plant reports utilization of 50% and efficiency of 80%. Which fact
+      explains why utilization is the lower figure?
+      A) Actual output exceeds effective capacity
+      B) Effective capacity equals design capacity
+      C) Effective capacity is below design capacity
+      D) Design capacity is below actual output
+      E) Rated capacity is below actual output
+    # C. Utilization = actual/design; efficiency = actual/effective. Same
+    # numerator, so utilization is smaller exactly when effective < design
+    # (here 0.5/0.8 = effective is 62.5% of design).
+    target: "C"
+    metadata: { skill: utilization-vs-efficiency, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: bottleneck-not-a-remedy
+    input: >-
+      Which of the following is NOT a sound way to deal with a bottleneck?
+      A) Move a skilled operator to the constraint during breaks
+      B) Hold a small buffer of work ahead of the constraint
+      C) Raise output on a non-constraint machine upstream of it
+      D) Cut changeover time on the constraint
+      E) Shift some of the constraint's work to another resource
+    # C. Extra output upstream of the constraint only piles up work-in-process;
+    # throughput is set by the constraint. A, B, D, E all protect or add
+    # constraint capacity.
+    target: "C"
+    metadata: { skill: bottleneck-management, provenance: synthetic, slo: SLO9, use_mode: capability }

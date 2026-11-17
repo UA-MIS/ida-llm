@@ -1,0 +1,96 @@
+# om300-exam3 rung 3 of 6. Lean / TPS vocabulary: TPS identification, kanban with an
+# EXCEPT stem, 5S, setup-time reduction. Adds negation (EXCEPT), and relational
+# distinctions (lean vs JIT vs kanban) that recognition alone cannot clear.
+version: 1
+id: om300-exam3-inventory-eoq-lean/l3-lean-concepts
+title: OM 300 Exam 3 -- lean operations and TPS concepts
+description: >
+  Six five-option items over lean operations: TPS identity, a kanban EXCEPT
+  item, 5S content and order, setup-time reduction, and the lean/JIT
+  hierarchy. Guessing floor 0.20.
+
+  Provenance: every scenario, option and number was written for this file.
+  The skills assessed derive from the course's Exam 3 blueprint; no exam
+  stem, option, scenario, number or answer key is reproduced, and no exam
+  asset is committed.
+kind: verifiable
+domain: operations-management
+system_prompt: >-
+  You are answering a multiple-choice item from an undergraduate operations-
+  management examination. Exactly one option is correct. You may reason
+  briefly first, but you must then put the letter of the correct option
+  alone on the last line, with no punctuation and no other text on that
+  line.
+scorer:
+  kind: exact_match
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+    strip_punctuation: true
+    lowercase: true
+tags: [slo-benchmark, "slo:SLO9", "use-mode:capability", om300-exam3-inventory-eoq-lean, om300, ladder-l3, lean, forced-choice, business-knowledge]
+samples:
+  - id: tps-identification
+    input: >-
+      Which production approach, developed at an automaker, is built on
+      continuous improvement, respect for people, and standardized work,
+      with just-in-time and autonomation as its two pillars? A) Material
+      requirements planning B) Kanban C) Toyota Production System D)
+      Economic order quantity E) Cross-docking
+    # C. TPS. Kanban is one tool within it; MRP is a push planning logic.
+    target: "C"
+    metadata: { skill: tps, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: kanban-except
+    input: >-
+      A shop converts to a kanban pull system. Each of the following is
+      expected EXCEPT: A) Small lot sizes B) Cards or bins that signal when
+      to replenish C) Work released only when downstream calls for it D)
+      Large batches built ahead of demand to keep machines busy E) Lower
+      work-in-process inventory
+    # D. Batching ahead of demand is push logic, contrary to kanban. Others are kanban hallmarks. 'EXCEPT' stem inverts the usual direction.
+    target: "D"
+    metadata: { skill: kanban, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: five-s-correct
+    input: >-
+      Which statement about the 5S practices is correct? A) They are a list
+      of workplace-organization steps (sort, set in order, shine,
+      standardize, sustain) used as a foundation for lean B) They apply only
+      to office work C) They replace the need for standard work D) They are
+      a statistical sampling method E) They were created to set reorder
+      points
+    # A. 5S = sort, set in order, shine, standardize, sustain; a lean foundation.
+    target: "A"
+    metadata: { skill: five-s, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: setup-reduction-true
+    input: >-
+      Which statement about reducing equipment setup time is TRUE? A)
+      Reduction ends once the setup falls under one hour B) Setup work that
+      can be done while the machine is still running should be moved outside
+      the stoppage C) Operator training must come before any change to
+      tooling D) Reducing setup raises the economically optimal lot size E)
+      Standardizing tools has no effect on setup time
+    # B. Convert internal setup to external (do prep while machine runs). Lower setup cost lowers (not raises) optimal lot size, so D is wrong; E false.
+    target: "B"
+    metadata: { skill: setup-reduction, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: lean-vs-jit
+    input: >-
+      Which term describes a broad philosophy of eliminating waste across
+      the whole system, of which delivering materials just when they are
+      needed is only one part? A) Just-in-time B) Lean operations C) Kanban
+      D) Safety stock E) Blanket ordering
+    # B. Lean is the umbrella; JIT/kanban are components.
+    target: "B"
+    metadata: { skill: lean-jit, provenance: synthetic, slo: SLO9, use_mode: capability }
+
+  - id: five-s-seq
+    input: >-
+      In the 5S sequence, which step comes immediately after 'set in order'?
+      A) Sort B) Sustain C) Standardize D) Shine E) Scale
+    # D. Sort, set in order, shine, standardize, sustain. After set in order comes shine.
+    target: "D"
+    metadata: { skill: five-s, provenance: synthetic, slo: SLO9, use_mode: capability }

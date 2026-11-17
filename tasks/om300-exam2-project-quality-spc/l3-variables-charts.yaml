@@ -1,0 +1,124 @@
+# om300-exam2-project-quality-spc, rung 3 of 5: variables control charts.
+# Skill targets derive from the Exam 2 blueprint. All data are new. Tolerance
+# 0.01 (two-decimal rounding); each item's nearest wrong method is >= 0.2 away.
+# Every factor an item needs is printed in the item, so no table is recalled.
+version: 1
+id: om300-exam2-project-quality-spc/l3-variables-charts
+title: "OM 300 Exam 2 rung 3: x-bar and R chart limits"
+kind: verifiable
+domain: operations-management
+description: >-
+  Rung 3 of 5. Control limits for variables charts: x-bar limits from a known
+  process standard deviation, x-bar limits from the average range using a
+  supplied A2 factor, and R-chart limits from supplied D3/D4 factors. Adds,
+  over rung 2, choosing the right formula family and combining several data
+  values. Provenance: every item is synthetic, authored for this file; the
+  skill targets derive from the OM 300 Exam 2 blueprint (project scheduling
+  and crashing, quality concepts, statistical process control). No exam
+  wording, scenario, numbers, options or answer key are reproduced, and no
+  student work or textbook content is involved.
+system_prompt: >-
+  You are producing the answer key for an undergraduate operations-management
+  quiz. Use the convention and constants the item supplies. Round exactly as
+  the item says. Put the final numeric answer alone on the last line, with
+  no units, no currency symbol, no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  tolerance: 0.01
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam2-project-quality-spc, om300, ladder-l3, calculation, control-charts, variables-charts, quantitative-literacy]
+samples:
+  - id: xbar-ucl-known-sigma
+    input: >-
+      A filling process has a long-run mean of 41.6 and a known process standard
+      deviation of 0.9. Samples of 9 units are taken each hour. Use three-
+      sigma limits. What is the upper control limit of the x-bar chart?
+      Round to two decimals.
+    # UCL = 41.6 + 3(0.9/sqrt 9) = 41.6 + 0.9 = 42.50. Wrong: forgetting the sqrt(n) shrink gives 41.6 + 2.7 = 44.30 (1.8 away).
+    target: "42.5"
+    metadata: { skill: xbar-known-sigma, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: xbar-lcl-known-sigma
+    input: >-
+      A machining process has a long-run mean of 310 mm and a known process
+      standard deviation of 4 mm. Samples of 16 parts are measured. Use
+      three-sigma limits. What is the lower control limit of the x-bar
+      chart, in mm? Round to two decimals.
+    # LCL = 310 - 3(4/4) = 307.00. Wrong: ignoring sqrt(n) gives 298.00 (9 away).
+    target: "307"
+    metadata: { skill: xbar-known-sigma, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: xbar-ucl-known-sigma-n25
+    input: >-
+      A cereal line has a long-run mean fill of 18.40 oz and a known process
+      standard deviation of 0.50 oz. Samples of 25 boxes are taken. Use
+      three-sigma limits. What is the upper control limit of the x-bar
+      chart? Round to two decimals.
+    # UCL = 18.40 + 3(0.50/5) = 18.40 + 0.30 = 18.70. Wrong: using sigma without dividing by sqrt(n) gives 19.90 (1.2 away).
+    target: "18.7"
+    metadata: { skill: xbar-known-sigma, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: xbar-ucl-from-ranges
+    input: >-
+      Six samples of 5 units gave these (mean, range) pairs: (12.42, 0.9), (12.38,
+      1.1), (12.50, 0.7), (12.46, 1.0), (12.34, 0.8), (12.40, 0.7). For
+      subgroups of 5 the x-bar chart factor is A2 = 0.577; limits are
+      x-double-bar plus or minus A2 times R-bar. What is the upper control
+      limit of the x-bar chart? Round to two decimals.
+    # x-double-bar = 74.5/6 = 12.4167; R-bar = 5.2/6 = 0.8667; A2*R-bar = 0.5000. UCL = 12.9167 -> 12.92. Wrong: adding R-bar itself gives 13.28 (0.36 away); using the grand mean alone gives 12.42.
+    target: "12.92"
+    metadata: { skill: xbar-from-ranges, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: xbar-lcl-from-ranges
+    input: >-
+      Six samples of 5 units gave these (mean, range) pairs: (12.42, 0.9), (12.38,
+      1.1), (12.50, 0.7), (12.46, 1.0), (12.34, 0.8), (12.40, 0.7). For
+      subgroups of 5 the x-bar chart factor is A2 = 0.577; limits are
+      x-double-bar plus or minus A2 times R-bar. What is the lower control
+      limit of the x-bar chart? Round to two decimals.
+    # x-double-bar = 12.4167; A2*R-bar = 0.5000. LCL = 11.9166 -> 11.92. Wrong: subtracting R-bar = 11.55 (0.37 away).
+    target: "11.92"
+    metadata: { skill: xbar-from-ranges, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: r-ucl
+    input: >-
+      A process is monitored with samples of 8 and the average range is 14.0. For
+      n = 8 the R-chart factors are D3 = 0.136 and D4 = 1.864; limits are
+      D3*R-bar and D4*R-bar. What is the upper control limit of the R chart?
+      Round to two decimals.
+    # UCL = 1.864 * 14 = 26.096 -> 26.10. Wrong: using D3 gives 1.90; R-bar + 3 = 17.
+    target: "26.1"
+    metadata: { skill: r-chart, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: r-lcl
+    input: >-
+      A process is monitored with samples of 8 and the average range is 14.0. For
+      n = 8 the R-chart factors are D3 = 0.136 and D4 = 1.864; limits are
+      D3*R-bar and D4*R-bar. What is the lower control limit of the R chart?
+      Round to two decimals.
+    # LCL = 0.136 * 14 = 1.904 -> 1.90. Wrong: using D4 gives 26.10.
+    target: "1.9"
+    metadata: { skill: r-chart, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: r-ucl-n10
+    input: >-
+      Samples of 10 are taken and the average range is 7.0. For n = 10 the R-chart
+      factors are D3 = 0.223 and D4 = 1.777; limits are D3*R-bar and
+      D4*R-bar. What is the upper control limit of the R chart? Round to two
+      decimals.
+    # UCL = 1.777 * 7 = 12.439 -> 12.44. Wrong: D3 gives 1.56.
+    target: "12.44"
+    metadata: { skill: r-chart, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: r-lcl-n10
+    input: >-
+      Samples of 10 are taken and the average range is 7.0. For n = 10 the R-chart
+      factors are D3 = 0.223 and D4 = 1.777; limits are D3*R-bar and
+      D4*R-bar. What is the lower control limit of the R chart? Round to two
+      decimals.
+    # LCL = 0.223 * 7 = 1.561 -> 1.56. Wrong: D4 gives 12.44.
+    target: "1.56"
+    metadata: { skill: r-chart, provenance: synthetic, slo: SLO2, use_mode: capability }

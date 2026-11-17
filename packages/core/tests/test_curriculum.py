@@ -102,6 +102,18 @@ class TestTheShippedCurriculum:
         assert curriculum.is_assessment_point("MIS 200", "SLO2")
         assert not curriculum.is_assessment_point("MIS 200", "SLO1")
 
+    def test_om_300_marks_the_same_trio_as_the_second_measured_class(
+        self, curriculum: CurriculumMap
+    ) -> None:
+        """OM 300's four exam families file under SLO2 (calculations) and SLO9
+        (concepts); both must be outcomes the map actually marks for the course."""
+        assert curriculum.outcomes_for_course("OM 300") == {
+            "SLO1": CoverageLevel.REINFORCED,
+            "SLO2": CoverageLevel.ASSESSMENT_POINT,
+            "SLO9": CoverageLevel.INTRODUCED,
+        }
+        assert curriculum.is_assessment_point("OM 300", "SLO2")
+
     def test_every_benchmarkable_outcome_is_taught_somewhere(
         self, curriculum: CurriculumMap
     ) -> None:
@@ -280,6 +292,18 @@ class TestCheckTaskTags:
             ],
         )
         assert check_task_tags(spec, curriculum) == []
+
+    def test_an_untagged_om300_task_is_rejected_like_an_untagged_mis200_one(
+        self, curriculum: CurriculumMap
+    ) -> None:
+        """``om300-*`` is a course-specific benchmark family exactly as
+        ``mis200-*`` is, so a task that lost its tags there must fail loudly."""
+        spec = _task(
+            id="om300-exam1-ops-forecasting/l3-productivity",
+            tags=[],
+            samples=[{"id": "s1", "input": "q", "target": "a"}],
+        )
+        assert any("lost its tags" in p for p in check_task_tags(spec, curriculum))
 
     def test_the_dash_spelled_slo_family_prefix_is_also_recognised(
         self, curriculum: CurriculumMap

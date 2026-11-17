@@ -136,6 +136,22 @@ def test_mis200_real_families_are_untouched_in_dev_majors():
     ]
 
 
+def test_om300_real_families_are_untouched_and_no_demo_om300_exists():
+    # OM 300 is a REAL measured class. A demo-om300-* family or a demo unit entry
+    # for it would shadow the real units on dev (the demo taxonomy is merged over
+    # the real one), so neither may exist.
+    majors = load_majors(REPO / "curriculum" / "majors.dev.yaml")
+    om300 = next(c for m in majors.majors for c in m.classes if c.course == "OM 300")
+    assert om300.task_families == [
+        "om300-exam1-ops-forecasting",
+        "om300-exam2-project-quality-spc",
+        "om300-exam3-inventory-eoq-lean",
+        "om300-exam4-ops-analytics",
+    ]
+    assert "OM 300" not in gen.DEMO_UNITS
+    assert not list((REPO / "tasks-dev").glob("demo-om300-*"))
+
+
 # --------------------------------------------------------------------------
 # 3. Dev-only — nothing demo is in the committed prod curriculum
 # --------------------------------------------------------------------------

@@ -26,8 +26,8 @@ classes exist and whose they are; ``curriculum/slo.yaml`` says which outcomes a
 class teaches. They join on the course code, and the join is where the silent
 failures live: a class neither file can name renders as a nameless column, and a
 coverage course no major claims becomes unreachable from the drill-down -- which
-would quietly delete ``MIS 200``, the only class in the product with a scored
-benchmark behind it, from every path a reader can walk. See
+would quietly delete ``MIS 200`` or ``OM 300``, the only classes in the product with
+a scored benchmark behind them, from every path a reader can walk. See
 ``ida_core.majors.check_against_curriculum``.
 
 Exit codes: 0 all valid, 1 one or more invalid.

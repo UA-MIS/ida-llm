@@ -30,14 +30,14 @@ evidence.
 The load-bearing field is **`task_families`** on a class. Results are filed by
 *outcome* — a task carries `slo:SLO2`, never `course:MIS 200` — so a class scored
 from "the outcomes it teaches" gets a number that is *identical* for every other
-class the map marks against those outcomes. Run the three MIS 200 exam families
+class the map marks against those outcomes. Run the MIS 200 exam families
 without it and AC 210, ST 260, GBA 300, OM 300 and FI 302 each display a score
 from a course none of them is: a dozen fabricated measurements, each
 individually plausible, produced by arithmetic rather than by anybody lying.
 
 So a class counts only the results whose task family it claims, and **a class
 that claims none can never show a number**. That is the default, and it is
-correct. Today exactly one class in the college claims any: MIS 200.
+correct. Today exactly two classes in the college claim any: MIS 200 and OM 300.
 
 Three cross-file rules are gated in CI, because none of them is visible from
 either file alone:
@@ -45,8 +45,8 @@ either file alone:
 1. **Every class can name itself** — it carries a `title`, or the coverage grid
    has a row for its code. A class with neither would render as a nameless column.
 2. **Every coverage course is claimed exactly once** — by one major, or by
-   `unassigned_core` with a reason. An edit that dropped `MIS 200` from every
-   class list would empty the only populated path in the product, silently.
+   `unassigned_core` with a reason. An edit that dropped `MIS 200` or `OM 300` from
+   every class list would empty a populated path in the product, silently.
 3. **Every `task_families` entry names a family the catalogue has** — a
    misspelled family makes a class read "not measured yet" forever, which looks
    exactly like a class nobody has got round to running.

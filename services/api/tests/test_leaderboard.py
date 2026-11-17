@@ -613,13 +613,19 @@ class TestMajorsTaxonomy:
         mis200 = next(c for c in mis.classes if c.course == "MIS 200")
         assert mis200.task_families, "MIS 200 claims no task family, so it can never score"
 
+        ops = view.major("operations-management")
+        assert ops is not None
+        om300 = next(c for c in ops.classes if c.course == "OM 300")
+        assert om300.task_families, "OM 300 claims no task family, so it can never score"
+
         # And every OTHER class in the college claims none, so none of them can
-        # display a number it did not earn.
+        # display a number it did not earn. MIS 200 and OM 300 are the two
+        # measured classes.
         others = [
             (major.id, entry.course)
             for major in view.majors
             for entry in major.classes
-            if entry.task_families and entry.course != "MIS 200"
+            if entry.task_families and entry.course not in {"MIS 200", "OM 300"}
         ]
         assert others == []
 

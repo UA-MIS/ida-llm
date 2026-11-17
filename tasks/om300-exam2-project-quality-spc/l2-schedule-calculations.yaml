@@ -1,0 +1,116 @@
+# om300-exam2-project-quality-spc, rung 2 of 5: project calculations.
+# Skill targets derive from the Exam 2 blueprint. All networks and numbers are
+# new for this file. Tolerance 0.01 (two-decimal rounding); every wrong method
+# below lands at least 1 unit away, i.e. >= 100x the tolerance.
+version: 1
+id: om300-exam2-project-quality-spc/l2-schedule-calculations
+title: "OM 300 Exam 2 rung 2: project duration, slack and crash cost"
+kind: verifiable
+domain: operations-management
+description: >-
+  Rung 2 of 5. Single-quantity project calculations: forward pass to project
+  duration, slack from a supplied early/late table, and cost per day of
+  crashing. Adds, over rung 1, choosing the right method and doing the
+  arithmetic. Provenance: every item is synthetic, authored for this file;
+  the skill targets derive from the OM 300 Exam 2 blueprint (project
+  scheduling and crashing, quality concepts, statistical process control).
+  No exam wording, scenario, numbers, options or answer key are reproduced,
+  and no student work or textbook content is involved.
+system_prompt: >-
+  You are producing the answer key for an undergraduate operations-management
+  quiz. Use the convention and constants the item supplies. Round exactly as
+  the item says. Put the final numeric answer alone on the last line, with
+  no units, no currency symbol, no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  tolerance: 0.01
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam2-project-quality-spc, om300, ladder-l2, calculation, project-scheduling, quantitative-literacy]
+samples:
+  - id: project-duration-1
+    input: >-
+      Activity / duration (days) / immediate predecessors: A / 6 / none; B / 9 /
+      none; C / 4 / A; D / 5 / A; E / 3 / B,C; F / 7 / D,E. What is the
+      project duration in days? Give a whole number.
+    # Forward pass: A 0-6, B 0-9, C 6-10, D 6-11, E max(9,10)=10 -> 13, F max(11,13)=13 -> 20.
+    # Duration 20 (path A-C-E-F). Wrong methods: sum of all durations 34; the
+    # path B-E-F = 9+3+7 = 19 (one away).
+    target: "20"
+    metadata: { skill: forward-pass, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: project-duration-2
+    input: >-
+      Activity / duration (days) / immediate predecessors: A / 4 / none; B / 6 /
+      A; C / 3 / A; D / 5 / B; E / 8 / C; F / 2 / D,E. What is the project
+      duration in days? Give a whole number.
+    # Forward pass: A 0-4, B 4-10, C 4-7, D 10-15, E 7-15, F max(15,15)=15 -> 17.
+    # Two tied critical paths A-B-D-F and A-C-E-F, both 17. Wrong: sum of
+    # all durations = 28; a model that stops at the first path found still
+    # gets 17, so the item tests reading ties rather than a trap.
+    target: "17"
+    metadata: { skill: forward-pass, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: project-duration-3
+    input: >-
+      Activity / duration (days) / immediate predecessors: A / 2 / none; B / 5 /
+      none; C / 7 / A; D / 3 / B; E / 3 / C,D. What is the project duration
+      in days? Give a whole number.
+    # Forward pass: A 0-2, C 2-9; B 0-5, D 5-8; E max(9,8)=9 -> 12. Duration 12
+    # (path A-C-E). Wrong: path B-D-E = 11 (one away); sum of all = 20.
+    target: "12"
+    metadata: { skill: forward-pass, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: slack-offset-late-times
+    input: >-
+      In a project analysis, activity G has early start 4, early finish 9, late
+      start 7 and late finish 12 (all in days). What is the slack of G in
+      days?
+    # slack = LS - ES = 7 - 4 = 3 (= LF - EF = 12 - 9). Wrong: LF - ES = 8, or the duration 5.
+    target: "3"
+    metadata: { skill: slack, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: slack-later-in-network
+    input: >-
+      Activity K has early start 2, early finish 8, late start 7 and late finish
+      13. What is K's slack in days?
+    # slack = LS - ES = 7 - 2 = 5 (LF - EF = 13 - 8 = 5). Wrong: duration 6, or LF - ES = 11.
+    target: "5"
+    metadata: { skill: slack, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: slack-critical-activity
+    input: >-
+      Activity M has early start 10, early finish 16, late start 10 and late
+      finish 16. What is M's slack in days?
+    # slack = 10 - 10 = 0, so M is critical. Wrong: reading the duration 6 as slack, or EF - LS = 6.
+    target: "0"
+    metadata: { skill: slack, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: crash-cost-per-day-1
+    input: >-
+      An activity normally takes 9 days and costs 3000 dollars. Crashed it takes 5
+      days and costs 4350 dollars. What is the cost of crashing it, in
+      dollars per day saved?
+    # (4350 - 3000)/(9 - 5) = 1350/4 = 337.5. Wrong: total extra cost 1350, or dividing by crash time 5 = 270 (67.5 away).
+    target: "337.5"
+    metadata: { skill: crash-cost, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: crash-cost-per-day-2
+    input: >-
+      An activity normally takes 10 days and costs 5000 dollars. Crashed it takes
+      6 days and costs 9120 dollars. What is the crash cost per day saved,
+      in dollars?
+    # (9120 - 5000)/(10 - 6) = 4120/4 = 1030. Wrong: 9120/6 = 1520, or the total extra 4120.
+    target: "1030"
+    metadata: { skill: crash-cost, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: crash-cost-per-day-3
+    input: >-
+      A task has a normal time of 14 days at 8800 dollars and a crash time of 11
+      days at 10450 dollars. What is its crash cost per day saved, in
+      dollars? Round to two decimals.
+    # (10450 - 8800)/(14 - 11) = 1650/3 = 550. Wrong: 1650 total, or 10450/11 = 950.
+    target: "550"
+    metadata: { skill: crash-cost, provenance: synthetic, slo: SLO2, use_mode: capability }

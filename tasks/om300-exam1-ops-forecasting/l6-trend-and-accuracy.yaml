@@ -1,0 +1,98 @@
+# rung 6: least-squares trend and forecast error. Adds a regression-style
+# computation, absolute errors that must not cancel, and choosing the best
+# method from error measures.
+version: 1
+id: om300-exam1-ops-forecasting/l6-trend-and-accuracy
+title: OM 300 Exam 1 -- trend projection and forecast accuracy (MAD)
+description: >
+  Six items: two mean absolute deviation (MAD) calculations (one where signed
+  errors would cancel), two selections of the best method from a table of
+  MADs, and two least-squares trend-projection forecasts. Tolerance 0.05, the
+  looser of the two roundings; the nearest wrong method is far larger.
+
+  Provenance: every scenario, number and distractor was written for this file.
+  The skill targets derive from the course's Exam 1 blueprint (OM 300,
+  Introduction to Operations Management), but no exam stem, number or answer key
+  is reproduced, and no exam asset is committed. No student work and no
+  textbook content.
+kind: verifiable
+domain: operations-management
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory
+  operations-management examination. Use exactly the convention and rounding the
+  item names. Put the final numeric answer alone on the last line, with no units,
+  no percent sign, no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  tolerance: 0.05
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam1-ops-forecasting, om300, ladder-l6, forecasting, trend-projection, mad, calculation, quantitative-literacy]
+samples:
+  - id: mad-five-periods
+    input: >-
+      Actual demand and forecast for five periods are (40, 45), (52, 50), (38,
+      44), (61, 58) and (47, 47), each pair written as (actual, forecast).
+      Compute the mean absolute deviation (MAD), rounded to two decimal places.
+    # |errors| = 5, 2, 6, 3, 0 -> 16/5 = 3.20
+    # Wrong (signed mean error): -1.20, 4.4 away.
+    target: "3.20"
+    metadata: { skill: mad, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: mad-errors-cancel
+    input: >-
+      Four periods of (actual, forecast): (100, 92), (80, 95), (120, 105), (90,
+      88). Compute the mean absolute deviation, rounded to two decimal places.
+    # errors +8, -15, +15, +2; abs 8+15+15+2 = 40; /4 = 10.00
+    # Wrong (signed): 10/4 = 2.50, 7.5 away.
+    target: "10.00"
+    metadata: { skill: mad, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: best-method-by-mad
+    input: >-
+      A planner tested several methods on the same history and recorded each
+      one's MAD: naive 12.40; 3-period moving average 9.80; weighted moving
+      average 8.60; exponential smoothing alpha 0.2: 10.10; exponential
+      smoothing alpha 0.5: 7.90; trend projection 8.90. She will adopt the
+      most accurate method. What is the MAD of the method she should adopt?
+    # Lowest MAD = 7.90 (exponential smoothing alpha 0.5).
+    # Wrong (highest MAD, or the first listed): 12.40 / far; 6 options, so
+    # the chance floor is 1/6.
+    target: "7.90"
+    metadata: { skill: select-method-by-error, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: best-method-by-mad-second
+    input: >-
+      Forecast errors (MAD, in thousands of units) for five candidate methods:
+      3-period moving average 21.5; 4-period moving average 24.1; weighted
+      moving average 19.8; exponential smoothing alpha 0.3: 20.6; trend
+      projection 18.7. Which MAD belongs to the method that should be
+      selected?
+    # Lowest = 18.7 (trend projection).
+    target: "18.7"
+    metadata: { skill: select-method-by-error, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: least-squares-five-periods
+    input: >-
+      Quarterly demand for periods 1 to 5 was 20, 24, 29, 31 and 38. Fit a
+      least-squares linear trend with the period number as x and forecast
+      period 6, rounded to two decimal places.
+    # xbar = 3, ybar = 28.4; Sxy = 43; Sxx = 10; b = 4.3; a = 28.4 - 12.9 =
+    # 15.5; forecast(6) = 15.5 + 25.8 = 41.30
+    # Wrong (forecast period 5 instead): 37.00; wrong (mean): 28.40.
+    target: "41.30"
+    metadata: { skill: least-squares-trend, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: least-squares-six-periods
+    input: >-
+      Monthly demand for months 1 to 6 was 112, 118, 125, 129, 138 and 141.
+      Fit a least-squares linear trend with the month number as x and forecast
+      month 8, rounded to two decimal places.
+    # xbar = 3.5, ybar = 763/6 = 127.1667; Sxy = 2775 - 6*3.5*127.1667 = 104.5;
+    # Sxx = 91 - 73.5 = 17.5; b = 5.97143; a = 106.26667; f(8) = 154.038 ->
+    # 154.04. A solver who rounds b to 5.97 gets 154.03, hence tolerance 0.05.
+    # Wrong (month 7): 148.07, 6 away.
+    target: "154.04"
+    metadata: { skill: least-squares-trend, provenance: synthetic, slo: SLO2, use_mode: capability }

@@ -1,0 +1,68 @@
+# om300-exam4-ops-analytics, rung 3 of 8 -- choose and apply a forecasting method with data
+#
+# EVERY ITEM IS SYNTHETIC: scenarios, wording and numbers were written for this
+# file; the skill targets follow the course's Exam 4 blueprint.
+version: 1
+id: om300-exam4-ops-analytics/l3-forecasting
+title: OM 300 Exam 4 -- quantitative forecasting
+kind: verifiable
+domain: operations-management
+description: >
+  Five items on exponential smoothing, weighted moving average, mean squared
+  error, mean absolute deviation and least-squares trend projection. Each
+  requires picking the right indexing or weight order, so a near-miss method
+  lands outside the tolerance.
+
+  Provenance: every scenario and number is synthetic, authored for this file.
+  The skill targets derive from the course's Exam 4 blueprint; no exam wording,
+  scenario, number or answer key is reproduced.
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory operations-management exam. Use the formula and convention the item names. Round as the item instructs. Put the final numeric answer alone on the last line, with no units, no currency symbol, no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  tolerance: 0.01
+  normalisation: { strip: true, collapse_whitespace: true, take_last_line: true }
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam4-ops-analytics, om300, ladder-l3, forecasting, quantitative-literacy]
+samples:
+  - id: exponential-smoothing-next
+    input: |-
+      Last period's forecast was 430 and actual demand was 412. With a smoothing constant alpha of 0.35, what is the exponential-smoothing forecast for the next period? Round to two decimal places.
+    # F = 430 + 0.35*(412-430) = 430 - 6.3 = 423.70.
+    # Wrong: reporting the actual 412 (gap 11.7); applying alpha to the forecast error with the sign flipped gives 436.30 (gap 12.6).
+    target: "423.70"
+    metadata: { skill: exp-smoothing, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: weighted-moving-average
+    input: |-
+      Demand was 120 in March, 135 in April and 128 in May. Using a 3-period weighted moving average with weight 0.5 on the most recent month (May), 0.3 on April and 0.2 on March, forecast June demand. Round to two decimal places.
+    # 0.5*128 + 0.3*135 + 0.2*120 = 64 + 40.5 + 24 = 128.50.
+    # Wrong: weights reversed 126.10 (gap 2.40); simple average 127.67 (gap 0.83).
+    target: "128.50"
+    metadata: { skill: wma, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: mean-squared-error
+    input: |-
+      A store compares forecasts with actual demand over six weeks.
+      Actual: 112, 98, 105, 120, 101, 117
+      Forecast: 108, 103, 100, 114, 106, 110
+      Compute the mean squared error (MSE: the average of the squared errors). Round to two decimal places.
+    # Errors: 4,-5,5,6,-5,7. Squares: 16,25,25,36,25,49 = 176. 176/6 = 29.333 -> 29.33.
+    # Wrong: MAD = 32/6 = 5.33 (gap 24); dividing by n-1 gives 35.2.
+    target: "29.33"
+    metadata: { skill: forecast-error, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: mean-absolute-deviation
+    input: |-
+      A store compares forecasts with actual demand over six weeks.
+      Actual: 112, 98, 105, 120, 101, 117
+      Forecast: 108, 103, 100, 114, 106, 110
+      Compute the mean absolute deviation (MAD). Round to two decimal places.
+    # |errors| 4,5,5,6,5,7 = 32. 32/6 = 5.333 -> 5.33.
+    # Wrong: signed mean error (4-5+5+6-5+7)/6 = 2.00 (gap 3.33); MSE 29.33.
+    target: "5.33"
+    metadata: { skill: forecast-error, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: least-squares-trend
+    input: |-
+      Monthly demand for six consecutive months (months coded x = 1 through 6) was 40, 44, 43, 49, 52, 54. Fit the least-squares trend line y = a + b*x and use it to forecast month 8. Round to two decimal places.
+    # xbar=3.5, ybar=47. Sxy-n*xbar*ybar = 1037-987 = 50. Sxx-n*xbar^2 = 91-73.5 = 17.5. b = 2.857143, a = 47-10 = 37.
+    # Month 8: 37 + 8*2.857143 = 59.857 -> 59.86.
+    # Wrong: month 7 gives 57.00 (gap 2.86); naive last value 54.
+    target: "59.86"
+    metadata: { skill: trend-projection, provenance: synthetic, slo: SLO2, use_mode: capability }

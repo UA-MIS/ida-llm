@@ -187,3 +187,39 @@ describe("MIS 200 specifically", () => {
     expect(unitTitle(CLS, "nonsense")).toBe("nonsense");
   });
 });
+
+describe("OM 300 specifically", () => {
+  const CLS = "OM 300";
+
+  it("is a class with a taxonomy of four units, one per exam, in course order", () => {
+    expect(hasUnits(CLS)).toBe(true);
+    expect(unitsFor(CLS).map((u) => u.title)).toEqual([
+      "Strategy, productivity & forecasting",
+      "Project management & quality control",
+      "Inventory & lean operations",
+      "Cumulative final",
+    ]);
+  });
+
+  it("maps each unit to exactly its own exam's family", () => {
+    expect(unitsFor(CLS).map((u) => u.families)).toEqual([
+      ["om300-exam1-ops-forecasting"],
+      ["om300-exam2-project-quality-spc"],
+      ["om300-exam3-inventory-eoq-lean"],
+      ["om300-exam4-ops-analytics"],
+    ]);
+  });
+
+  it("titles Unit 4 as the cumulative final, with no synthetic-extension caveat", () => {
+    const unit = findUnit(CLS, "cumulative-final")!;
+    expect(unit.n).toBe(4);
+    expect(unit.caveat).toBeUndefined();
+  });
+
+  it("shares no family with MIS 200", () => {
+    const mine = new Set(unitsFor(CLS).flatMap((u) => u.families));
+    for (const family of unitsFor("MIS 200").flatMap((u) => u.families)) {
+      expect(mine.has(family)).toBe(false);
+    }
+  });
+});

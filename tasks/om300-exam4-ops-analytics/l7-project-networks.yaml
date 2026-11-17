@@ -1,0 +1,60 @@
+# om300-exam4-ops-analytics, rung 7 of 8 -- forward and backward pass, crashing logic
+#
+# EVERY ITEM IS SYNTHETIC: scenarios, wording and numbers were written for this
+# file; the skill targets follow the course's Exam 4 blueprint.
+version: 1
+id: om300-exam4-ops-analytics/l7-project-networks
+title: OM 300 Exam 4 -- project network duration, slack and crashing
+kind: verifiable
+domain: operations-management
+description: >
+  Five items on small activity-on-node networks: project duration, slack of a
+  non-critical activity, and the effect of crashing a critical versus a
+  non-critical activity. Answers are whole numbers (no tolerance).
+
+  Provenance: every scenario and number is synthetic, authored for this file.
+  The skill targets derive from the course's Exam 4 blueprint; no exam wording,
+  scenario, number or answer key is reproduced.
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory operations-management exam. Each project network lists activities, durations and immediate predecessors. Put the final answer, a whole number, alone on the last line, with no units and no other text on that line.
+scorer:
+  kind: numeric_match
+  tolerance: 0
+  normalisation: { strip: true, collapse_whitespace: true, take_last_line: true }
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam4-ops-analytics, om300, ladder-l7, project, quantitative-literacy]
+samples:
+  - id: duration-network-1
+    input: |-
+      Network 1: A (3 weeks, no predecessor); B (5, after A); C (2, after A); D (6, after B); E (4, after B and C); F (3, after D and E). What is the project duration (length of the longest path)?
+    # A-B-D-F = 3+5+6+3 = 17; A-B-E-F = 15; A-C-E-F = 12. Duration 17.
+    # Wrong: summing all durations 23; shortest path 12.
+    target: "17"
+    metadata: { skill: critical-path, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: duration-network-2
+    input: |-
+      Network 2: A (5 days, no predecessor); B (8, no predecessor); C (4, after A); D (3, after A and B); E (6, after C and D); F (2, after D). What is the project duration?
+    # Paths: A-C-E 15; A-D-E 14; B-D-E 17; B-D-F 13; A-D-F 10. Duration 17.
+    # Wrong: A-C-E (first start only) 15.
+    target: "17"
+    metadata: { skill: critical-path, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: slack-network-1-c
+    input: |-
+      Network 1: A (3 weeks, no predecessor); B (5, after A); C (2, after A); D (6, after B); E (4, after B and C); F (3, after D and E). How much slack (weeks) does activity C have?
+    # EF(C)=3+2=5. E's ES = max(EF(B)=8, EF(C)=5) = 8. Slack C = 8-5 = 3.
+    # Wrong: slack of E is 2; slack of C is not 0.
+    target: "3"
+    metadata: { skill: slack, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: crash-critical-activity
+    input: |-
+      Network 3: A (6 weeks, no predecessor); B (4, after A); C (7, after A); D (5, after B); E (3, after C and D); F (4, after E). Paths: A-B-D-E-F and A-C-E-F. Activity D can be crashed (shortened) by 2 weeks. What is the new project duration after crashing D by 2 weeks, taking into account that another path may become critical?
+    # Original: A-B-D-E-F = 6+4+5+3+4 = 22; A-C-E-F = 6+7+3+4 = 20. Crash D by 2: A-B-D-E-F = 20; A-C-E-F = 20. New duration 20.
+    # Wrong: 22 (ignoring the crash). Note 22-2 = 20 happens to coincide with A-C-E-F tying at 20; a 3-week crash would still give 20 (not 19) because A-C-E-F becomes critical.
+    target: "20"
+    metadata: { skill: crashing, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: crash-noncritical-activity
+    input: |-
+      Network 3: A (6 weeks, no predecessor); B (4, after A); C (7, after A); D (5, after B); E (3, after C and D); F (4, after E). Activity C can be crashed (shortened) by 2 weeks. What is the new project duration after crashing C by 2 weeks?
+    # Critical path A-B-D-E-F = 22 does not contain C; A-C-E-F becomes 18. Duration stays 22.
+    # Wrong: 20 (assuming the reduction applies to the project).
+    target: "22"
+    metadata: { skill: crashing, provenance: synthetic, slo: SLO2, use_mode: capability }

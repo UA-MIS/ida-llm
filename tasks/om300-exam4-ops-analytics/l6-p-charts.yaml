@@ -1,0 +1,60 @@
+# om300-exam4-ops-analytics, rung 6 of 8 -- sigma of a proportion, chosen sigma multiple, floor at zero
+#
+# EVERY ITEM IS SYNTHETIC: scenarios, wording and numbers were written for this
+# file; the skill targets follow the course's Exam 4 blueprint.
+version: 1
+id: om300-exam4-ops-analytics/l6-p-charts
+title: OM 300 Exam 4 -- attribute (p) chart limits
+kind: verifiable
+domain: operations-management
+description: >
+  Five items on p charts: standard deviation of the proportion, three-sigma
+  upper and lower limits, a four-sigma limit that goes negative and must be
+  reported as zero, and a two-sigma limit. Tolerance is four-decimal.
+
+  Provenance: every scenario and number is synthetic, authored for this file.
+  The skill targets derive from the course's Exam 4 blueprint; no exam wording,
+  scenario, number or answer key is reproduced.
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory operations-management exam. Use the standard p-chart formulas: sigma_p = sqrt(p*(1-p)/n), limits = p +/- z*sigma_p, and report a negative lower limit as 0. Round to four decimal places. Put the final numeric answer alone on the last line, with no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  tolerance: 0.0001
+  normalisation: { strip: true, collapse_whitespace: true, take_last_line: true }
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam4-ops-analytics, om300, ladder-l6, spc, quantitative-literacy]
+samples:
+  - id: p-sigma
+    input: |-
+      A call center historically sees 3.5% of calls escalated. A daily sample is 300 calls. What is the standard deviation of the sample proportion, sqrt(p(1-p)/n)? Round to four decimal places.
+    # sqrt(0.035*0.965/300) = sqrt(0.00011258) = 0.010611 -> 0.0106.
+    # Wrong: omit sqrt 0.0001126 (gap 0.0105); using n-1.
+    target: "0.0106"
+    metadata: { skill: p-chart, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: p-ucl-3sigma
+    input: |-
+      A call center historically sees 3.5% of calls escalated. A daily sample is 300 calls. What is the three-sigma upper control limit of the p chart? Round to four decimal places.
+    # sigma 0.010611. 0.035 + 3*0.010611 = 0.066832 -> 0.0668.
+    # Wrong: two-sigma 0.0562 (gap 0.011); four-sigma 0.0774.
+    target: "0.0668"
+    metadata: { skill: p-chart, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: p-lcl-3sigma
+    input: |-
+      A call center historically sees 3.5% of calls escalated. A daily sample is 300 calls. What is the three-sigma lower control limit of the p chart? Round to four decimal places.
+    # 0.035 - 0.031832 = 0.003168 -> 0.0032.
+    # Wrong: four-sigma gives negative -> 0; two-sigma 0.0138 (gap 0.0106).
+    target: "0.0032"
+    metadata: { skill: p-chart, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: p-lcl-4sigma-floor
+    input: |-
+      A claims-processing unit historically has a 4% error rate and samples 120 claims per day. What is the four-sigma lower control limit of the p chart? A negative limit is reported as 0. Round to four decimal places.
+    # sigma = sqrt(0.04*0.96/120) = 0.017889. 0.04 - 4*0.017889 = -0.031554 -> floor 0.
+    # Wrong: reporting -0.0316 (gap 0.0316); three-sigma 0.0063.
+    target: "0"
+    metadata: { skill: p-chart, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: p-ucl-2sigma
+    input: |-
+      A parts line historically makes 6% defective units and samples 200 units per lot. What is the two-sigma upper control limit of the p chart? Round to four decimal places.
+    # sigma = sqrt(0.06*0.94/200) = 0.016793. 0.06 + 2*0.016793 = 0.093586 -> 0.0936.
+    # Wrong: three-sigma 0.1104 (gap 0.0168).
+    target: "0.0936"
+    metadata: { skill: p-chart, provenance: synthetic, slo: SLO2, use_mode: capability }

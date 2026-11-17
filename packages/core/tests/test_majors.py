@@ -6,20 +6,20 @@ module exists to guarantee is that the three failures nothing else would notice
 are REJECTED:
 
 * a class neither file can name -- it would render as a nameless column;
-* a coverage course no major claims -- ``MIS 200`` is the only class in the
-  product with a scored benchmark behind it, and an edit that dropped it from
-  every class list would empty the demonstration path silently;
+* a coverage course no major claims -- ``MIS 200`` and ``OM 300`` are the only
+  classes in the product with a scored benchmark behind them, and an edit that
+  dropped either from every class list would empty a populated path silently;
 * a ``task_families`` entry naming a family the catalogue does not have -- the
   class then matches no result, reads "not measured yet" forever, and looks
   exactly like a class nobody has got round to running.
 
 And one about the shape of the data itself: ``task_families`` is what makes a
 class's score a claim about THAT CLASS.  Results are filed by outcome, so
-without it, running the three MIS 200 exam families would light up every course
-the map marks against SLO1, SLO2 or SLO9 with a score from a class none of them
-is.  :func:`test_only_one_class_claims_any_task_family_today` pins the fact that
-exactly one class does, so the day a second one is added it is a deliberate edit
-rather than a side effect.
+without it, running the MIS 200 or OM 300 exam families would light up every
+course the map marks against SLO1, SLO2 or SLO9 with a score from a class none
+of them is.  :func:`test_only_the_two_measured_classes_claim_task_families_today`
+pins the fact that exactly two classes do, so the day a third is added it is a
+deliberate edit rather than a side effect.
 """
 
 from __future__ import annotations
@@ -115,18 +115,38 @@ def test_mis_200_is_owned_by_the_mis_major(majors: Majors) -> None:
     assert owner.id == "management-information-systems"
 
 
-def test_only_one_class_claims_any_task_family_today(majors: Majors) -> None:
+def test_only_the_two_measured_classes_claim_task_families_today(majors: Majors) -> None:
     claiming = [
         (major.id, entry.course)
         for major in majors.majors
         for entry in major.classes
         if entry.task_families
     ]
-    assert claiming == [("management-information-systems", "MIS 200")], (
-        "a second class now claims task families. That is a real product change -- "
+    assert claiming == [
+        ("management-information-systems", "MIS 200"),
+        ("operations-management", "OM 300"),
+    ], (
+        "a third class now claims task families. That is a real product change -- "
         "another class can show a score -- so update this test deliberately rather "
         "than deleting it."
     )
+
+
+def test_om_300_claims_exactly_its_four_exam_families(majors: Majors) -> None:
+    owner = majors.major_for_course("OM 300")
+    assert owner is not None
+    assert owner.id == "operations-management"
+    entry = next(e for e in owner.classes if e.course == "OM 300")
+    assert entry.task_families == [
+        "om300-exam1-ops-forecasting",
+        "om300-exam2-project-quality-spc",
+        "om300-exam3-inventory-eoq-lean",
+        "om300-exam4-ops-analytics",
+    ]
+    # No family is claimed by two classes: a shared family would print one score
+    # under two course headings.
+    owned = [f for m in majors.majors for c in m.classes for f in c.task_families]
+    assert len(owned) == len(set(owned))
 
 
 def test_the_catalog_title_supersedes_the_maps_abbreviation(

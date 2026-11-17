@@ -1,0 +1,54 @@
+# om300-exam4-ops-analytics, rung 8 of 8 -- produce the path, not just its length
+#
+# EVERY ITEM IS SYNTHETIC: scenarios, wording and numbers were written for this
+# file; the skill targets follow the course's Exam 4 blueprint.
+version: 1
+id: om300-exam4-ops-analytics/l8-critical-path-sequence
+title: OM 300 Exam 4 -- critical path as an ordered sequence
+kind: verifiable
+domain: operations-management
+description: >
+  Five items that ask for the critical path itself as a string of activity
+  letters joined by hyphens in precedence order. All-or-nothing; the format is
+  pinned in the system prompt.
+
+  Provenance: every scenario and number is synthetic, authored for this file.
+  The skill targets derive from the course's Exam 4 blueprint; no exam wording,
+  scenario, number or answer key is reproduced.
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory operations-management exam. Identify the critical path: the longest path through the network. Put the final answer alone on the last line as the activity letters in order, joined by single hyphens, with no spaces and no other text (for example: A-C-F).
+scorer:
+  kind: exact_match
+  normalisation: { strip: true, collapse_whitespace: true, take_last_line: true, lowercase: true }
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam4-ops-analytics, om300, ladder-l8, project, quantitative-literacy]
+samples:
+  - id: critical-path-network-1
+    input: |-
+      Network 1: A (3 weeks, no predecessor); B (5, after A); C (2, after A); D (6, after B); E (4, after B and C); F (3, after D and E). What is the critical path?
+    # A-B-D-F = 17 (others 15, 12).
+    target: "A-B-D-F"
+    metadata: { skill: critical-path, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: critical-path-network-2
+    input: |-
+      Network 2: A (5 days, no predecessor); B (8, no predecessor); C (4, after A); D (3, after A and B); E (6, after C and D); F (2, after D). What is the critical path?
+    # B-D-E = 17 (A-C-E 15).
+    target: "B-D-E"
+    metadata: { skill: critical-path, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: critical-path-network-3
+    input: |-
+      Network 3: A (6 weeks, no predecessor); B (4, after A); C (7, after A); D (5, after B); E (3, after C and D); F (4, after E). What is the critical path?
+    # A-B-D-E-F = 22 (A-C-E-F 20).
+    target: "A-B-D-E-F"
+    metadata: { skill: critical-path, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: critical-path-network-4
+    input: |-
+      Network 4: A (4 weeks, no predecessor); B (3, after A); C (8, after A); D (5, after B); E (2, after C); F (6, after D and E). What is the critical path?
+    # A-B-D-F = 4+3+5+6 = 18; A-C-E-F = 4+8+2+6 = 20. Critical A-C-E-F.
+    target: "A-C-E-F"
+    metadata: { skill: critical-path, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: critical-path-network-5
+    input: |-
+      Network 5: A (2, no predecessor); B (6, no predecessor); C (5, after A); D (4, after B); E (3, after C and D); F (7, after D); G (2, after E and F). What is the critical path?
+    # A-C-E-G = 12; B-D-E-G = 6+4+3+2 = 15; B-D-F-G = 6+4+7+2 = 19. Critical B-D-F-G.
+    target: "B-D-F-G"
+    metadata: { skill: critical-path, provenance: synthetic, slo: SLO2, use_mode: capability }

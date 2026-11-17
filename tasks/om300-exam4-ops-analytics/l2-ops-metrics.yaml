@@ -1,0 +1,61 @@
+# om300-exam4-ops-analytics, rung 2 of 8 -- one formula, one step of unit handling
+#
+# EVERY ITEM IS SYNTHETIC: scenarios, wording and numbers were written for this
+# file; the skill targets follow the course's Exam 4 blueprint.
+version: 1
+id: om300-exam4-ops-analytics/l2-ops-metrics
+title: OM 300 Exam 4 -- single-formula operations metrics
+kind: verifiable
+domain: operations-management
+description: >
+  Five items, each a single operations metric: labor productivity after a
+  stated gain, percent productivity change, inventory turnover, days of
+  inventory, and reorder point with safety stock. Each adds one trap -- a
+  unit conversion, the wrong income-statement line, a 365-day year.
+
+  Provenance: every scenario and number is synthetic, authored for this file.
+  The skill targets derive from the course's Exam 4 blueprint; no exam wording,
+  scenario, number or answer key is reproduced.
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory operations-management exam. Use the formula and convention the item names. Round as the item instructs. Put the final numeric answer alone on the last line, with no units, no currency symbol, no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  tolerance: 0.01
+  normalisation: { strip: true, collapse_whitespace: true, take_last_line: true }
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam4-ops-analytics, om300, ladder-l2, metrics, quantitative-literacy]
+samples:
+  - id: labor-productivity-gain
+    input: |-
+      A print shop produces 1,316 pamphlets in a 7-hour shift using 3 workers. Productivity is measured as pamphlets per labor-hour (labor-hours = workers x hours per shift). If productivity rises by 15%, what is the new productivity? Round to two decimal places.
+    # Labor-hours = 3*7 = 21. 1316/21 = 62.6667. x1.15 = 72.0667 -> 72.07.
+    # Wrong: new OUTPUT 1316*1.15 = 1513.4 (gap >1400); per-worker 1316/3*1.15 = 504.5.
+    target: "72.07"
+    metadata: { skill: productivity, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: productivity-percent-change
+    input: |-
+      A workshop made 480 units using 6 labor-hours last week, and 540 units using 6.5 labor-hours this week. By what percent did labor productivity (units per labor-hour) change? Report the percent as a number, rounded to two decimal places (for example, 3.5 for a 3.5% increase).
+    # Before: 480/6 = 80. After: 540/6.5 = 83.0769. Change = 3.0769/80 = 3.846% -> 3.85.
+    # Wrong: output change 12.5% (gap 8.65); hours-only change 8.33%.
+    target: "3.85"
+    metadata: { skill: productivity, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: inventory-turnover-cogs
+    input: |-
+      A distributor reports annual sales of $58.7 million, cost of goods sold of $41.3 million, net income of $4.1 million and inventory of $6.4 million on its balance sheet. Compute inventory turnover as cost of goods sold divided by inventory. Round to two decimal places.
+    # 41.3/6.4 = 6.453125 -> 6.45.
+    # Wrong: using sales 58.7/6.4 = 9.17 (gap 2.72); using net income 0.64.
+    target: "6.45"
+    metadata: { skill: inventory-turnover, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: days-of-inventory
+    input: |-
+      A distributor has cost of goods sold of $41.3 million and inventory of $6.4 million. Using a 365-day year, how many days of inventory does it hold, defined as 365 divided by inventory turnover (turnover = cost of goods sold / inventory)? Keep turnover unrounded in the calculation and round only the final answer to two decimal places.
+    # Turnover 6.453125. 365/6.453125 = 56.5617 -> 56.56.
+    # Wrong: 360-day year gives 55.79 (gap 0.77); using turnover itself 6.45; rounding turnover to 6.45 first gives 56.59 (gap 0.03), hence the no-intermediate-rounding instruction.
+    target: "56.56"
+    metadata: { skill: inventory-turnover, provenance: synthetic, slo: SLO2, use_mode: capability }
+  - id: reorder-point-safety-stock
+    input: |-
+      A distributor's lead time on a fast-moving item is 4 days, average demand is 215 units per day, and management holds 45 units of safety stock. Compute the reorder point (demand during lead time plus safety stock). Round to the nearest whole number.
+    # 215*4 = 860; +45 = 905.
+    # Wrong: omit safety stock 860 (gap 45); omit lead time 260.
+    target: "905"
+    metadata: { skill: reorder-point, provenance: synthetic, slo: SLO2, use_mode: capability }

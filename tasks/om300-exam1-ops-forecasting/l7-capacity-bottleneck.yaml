@@ -1,0 +1,127 @@
+# rung 7: capacity measures and process bottlenecks. Adds a process described
+# in text (with parallel identical machines), a rule for effective stage time,
+# and throughput over a shift.
+version: 1
+id: om300-exam1-ops-forecasting/l7-capacity-bottleneck
+title: OM 300 Exam 1 -- utilization, efficiency and bottleneck time
+description: >
+  Eight items. Utilization and efficiency from design/effective/actual
+  capacity, two reverse-solves, and three process items where parallel
+  identical machines are stated in text. The convention is pinned in each
+  process item: a stage's effective time per batch is its machine time divided
+  by the number of identical parallel machines, and the bottleneck is the
+  stage with the largest effective time. Tolerance 0.01; the nearest wrong
+  method (efficiency for utilization, ignoring parallel machines) is far off.
+
+  Provenance: every scenario, number and distractor was written for this file.
+  The skill targets derive from the course's Exam 1 blueprint (OM 300,
+  Introduction to Operations Management), but no exam stem, number or answer key
+  is reproduced, and no exam asset is committed. No student work and no
+  textbook content.
+kind: verifiable
+domain: operations-management
+system_prompt: >-
+  You are producing the answer key for an undergraduate introductory
+  operations-management examination. Use exactly the convention and rounding the
+  item names. Put the final numeric answer alone on the last line, with no units,
+  no percent sign, no label and no other text on that line.
+scorer:
+  kind: numeric_match
+  tolerance: 0.01
+  normalisation:
+    take_last_line: true
+    strip: true
+    collapse_whitespace: true
+tags: [slo-benchmark, "slo:SLO2", "use-mode:capability", om300-exam1-ops-forecasting, om300, ladder-l7, capacity, bottleneck, calculation, quantitative-literacy]
+samples:
+  - id: utilization-percent
+    input: >-
+      A packing line has design capacity 8,400 cartons per week, effective
+      capacity 6,720 and actual output 5,040. What is its utilization as a
+      percentage, rounded to two decimal places?
+    # utilization = actual/design = 5040/8400 = 0.60 -> 60.00
+    # Wrong (efficiency, vs effective): 75.00, 15 away.
+    target: "60.00"
+    metadata: { skill: utilization, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: efficiency-percent
+    input: >-
+      A bakery oven has design capacity 1,250 trays per week, effective
+      capacity 1,000 and actual output 920. What is its efficiency as a
+      percentage, rounded to two decimal places?
+    # efficiency = actual/effective = 920/1000 = 92.00
+    # Wrong (utilization, vs design): 73.60, 18 away.
+    target: "92.00"
+    metadata: { skill: efficiency, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: utilization-large-numbers
+    input: >-
+      A mill has design capacity 15,000 units per month, effective capacity
+      12,600 and actual output 9,450. What is its utilization as a percentage,
+      rounded to two decimal places?
+    # 9450/15000 = 0.63 -> 63.00; wrong (efficiency 75.00).
+    target: "63.00"
+    metadata: { skill: utilization, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: actual-output-from-efficiency
+    input: >-
+      A line's effective capacity is 2,400 units per week and its efficiency
+      is 80%. How many units does it actually produce per week?
+    # efficiency = actual/effective -> actual = 0.80*2400 = 1920
+    # Wrong (divide): 3000, far.
+    target: "1920"
+    metadata: { skill: efficiency-reverse, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: actual-output-from-utilization
+    input: >-
+      A line's design capacity is 4,800 units per week and its utilization is
+      62.5%. How many units does it actually produce per week?
+    # actual = 0.625*4800 = 3000
+    target: "3000"
+    metadata: { skill: utilization-reverse, provenance: synthetic, slo: SLO2, use_mode: capability }
+
+  - id: bottleneck-time-parallel-machines
+    input: >-
+      A bread line has four stages in sequence, and each batch passes through
+      one machine per stage. Mixing takes 14 minutes on one machine. Shaping
+      takes 36 minutes per batch and has 2 identical machines in parallel.
+      Baking takes 72 minutes per batch and has 3 identical machines in
+      parallel. Packing takes 20 minutes on one machine. Treat a stage's
+      effective time per batch as its machine time divided by its number of
+      identical parallel machines; the bottleneck is the stage with the
+      largest effective time. What is the bottleneck time per batch, in
+      minutes?
+    # effective: mixing 14; shaping 36/2 = 18; baking 72/3 = 24; packing 20.
+    # max = 24 (baking).
+    # Wrong (ignore parallel machines): 72, far; wrong (second-highest): 20.
+    target: "24"
+    metadata: { skill: bottleneck-time, provenance: synthetic, scenario: bread-line, slo: SLO2, use_mode: capability }
+
+  - id: shift-output-from-bottleneck
+    input: >-
+      The same bread line (mixing 14 minutes on one machine; shaping 36 minutes
+      on 2 parallel machines; baking 72 minutes on 3 parallel machines;
+      packing 20 minutes on one machine) makes 30 loaves per batch. Using the
+      convention that a stage's effective time is machine time divided by its
+      identical parallel machines, and that output is limited by the largest
+      effective time, how many loaves can it produce in an 8-hour shift?
+    # bottleneck 24 min/batch -> 480/24 = 20 batches; 20*30 = 600 loaves.
+    # Wrong (bottleneck 72, no parallel): 6.67 batches -> 200.
+    target: "600"
+    metadata: { skill: throughput-from-bottleneck, provenance: synthetic, scenario: bread-line, slo: SLO2, use_mode: capability }
+
+  - id: bottleneck-time-second-line
+    input: >-
+      A packaging line has four stages in sequence. Cutting takes 10 minutes
+      per batch on one machine. Printing takes 45 minutes per batch with 3
+      identical machines in parallel. Folding takes 28 minutes per batch with
+      2 identical machines in parallel. Sealing takes 16 minutes per batch on
+      one machine. Treat a stage's effective time per batch as its machine time
+      divided by its number of identical parallel machines; the bottleneck is
+      the stage with the largest effective time. What is the bottleneck time
+      per batch, in minutes?
+    # effective: cutting 10; printing 45/3 = 15; folding 28/2 = 14; sealing 16.
+    # max = 16 (sealing).
+    # Wrong (ignore parallel machines): 45, far.
+    target: "16"
+    metadata: { skill: bottleneck-time, provenance: synthetic, slo: SLO2, use_mode: capability }

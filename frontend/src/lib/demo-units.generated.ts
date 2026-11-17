@@ -180,28 +180,6 @@ export const DEMO_TAXONOMY: Record<string, ClassUnit[]> = {
       caveat: "Illustrative demonstration data for a class that has not yet had its own tasks authored. The items are synthetic placeholders and the scores are seeded, not measured.",
     },
   ],
-  "OM 300": [
-    {
-      key: "process-analysis",
-      n: 1,
-      title: "Process analysis",
-      covers: ["Process flow", "Bottlenecks", "Capacity"],
-      blurb: "Reading a process as a flow and finding where it is constrained.",
-      families: ["demo-om300-u1"],
-      source: "Illustrative demonstration set",
-      caveat: "Illustrative demonstration data for a class that has not yet had its own tasks authored. The items are synthetic placeholders and the scores are seeded, not measured.",
-    },
-    {
-      key: "quality-and-operations",
-      n: 2,
-      title: "Quality and operations",
-      covers: ["Quality concepts", "Inventory basics", "Operations strategy"],
-      blurb: "The concepts that govern how operations are run and improved.",
-      families: ["demo-om300-u2"],
-      source: "Illustrative demonstration set",
-      caveat: "Illustrative demonstration data for a class that has not yet had its own tasks authored. The items are synthetic placeholders and the scores are seeded, not measured.",
-    },
-  ],
   "MIS 221": [
     {
       key: "programming-fundamentals",
