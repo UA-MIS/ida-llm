@@ -9,6 +9,8 @@ from fastapi.responses import Response
 from ida_api.admin.deps import Admin, not_implemented
 from ida_api.admin.schemas import SystemGuards, SystemInfo
 from ida_api.deps import AppContext, get_context
+from ida_core.configdb.reader import current_revision
+from ida_core.db import session_scope
 
 router = APIRouter(tags=["admin: system"])
 
@@ -41,8 +43,12 @@ def get_system(_: Admin, ctx: AppContext = Depends(get_context)) -> SystemInfo:
 
 
 def _current_revision(ctx: AppContext):
-    """``(revision, at)`` -- ``(None, None)`` until the config tables exist (B2)."""
-    return None, None
+    """``(revision, at)`` in db mode; ``(None, None)`` in yaml mode, where the
+    config tables are not the source of truth."""
+    if ctx.settings.config_source != "db":
+        return None, None
+    with session_scope(ctx.session_factory) as session:
+        return current_revision(session)
 
 
 @router.get(

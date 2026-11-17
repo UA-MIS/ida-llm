@@ -13,6 +13,7 @@ import sys
 
 from ida_core.artifacts import LocalArtifactStore, S3ArtifactStore
 from ida_core.config import get_settings
+from ida_core.configdb.crypto import DbCredentialResolver, parse_kek
 from ida_core.db import make_engine, make_session_factory
 from ida_core.queue import RedisQueue
 from ida_harness.config_provider import build_provider
@@ -66,7 +67,11 @@ def build_worker() -> Worker:
     # One judge for the process: it owns an HTTP client, and every job reuses it.
     # Nothing closes it, deliberately -- the worker loop's lifetime is the
     # process's, and the OS reclaims the socket at exit.
-    judge = build_judge_from_settings(settings, registry)
+    # Admin-entered provider keys (credential_ref): decrypted at use time with
+    # IDA_CREDENTIALS_KEK. parse_kek raises on a malformed KEK, so a runner that
+    # cannot decrypt never comes up looking healthy.
+    credentials = DbCredentialResolver(session_factory, parse_kek(settings.credentials_kek))
+    judge = build_judge_from_settings(settings, registry, credentials)
 
     return Worker(
         queue=queue,
@@ -76,6 +81,7 @@ def build_worker() -> Worker:
         artifact_store=store,
         git_sha=snapshot.task_git_sha,
         config=config if settings.config_source == "db" else None,
+        credentials=credentials,
         poll_timeout_s=settings.runner_poll_timeout_s,
         judge=judge,
         reaper=Reaper(

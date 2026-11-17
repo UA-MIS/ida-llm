@@ -5638,7 +5638,7 @@
     },
     "/admin/credentials/{name}": {
       "delete": {
-        "description": "409 while any non-archived model references it.",
+        "description": "409 while any non-archived model references it.  Archived models that\nnamed it are detached.",
         "operationId": "delete_credential_admin_credentials__name__delete",
         "parameters": [
           {
@@ -5842,6 +5842,7 @@
     },
     "/admin/credentials/{name}/secret": {
       "put": {
+        "description": "Replace the key.  Every process's in-memory copy is keyed by row\nversion, so the next job decrypts the new one -- no restart.",
         "operationId": "rotate_credential_admin_credentials__name__secret_put",
         "parameters": [
           {
@@ -8212,7 +8213,7 @@
     },
     "/admin/model-families/{key}": {
       "delete": {
-        "description": "409 while any non-archived model is a member.",
+        "description": "409 while any non-archived model is a member.  Archived members are\ndetached (their history keeps the key; the family name is gone).",
         "operationId": "delete_model_family_admin_model_families__key__delete",
         "parameters": [
           {
@@ -8634,7 +8635,7 @@
     },
     "/admin/models": {
       "get": {
-        "description": "Every model, disabled/hidden/testing-only included, with key presence.",
+        "description": "Every model, disabled/hidden/testing-only included, in registry order,\nwith whether its key is present (never the key).",
         "operationId": "list_admin_models_admin_models_get",
         "parameters": [
           {
@@ -9026,7 +9027,7 @@
     },
     "/admin/models/reorder": {
       "post": {
-        "description": "Rewrites ``display_order`` as 10, 20, 30 ... in one revision.",
+        "description": "Rewrites ``display_order`` as 10, 20, 30 ... for the listed models, in the\nlisted order, in one revision.  Models not listed keep their order.",
         "operationId": "reorder_models_admin_models_reorder_post",
         "parameters": [
           {
@@ -9616,6 +9617,7 @@
         ]
       },
       "patch": {
+        "description": "Quick toggles: only the fields the body names change; an explicit\n``null`` clears ``family_key``/``display_order``.",
         "operationId": "patch_model_admin_models__key__patch",
         "parameters": [
           {
@@ -9834,6 +9836,7 @@
         ]
       },
       "put": {
+        "description": "Full replace.  The key is immutable (a rename is create + archive).",
         "operationId": "replace_model_admin_models__key__put",
         "parameters": [
           {
@@ -10054,7 +10057,7 @@
     },
     "/admin/models/{key}/test": {
       "post": {
-        "description": "One 1-token request through the real client. Spends a trivial amount on\npaid models. Rate-limited to 1 per 10 s per model.",
+        "description": "One 1-token request through the real client, with the resolved key.\n\nSpends a trivial amount on paid models (the console says so), so it is\nrate-limited per model and audited.  The error text is truncated and\nscrubbed of the key before it is returned.",
         "operationId": "test_model_admin_models__key__test_post",
         "parameters": [
           {

@@ -104,3 +104,60 @@ def test_without_a_provider_the_startup_registry_is_used(monkeypatch) -> None:
     )
     worker._process(_message(1))
     assert seen == [REGISTRY]
+
+
+def test_a_credential_ref_model_resolves_its_key_in_the_worker(tmp_path, monkeypatch) -> None:
+    """``execute_job`` hands the resolver to ``resolve_api_key``: a model that
+    names an admin-entered credential gets the decrypted key, at use time."""
+    from ida_core.contracts import RunRecord
+    from ida_core.db import create_all, make_engine, make_session_factory, session_scope
+    from ida_core.repositories import create_run
+    from ida_runner.worker import execute_job
+
+    engine = make_engine(f"sqlite+pysqlite:///{tmp_path / 'w.db'}")
+    create_all(engine)
+    factory = make_session_factory(engine)
+    with session_scope(factory) as session:
+        create_run(
+            session,
+            RunRecord(
+                id="run_cred",
+                status=RunStatus.QUEUED,
+                task_id="demo/arithmetic-quiz-check",
+                model_key="mock",
+                harness_version="t",
+            ),
+        )
+    registry = REGISTRY.model_copy(
+        update={
+            "models": [
+                m.model_copy(update={"credential_ref": "mock-cred", "api_key_env": None})
+                if m.key == "mock"
+                else m
+                for m in REGISTRY.models
+            ]
+        }
+    )
+
+    class Resolver:
+        def get(self, name: str) -> str:
+            assert name == "mock-cred"
+            return "sk-from-the-vault-not-real"
+
+    captured = {}
+
+    def fake_run_task(**kwargs):
+        captured["api_key"] = kwargs["api_key"]
+        raise RuntimeError("stop here")
+
+    monkeypatch.setattr(worker_module, "run_task", fake_run_task)
+    record = execute_job(
+        _message(0).model_copy(update={"run_id": "run_cred"}),
+        session_factory=factory,
+        registry=registry,
+        catalog=CATALOG,
+        artifact_store=None,
+        credentials=Resolver(),
+    )
+    assert captured["api_key"] == "sk-from-the-vault-not-real"
+    assert record.status is RunStatus.FAILED  # the fake stopped it; the key got there

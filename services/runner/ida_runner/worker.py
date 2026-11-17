@@ -60,7 +60,7 @@ from ida_core.contracts import (
 from ida_core.db import session_scope, utcnow
 from ida_core.gitmeta import build_identity
 from ida_core.queue import NackOutcome, RunQueue
-from ida_core.registry import resolve_api_key
+from ida_core.registry import CredentialResolver, resolve_api_key
 from ida_core.repositories import (
     fail_run,
     finish_run,
@@ -92,6 +92,7 @@ def execute_job(
     completion_cache: CompletionCache | None = None,
     client_factory=None,
     judge: LLMJudge | None = None,
+    credentials: CredentialResolver | None = None,
 ) -> RunRecord:
     """Execute one queue message end to end and return the finished run record.
 
@@ -136,7 +137,7 @@ def execute_job(
     try:
         spec = catalog.get(message.task_id)
         entry = registry.get(message.model_key)
-        api_key = resolve_api_key(entry)
+        api_key = resolve_api_key(entry, credentials=credentials)
     except Exception as exc:
         return _fail_run(session_factory, record, f"{type(exc).__name__}: {exc}")
 
@@ -242,7 +243,11 @@ class Worker:
         reaper_interval_s: float = 60.0,
         heartbeat_interval_s: float = 30.0,
         config: ConfigProvider | None = None,
+        credentials: CredentialResolver | None = None,
     ) -> None:
+        # Decrypts admin-entered provider keys (credential_ref). One resolver
+        # per process; it caches plaintext in memory per credential version.
+        self._credentials = credentials
         self._queue = queue
         # When a provider is given (IDA_CONFIG_SOURCE=db), EACH JOB reads one
         # snapshot from it -- so a model or task added at /admin is runnable
@@ -375,6 +380,7 @@ class Worker:
                 completion_cache=self._completion_cache,
                 client_factory=self._client_factory,
                 judge=self._judge,
+                credentials=self._credentials,
             )
         except Exception as exc:
             metrics.JOBS.labels(outcome="crashed").inc()

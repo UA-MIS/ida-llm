@@ -195,6 +195,12 @@ class DbConfigProvider:
         self._current: ConfigSnapshot | None = None
         self._checked_at = float("-inf")
 
+    def invalidate(self) -> None:
+        """Check the revision on the next :meth:`snapshot`, ignoring the refresh
+        window -- called by the admin API right after it commits, so the person
+        who saved sees their edit at once."""
+        self._checked_at = float("-inf")
+
     def _build(self) -> ConfigSnapshot:
         with session_scope(self._session_factory) as session:
             return load_db_snapshot(session, task_git_sha=self._task_git_sha)

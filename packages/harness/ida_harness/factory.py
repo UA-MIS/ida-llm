@@ -34,7 +34,7 @@ from collections.abc import Callable
 import httpx
 
 from ida_core.contracts import ModelEntry, ServingStack
-from ida_core.registry import resolve_api_key
+from ida_core.registry import CredentialResolver, resolve_api_key
 from ida_harness.anthropic_client import AnthropicMessagesClient
 from ida_harness.client import (
     BaseChatClient,
@@ -82,6 +82,7 @@ def build_client(
     transport: httpx.BaseTransport | None = None,
     sleep: Callable[[float], None] = time.sleep,
     jitter: Callable[[float, float], float] = random.uniform,
+    credentials: CredentialResolver | None = None,
 ) -> ModelClient:
     """Build the right client for ``entry``, resolving its key if needed.
 
@@ -99,8 +100,10 @@ def build_client(
     unconfigured provider fails; it never quietly becomes a stand-in whose
     answers would be stored under the real model's name.
     """
-    if api_key is None and entry.api_key_env:
-        api_key = resolve_api_key(entry, env)
+    if api_key is None and (entry.api_key_env or entry.credential_ref):
+        # `credentials` decrypts an admin-entered key (credential_ref, AD-10);
+        # the api_key_env path is unchanged.
+        api_key = resolve_api_key(entry, env, credentials)
     return client_class_for(entry)(
         entry,
         api_key=api_key,

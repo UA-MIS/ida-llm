@@ -47,6 +47,7 @@ from datetime import timedelta
 
 from ida_core.artifacts import ArtifactStore, LocalArtifactStore, S3ArtifactStore
 from ida_core.config import Settings, get_settings
+from ida_core.configdb.crypto import DbCredentialResolver, parse_kek
 from ida_core.contracts import (
     ModelRegistry,
     RunJobMessage,
@@ -901,7 +902,8 @@ def run_judge_calibration(ctx: SweepContext, *, dry_run: bool = False) -> SweepR
         report.notes.append("no artifact store configured")
         return report
 
-    judge = build_judge_from_settings(settings, ctx.registry)
+    credentials = DbCredentialResolver(ctx.session_factory, parse_kek(settings.credentials_kek))
+    judge = build_judge_from_settings(settings, ctx.registry, credentials)
     if judge is None:
         # Still exit 0. "The operator has not chosen to pay for a judge" is a
         # configuration state, not tonight's failure, and the backlog is logged
