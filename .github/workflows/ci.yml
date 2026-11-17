@@ -477,6 +477,37 @@ jobs:
           pip install -e packages/core
           pip install alembic==1.16.5 "psycopg[binary]==3.2.10"
 
+      - name: Wait for Postgres
+        # Under ARC `containerMode: kubernetes` the `services.postgres` options
+        # (--health-cmd etc.) are NOT honored as a readiness gate: the sidecar
+        # starts alongside the job container and the first step runs immediately,
+        # so Alembic raced initdb and failed with "connection refused" on most
+        # runs. A bare TCP connect is not enough either -- the port can accept
+        # before initdb finishes and the server takes real logins -- so do a real
+        # psycopg connect with the job's DATABASE_URL, bounded so a Postgres that
+        # never comes up fails loudly instead of hanging the job.
+        run: |
+          set -eu
+          python - <<'PY'
+          import os
+          import sys
+          import time
+          import psycopg
+
+          deadline = time.monotonic() + 90
+          last = None
+          while time.monotonic() < deadline:
+              try:
+                  with psycopg.connect(os.environ["DATABASE_URL"], connect_timeout=3) as conn:
+                      conn.execute("SELECT 1")
+                  print("postgres is accepting connections")
+                  sys.exit(0)
+              except psycopg.Error as exc:
+                  last = exc
+                  time.sleep(2)
+          sys.exit(f"::error::Postgres on 127.0.0.1:5432 did not accept connections within 90s (last error: {last})")
+          PY
+
       - name: Upgrade to head
         run: alembic upgrade head
 
