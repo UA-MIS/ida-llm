@@ -28,6 +28,20 @@ data:
   # --- service-to-service ---
   API_URL: "http://ida-llm-api"
 
+  # ── ADMIN CONSOLE (admin-console design §7.2) ───────────────────────────────
+  # Inert until an overlay sets ADMIN_CONSOLE_ENABLED (C2/C3) -- no overlay does
+  # yet, and preview never will (no Dex redirect URI for a PR host, AD-14).
+  #
+  # The Dex team whose members may sign in to /admin. Checked by the FRONTEND at
+  # sign-in, exact and case-sensitive; the API only shows it on /admin/system.
+  IDA_ADMIN_GROUPS: "UA-MIS:ida-llm"
+  # Estimated spend above which an admin-launched run needs the dollar figure
+  # typed back (AD-13). Matches the $25 hard cap on the testing key, so the
+  # console never makes hitting that cap easier than the CLI does.
+  IDA_ADMIN_RUN_MAX_ESTIMATED_USD: "25"
+  # IDA_CONFIG_SOURCE is deliberately NOT here: it is flipped to "db" per overlay
+  # (dev first, C2; staging/prod, C3) and moves to base only after prod flips.
+
   # ── RUN-EXECUTION AUTH: THE ARMING SWITCH ───────────────────────────────────
   # Absent, which means the app default `disabled` applies: the anonymous caller
   # holds `runner` and can enqueue runs. That is correct TODAY only because the

@@ -140,3 +140,92 @@ patches:
       - op: replace
         path: /spec/resources/requests/storage
         value: 2Gi
+  # ── ADMIN CONSOLE WIRING, STILL DARK (admin-console design §7.2, PR C1) ──────
+  # Secrets in, console OFF: ADMIN_CONSOLE_ENABLED is NOT set (C2/C3 flip it), and
+  # IDA_CONFIG_SOURCE stays the code default `yaml`. With the console off the
+  # frontend's /admin is a 404; the API's /admin needs the bearer only the
+  # frontend pod holds. ORDER AT SYNC: the four Vault keys first (see
+  # app-secret.externalsecret.yaml) -- the refs are not optional.
+  - target: { kind: Deployment, name: ida-llm-api }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: IDA_ADMIN_TOKENS
+          valueFrom:
+            secretKeyRef:
+              name: ida-llm-secret
+              key: IDA_ADMIN_TOKENS
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: IDA_CREDENTIALS_KEK
+          valueFrom:
+            secretKeyRef:
+              name: ida-llm-secret
+              key: IDA_CREDENTIALS_KEK
+  - target: { kind: Deployment, name: ida-llm-runner }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: IDA_CREDENTIALS_KEK
+          valueFrom:
+            secretKeyRef:
+              name: ida-llm-secret
+              key: IDA_CREDENTIALS_KEK
+  # Only the judge-calibration sweep builds a model client (the judge); the two
+  # enqueueing sweeps never decrypt anything, so they get no KEK.
+  - target: { kind: CronJob, name: ida-llm-judge-calibration }
+    patch: |-
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/env/-
+        value:
+          name: IDA_CREDENTIALS_KEK
+          valueFrom:
+            secretKeyRef:
+              name: ida-llm-secret
+              key: IDA_CREDENTIALS_KEK
+  - target: { kind: Deployment, name: ida-llm-frontend }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: AUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ida-llm-secret
+              key: AUTH_SECRET
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: AUTH_DEX_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ida-llm-secret
+              key: AUTH_DEX_SECRET
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: IDA_ADMIN_TOKENS
+          valueFrom:
+            secretKeyRef:
+              name: ida-llm-secret
+              key: IDA_ADMIN_TOKENS
+  # AUTH_URL is the canonical origin Auth.js builds redirect URIs from; it MUST
+  # equal this overlay's ingress host and a redirect URI on the Dex client. Move
+  # the host, move this, and add the new URI to Dex -- together.
+  - target: { kind: ConfigMap, name: ida-llm-config }
+    patch: |-
+      - op: add
+        path: /data/AUTH_URL
+        value: https://ida-llm-dev.capstone.uamishub.com
+      # The Dex issuer and the ONE static client id (AD-14). Here and not in base
+      # so preview -- which has no admin console and no redirect URI -- renders
+      # no AUTH_* at all (chart-render asserts it).
+      - op: add
+        path: /data/AUTH_DEX_ISSUER
+        value: https://id.capstone.uamishub.com
+      - op: add
+        path: /data/AUTH_DEX_ID
+        value: ida-llm

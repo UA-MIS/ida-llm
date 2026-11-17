@@ -310,6 +310,10 @@ class TestTheRealConfigMapIsUsable:
             "IDA_JUDGE_MODEL_KEY",
             # Settings.public_hide_tags: models hidden from the public read API.
             "IDA_PUBLIC_HIDE_TAGS",
+            # Settings.admin_groups (shown on GET /admin/system) and
+            # Settings.admin_run_max_estimated_usd (the admin launch ceiling).
+            "IDA_ADMIN_GROUPS",
+            "IDA_ADMIN_RUN_MAX_ESTIMATED_USD",
         }
         not_ours = {
             "API_URL",  # the frontend reads this, server-side (Node, not Python)

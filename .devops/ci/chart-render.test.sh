@@ -173,6 +173,49 @@ for ing in by_kind.get("Ingress", []):
     check("ida-llm-api" not in [*backends, default],
           f"{env}: Ingress {ing['metadata']['name']} does not route to ida-llm-api")
 
+# ---- admin console wiring (admin-console design §7.2, PR C1) -----------------
+def env_names(workload, container=0):
+    spec = workload["spec"]
+    if workload["kind"] == "CronJob":
+        spec = spec["jobTemplate"]["spec"]
+    containers = spec["template"]["spec"]["containers"]
+    return {e["name"] for e in containers[container].get("env", [])}
+
+
+cfg = (config or {}).get("data", {})
+frontend = named.get("ida-llm-frontend")
+api = named.get("ida-llm-api")
+runner = named.get("ida-llm-runner")
+judge_cron = next((c for c in cronjobs if c["metadata"]["name"] == "ida-llm-judge-calibration"), None)
+admin_cfg = sorted(k for k in cfg if k.startswith("AUTH_") or k == "ADMIN_CONSOLE_ENABLED")
+if env == "preview":
+    # (a) preview has NO admin console: no Dex redirect URI exists for a PR host
+    # (AD-14), and preview's ida-llm-secret is platform-owned (no admin keys).
+    check(not admin_cfg, f"preview: no AUTH_* / ADMIN_CONSOLE_ENABLED in the ConfigMap (got {admin_cfg})")
+    leaked = env_names(frontend) & {"AUTH_SECRET", "AUTH_DEX_SECRET", "IDA_ADMIN_TOKENS"}
+    check(not leaked, f"preview: the frontend gets no admin secrets (got {sorted(leaked)})")
+    check("IDA_CREDENTIALS_KEK" not in env_names(api), "preview: the api gets no KEK")
+else:
+    # (b) AUTH_URL is exactly this overlay's ingress host -- the redirect URI Dex
+    # holds. A mismatch fails sign-in with an opaque OIDC error.
+    rule_host = ingress["spec"]["rules"][0]["host"] if ingress else None
+    check(cfg.get("AUTH_URL") == f"https://{rule_host}",
+          f"{env}: AUTH_URL ({cfg.get('AUTH_URL')}) equals the ingress host ({rule_host})")
+    check(cfg.get("AUTH_DEX_ID") == "ida-llm", f"{env}: AUTH_DEX_ID is the one Dex client")
+    check(cfg.get("AUTH_DEX_ISSUER") == "https://id.capstone.uamishub.com", f"{env}: Dex issuer")
+    check({"IDA_ADMIN_TOKENS", "IDA_CREDENTIALS_KEK"} <= env_names(api),
+          f"{env}: the api gets the admin bearer and the KEK")
+    check("IDA_CREDENTIALS_KEK" in env_names(runner), f"{env}: the runner gets the KEK")
+    check(judge_cron is not None and "IDA_CREDENTIALS_KEK" in env_names(judge_cron),
+          f"{env}: the judge-calibration sweep gets the KEK")
+    check({"AUTH_SECRET", "AUTH_DEX_SECRET", "IDA_ADMIN_TOKENS"} <= env_names(frontend),
+          f"{env}: the frontend gets AUTH_SECRET, AUTH_DEX_SECRET and the admin bearer")
+    # Still DARK after C1: the console switch and the config source are flipped
+    # per environment in C2/C3, which update these two lines on purpose.
+    check("ADMIN_CONSOLE_ENABLED" not in cfg, f"{env}: ADMIN_CONSOLE_ENABLED is still unset (dark)")
+    check(cfg.get("IDA_CONFIG_SOURCE", "yaml") == "yaml", f"{env}: IDA_CONFIG_SOURCE is still yaml")
+check("IDA_ADMIN_TOKENS" not in env_names(runner), f"{env}: the runner never holds the admin bearer")
+
 # ---- the credit / campus-hardware safety switch -----------------------------
 mock = named.get("ida-llm-mock-model")
 mock_url = (config or {}).get("data", {}).get("MOCK_MODEL_BASE_URL", "")

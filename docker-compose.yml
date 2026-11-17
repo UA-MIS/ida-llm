@@ -56,6 +56,15 @@ x-python-env: &python-env
   IDA_MODELS_FILE: /app/models.yaml
   IDA_TASKS_DIR: /app/tasks
   IDA_AUTH_MODE: disabled
+  # ── admin console, LOCAL ONLY (admin-console design §7.2) ──────────────────
+  # The database is the config source locally (seeded from the YAML on first
+  # start), so /admin edits work end to end. Override with IDA_CONFIG_SOURCE=yaml
+  # in your shell to run exactly as before. The token and the KEK below are
+  # obviously-fake LOCAL values -- never reuse them anywhere; deployed envs get
+  # their own from Vault.
+  IDA_CONFIG_SOURCE: ${IDA_CONFIG_SOURCE:-db}
+  IDA_ADMIN_TOKENS: &admin-tokens admin-console:local-dev-admin-token-not-secret
+  IDA_CREDENTIALS_KEK: k1:bG9jYWwtZGV2LWtlay1ub3QtYS1zZWNyZXQtMDAwMDA=
 
 services:
   postgres:
@@ -176,6 +185,18 @@ services:
       # at BUILD time while one frontend image is promoted byte-identically
       # across dev, staging and prod. `API_URL` is the ConfigMap's name for it.
       API_URL: http://api:8000
+      # Admin console, LOCAL ONLY. Sign-in uses the ONE `ida-llm` Dex client's
+      # localhost redirect URI (http://localhost:3000/api/auth/callback/dex).
+      # AUTH_DEX_SECRET is a placeholder: ask a platform maintainer for the dev
+      # secret and export it in your shell -- never commit it.
+      ADMIN_CONSOLE_ENABLED: "true"
+      AUTH_URL: http://localhost:${FRONTEND_PORT:-3000}
+      AUTH_SECRET: local-dev-auth-secret-not-a-secret-0000000000
+      AUTH_DEX_ISSUER: https://id.capstone.uamishub.com
+      AUTH_DEX_ID: ida-llm
+      AUTH_DEX_SECRET: ${AUTH_DEX_SECRET:-ask-a-platform-maintainer}
+      IDA_ADMIN_GROUPS: UA-MIS:ida-llm
+      IDA_ADMIN_TOKENS: *admin-tokens
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
