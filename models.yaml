@@ -157,7 +157,9 @@ models:
     # and it does not belong in the name of the model. The duplicated "Luna" went
     # with it.
     display_name: Luna (OpenAI GPT-5.6)
-    display_order: 50
+    family: openai-gpt-5
+    family_display_name: GPT-5
+    display_order: 112
     base_url: https://api.openai.com/v1
     api_key_env: OPENAI_API_KEY         # Vault: secret/tenants/ida-llm/<env>/app
                                         # -> Secret `ida-llm-secret`. See
@@ -191,6 +193,463 @@ models:
     cost:
       input_usd_per_mtok: 0.20
       output_usd_per_mtok: 1.20
+
+  # --- The OpenAI lineup, 2024 -> now: one flagship per generation, ENABLED --
+  # -- TESTING ONLY, SAME $25 HARD CAP AS `luna` (one shared OPENAI_API_KEY) ---
+  #
+  # Built to show growth across generations. No -pro, mini, nano, audio,
+  # realtime or image models. Ids were smoke-tested on the prod key on
+  # 2026-11-17 (1-token request, HTTP 200 for every id below); gpt-4, gpt-4-turbo,
+  # gpt-3.5-turbo and o1 return 404 (retired) and are NOT here. Where OpenAI
+  # publishes a dated snapshot the entry pins it (the bare alias floats); the
+  # gpt-5.6 and gpt-6.x ids have no dated form.
+  #
+  # ⚠ WIRE FORMAT, verified against the API: gpt-4o and gpt-4.1 accept
+  # `max_tokens` AND temperature 0, so they use `openai_api` at temperature 0.0
+  # (greedy-ish, like the other plain clients). o3 and every GPT-5/6 id reject
+  # `max_tokens` with a 400, and gpt-5 rejects temperature 0 -- those use
+  # `openai_reasoning` at the fixed 1.0. Reasoning rows are therefore NOT
+  # comparable to the temperature-0 rows as a like-for-like sampling setup.
+  #
+  # ⚠ THE OUTPUT CAP IS SHARED WITH THINKING for the reasoning rows (4096, same
+  # as luna). A task that makes o3/gpt-5.x think past it fails LOUDLY (empty
+  # completion on `length`) rather than scoring 0.
+  #
+  # FAMILIES (collapsed row = lowest display_order = newest): openai-gpt-6,
+  # openai-gpt-5 (includes the pre-existing `luna`, GPT-5.6), openai-gpt-4
+  # ("GPT-4 era": 4o, 4.1, o3).
+  #
+  # PRICING (USD per million tokens, standard short-context tier) retrieved
+  # 2026-11-17 from https://developers.openai.com/api/docs/pricing; context
+  # windows from developers.openai.com/api/docs/models/<id>. gpt-4o,
+  # gpt-4.1, o3 and gpt-5 are marked Deprecated on their model pages. Cached-input
+  # discounts are not modelled (TokenUsage does not split them), so recorded cost
+  # is an over-estimate. Prices above 272K-token prompts are higher; no task is
+  # near that.
+
+  - key: gpt-6-1-sol
+    display_name: GPT-6.1 Sol
+    family: openai-gpt-6
+    family_display_name: GPT-6
+    display_order: 100
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, openai, reasoning, testing-only, budget-capped]
+    serving:
+      model_id: gpt-6.1-sol
+      serving_stack: openai_reasoning
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 1050000
+      hardware: null
+      sampling:
+        temperature: 1.0                # the ONLY accepted value (reasoning dialect)
+        top_p: 1.0
+        max_tokens: 4096                # sent as `max_completion_tokens`; shared with thinking
+        seed: null
+    cost:
+      input_usd_per_mtok: 2.00
+      output_usd_per_mtok: 10.00
+
+  - key: gpt-6-1-terra
+    display_name: GPT-6.1 Terra
+    family: openai-gpt-6
+    family_display_name: GPT-6
+    display_order: 101
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, openai, reasoning, testing-only, budget-capped]
+    serving:
+      model_id: gpt-6.1-terra
+      serving_stack: openai_reasoning
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 1050000
+      hardware: null
+      sampling:
+        temperature: 1.0                # the ONLY accepted value (reasoning dialect)
+        top_p: 1.0
+        max_tokens: 4096                # sent as `max_completion_tokens`; shared with thinking
+        seed: null
+    cost:
+      input_usd_per_mtok: 1.00
+      output_usd_per_mtok: 5.00
+
+  - key: gpt-6-sol
+    display_name: GPT-6 Sol
+    family: openai-gpt-6
+    family_display_name: GPT-6
+    display_order: 102
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, openai, reasoning, testing-only, budget-capped]
+    serving:
+      model_id: gpt-6-sol
+      serving_stack: openai_reasoning
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 1050000
+      hardware: null
+      sampling:
+        temperature: 1.0                # the ONLY accepted value (reasoning dialect)
+        top_p: 1.0
+        max_tokens: 4096                # sent as `max_completion_tokens`; shared with thinking
+        seed: null
+    cost:
+      input_usd_per_mtok: 2.00
+      output_usd_per_mtok: 10.00
+
+  - key: gpt-6-astra
+    display_name: GPT-6 Astra
+    family: openai-gpt-6
+    family_display_name: GPT-6
+    display_order: 103
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, openai, reasoning, testing-only, budget-capped]
+    serving:
+      model_id: gpt-6-astra
+      serving_stack: openai_reasoning
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 1050000
+      hardware: null
+      sampling:
+        temperature: 1.0                # the ONLY accepted value (reasoning dialect)
+        top_p: 1.0
+        max_tokens: 4096                # sent as `max_completion_tokens`; shared with thinking
+        seed: null
+    cost:
+      input_usd_per_mtok: 10.00
+      output_usd_per_mtok: 50.00
+
+  - key: gpt-6-luna
+    display_name: GPT-6 Luna
+    family: openai-gpt-6
+    family_display_name: GPT-6
+    display_order: 104
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, openai, reasoning, testing-only, budget-capped]
+    serving:
+      model_id: gpt-6-luna
+      serving_stack: openai_reasoning
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 1050000
+      hardware: null
+      sampling:
+        temperature: 1.0                # the ONLY accepted value (reasoning dialect)
+        top_p: 1.0
+        max_tokens: 4096                # sent as `max_completion_tokens`; shared with thinking
+        seed: null
+    cost:
+      input_usd_per_mtok: 0.10
+      output_usd_per_mtok: 0.50
+
+  - key: gpt-5-6-sol
+    display_name: GPT-5.6 Sol
+    family: openai-gpt-5
+    family_display_name: GPT-5
+    display_order: 110
+    # TODO(pricing): promotional rate, advertised as valid until 2026-11-30 (a 20%/33%
+    # cut off input/output); the list price is not stated. Re-check after that date --
+    # recorded cost is an UNDER-estimate from 2026-12-01 until updated.
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, openai, reasoning, testing-only, budget-capped]
+    serving:
+      model_id: gpt-5.6-sol
+      serving_stack: openai_reasoning
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 1050000
+      hardware: null
+      sampling:
+        temperature: 1.0                # the ONLY accepted value (reasoning dialect)
+        top_p: 1.0
+        max_tokens: 4096                # sent as `max_completion_tokens`; shared with thinking
+        seed: null
+    cost:
+      input_usd_per_mtok: 4.00
+      output_usd_per_mtok: 20.00
+
+  - key: gpt-5-6-terra
+    display_name: GPT-5.6 Terra
+    family: openai-gpt-5
+    family_display_name: GPT-5
+    display_order: 111
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, openai, reasoning, testing-only, budget-capped]
+    serving:
+      model_id: gpt-5.6-terra
+      serving_stack: openai_reasoning
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 1050000
+      hardware: null
+      sampling:
+        temperature: 1.0                # the ONLY accepted value (reasoning dialect)
+        top_p: 1.0
+        max_tokens: 4096                # sent as `max_completion_tokens`; shared with thinking
+        seed: null
+    cost:
+      input_usd_per_mtok: 2.00
+      output_usd_per_mtok: 12.00
+
+  - key: gpt-5-5
+    display_name: GPT-5.5
+    family: openai-gpt-5
+    family_display_name: GPT-5
+    display_order: 113
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, openai, reasoning, testing-only, budget-capped]
+    serving:
+      model_id: gpt-5.5-2026-04-23
+      serving_stack: openai_reasoning
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 1050000
+      hardware: null
+      sampling:
+        temperature: 1.0                # the ONLY accepted value (reasoning dialect)
+        top_p: 1.0
+        max_tokens: 4096                # sent as `max_completion_tokens`; shared with thinking
+        seed: null
+    cost:
+      input_usd_per_mtok: 5.00
+      output_usd_per_mtok: 30.00
+
+  - key: gpt-5-4
+    display_name: GPT-5.4
+    family: openai-gpt-5
+    family_display_name: GPT-5
+    display_order: 114
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, openai, reasoning, testing-only, budget-capped]
+    serving:
+      model_id: gpt-5.4-2026-03-05
+      serving_stack: openai_reasoning
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 1050000
+      hardware: null
+      sampling:
+        temperature: 1.0                # the ONLY accepted value (reasoning dialect)
+        top_p: 1.0
+        max_tokens: 4096                # sent as `max_completion_tokens`; shared with thinking
+        seed: null
+    cost:
+      input_usd_per_mtok: 2.50
+      output_usd_per_mtok: 15.00
+
+  - key: gpt-5-2
+    display_name: GPT-5.2
+    family: openai-gpt-5
+    family_display_name: GPT-5
+    display_order: 115
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, openai, reasoning, testing-only, budget-capped]
+    serving:
+      model_id: gpt-5.2-2025-12-11
+      serving_stack: openai_reasoning
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 400000
+      hardware: null
+      sampling:
+        temperature: 1.0                # the ONLY accepted value (reasoning dialect)
+        top_p: 1.0
+        max_tokens: 4096                # sent as `max_completion_tokens`; shared with thinking
+        seed: null
+    cost:
+      input_usd_per_mtok: 1.75
+      output_usd_per_mtok: 14.00
+
+  - key: gpt-5-1
+    display_name: GPT-5.1
+    family: openai-gpt-5
+    family_display_name: GPT-5
+    display_order: 116
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, openai, reasoning, testing-only, budget-capped]
+    serving:
+      model_id: gpt-5.1-2025-11-13
+      serving_stack: openai_reasoning
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 400000
+      hardware: null
+      sampling:
+        temperature: 1.0                # the ONLY accepted value (reasoning dialect)
+        top_p: 1.0
+        max_tokens: 4096                # sent as `max_completion_tokens`; shared with thinking
+        seed: null
+    cost:
+      input_usd_per_mtok: 1.25
+      output_usd_per_mtok: 10.00
+
+  - key: gpt-5
+    display_name: GPT-5
+    family: openai-gpt-5
+    family_display_name: GPT-5
+    display_order: 117
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, openai, reasoning, testing-only, budget-capped]
+    serving:
+      model_id: gpt-5-2025-08-07
+      serving_stack: openai_reasoning
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 400000
+      hardware: null
+      sampling:
+        temperature: 1.0                # the ONLY accepted value (reasoning dialect)
+        top_p: 1.0
+        max_tokens: 4096                # sent as `max_completion_tokens`; shared with thinking
+        seed: null
+    cost:
+      input_usd_per_mtok: 1.25
+      output_usd_per_mtok: 10.00
+
+  - key: gpt-4-1
+    display_name: GPT-4.1
+    family: openai-gpt-4
+    family_display_name: GPT-4 era
+    display_order: 120
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, openai, testing-only, budget-capped]
+    serving:
+      model_id: gpt-4.1-2025-04-14
+      serving_stack: openai_api
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 1047576
+      hardware: null
+      sampling:
+        temperature: 0.0                # accepted (verified 200 with temperature=0)
+        top_p: 1.0
+        max_tokens: 4096                # sent as `max_tokens`
+        seed: null
+    cost:
+      input_usd_per_mtok: 2.00
+      output_usd_per_mtok: 8.00
+
+  - key: o3
+    display_name: o3
+    family: openai-gpt-4
+    family_display_name: GPT-4 era
+    display_order: 121
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, openai, reasoning, testing-only, budget-capped]
+    serving:
+      model_id: o3-2025-04-16
+      serving_stack: openai_reasoning
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 200000
+      hardware: null
+      sampling:
+        temperature: 1.0                # the ONLY accepted value (reasoning dialect)
+        top_p: 1.0
+        max_tokens: 4096                # sent as `max_completion_tokens`; shared with thinking
+        seed: null
+    cost:
+      input_usd_per_mtok: 2.00
+      output_usd_per_mtok: 8.00
+
+  - key: gpt-4o
+    display_name: GPT-4o
+    family: openai-gpt-4
+    family_display_name: GPT-4 era
+    display_order: 122
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+    enabled: true
+    timeout_s: 180
+    max_retries: 4
+    tags: [cloud, openai, testing-only, budget-capped]
+    serving:
+      model_id: gpt-4o-2024-11-20
+      serving_stack: openai_api
+      serving_version: null
+      quantization: unknown
+      revision: null
+      context_window: 128000
+      hardware: null
+      sampling:
+        temperature: 0.0                # accepted (verified 200 with temperature=0)
+        top_p: 1.0
+        max_tokens: 4096                # sent as `max_tokens`
+        seed: null
+    cost:
+      input_usd_per_mtok: 2.50
+      output_usd_per_mtok: 10.00
+
 
   # --- Qwen 3.8 27B on the GB10 appliance -- THE ONE LOCAL MACHINE ----------
   #

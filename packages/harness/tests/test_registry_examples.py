@@ -155,7 +155,24 @@ CLAUDE_KEYS = {
     "claude-haiku-5-5",
     "claude-haiku-4-5",
 }
-ALLOWED_ENABLED_KEYS = {"mock", "luna", "qwen-local"} | CLAUDE_KEYS
+OPENAI_LINEUP_KEYS = {
+    "gpt-6-1-sol",
+    "gpt-6-1-terra",
+    "gpt-6-sol",
+    "gpt-6-astra",
+    "gpt-6-luna",
+    "gpt-5-6-sol",
+    "gpt-5-6-terra",
+    "gpt-5-5",
+    "gpt-5-4",
+    "gpt-5-2",
+    "gpt-5-1",
+    "gpt-5",
+    "gpt-4-1",
+    "o3",
+    "gpt-4o",
+}
+ALLOWED_ENABLED_KEYS = {"mock", "luna", "qwen-local"} | CLAUDE_KEYS | OPENAI_LINEUP_KEYS
 """The only entries that may be `enabled: true` in the live ``models.yaml``.
 
 ``mock`` is free and deterministic.  ``luna`` is deliberately enabled (issue
@@ -201,7 +218,7 @@ class TestLiveFileIsUnchangedInSpirit:
         }
         # qwen-local is https but self-hosted and free; the claude-* trio are
         # paid but pinned individually (and sweep-excluded) below.
-        assert hosted_and_on - {"qwen-local"} - CLAUDE_KEYS == {"luna"}
+        assert hosted_and_on - {"qwen-local"} - CLAUDE_KEYS - OPENAI_LINEUP_KEYS == {"luna"}
 
     def test_the_budget_capped_entry_is_tagged_as_such(self) -> None:
         """The $25 cap is an OpenAI-side setting nothing in this repo can read.

@@ -81,12 +81,15 @@ def test_claude_versions_are_grouped_into_families_from_data():
         "claude-opus": 6,
         "claude-sonnet": 4,
         "claude-haiku": 2,
+        "openai-gpt-6": 5,
+        "openai-gpt-5": 8,
+        "openai-gpt-4": 3,
     }
     for members in families.values():
         assert len({m.family_display_name for m in members}) == 1
     orders = [m.display_order for m in entries if m.display_order is not None]
     assert len(orders) == len(set(orders)), "display_order must be unique"
     by_key = {m.key: m for m in entries}
-    # Luna and Qwen are their own rows, after the Claude families.
-    assert by_key["luna"].family is None and by_key["qwen-local"].family is None
-    assert by_key["luna"].display_order > max(m.display_order for m in entries if m.family)
+    # Qwen is its own row; luna is a member of the GPT-5 family.
+    assert by_key["qwen-local"].family is None
+    assert by_key["luna"].family == "openai-gpt-5"
