@@ -31,8 +31,10 @@ from ida_core.configdb.seed import record_revision
 from ida_core.configdb.tables import AuditLogRow
 from ida_core.db import utcnow
 from ida_core.validation_suite import Issue, errors_of, validate_models
+from ida_harness.tasks import TaskCatalog
 
 SCOPE_MODELS = "models"
+SCOPE_TASKS = "tasks"
 
 
 def require_db_config(ctx: AppContext) -> None:
@@ -106,6 +108,13 @@ def validate_post_state(session: Session, scopes: set[str]) -> list[Issue]:
             Issue(f"registry.{i.path}" if i.path else "registry", i.message, i.severity)
             for i in validate_models(reader.models_document(session))
         ]
+    if SCOPE_TASKS in scopes:
+        # The whole live catalog must still build -- the same two layers and the
+        # same duplicate-id rule every process applies when it loads a snapshot.
+        try:
+            TaskCatalog.from_documents(reader.task_documents(session))
+        except Exception as exc:
+            issues.append(Issue("catalog", str(exc)))
     return issues
 
 

@@ -439,6 +439,12 @@ class Settings(BaseSettings):
     cap on the testing key so the console never makes it easier to hit that
     cap than the CLI does."""
 
+    admin_upload_max_bytes: int = 1_048_576
+    """Largest task YAML ``POST /admin/material/upload`` accepts (1 MiB).
+
+    The largest committed task file is a few tens of KiB; a megabyte is room to
+    grow, and a ceiling on a request that is parsed in memory."""
+
     credentials_kek: str = ""
     """Key-encryption key(s) for admin-entered provider credentials (AD-10).
 

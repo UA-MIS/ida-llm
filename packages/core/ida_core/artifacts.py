@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
@@ -121,6 +122,16 @@ def judge_key(run_id: str, sample_id: str, repeat_index: int = 0) -> str:
 def eval_log_key(run_id: str) -> str:
     """Object key for the whole structured eval log of a run."""
     return f"{run_prefix(run_id)}eval-log.json"
+
+
+def admin_material_key(sha256: str, at: datetime) -> str:
+    """Where an admin-uploaded task YAML's raw bytes live (design 5.2):
+    ``admin-material/<yyyy>/<mm>/<sha256>.yaml``.  Content-addressed, so the
+    same file uploaded twice is one object, and the key names exactly the bytes
+    behind ``tasks.upload_object_key``."""
+    if not re.fullmatch(r"[0-9a-f]{64}", sha256):
+        raise ValueError("sha256 must be 64 lower-case hex characters")
+    return f"admin-material/{at:%Y}/{at:%m}/{sha256}.yaml"
 
 
 def to_uri(bucket: str, key: str) -> str:
@@ -209,6 +220,11 @@ class S3ArtifactStore:
             raise KeyError(key) from exc
         return json.loads(obj["Body"].read().decode())
 
+    def put_bytes(self, key: str, data: bytes, content_type: str) -> str:
+        """Raw bytes (an uploaded task file), stored verbatim."""
+        self._client.put_object(Bucket=self.bucket, Key=key, Body=data, ContentType=content_type)
+        return to_uri(self.bucket, key)
+
     def exists(self, key: str) -> bool:
         from botocore.exceptions import ClientError
 
@@ -246,6 +262,12 @@ class LocalArtifactStore:
         path = self._path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str))
+        return to_uri(self.bucket, key)
+
+    def put_bytes(self, key: str, data: bytes, content_type: str) -> str:
+        path = self._path(key)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
         return to_uri(self.bucket, key)
 
     def get_json(self, key: str) -> dict:
