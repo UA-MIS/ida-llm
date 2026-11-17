@@ -18,6 +18,9 @@ dependencies = [
     # though it does not otherwise talk to them yet. Deliberate -- do not "clean up".
     "redis~=5.1",
     "httpx~=0.28.0",
+    # Multipart form parsing for POST /admin/material/upload (task YAML uploads).
+    # FastAPI refuses to even REGISTER a File()/Form() route without it.
+    "python-multipart~=0.0.20",
 ]
 
 [project.scripts]

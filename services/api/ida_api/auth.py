@@ -26,12 +26,28 @@ validates its token here, in this file, and nowhere else -- every protected
 route already depends on :func:`current_principal`, so that stays an edit to
 this file plus a mode name, not a sweep through the route handlers.
 
-WHY A STATIC BEARER TOKEN DOES NOT GRANT ``author``
----------------------------------------------------
+WHY A RUN TOKEN DOES NOT GRANT ``author`` -- AND WHY AN ADMIN TOKEN DOES
+-----------------------------------------------------------------------
 A shared token in an env var is a weaker credential than the per-person SSO
-identity A10 was written against, so a configured token grants ``reader`` and
-``runner`` and stops there.  The answer key stays fail-shut until real SSO
-lands, rather than becoming unlockable by whoever has the CI secret.
+identity A10 was written against, so a configured RUN token
+(``IDA_AUTH_TOKENS``) grants ``reader`` and ``runner`` and stops there.  The
+answer key stays fail-shut rather than becoming unlockable by whoever has the
+CI secret.
+
+An ADMIN token (``IDA_ADMIN_TOKENS``, the admin console's bearer) is the
+condition this docstring always named: it is presented only by the frontend
+pod, and only after that pod has verified a per-person SSO identity (Dex ->
+GitHub, team ``UA-MIS:ida-llm``) and is forwarding it as ``X-IDA-Actor``.  So
+it grants :data:`ADMIN_ROLES`, ``author`` included.  See AD-4 in the
+admin-console design and :mod:`ida_api.admin.deps`.
+
+THE ADMIN TOKEN WORKS IN EVERY ``auth_mode``, AND ANONYMOUS NEVER GETS ADMIN
+---------------------------------------------------------------------------
+``disabled`` hands anonymous callers ``runner`` because every context that runs
+that way talks only to the mock model (AD-5).  Admin writes material, models
+and provider keys -- a different blast radius -- so ``admin`` is never part of
+an anonymous principal in any mode, and an admin bearer is honoured even while
+``disabled`` ignores every other header.  ``TestAnonymousNeverAdmin`` pins both.
 """
 
 from __future__ import annotations
@@ -90,9 +106,11 @@ class Principal:
         ``reader``  read runs, results and redacted task specs
         ``runner``  enqueue runs (spends money)
         ``author``  read unredacted task specs, i.e. the gold answers
+        ``admin``   every ``/admin/*`` route (the admin console)
 
-        Nobody holds ``author`` in either mode -- see the module docstring.  The
-        anonymous principal holds ``runner`` only when ``auth_mode=disabled``.
+        Only an admin-token principal holds ``author`` or ``admin`` -- see the
+        module docstring.  The anonymous principal holds ``runner`` only when
+        ``auth_mode=disabled``, and never ``author`` or ``admin``.
         """
         if role not in self.roles:
             raise HTTPException(
@@ -124,7 +142,14 @@ reach it, which is the exact gap ``docs/sensitive-material.md`` § 6 exists to
 close.  ``TestAnonymousCannotSpend`` fails if it comes back."""
 
 TOKEN_ROLES = frozenset({"reader", "runner"})
-"""What a configured bearer token grants.  Deliberately not ``author``."""
+"""What a configured RUN bearer token grants.  Deliberately not ``author``."""
+
+ADMIN_ROLES = frozenset({"reader", "runner", "author", "admin"})
+"""What an ADMIN bearer token (``IDA_ADMIN_TOKENS``) grants.
+
+``author`` is included because an admin principal is a real, SSO-verified
+person (the module docstring's condition), and ``admin`` is the role every
+``/admin/*`` route requires.  No anonymous principal ever holds ``admin``."""
 
 
 def parse_auth_tokens(raw: str) -> dict[str, str]:
@@ -200,14 +225,22 @@ def _token_index(raw: str) -> tuple[tuple[str, str], ...]:
     return tuple(parse_auth_tokens(raw).items())
 
 
-def _principal_for_token(offered: str, raw_tokens: str) -> Principal | None:
+def _principal_for_token(offered: str, settings: Settings) -> Principal | None:
     """The principal for ``offered``, or ``None`` if no configured token matches.
+
+    Searches BOTH token lists -- ``IDA_ADMIN_TOKENS`` (grants
+    :data:`ADMIN_ROLES`) and ``IDA_AUTH_TOKENS`` (grants :data:`TOKEN_ROLES`) --
+    through this one function, so there is exactly one code path that decides
+    what a bearer is worth.
 
     ⚠ COMPARED WITH :func:`hmac.compare_digest`, NOT ``==`` AND NOT A DICT
     LOOKUP.  Both of those short-circuit on the first differing byte, which
     leaks how much of a guessed token was correct to anyone who can time the
-    endpoint.  Every configured entry is compared; the loop does not exit early
-    on a mismatch.
+    endpoint.  Every configured entry IN BOTH LISTS is compared; the loop does
+    not exit early on a match or a mismatch, so the time taken does not reveal
+    which list (if either) a token belongs to.  The two lists can never share a
+    token (:func:`validate_auth_config` refuses it), so at most one entry
+    matches and the order the lists are scanned in cannot change the answer.
 
     ⚠ AND COMPARED AS **BYTES**.  ``compare_digest`` raises ``TypeError`` on a
     ``str`` containing any non-ASCII character -- so comparing the raw strings
@@ -217,15 +250,51 @@ def _principal_for_token(offered: str, raw_tokens: str) -> Principal | None:
     """
     offered_bytes = offered.encode("utf-8")
     matched: Principal | None = None
-    for token, subject in _token_index(raw_tokens):
-        if hmac.compare_digest(offered_bytes, token.encode("utf-8")):
-            matched = Principal(
-                subject=subject,
-                display_name=subject,
-                is_anonymous=False,
-                roles=TOKEN_ROLES,
-            )
+    for raw_tokens, roles in (
+        (settings.admin_tokens, ADMIN_ROLES),
+        (settings.auth_tokens, TOKEN_ROLES),
+    ):
+        for token, subject in _token_index(raw_tokens):
+            if hmac.compare_digest(offered_bytes, token.encode("utf-8")):
+                matched = Principal(
+                    subject=subject,
+                    display_name=subject,
+                    is_anonymous=False,
+                    roles=roles,
+                )
     return matched
+
+
+def bearer_from_header(authorization: str | None) -> str | None:
+    """The token from ``Authorization: Bearer <token>``, or ``None`` if the
+    header is absent or not bearer-shaped.
+
+    Shared by :func:`current_principal` and the admin dependency so the two can
+    never disagree about what counts as "a bearer was offered"."""
+    if authorization is None:
+        return None
+    scheme, separator, offered = authorization.partition(" ")
+    if not separator or scheme.lower() != "bearer" or not offered.strip():
+        return None
+    return offered.strip()
+
+
+def resolve_bearer(offered: str, settings: Settings) -> Principal | None:
+    """:func:`_principal_for_token`, with a broken config turned into a 503.
+
+    Unreachable when the app was built through ``create_app``, which validates
+    first. Kept because the alternative to a 503 is a 500 -- and a 500 on the
+    auth path is indistinguishable, from the outside, from a route that never
+    checked.
+    """
+    try:
+        return _principal_for_token(offered, settings)
+    except AuthConfigError:
+        log.exception("auth/admin tokens are unparseable; refusing to authenticate anyone")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="authentication is misconfigured on this deployment",
+        ) from None
 
 
 def _unauthorized(detail: str) -> HTTPException:
@@ -249,15 +318,36 @@ def validate_auth_config(settings: Settings) -> None:
     The alternative -- discovering it on the first ``POST /runs`` -- means a
     service that reports Ready while the control it was deployed for is absent.
 
-    Two checks, and the second one runs in *every* mode on purpose:
+    Four checks; every one but the first runs in *every* mode on purpose:
 
     1. ``auth_mode=token`` with no usable token is a contradiction.  It is not
        "auth on with nobody allowed"; it is a deployment that was meant to have
        credentials and does not.
     2. Whatever is in ``auth_tokens`` must parse, even while ``disabled``, so a
        typo is found now rather than on the day someone flips the flag.
+    3. Whatever is in ``admin_tokens`` must parse too -- same parser, same
+       strictness, same never-quote-a-token rule.  The admin bearer is honoured
+       in every mode, so it is validated in every mode.
+    4. No token may appear in both lists.  A shared value would make "is this
+       caller an admin?" depend on scan order, and would mean the CI run secret
+       is also the admin console's key.
     """
     tokens = parse_auth_tokens(settings.auth_tokens)
+    try:
+        admin_tokens = parse_auth_tokens(settings.admin_tokens)
+    except AuthConfigError as exc:
+        # Re-labelled so the operator knows WHICH variable to fix; the parser's
+        # own message names entries by position and subject, never by value.
+        raise AuthConfigError(f"IDA_ADMIN_TOKENS: {exc}") from None
+    shared = set(tokens) & set(admin_tokens)
+    if shared:
+        raise AuthConfigError(
+            f"{len(shared)} token(s) appear in both IDA_AUTH_TOKENS and IDA_ADMIN_TOKENS "
+            f"(admin subject(s) {sorted(admin_tokens[t] for t in shared)!r}). The admin "
+            "console's bearer must be its own secret."
+        )
+    if admin_tokens:
+        log.info("admin console: %d admin credential(s) configured", len(admin_tokens))
     if settings.auth_mode == "token" and not tokens:
         raise AuthConfigError(
             "auth_mode='token' but auth_tokens is empty: this process cannot enforce "
@@ -292,9 +382,13 @@ def current_principal(
 
     Resolution, in order:
 
-    * ``auth_mode=disabled`` -> :data:`ANONYMOUS`, and any ``Authorization``
-      header is ignored.  There is nothing to validate it against, and 401-ing a
-      developer over a stale header in their shell history helps nobody.
+    * A bearer that matches an ADMIN token -> an admin principal, **in any
+      mode**, ``disabled`` included (AD-4/AD-5).  It is the only header
+      ``disabled`` looks at.
+    * ``auth_mode=disabled`` -> :data:`ANONYMOUS`, and any other
+      ``Authorization`` header is ignored.  There is nothing to validate it
+      against, and 401-ing a developer over a stale header in their shell
+      history helps nobody.
     * ``auth_mode=token``, no header -> :data:`ANONYMOUS_READER`.  The public
       reader.  **Not** a 401: the results view is meant to work uncredentialed.
     * ``auth_mode=token``, a header that is not a recognised bearer token -> 401.
@@ -302,31 +396,28 @@ def current_principal(
       anonymous would surface as a puzzling 403 about a role.
     * anything else -> 501, loudly.
     """
+    offered = bearer_from_header(authorization)
+    matched: Principal | None = None
+    if offered is not None and (settings.admin_tokens or settings.auth_mode == "token"):
+        # One resolution covers both lists (constant-time over all entries).
+        # Skipped only in `disabled` with no admin tokens, where the old
+        # behaviour -- ignore the header entirely -- is exactly right.
+        matched = resolve_bearer(offered, settings)
+        if matched is not None and "admin" in matched.roles:
+            return matched
+
     if settings.auth_mode == "disabled":
         return ANONYMOUS
 
     if settings.auth_mode == "token":
         if authorization is None:
             return ANONYMOUS_READER
-        scheme, separator, offered = authorization.partition(" ")
-        if not separator or scheme.lower() != "bearer" or not offered.strip():
+        if offered is None:
             raise _unauthorized("expected an 'Authorization: Bearer <token>' header")
-        try:
-            principal = _principal_for_token(offered.strip(), settings.auth_tokens)
-        except AuthConfigError:
-            # Unreachable when the app was built through create_app, which
-            # validates first. Kept because the alternative to a 503 here is a
-            # 500 -- and a 500 on the auth path is indistinguishable, from the
-            # outside, from a route that never checked.
-            log.exception("auth_tokens is unparseable; refusing to authenticate anyone")
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="authentication is misconfigured on this deployment",
-            ) from None
-        if principal is None:
+        if matched is None:
             log.warning("rejected an unrecognised bearer token")  # never log the value
             raise _unauthorized("unrecognised bearer token")
-        return principal
+        return matched
 
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,

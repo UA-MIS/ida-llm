@@ -383,6 +383,68 @@ class Settings(BaseSettings):
     so a misconfigured deployment fails its readiness probe instead of serving
     with an auth mode it cannot enforce."""
 
+    # ── admin console (see services/api/ida_api/admin and
+    #    artifacts/design/admin-console.md in the capstone repo) ──────────
+    # IDA_-only. The two SECRETS (admin_tokens, credentials_kek) arrive from
+    # Vault via ESO in deployed environments and default to empty, which keeps
+    # every /admin route answering 503 `admin_disabled` -- the console ships
+    # DARK until an environment is deliberately given a token.
+
+    admin_tokens: str = ""
+    """Bearer tokens that grant the ``admin`` role, as ``subject:token`` pairs.
+
+    **A SECRET.**  Same format and the SAME strict parser as
+    :attr:`auth_tokens` (``ida_api.auth.parse_auth_tokens``), so the 16-char
+    floor, unique subjects/tokens and never-log-a-token rules carry over.
+    Presented only by the frontend pod (AD-4), which also forwards the
+    SSO-verified GitHub login as ``X-IDA-Actor``.
+
+    Honoured in EVERY :attr:`auth_mode`, ``disabled`` included -- unlike
+    :attr:`auth_tokens`.  Empty means the admin API is off (503)."""
+
+    admin_groups: str = ""
+    """Comma-separated Dex groups the console admits (e.g. ``UA-MIS:ida-llm``).
+
+    Enforced by the FRONTEND at sign-in, not here: the API never sees a Dex
+    token.  Read by ``GET /admin/system`` only, as a hint for the operator
+    reading a "denied" screen.  Not a secret."""
+
+    config_source: Literal["yaml", "db"] = "yaml"
+    """Where models, tasks and curriculum come from (AD-6).
+
+    ``yaml`` (the default) is today's behaviour, byte for byte: every test, CLI
+    and ``make dev`` path reads the git files.  ``db`` makes the database the
+    source of truth, edited through ``/admin``.  Flipping back to ``yaml`` is
+    the rollback.  A ``Literal`` so a typo dies at startup instead of silently
+    selecting one of the two."""
+
+    admin_run_max_estimated_usd: float = 25.0
+    """Estimated spend above which an admin launch needs typed confirmation (AD-13).
+
+    In ADDITION to :attr:`sweep_max_runs`/:attr:`sweep_max_samples`, which
+    bound admin launches exactly as they bound sweeps.  Matches the $25 hard
+    cap on the testing key so the console never makes it easier to hit that
+    cap than the CLI does."""
+
+    credentials_kek: str = ""
+    """Key-encryption key(s) for admin-entered provider credentials (AD-10).
+
+    **A SECRET.**  ``kid:<base64url 32 bytes>`` entries, comma-separated; the
+    FIRST is active.  Empty means admin-entered credentials are unusable (and
+    ``POST /admin/credentials`` answers 503 ``kek_missing``); models that use
+    ``api_key_env`` are unaffected.  Parsed strictly by
+    ``ida_core.configdb.crypto`` -- never echoed, never logged."""
+
+    @property
+    def credentials_kek_active_id(self) -> str | None:
+        """The ACTIVE key id (the text before the first entry's ``:``), or ``None``.
+
+        Only the label is read here -- never the key -- so ``GET /admin/system``
+        can say which kid is active without touching key material."""
+        first = self.credentials_kek.strip().split(",", 1)[0].strip()
+        kid, separator, _ = first.partition(":")
+        return kid.strip() or None if separator else None
+
     @property
     def sweep_exclude_tag_set(self) -> frozenset[str]:
         """:attr:`sweep_exclude_tags` parsed, normalised and de-duplicated.
