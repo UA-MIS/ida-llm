@@ -1,6 +1,8 @@
 /**
- * The admin API contract (design §9), hand-mirrored from
- * `services/api/ida_api/admin/schemas.py`. Shared by server pages and the
+ * The admin API contract, hand-mirrored from
+ * `services/api/ida_api/admin/schemas.py` (the source of truth since B1, with
+ * its dump at `docs/admin-api.openapi.json`; `tests/admin-contract.test.ts`
+ * checks every path this console calls exists there). Shared by server pages and the
  * `components/admin` client components, so it holds TYPES ONLY: nothing here
  * may import a server module or carry a value.
  *
@@ -26,16 +28,19 @@ export type AdminErrorCode =
   | "actor_required"
   | "not_found"
   | "version_conflict"
+  | "precondition_required"
   | "validation_failed"
   | "conflict"
   | "spend_confirmation_required"
   | "cap_exceeded"
-  | "kek_missing";
+  | "kek_missing"
+  | "rate_limited"
+  | "not_implemented";
 
 export interface AdminError {
   code: AdminErrorCode;
   message: string;
-  issues?: Issue[];
+  issues?: Issue[] | null;
   current?: unknown;
 }
 
@@ -46,23 +51,37 @@ export interface ModelFamily {
   version: Version;
 }
 
+export const SERVING_STACKS = ["openai_api", "openai_reasoning", "anthropic_compat", "vllm", "ollama", "llama_cpp", "mock"] as const;
+export type ServingStack = (typeof SERVING_STACKS)[number];
+export const QUANTIZATIONS = ["none", "fp8", "int8", "int4", "awq", "gptq", "unknown"] as const;
+export type Quantization = (typeof QUANTIZATIONS)[number];
+
+/** Core `SamplingParams`. */
 export interface Sampling {
-  temperature: number | null;
-  top_p: number | null;
-  max_tokens: number;
-  seed: number | null;
+  temperature?: number;
+  top_p?: number;
+  max_tokens?: number;
+  seed?: number | null;
+  stop?: string[];
 }
 
+/** Core `ServingConfig`. `registry_key` is accepted and ignored by the admin API. */
 export interface Serving {
   model_id: string;
-  serving_stack: string;
-  serving_version: string | null;
-  quantization: string;
+  serving_stack: ServingStack;
+  serving_version?: string | null;
+  quantization?: Quantization;
   revision?: string | null;
-  context_window: number | null;
-  hardware: string | null;
-  sampling: Sampling;
+  context_window?: number | null;
+  hardware?: string | null;
+  sampling?: Sampling;
   extra?: Record<string, unknown>;
+  registry_key?: string;
+}
+
+export interface CostRates {
+  input_usd_per_mtok: number;
+  output_usd_per_mtok: number;
 }
 
 export interface AdminModelInput {
@@ -80,8 +99,10 @@ export interface AdminModelInput {
   max_retries: number;
   tags: string[];
   serving: Serving;
-  cost: { input_usd_per_mtok: number; output_usd_per_mtok: number };
+  cost: CostRates;
 }
+
+export type AdminModelPatch = Partial<Pick<AdminModelInput, "enabled" | "hidden" | "display_order" | "family_key">>;
 
 export interface AdminModel extends AdminModelInput {
   uses: "env" | "credential" | "none";
@@ -103,7 +124,7 @@ export interface Credential {
   provider: string;
   kek_id: string;
   created_at: string;
-  created_by: string;
+  created_by: string | null;
   rotated_at: string | null;
   last_used_at: string | null;
   used_by_models: string[];
@@ -126,6 +147,7 @@ export interface TaskFamily {
   sample_count: number;
   classes: string[];
   unit: { course: string; key: string } | null;
+  archived_at?: string | null;
   version: Version;
 }
 
@@ -138,6 +160,8 @@ export interface TaskFamilyInput {
 
 export interface AdminTaskSummary {
   id: string;
+  family_key: string;
+  archived_at?: string | null;
   title: string;
   kind: "verifiable" | "subjective";
   sample_count: number;
@@ -167,13 +191,14 @@ export interface AdminTask extends AdminTaskSummary {
 export interface ValidateResult {
   ok: boolean;
   issues: Issue[];
-  content_sha?: string;
-  sample_count?: number;
+  content_sha?: string | null;
+  sample_count?: number | null;
 }
 
 export interface UploadResult extends ValidateResult {
-  task?: AdminTaskSummary;
-  diff?: { samples_added: number; samples_removed: number; samples_changed: number };
+  committed?: boolean;
+  task?: AdminTaskSummary | null;
+  diff?: { samples_added: number; samples_removed: number; samples_changed: number } | null;
 }
 
 export interface AdminUnit {
@@ -216,11 +241,21 @@ export interface AdminClass {
 
 export interface ClassInput {
   course: string;
-  major_id: string | null;
-  unassigned_reason: string | null;
+  major_id?: string | null;
+  unassigned_reason?: string | null;
   title?: string | null;
   credit_hours?: number | null;
-  position: number;
+  position?: number;
+}
+
+/** Shared body of `PUT /classes/{course}/task-families` and `PUT /units/{id}/families`. */
+export interface FamiliesInput {
+  families: string[];
+}
+
+/** Body of every `.../reorder` route. */
+export interface ReorderInput {
+  order: string[];
 }
 
 export interface AdminMajor {
@@ -239,12 +274,12 @@ export interface AdminMajor {
 export interface MajorInput {
   id: string;
   name: string;
-  department: string;
-  subject_codes: string[];
-  display_code: string | null;
-  catalog: string | null;
-  class_source: string;
-  position: number;
+  department?: string;
+  subject_codes?: string[];
+  display_code?: string | null;
+  catalog?: string | null;
+  class_source?: string;
+  position?: number;
 }
 
 export interface MajorsResponse {
@@ -265,8 +300,8 @@ export interface RunLaunchInput {
   family_keys?: string[];
   task_ids?: string[];
   label?: string;
-  sampling_override?: Record<string, unknown>;
-  confirm_spend_usd?: number;
+  sampling_override?: Sampling | null;
+  confirm_spend_usd?: number | null;
 }
 
 export interface RunEstimate {
@@ -281,10 +316,10 @@ export interface RunEstimate {
 }
 
 export interface EnqueueResponse {
+  queued: number;
   runs: AdminRunRecord[];
-  sweep_id: string | null;
-  estimate?: RunEstimate;
-  [key: string]: unknown;
+  sweep_id: string;
+  estimate: RunEstimate;
 }
 
 export interface SweepSummary {
@@ -309,6 +344,27 @@ export type AdminRunRecord = Omit<PublicRunRecord, "status"> & {
 export interface AdminRunDetail {
   run: AdminRunRecord;
   results: ResultRecord[];
+  results_total: number;
+}
+
+export interface AdminRunList {
+  runs: AdminRunRecord[];
+  next_cursor: string | null;
+}
+
+export interface SweepList {
+  sweeps: SweepSummary[];
+  next_cursor: string | null;
+}
+
+export interface SweepDetail {
+  summary: SweepSummary;
+  runs: AdminRunRecord[];
+}
+
+export interface AuditList {
+  entries: AuditEntry[];
+  next_cursor: string | null;
 }
 
 export type { PublicRunDetail };
@@ -324,12 +380,8 @@ export interface AuditEntry {
   before: unknown;
   after: unknown;
   config_revision: number | null;
-}
-
-export interface Page<T> {
-  entries?: T[];
-  runs?: T[];
-  next_cursor: string | null;
+  actor_sub?: string | null;
+  request_id?: string | null;
 }
 
 export interface SystemInfo {
@@ -346,7 +398,7 @@ export interface SystemInfo {
   judge_model_key: string | null;
   kek_configured: boolean;
   kek_active_id: string | null;
-  admin_group_hint?: string | null;
-  /** Added by B6; until it is true the UI refuses `provenance=private`. */
+  admin_group_hint: string | null;
+  /** False until B6 gates `GET /tasks/{id}`; while false the UI refuses `provenance=private`. */
   tasks_spec_gated?: boolean;
 }

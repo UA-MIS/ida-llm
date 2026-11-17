@@ -17,7 +17,7 @@ function explain(err: LoadFailure): { title: string; body: string } {
   if (status === 503 || code === "admin_disabled") {
     return { title: "The admin service is not switched on yet", body: "The settings service has not been given its admin key. An operator needs to finish setting it up." };
   }
-  if (status === 404 || status === 405) {
+  if (status === 404 || status === 405 || status === 501 || code === "not_implemented") {
     return { title: "This section is not available yet", body: "The settings service does not offer this feature yet. It will appear here once that part has been deployed." };
   }
   if (status === 401 || status === 403) {

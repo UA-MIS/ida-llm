@@ -16,6 +16,9 @@ const FRIENDLY: Record<number, string> = {
   403: "Your account does not have permission to do that.",
   404: "That item no longer exists. It may have been removed by someone else.",
   413: "That file is too large.",
+  428: "The page was out of date. Reload it and try again.",
+  429: "Please wait a few seconds before trying that again.",
+  501: "This feature is not available yet. It will work once that part of the service is deployed.",
   502: "The admin service could not be reached. Try again in a minute.",
   503: "The admin service is not switched on yet. Ask an operator.",
 };
