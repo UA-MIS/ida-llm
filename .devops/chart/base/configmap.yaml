@@ -29,8 +29,8 @@ data:
   API_URL: "http://ida-llm-api"
 
   # ── ADMIN CONSOLE (admin-console design §7.2) ───────────────────────────────
-  # Inert until an overlay sets ADMIN_CONSOLE_ENABLED (C2/C3) -- no overlay does
-  # yet, and preview never will (no Dex redirect URI for a PR host, AD-14).
+  # Inert until an overlay sets ADMIN_CONSOLE_ENABLED (C2/C3); see the overlays for
+  # which have flipped. Preview never will (no Dex redirect URI for a PR host, AD-14).
   #
   # The Dex team whose members may sign in to /admin. Checked by the FRONTEND at
   # sign-in, exact and case-sensitive; the API only shows it on /admin/system.
