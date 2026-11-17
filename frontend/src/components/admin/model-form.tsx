@@ -192,12 +192,7 @@ export function ModelForm({
   const [issues, setIssues] = useState<Issue[]>([]);
   const [error, setError] = useState<AdminError | null>(null);
   const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  const set = <K extends keyof ModelFormState>(k: K, v: ModelFormState[K]) => {
-    setF((prev) => ({ ...prev, [k]: v }));
-    setSaved(false);
-  };
+  const set = <K extends keyof ModelFormState>(k: K, v: ModelFormState[K]) => setF((prev) => ({ ...prev, [k]: v }));
   const { byField, other } = partitionIssues(issues, FIELDS);
   const invalid = (path: string) => (byField[path]?.length ? true : undefined);
   const text = (k: keyof ModelFormState, path: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
@@ -234,7 +229,9 @@ export function ModelForm({
     if (creating) {
       router.push(`/admin/models/${encodeURIComponent(res.data.key)}?created=1`);
     } else {
-      setSaved(true);
+      // The page re-keys this form by version, so the confirmation is shown
+      // by the page (from ?saved=1) rather than by state that would be lost.
+      router.replace(`/admin/models/${encodeURIComponent(res.data.key)}?saved=1`);
       router.refresh();
     }
   }
@@ -422,13 +419,8 @@ export function ModelForm({
           {busy ? "Saving…" : creating ? "Add model" : "Save changes"}
         </button>
         <Link href="/admin/models" className="adm-btn adm-btn-quiet">
-          {saved ? "Back to models" : "Cancel"}
+          {creating ? "Cancel" : "Back to models"}
         </Link>
-        {saved ? (
-          <span role="status" className="adm-badge adm-badge-ok">
-            Saved
-          </span>
-        ) : null}
       </div>
     </form>
   );

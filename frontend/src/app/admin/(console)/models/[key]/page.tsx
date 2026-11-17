@@ -15,12 +15,14 @@ export default async function EditModelPage({
   searchParams,
 }: {
   params: Promise<{ key: string }>;
-  searchParams: Promise<{ created?: string }>;
+  searchParams: Promise<{ created?: string; saved?: string }>;
 }) {
   const { key } = await params;
   const admin = await requireAdmin(`/admin/models/${encodeURIComponent(key)}`);
   const actor = getActor(admin);
-  const created = (await searchParams).created === "1";
+  const sp = await searchParams;
+  const created = sp.created === "1";
+  const saved = sp.saved === "1";
   let model: AdminModel;
   let families: ModelFamily[];
   let credentials: Credential[];
@@ -55,6 +57,11 @@ export default async function EditModelPage({
       {created ? (
         <p role="status" className="adm-panel adm-panel-ok">
           Model added. It is switched {model.enabled ? "on" : "off"}; use “Test connection” below to check it can be reached.
+        </p>
+      ) : null}
+      {saved ? (
+        <p role="status" className="adm-panel adm-panel-ok">
+          Changes saved. They reach the public site within a few seconds.
         </p>
       ) : null}
       <ModelForm key={model.version} model={model} families={families} credentials={credentials} />

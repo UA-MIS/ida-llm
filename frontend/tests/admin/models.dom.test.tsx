@@ -10,7 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const push = vi.fn();
 const refresh = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }), usePathname: () => "/admin/models" }));
+const replace = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh, replace }), usePathname: () => "/admin/models" }));
 
 import { bffUrl, partitionIssues } from "@/lib/admin/client";
 import { ConfirmButton } from "@/components/admin/confirm-button";
@@ -32,6 +33,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   push.mockReset();
   refresh.mockReset();
+  replace.mockReset();
 });
 
 const field = (label: RegExp | string) => screen.getByLabelText(label) as HTMLInputElement;
@@ -88,6 +90,14 @@ describe("ModelForm", () => {
     const msg = await screen.findByText("unknown model id for this provider");
     expect(msg.closest(".adm-field")?.querySelector("input")?.id).toBe("m-serving.model_id");
     expect(fake.calls[0]).toMatchObject({ method: "PUT", path: "/models/gpt-5-mini", ifMatch: "1" });
+  });
+
+  it("saves and comes back to the page with a confirmation that survives the reload", async () => {
+    render(<ModelForm model={sampleModel()} families={[]} credentials={[]} />);
+    fireEvent.change(field(/^Name/), { target: { value: "GPT-5 mini (OpenAI)" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/admin/models/gpt-5-mini?saved=1"));
+    expect(fake.state.models[0]!.display_name).toBe("GPT-5 mini (OpenAI)");
   });
 
   it("explains a concurrent edit instead of overwriting it", async () => {
