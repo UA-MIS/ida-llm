@@ -212,8 +212,8 @@ else:
           f"{env}: the frontend gets AUTH_SECRET, AUTH_DEX_SECRET and the admin bearer")
     # The three admin flags move together, per environment (C2 dev, C3 staging,
     # then prod). Add an env to FLIPPED in the same PR that patches its overlay;
-    # an unflipped env must stay fully dark. Prod joins only once it runs v1.2.0.
-    FLIPPED = {"dev", "staging"}
+    # an unflipped env must stay fully dark. Prod joined once it ran v1.2.0.
+    FLIPPED = {"dev", "staging", "prod"}
     flags = {
         "IDA_CONFIG_SOURCE": "db",
         "ADMIN_CONSOLE_ENABLED": "true",
