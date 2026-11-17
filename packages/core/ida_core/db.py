@@ -40,6 +40,7 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
+    event,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
@@ -273,8 +274,45 @@ def make_engine(database_url: str, *, echo: bool = False):
         # SQLite has no real pool; pre-ping is meaningless and check_same_thread
         # must be relaxed for the TestClient's thread pool.
         kwargs.pop("pool_pre_ping")
-        kwargs["connect_args"] = {"check_same_thread": False}
+        kwargs["connect_args"] = {
+            "check_same_thread": False,
+            "timeout": SQLITE_BUSY_TIMEOUT_S,
+        }
+        engine = create_engine(database_url, **kwargs)
+        if ":memory:" not in database_url and database_url.rstrip("/") != "sqlite:":
+            event.listen(engine, "connect", _sqlite_wal)
+        return engine
     return create_engine(database_url, **kwargs)
+
+
+SQLITE_BUSY_TIMEOUT_S = 30.0
+"""How long a SQLite connection waits for another's write lock before raising
+``database is locked`` (pysqlite's default is 5 s).  SQLite is the TEST and
+local-dev database only -- production is Postgres -- so this only ever decides
+whether a slow CI disk fails a test that is otherwise correct."""
+
+
+def _sqlite_wal(dbapi_connection, _record) -> None:
+    """WAL + ``synchronous=NORMAL`` for file-backed SQLite (tests, local dev).
+
+    ⚠ WHY THIS EXISTS (CI flake, 2026-11-17). The in-process tracer runs the API
+    and a runner thread against ONE SQLite file. In the default rollback-journal
+    mode every commit -- and every DDL statement ``create_all`` issues, one
+    autocommit each -- is an fsync, and a reader blocks a writer's commit. With
+    the admin-console tables the schema grew from 2 tables to 16, ``create_all``
+    from a handful of statements to ~40, and on a busy CI disk the fsyncs
+    stretched long enough that the runner's commit and the API's waited past
+    pysqlite's 5 s busy timeout: ``sqlite3.OperationalError: database is
+    locked``. WAL lets readers proceed beside the writer, and ``NORMAL`` drops
+    the per-commit fsync (durable at checkpoint), which is the right trade for a
+    throwaway test database and changes nothing about what the tests assert.
+    Production never comes through here."""
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+    finally:
+        cursor.close()
 
 
 def make_session_factory(engine) -> sessionmaker[Session]:
