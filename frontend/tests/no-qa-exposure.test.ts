@@ -121,6 +121,14 @@ describe("no question/answer content is reachable from the public frontend", () 
     }
   });
 
+  it("reads task metadata, never the full task spec with its prompts (B6)", () => {
+    // `GET /tasks/{id}` carries every prompt; the API is about to refuse it to
+    // anonymous callers. Public pages use `getTaskMeta` (`/tasks/{id}/meta`).
+    for (const f of PUBLIC.filter((p) => p.endsWith(".tsx"))) {
+      expect(code(f), `${f} fetches the full task spec`).not.toMatch(/\bgetTask\(/);
+    }
+  });
+
   it("never renders a scorer's or judge's explanation, or a per-sample error string", () => {
     for (const f of PUBLIC.filter((p) => p.endsWith(".tsx"))) {
       const body = code(f);

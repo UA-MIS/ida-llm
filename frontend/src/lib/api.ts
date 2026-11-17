@@ -24,6 +24,7 @@ import type {
   RunDetail,
   RunListResponse,
   TaskDetail,
+  TaskMeta,
 } from "./types";
 
 const SERVER_BASE =
@@ -111,4 +112,28 @@ export function getLeaderboard(params?: {
 /** One full task spec, including each sample's authored `metadata`. */
 export function getTask(taskId: string): Promise<TaskDetail> {
   return getJson<TaskDetail>(`/tasks/${taskId}`, 60);
+}
+
+/**
+ * A task's METADATA only: titles, tags and each sample's authored `metadata`,
+ * never a prompt or a target (`GET /tasks/{id}/meta`, admin-console B6).
+ *
+ * ⚠ THE PUBLIC PAGES READ THIS, NOT `getTask`. The full spec carries the
+ * prompts, and the API is about to refuse it to anonymous callers
+ * (`IDA_TASKS_SPEC_GATED`); this is what lets that flag be flipped without
+ * the public run page losing its drill-down labels.
+ *
+ * Deploy-order safe: against an API that predates `/meta` (404 there), it
+ * falls back to the full spec ONCE and keeps only the same metadata fields,
+ * so nothing more reaches the page either way. After the gate is on, that
+ * fallback is refused too, and callers already treat this as best-effort.
+ */
+export async function getTaskMeta(taskId: string): Promise<TaskMeta> {
+  try {
+    return await getJson<TaskMeta>(`/tasks/${taskId}/meta`, 60);
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 404) throw error;
+    const full = await getTask(taskId);
+    return { id: full.id, samples: full.samples.map((s) => ({ id: s.id, metadata: s.metadata })) };
+  }
 }

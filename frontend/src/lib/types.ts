@@ -648,3 +648,13 @@ export interface TaskDetail {
   /** True when gold answers were withheld — the default for an anonymous read. */
   targets_redacted: boolean;
 }
+
+/**
+ * `GET /tasks/{id}/meta`: a task without its questions or answers. Only the
+ * fields the public pages use are declared; the API also sends title,
+ * description, kind, domain, tags, content_sha and sample_count.
+ */
+export interface TaskMeta {
+  id: string;
+  samples: Array<{ id: string; metadata: Record<string, unknown> }>;
+}

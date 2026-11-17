@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ApiError, getRun, getTask } from "@/lib/api";
+import { ApiError, getRun, getTaskMeta } from "@/lib/api";
 import {
   formatCost,
   formatDuration,
@@ -359,13 +359,14 @@ export default async function RunDetailPage({
 
   const { run, results } = detail;
 
-  // The task spec, for each sample's authored metadata. Best-effort: a run can
+  // The task's metadata (never its prompts: `getTaskMeta`), for each sample's
+  // authored metadata. Best-effort: a run can
   // outlive the task file that produced it (an id is never reused for different
   // content, but a family can be removed), and losing the drill-down labels must
   // never take down the page that shows the actual results.
   let sampleMetadata: Record<string, Record<string, unknown>> = {};
   try {
-    const task = await getTask(run.task_id);
+    const task = await getTaskMeta(run.task_id);
     sampleMetadata = Object.fromEntries(
       task.samples.map((sample) => [sample.id, sample.metadata]),
     );
