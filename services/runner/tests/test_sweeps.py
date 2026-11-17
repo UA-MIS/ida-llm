@@ -890,7 +890,7 @@ class TestRetroactiveGradingEndToEnd:
         transport = make_transport(app)
         entry = ctx.registry.get("mock")
 
-        def _build(settings_arg, registry_arg):
+        def _build(settings_arg, registry_arg, credentials=None):
             # Honour the real "off by default" policy even here: an empty key
             # must still mean no judge, or the test would prove nothing about
             # the unconfigured path.

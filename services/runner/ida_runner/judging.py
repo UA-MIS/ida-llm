@@ -33,12 +33,17 @@ import logging
 
 from ida_core.config import Settings
 from ida_core.contracts import ModelRegistry
+from ida_core.registry import CredentialResolver
 from ida_harness.judge import LLMJudge, build_judge
 
 log = logging.getLogger(__name__)
 
 
-def build_judge_from_settings(settings: Settings, registry: ModelRegistry) -> LLMJudge | None:
+def build_judge_from_settings(
+    settings: Settings,
+    registry: ModelRegistry,
+    credentials: CredentialResolver | None = None,
+) -> LLMJudge | None:
     """The configured judge, or ``None`` when none is configured.
 
     Raises :class:`~ida_harness.errors.JudgeConfigurationError` (unknown key,
@@ -58,6 +63,7 @@ def build_judge_from_settings(settings: Settings, registry: ModelRegistry) -> LL
         )
         return None
 
-    judge = build_judge(registry, key)
+    # `credentials` lets a judge use an admin-entered key (credential_ref).
+    judge = build_judge(registry, key, credentials=credentials)
     log.info("judge configured: %s", key)
     return judge

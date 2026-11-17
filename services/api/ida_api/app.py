@@ -71,6 +71,7 @@ from ida_api.schemas import (
 )
 from ida_api.slo import CurriculumView, in_benchmark, slo_of, use_mode_of
 from ida_core import artifacts as artifact_paths
+from ida_core.configdb.crypto import parse_kek
 from ida_core.contracts import (
     RunDetail,
     RunJobMessage,
@@ -176,6 +177,10 @@ def create_app(context: AppContext | None = None) -> FastAPI:
     # 501 (see ida_api.auth). Booting is what lets that 501 be seen: the reads
     # stay up and the one route that spends money says loudly that it cannot.
     validate_auth_config(app.state.settings)
+    # Same rule for the credentials KEK (AD-10): malformed -> refuse to boot
+    # (KekConfigError, message names entries by position/kid, never the key).
+    # Empty is fine -- credentials are unusable and everything else works.
+    parse_kek(app.state.settings.credentials_kek)
 
     @app.middleware("http")
     async def _record_request_metrics(request: Request, call_next):

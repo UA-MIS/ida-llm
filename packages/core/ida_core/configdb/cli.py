@@ -2,6 +2,7 @@
 
     python -m ida_core.configdb diff            # YAML vs database; exit 1 on any difference
     python -m ida_core.configdb import <dir>    # DEV/TEST ONLY: replace the config with <dir>'s YAML
+    python -m ida_core.configdb rotate-kek      # re-encrypt every credential under the active KEK
 
 ``diff`` is the parity gate (design 4.3).  Run it right after the first
 ``IDA_CONFIG_SOURCE=db`` deploy in each environment: it reads the YAML this
@@ -250,6 +251,39 @@ def import_directory(
         return revision
 
 
+def rotate_kek(settings: Settings, session_factory) -> int:
+    """The KEK rotation step (design 5.3): add the new kid FIRST in Vault ->
+    restart -> run this -> remove the old kid.  Prints counts, never material."""
+    from ida_core.configdb.crypto import parse_kek, rotate_all
+
+    ring = parse_kek(settings.credentials_kek)
+    if ring is None:
+        print("IDA_CREDENTIALS_KEK is unset; nothing to rotate with", file=sys.stderr)
+        return 2
+    with session_scope(session_factory) as session:
+        rotated = rotate_all(session, ring)
+        if rotated:
+            revision = record_revision(
+                session,
+                actor="system:rotate-kek",
+                source="admin",
+                summary=f"re-encrypted {rotated} credential(s) under kid {ring.active_kid}",
+            )
+            session.add(
+                AuditLogRow(
+                    actor_login="system:rotate-kek",
+                    via_subject="cli",
+                    action="credential.rotate",
+                    entity_type="credential",
+                    entity_id="*",
+                    after={"rotated": rotated, "kek_id": ring.active_kid},
+                    config_revision=revision,
+                )
+            )
+    print(f"re-encrypted {rotated} credential(s) under kid {ring.active_kid}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m ida_core.configdb", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -257,6 +291,10 @@ def main(argv: list[str] | None = None) -> int:
     imp = sub.add_parser("import", help="DEV/TEST ONLY: replace the config with a directory")
     imp.add_argument("root", type=Path, help="a repo-shaped directory (models.yaml, tasks/, ...)")
     imp.add_argument("--force", action="store_true", help="discard admin edits")
+    sub.add_parser(
+        "rotate-kek",
+        help="re-encrypt every provider credential under the FIRST kid of IDA_CREDENTIALS_KEK",
+    )
     args = parser.parse_args(argv)
 
     settings = get_settings()
@@ -270,6 +308,8 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print("no differences: the database serves exactly what the YAML does")
         return 0
+    if args.command == "rotate-kek":
+        return rotate_kek(settings, session_factory)
     try:
         revision = import_directory(settings, session_factory, args.root, force=args.force)
     except SeedError as exc:

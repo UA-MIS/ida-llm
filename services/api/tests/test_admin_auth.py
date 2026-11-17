@@ -348,7 +348,9 @@ class TestErrorEnvelope:
         response = admin_on.delete(
             "/admin/models/mock", headers={**bearer(ADMIN_TOKEN), **ACTOR, "If-Match": value}
         )
-        assert response.status_code == 501  # past the gate; body lands in B3
+        # Past the If-Match parse (no 428/400); this yaml-mode app then refuses
+        # the edit itself (409), which is a later, different check.
+        assert response.status_code not in (400, 428), response.text
 
     def test_system_reports_the_kek_id_and_never_the_key(self, context: AppContext) -> None:
         key = "k1:" + "A" * 43 + "="

@@ -31,6 +31,7 @@ pydantic-settings~=2.5
 SQLAlchemy~=2.0
 alembic~=1.13
 psycopg[binary]~=3.2
+cryptography~=50.0           # AES-GCM for admin-entered provider keys (configdb.crypto)
 
 # --- services ---------------------------------------------------------------
 fastapi~=0.141.0

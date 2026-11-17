@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Protocol
 from urllib.parse import urlsplit
 
 from ida_core.contracts import ModelEntry, ModelRegistry
@@ -56,15 +57,39 @@ def load_registry(path: Path | str) -> ModelRegistry:
     return ModelRegistry.model_validate(document)
 
 
-def resolve_api_key(entry: ModelEntry, env: dict[str, str] | None = None) -> str | None:
+class CredentialResolver(Protocol):
+    """Decrypts an admin-entered credential by name (``ida_core.configdb.crypto``).
+
+    A protocol here, not an import, so this module stays free of the database
+    and the crypto library for every caller that never sees a credential."""
+
+    def get(self, name: str) -> str: ...
+
+
+def resolve_api_key(
+    entry: ModelEntry,
+    env: dict[str, str] | None = None,
+    credentials: CredentialResolver | None = None,
+) -> str | None:
     """Return the API key for ``entry``.
 
-    ``None`` when the entry declares no ``api_key_env`` (an unauthenticated
-    endpoint -- the mock model, a campus vLLM behind network policy).  Raises
-    :class:`MissingApiKeyError` when a key *is* declared but unset, because
-    silently sending an empty ``Authorization`` header produces a confusing
-    401 far from the cause.
+    ``None`` when the entry declares neither ``api_key_env`` nor
+    ``credential_ref`` (an unauthenticated endpoint -- the mock model, a campus
+    vLLM behind network policy).  Raises :class:`MissingApiKeyError` when a key
+    *is* declared but cannot be produced, because silently sending an empty
+    ``Authorization`` header produces a confusing 401 far from the cause.
+
+    ``credential_ref`` (admin-entered, AD-10) is decrypted through
+    ``credentials`` at use time.  The ``api_key_env`` path below it is
+    byte-for-byte what it always was.
     """
+    if entry.credential_ref is not None:
+        if credentials is None:
+            raise MissingApiKeyError(
+                f"model {entry.key!r} uses credential {entry.credential_ref!r}, but no "
+                "credential store is available to this process"
+            )
+        return credentials.get(entry.credential_ref)
     if entry.api_key_env is None:
         return None
     environ = os.environ if env is None else env
