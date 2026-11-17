@@ -14,10 +14,8 @@ import sys
 from ida_core.artifacts import LocalArtifactStore, S3ArtifactStore
 from ida_core.config import get_settings
 from ida_core.db import make_engine, make_session_factory
-from ida_core.gitmeta import current_git_sha
 from ida_core.queue import RedisQueue
-from ida_core.registry import load_registry
-from ida_harness.tasks import TaskCatalog
+from ida_harness.config_provider import build_provider
 from ida_runner import metrics
 from ida_runner.judging import build_judge_from_settings
 from ida_runner.reaper import Reaper
@@ -54,7 +52,11 @@ def build_worker() -> Worker:
         heartbeat_ttl_s=settings.runner_heartbeat_ttl_s,
     )
     session_factory = make_session_factory(engine)
-    registry = load_registry(settings.resolved_models_file())
+    # yaml mode: today's files, loaded once. db mode: seed-if-never-seeded, then
+    # the live tables -- the worker re-reads a snapshot per job (see Worker).
+    config = build_provider(settings, session_factory)
+    snapshot = config.snapshot()
+    registry = snapshot.registry
 
     # BUILT BEFORE THE WORKER, AND ALLOWED TO RAISE. A judge that cannot be
     # constructed is an operator who asked for grading and would not get it; the
@@ -70,9 +72,10 @@ def build_worker() -> Worker:
         queue=queue,
         session_factory=session_factory,
         registry=registry,
-        catalog=TaskCatalog.from_directory(settings.resolved_tasks_dir()),
+        catalog=snapshot.catalog,
         artifact_store=store,
-        git_sha=current_git_sha(settings.resolved_tasks_dir()),
+        git_sha=snapshot.task_git_sha,
+        config=config if settings.config_source == "db" else None,
         poll_timeout_s=settings.runner_poll_timeout_s,
         judge=judge,
         reaper=Reaper(

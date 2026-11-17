@@ -78,3 +78,23 @@ def test_an_empty_task_tree_fails_rather_than_passing_vacuously(content_tree: Pa
     result = _run(content_tree)
     assert result.returncode == 1
     assert "no task files found" in result.stderr
+
+
+def test_a_unit_invariant_violation_fails_the_gate(tmp_path: Path) -> None:
+    """The unit invariants moved here from the frontend's units.test.ts: a
+    family claimed by two units must fail CI, not render twice."""
+    shutil.copy(REPO_ROOT / "models.yaml", tmp_path / "models.yaml")
+    shutil.copytree(REPO_ROOT / "tasks", tmp_path / "tasks")
+    shutil.copytree(REPO_ROOT / "curriculum", tmp_path / "curriculum")
+    units = tmp_path / "curriculum" / "units.yaml"
+    text = units.read_text()
+    units.write_text(text.replace("- mis200-competitive-strategy", "- mis200-is-concepts", 1))
+
+    result = _run(tmp_path)
+    assert result.returncode == 1
+    assert "at most one unit" in result.stderr
+
+
+def test_the_units_file_is_reported_when_valid() -> None:
+    result = _run(REPO_ROOT)
+    assert "units.yaml  (" in result.stdout

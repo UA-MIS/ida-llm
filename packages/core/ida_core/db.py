@@ -1,6 +1,7 @@
 """Relational schema (SQLAlchemy 2.0) + session plumbing.
 
-Two tables, deliberately.  ``runs`` is the queryable spine; ``results`` is the
+Two run tables, deliberately (plus the admin configuration tables in
+:mod:`ida_core.configdb.tables`, registered on the same ``Base``).  ``runs`` is the queryable spine; ``results`` is the
 grain the UI and the recommender read.  Anything large, append-only and never
 joined on (transcripts, raw provider JSON, full eval logs) lives in object
 storage and is referenced by URI -- see :mod:`ida_core.artifacts`.
@@ -30,6 +31,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     DateTime,
     Float,
     ForeignKey,
@@ -116,6 +118,21 @@ class RunRow(Base):
     )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """Set when an admin cancels a RUNNING run (AD-12, ``ida_0007``).  The worker
+    checks it between samples and lands the run on ``cancelled``."""
+
+    config_revision: Mapped[int | None] = mapped_column(BigInteger)
+    """The ``config_revisions`` id this run was planned against (``ida_0007``).
+
+    ``task_git_sha`` keeps meaning "the image's git sha"; once material is
+    authored in the database, this plus ``task_content_sha`` -> ``task_revisions``
+    is what pins the exact text.  NULL in yaml mode and for older rows."""
+
+    launched_by: Mapped[str | None] = mapped_column(String(64))
+    """The GitHub login behind an admin-console launch (``ida_0007``).  NULL for
+    token/CLI/sweep launches, which already log ``principal.subject``."""
 
 
 class ResultRow(Base):
@@ -229,6 +246,13 @@ Index(
     unique=True,
 )
 Index("ix_runs_task_model", RunRow.task_id, RunRow.model_key)
+
+# The admin-editable configuration tables (design section 3) live in their own
+# module, and are imported HERE so that `Base.metadata` -- what
+# `migrations/env.py` autogenerates against and what `create_all` builds --
+# always includes them. Imported after `Base` exists, which is all the cycle
+# needs. `test_migrations` proves the ORM and the migrations agree.
+from ida_core.configdb import tables as _config_tables  # noqa: E402, F401
 
 
 def make_engine(database_url: str, *, echo: bool = False):

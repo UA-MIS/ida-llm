@@ -380,7 +380,7 @@
           },
           "key": {
             "maxLength": 128,
-            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
             "title": "Key",
             "type": "string"
           },
@@ -544,7 +544,7 @@
           },
           "key": {
             "maxLength": 128,
-            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
             "title": "Key",
             "type": "string"
           },
@@ -2371,13 +2371,14 @@
         "type": "object"
       },
       "RunStatus": {
-        "description": "Lifecycle of a :class:`RunRecord`.\n\n``queued`` -> ``running`` -> (``succeeded`` | ``partial`` | ``failed``).\nA run whose runner dies before finishing does **not** stay ``running``: its\nqueue claim is recovered and the row goes back to ``queued`` for another\nattempt, or -- once attempts are spent, or if no claim survives at all --\nit is closed out ``failed`` with a reason.  See\n:class:`ida_runner.reaper.Reaper`.  ``running`` therefore means a runner is\ngenuinely working on it, which is what makes the status worth showing.\n\nThe three terminal states are decided by :attr:`RunRecord.error_count`\nagainst :attr:`RunRecord.sample_count` and are **not** interchangeable.\nReporting a run in which every sample errored as ``succeeded`` -- which an\nearlier revision did -- tells the reader the model was measured when it was\nnot, and is exactly the kind of false statement this platform exists to\navoid.  :func:`terminal_status` is the single place that decision is made.",
+        "description": "Lifecycle of a :class:`RunRecord`.\n\n``queued`` -> ``running`` -> (``succeeded`` | ``partial`` | ``failed`` |\n``cancelled``).  ``queued`` may also go straight to ``cancelled``.\nA run whose runner dies before finishing does **not** stay ``running``: its\nqueue claim is recovered and the row goes back to ``queued`` for another\nattempt, or -- once attempts are spent, or if no claim survives at all --\nit is closed out ``failed`` with a reason.  See\n:class:`ida_runner.reaper.Reaper`.  ``running`` therefore means a runner is\ngenuinely working on it, which is what makes the status worth showing.\n\nThe three terminal states are decided by :attr:`RunRecord.error_count`\nagainst :attr:`RunRecord.sample_count` and are **not** interchangeable.\nReporting a run in which every sample errored as ``succeeded`` -- which an\nearlier revision did -- tells the reader the model was measured when it was\nnot, and is exactly the kind of false statement this platform exists to\navoid.  :func:`terminal_status` is the single place that decision is made.",
         "enum": [
           "queued",
           "running",
           "succeeded",
           "partial",
-          "failed"
+          "failed",
+          "cancelled"
         ],
         "title": "RunStatus",
         "type": "string"

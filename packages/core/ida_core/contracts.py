@@ -92,7 +92,8 @@ class ScorerKind(StrEnum):
 class RunStatus(StrEnum):
     """Lifecycle of a :class:`RunRecord`.
 
-    ``queued`` -> ``running`` -> (``succeeded`` | ``partial`` | ``failed``).
+    ``queued`` -> ``running`` -> (``succeeded`` | ``partial`` | ``failed`` |
+    ``cancelled``).  ``queued`` may also go straight to ``cancelled``.
     A run whose runner dies before finishing does **not** stay ``running``: its
     queue claim is recovered and the row goes back to ``queued`` for another
     attempt, or -- once attempts are spent, or if no claim survives at all --
@@ -129,8 +130,23 @@ class RunStatus(StrEnum):
     FAILED = "failed"
     """The run measured nothing: setup failed, or every sample errored."""
 
+    CANCELLED = "cancelled"
+    """An admin stopped the run (AD-12).  Terminal, and NEVER evidence.
 
-TERMINAL_RUN_STATUSES = frozenset({RunStatus.SUCCEEDED, RunStatus.PARTIAL, RunStatus.FAILED})
+    A queued run is cancelled before any runner claims it; a running one stops
+    issuing calls before its next sample, keeps the results (and the spend) it
+    already has, and lands here.  It is deliberately NOT decided by
+    :func:`terminal_status` -- it is a human decision, not an error count --
+    and the leaderboard and the sweeps' dedupe ignore it exactly as they would
+    a run that never happened: the leaderboard reads only
+    ``ida_core.repositories.TERMINAL_RUN_STATUSES`` (which excludes it, so a
+    cancelled re-run never shadows an older real score), and a sweep counts
+    only ``succeeded`` as measured."""
+
+
+TERMINAL_RUN_STATUSES = frozenset(
+    {RunStatus.SUCCEEDED, RunStatus.PARTIAL, RunStatus.FAILED, RunStatus.CANCELLED}
+)
 """The statuses from which a run never moves again.
 
 Named once so "is this run finished?" cannot be spelled three slightly different
@@ -375,6 +391,27 @@ class ModelEntry(BaseModel):
     """Position on the public grids, ascending; a family sits where its first
     member does and members run in this order (newest first).  ``None`` sorts
     after every ordered model."""
+
+    hidden: bool = False
+    """Withheld from the PUBLIC read API, exactly like an ``IDA_PUBLIC_HIDE_TAGS``
+    match (``ida_api.leaderboard.is_publicly_hidden``).  Not disabled: the
+    runner, sweeps and the admin console still see it.  The admin console's
+    per-model switch; ``models.yaml`` need not mention it."""
+
+    credential_ref: str | None = None
+    """Name of an admin-entered provider credential holding this model's key
+    (AD-10), decrypted at use time with ``IDA_CREDENTIALS_KEK``.  Mutually
+    exclusive with :attr:`api_key_env`: a key comes from an env var OR from a
+    stored credential, never "whichever happens to be set"."""
+
+    @model_validator(mode="after")
+    def _one_key_source(self) -> ModelEntry:
+        if self.api_key_env and self.credential_ref:
+            raise ValueError(
+                f"model {self.key!r} sets both api_key_env and credential_ref; "
+                "a key comes from an env var or from a stored credential, not both"
+            )
+        return self
 
     @model_validator(mode="after")
     def _has_somewhere_to_send_the_request(self) -> ModelEntry:

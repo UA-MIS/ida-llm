@@ -90,12 +90,78 @@ def test_baseline_migration_matches_orm_metadata(migrated_engine, metadata_engin
     assert _describe(migrated_engine) == _describe(metadata_engine)
 
 
+ADMIN_CONFIG_TABLES = {
+    "config_revisions",
+    "model_families",
+    "models",
+    "provider_credentials",
+    "task_families",
+    "tasks",
+    "task_revisions",
+    "majors",
+    "classes",
+    "class_task_families",
+    "units",
+    "unit_families",
+    "curriculum_documents",
+    "audit_log",
+}
+"""``ida_0006_admin_config_tables`` -- the admin console's configuration store."""
+
+EXPECTED_TABLES = {"runs", "results"} | ADMIN_CONFIG_TABLES
+
+
 def test_migration_creates_the_expected_tables(migrated_engine) -> None:
-    assert set(_describe(migrated_engine)) == {"runs", "results"}
+    assert set(_describe(migrated_engine)) == EXPECTED_TABLES
 
 
-def test_orm_metadata_declares_both_tables() -> None:
-    assert set(Base.metadata.tables) == {"runs", "results"}
+def test_orm_metadata_declares_every_table() -> None:
+    assert set(Base.metadata.tables) == EXPECTED_TABLES
+
+
+class TestAdminRevisions:
+    """0006 creates only tables (seeding is NOT a migration, AD-7) and 0007 adds
+    three nullable run columns; both must step back cleanly one at a time."""
+
+    def _config(self, engine, monkeypatch):
+        url = str(engine.url)
+        monkeypatch.setenv("IDA_DATABASE_URL", url)
+        return _alembic_config(url)
+
+    def test_0007_back_to_0006_drops_only_the_run_columns(self, migrated_engine, monkeypatch):
+        from alembic.command import downgrade
+
+        downgrade(self._config(migrated_engine, monkeypatch), "ida_0006_admin_config_tables")
+        after = _describe(migrated_engine)
+        assert {"cancel_requested_at", "config_revision", "launched_by"}.isdisjoint(
+            after["runs"]["columns"]
+        )
+        assert set(after) >= ADMIN_CONFIG_TABLES
+
+    def test_0006_back_to_0005_drops_every_admin_table(self, migrated_engine, monkeypatch):
+        from alembic.command import downgrade
+
+        downgrade(self._config(migrated_engine, monkeypatch), "ida_0005_judge_attempts")
+        assert set(_describe(migrated_engine)) == {"runs", "results"}
+
+    def test_round_trip_from_0005_matches_the_orm(
+        self, migrated_engine, metadata_engine, monkeypatch
+    ):
+        from alembic.command import downgrade, upgrade
+
+        config = self._config(migrated_engine, monkeypatch)
+        downgrade(config, "ida_0005_judge_attempts")
+        upgrade(config, "head")
+        assert _describe(migrated_engine) == _describe(metadata_engine)
+
+    def test_the_new_tables_are_empty_after_migrating(self, migrated_engine) -> None:
+        """No seed rows: the migrate initContainer cannot see which YAML an
+        environment uses (AD-7)."""
+        from sqlalchemy import text
+
+        with migrated_engine.connect() as conn:
+            for table in ADMIN_CONFIG_TABLES:
+                assert conn.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar() == 0  # noqa: S608
 
 
 def test_downgrade_removes_everything(migrated_engine, tmp_path, monkeypatch) -> None:
@@ -518,3 +584,13 @@ class TestPartialDowngradeToTwo:
         assert "THE DOWNGRADE DESTROYS DATA" in source, (
             "an operator must be warned where they look, not only where we tested"
         )
+
+
+def test_every_revision_id_fits_alembic_version_on_postgres() -> None:
+    """``alembic_version.version_num`` is VARCHAR(32) on Postgres. A longer id
+    applies the migration's DDL and then fails writing its own stamp -- and
+    SQLite does not enforce the length, so nothing else in this suite sees it.
+    (The design's ``ida_0007_run_cancel_and_provenance`` was 34 characters.)"""
+    script = ScriptDirectory.from_config(_alembic_config("sqlite://"))
+    too_long = [r.revision for r in script.walk_revisions() if len(r.revision) > 32]
+    assert too_long == []

@@ -95,6 +95,12 @@ patches:
       - op: add
         path: /data/IDA_CURRICULUM_FILE
         value: /app/curriculum/slo.dev.yaml
+      # The unit taxonomy's dev twin (real + demo classes). Units moved out of
+      # the frontend (admin-console AD-11) and are served on /curriculum, so the
+      # demo units now arrive the same way the demo majors do.
+      - op: add
+        path: /data/IDA_UNITS_FILE
+        value: /app/curriculum/units.dev.yaml
       - op: add
         path: /data/IDA_TASKS_DIR
         value: /app/tasks-all

@@ -17,7 +17,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-TERMINAL_STATUSES = {"succeeded", "partial", "failed"}
+TERMINAL_STATUSES = {"succeeded", "partial", "failed", "cancelled"}
 """Every state a finished run can be in.
 
 Derived from :class:`ida_core.contracts.RunStatus` and asserted against it below,

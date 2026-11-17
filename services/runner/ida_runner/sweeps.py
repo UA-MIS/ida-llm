@@ -55,10 +55,9 @@ from ida_core.contracts import (
     TaskKind,
 )
 from ida_core.db import make_engine, make_session_factory, session_scope, utcnow
-from ida_core.gitmeta import build_identity, current_git_sha
+from ida_core.gitmeta import build_identity
 from ida_core.ids import new_id, new_run_id
 from ida_core.queue import RedisQueue, RunQueue
-from ida_core.registry import load_registry
 from ida_core.repositories import (
     create_run,
     existing_run_keys,
@@ -67,6 +66,7 @@ from ida_core.repositories import (
     models_with_any_run,
     persist_regraded_results,
 )
+from ida_harness.config_provider import build_provider
 from ida_harness.regrade import regrade_run
 from ida_harness.runner import unscorable_reason
 from ida_harness.tasks import TaskCatalog
@@ -609,14 +609,18 @@ def build_context(
     """
     settings = settings or get_settings()
     engine = make_engine(settings.database_url)
+    session_factory = make_session_factory(engine)
+    # A sweep is one short-lived CronJob run: one snapshot for its whole life,
+    # from YAML or (IDA_CONFIG_SOURCE=db) from the live tables.
+    snapshot = build_provider(settings, session_factory).snapshot()
     return SweepContext(
         artifact_store=build_artifact_store(settings) if need_artifacts else None,
         settings=settings,
-        session_factory=make_session_factory(engine),
+        session_factory=session_factory,
         queue=RedisQueue.from_url(settings.redis_url),
-        registry=load_registry(settings.resolved_models_file()),
-        catalog=TaskCatalog.from_directory(settings.resolved_tasks_dir()),
-        git_sha=current_git_sha(settings.resolved_tasks_dir()),
+        registry=snapshot.registry,
+        catalog=snapshot.catalog,
+        git_sha=snapshot.task_git_sha,
     )
 
 

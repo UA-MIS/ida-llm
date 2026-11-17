@@ -272,7 +272,6 @@ class TestModelsEndpoint:
         It now disables an entry EXPLICITLY, so the filter is exercised whatever
         models.yaml happens to contain, and asserts both directions.
         """
-        import dataclasses
 
         from fastapi.testclient import TestClient as _TestClient
 
@@ -285,7 +284,7 @@ class TestModelsEndpoint:
                 for m in context.registry.models
             ]
         )
-        client = _TestClient(create_app(dataclasses.replace(context, registry=registry)))
+        client = _TestClient(create_app(context.replace(registry=registry)))
 
         assert "qwen-local" not in {m["key"] for m in client.get("/models").json()}
         assert "qwen-local" in {

@@ -104,7 +104,15 @@
         "tags": { "type": "array", "items": { "type": "string" } },
         "family": { "type": ["string", "null"] },
         "family_display_name": { "type": ["string", "null"] },
-        "display_order": { "type": ["integer", "null"] }
+        "display_order": { "type": ["integer", "null"] },
+        "hidden": {
+          "type": "boolean",
+          "description": "Withheld from the public read API (like an IDA_PUBLIC_HIDE_TAGS match). Set from the admin console; models.yaml need not mention it."
+        },
+        "credential_ref": {
+          "type": ["string", "null"],
+          "description": "Name of an admin-entered provider credential holding the key. Mutually exclusive with api_key_env."
+        }
       }
     }
   }

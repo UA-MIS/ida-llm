@@ -7,9 +7,14 @@ runs locally. It deliberately checks BOTH layers (see
 than stopping at the first, so a contributor fixing task files gets the whole
 list in one pass.
 
-Four authored formats are checked: ``models.yaml``, ``curriculum/slo.yaml``,
-``curriculum/majors.yaml`` and ``tasks/**/*.yaml`` -- plus the rules that span
-more than one of them.
+Five authored formats are checked: ``models.yaml``, ``curriculum/slo.yaml``,
+``curriculum/majors.yaml``, ``curriculum/units.yaml`` and ``tasks/**/*.yaml`` --
+plus the rules that span more than one of them.
+
+The rules themselves live in ``ida_core`` (``ida_core.validation_suite`` runs
+them together for the admin API and the database seeder); this file is the thin
+YAML-reading CLI over them, and its output format and exit codes are what CI
+has always seen.
 
 The cross-file rules
 --------------------
@@ -55,6 +60,7 @@ from ida_core.majors import (
     load_majors,
     title_disagreements,
 )
+from ida_core.units import default_units_path, load_units
 from ida_core.validation import (
     ValidationError,
     discover_task_files,
@@ -62,6 +68,7 @@ from ida_core.validation import (
     validate_models_document,
     validate_task_document,
 )
+from ida_core.validation_suite import validate_units
 
 OK = "  ok"
 BAD = "FAIL"
@@ -118,7 +125,7 @@ def _task_families(tasks_dir: Path) -> set[str]:
 
 def _check_majors(
     path: Path, curriculum: CurriculumMap | None, task_families: set[str]
-) -> list[str]:
+) -> tuple[Majors | None, list[str]]:
     """Load the majors taxonomy and reconcile it against the curriculum map.
 
     An ABSENT file is not an error: a deployment can run without the taxonomy
@@ -129,11 +136,11 @@ def _check_majors(
     """
     if not path.exists():
         print(f"{OK}  {path}  (absent; the drill-down falls back to outcome views)")
-        return []
+        return None, []
     try:
         majors: Majors = load_majors(path)
     except ValidationError as exc:
-        return [str(exc)]
+        return None, [str(exc)]
 
     class_count = sum(len(m.classes) for m in majors.majors)
     print(
@@ -144,7 +151,7 @@ def _check_majors(
     if curriculum is None:
         # Same rule as the task pass: "we could not check" must never print the
         # same as "we checked and it was clean".
-        return [
+        return majors, [
             f"{path}: the curriculum map failed to load, so the majors taxonomy could not be "
             "reconciled against it; fix the curriculum error above"
         ]
@@ -158,7 +165,35 @@ def _check_majors(
     problems = check_against_curriculum(majors, curriculum) + check_task_families(
         majors, task_families
     )
-    return [f"{path}: {problem}" for problem in problems]
+    return majors, [f"{path}: {problem}" for problem in problems]
+
+
+def _check_units(path: Path, majors: Majors | None) -> list[str]:
+    """The unit taxonomy and its two invariants against the majors taxonomy.
+
+    Moved here from the frontend's ``units.test.ts`` when units moved out of
+    TypeScript (AD-11): a family in at most one unit, and a unit's families a
+    subset of its class's. Absent is fine (no class has units); present and
+    broken is not. Without a loadable majors taxonomy the subset rule cannot
+    be checked, and that is reported rather than passed.
+    """
+    if not path.exists():
+        print(f"{OK}  {path}  (absent; no class has a unit breakdown)")
+        return []
+    try:
+        units = load_units(path)
+    except ValidationError as exc:
+        return [str(exc)]
+    problems = [f"{path}: {issue.path}: {issue.message}" for issue in validate_units(units, majors)]
+    if majors is None:
+        problems.append(
+            f"{path}: the majors taxonomy failed to load or is absent, so unit families could "
+            "not be checked against their classes"
+        )
+    if not problems:
+        count = sum(len(rows) for rows in units.values())
+        print(f"{OK}  {path}  ({len(units)} class(es), {count} unit(s))")
+    return problems
 
 
 def _check_tasks(tasks_dir: Path, curriculum: CurriculumMap | None) -> list[str]:
@@ -209,10 +244,15 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Validating authored content under {root}\n")
     curriculum, curriculum_errors = _check_curriculum(default_curriculum_path(root))
+    models_errors = _check_models(root / "models.yaml")
+    majors, majors_errors = _check_majors(
+        default_majors_path(root), curriculum, _task_families(root / "tasks")
+    )
     errors = (
-        _check_models(root / "models.yaml")
+        models_errors
         + curriculum_errors
-        + _check_majors(default_majors_path(root), curriculum, _task_families(root / "tasks"))
+        + majors_errors
+        + _check_units(default_units_path(root), majors)
         + _check_tasks(root / "tasks", curriculum)
     )
 

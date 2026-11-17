@@ -8,6 +8,7 @@ meaning we are guessing at.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 
 from ida_core.contracts import TaskSpec
@@ -71,6 +72,35 @@ class TaskCatalog:
                 raise TaskLoadError(f"duplicate task id {spec.id!r}: {sources[spec.id]} and {path}")
             tasks[spec.id] = spec
             sources[spec.id] = path
+        return cls(tasks, sources)
+
+    @classmethod
+    def from_documents(cls, documents: Iterable[tuple[str, dict]]) -> TaskCatalog:
+        """Build a catalog from already-parsed task documents -- the database path.
+
+        Runs the SAME two layers as :func:`load_task_file` (JSON Schema, then
+        ``TaskSpec.from_document``, which stamps ``content_sha``), so a task
+        stored in the database is exactly as valid, and hashes exactly the same,
+        as the file it was seeded from.  ``source_of`` reports ``db:<task_id>``.
+        """
+        tasks: dict[str, TaskSpec] = {}
+        sources: dict[str, Path] = {}
+        for task_id, document in documents:
+            source = f"db:{task_id}"
+            if not isinstance(document, dict):
+                raise TaskLoadError(f"{source}: top level must be a mapping")
+            try:
+                validate_task_document(document, source)
+            except ValidationError as exc:
+                raise TaskLoadError(str(exc)) from exc
+            try:
+                spec = TaskSpec.from_document(document)
+            except Exception as exc:
+                raise TaskLoadError(f"{source}: {exc}") from exc
+            if spec.id in tasks:
+                raise TaskLoadError(f"duplicate task id {spec.id!r} in the database")
+            tasks[spec.id] = spec
+            sources[spec.id] = Path(source)
         return cls(tasks, sources)
 
     def get(self, task_id: str) -> TaskSpec:
