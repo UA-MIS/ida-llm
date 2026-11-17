@@ -19,7 +19,14 @@ import { defineConfig } from "vitest/config";
  * rather than merely computing them. A landing page that quietly dropped its
  * "not measured yet" rows would pass every pure test in this directory.
  */
-const alias = { "@": fileURLToPath(new URL("./src", import.meta.url)) };
+const alias = {
+  "@": fileURLToPath(new URL("./src", import.meta.url)),
+  // `server-only` throws on import outside a React Server Components bundle,
+  // which is exactly its job in `next build`. Under vitest there is no RSC
+  // bundle, so the admin modules' tests resolve it to an empty module.
+  // `tests/admin-isolation.test.ts` still asserts the import is present.
+  "server-only": fileURLToPath(new URL("./tests/admin/server-only-shim.ts", import.meta.url)),
+};
 
 export default defineConfig({
   test: {

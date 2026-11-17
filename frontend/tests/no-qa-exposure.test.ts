@@ -33,12 +33,26 @@ function files(dir = SRC): string[] {
 }
 
 const ALL = files().filter((f) => /\.(ts|tsx)$/.test(f));
+
+/**
+ * ⚠ THE ADMIN CONSOLE IS THE ONE DELIBERATE EXCEPTION (design §6.6). Files in
+ * these trees render unredacted material, but only after `requireAdmin()` has
+ * proved a signed-in UA-MIS:ida-llm member (`tests/admin-isolation.test.ts`
+ * pins that every admin page does). The public checks below are scoped to
+ * everything ELSE, so they stay exactly as strict for the public site.
+ */
+const ADMIN_TREES = ["/app/admin/", "/components/admin/", "/lib/admin/", "/app/api/auth/"];
+const isAdmin = (f: string) => {
+  const rel = f.slice(SRC.length);
+  return rel === "/auth.ts" || ADMIN_TREES.some((t) => rel.startsWith(t));
+};
+const PUBLIC = ALL.filter((f) => !isAdmin(f));
 const read = (f: string) => readFileSync(f, "utf8");
 /** Source with comments stripped, so prose explaining the ban cannot trip it. */
 const code = (f: string) => read(f).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 describe("no question/answer content is reachable from the public frontend", () => {
-  it("has no route handler except the three ops endpoints", () => {
+  it("has no route handler except the three ops endpoints, the admin BFF and Auth.js", () => {
     // An ALLOWLIST, not a pattern: every route handler in this app is a public,
     // unauthenticated surface, so adding one is a deliberate act that has to be
     // recorded here. `version` joined healthz and metrics on 2026-11-12 for the
@@ -48,7 +62,14 @@ describe("no question/answer content is reachable from the public frontend", () 
     // environment), so "what is deployed?" had nowhere else to be asked.
     // The next test is what makes that safe.
     const handlers = ALL.filter((f) => /\/route\.ts$/.test(f)).map((f) => f.slice(SRC.length));
+    //
+    // The two admin entries (design §6.6) are not public surfaces: the BFF
+    // answers nothing without an admin session (admin-bff.test.ts) and the
+    // Auth.js handler 404s while ADMIN_CONSOLE_ENABLED is unset. Neither can
+    // serve material to an anonymous reader.
     expect(handlers.sort()).toEqual([
+      "/app/admin/api/[...path]/route.ts",
+      "/app/api/auth/[...nextauth]/route.ts",
       "/app/api/healthz/route.ts",
       "/app/api/metrics/route.ts",
       "/app/api/version/route.ts",
@@ -74,15 +95,15 @@ describe("no question/answer content is reachable from the public frontend", () 
 
   it("has no transcript proxy, viewer or fetcher left", () => {
     expect(existsSync(join(SRC, "app/api/runs"))).toBe(false);
-    for (const f of ALL) {
+    for (const f of PUBLIC) {
       expect(code(f), `${f} still touches transcripts`).not.toMatch(
         /getTranscript|SampleTranscript|<Transcript\b|\/transcript\b/,
       );
     }
   });
 
-  it("ships no client component that is handed run content", () => {
-    const clients = ALL.filter((f) => /^\s*["']use client["']/.test(read(f))).map((f) => f.slice(SRC.length));
+  it("ships no public client component that is handed run content", () => {
+    const clients = PUBLIC.filter((f) => /^\s*["']use client["']/.test(read(f))).map((f) => f.slice(SRC.length));
     // The theme toggle, the error boundary and the family expander (handed only
     // pre-rendered score cells and a label) hold no data. A new entry here
     // needs a deliberate look at what props cross the server/client boundary.
@@ -93,8 +114,15 @@ describe("no question/answer content is reachable from the public frontend", () 
     ]);
   });
 
+  it("keeps every admin client component under components/admin/", () => {
+    const adminClients = ALL.filter((f) => isAdmin(f) && /^\s*["']use client["']/.test(read(f)));
+    for (const f of adminClients) {
+      expect(f.slice(SRC.length), "an admin client component outside components/admin/").toMatch(/^\/components\/admin\//);
+    }
+  });
+
   it("never renders a scorer's or judge's explanation, or a per-sample error string", () => {
-    for (const f of ALL.filter((p) => p.endsWith(".tsx"))) {
+    for (const f of PUBLIC.filter((p) => p.endsWith(".tsx"))) {
       const body = code(f);
       expect(body, `${f} renders score.explanation`).not.toMatch(/\.explanation\b/);
       expect(body, `${f} renders score.details`).not.toMatch(/score\??\.details|\.criteria\b/);
