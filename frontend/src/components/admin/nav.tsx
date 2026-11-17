@@ -14,6 +14,9 @@ export const ADMIN_SECTIONS: { href: string; label: string }[] = [
   { href: "/admin/model-families", label: "Model families" },
   { href: "/admin/credentials", label: "API keys" },
   { href: "/admin/material", label: "Course material" },
+  { href: "/admin/classes", label: "Majors and classes" },
+  { href: "/admin/runs", label: "Runs" },
+  { href: "/admin/audit", label: "Activity log" },
   { href: "/admin/system", label: "System" },
 ];
 

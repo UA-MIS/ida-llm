@@ -10,7 +10,9 @@
  * rules are only the few the tests exercise.
  */
 
-import type { AdminModel, AdminModelInput, AdminTask, Credential, Issue, ModelFamily, TaskDocument, TaskFamily } from "@/lib/admin/types";
+import type {
+  AdminClass, AdminModel, AdminModelInput, AdminTask, AdminUnit, Credential, Issue, ModelFamily, RunEstimate, RunLaunchInput, TaskDocument, TaskFamily,
+} from "@/lib/admin/types";
 
 export interface FakeState {
   models: AdminModel[];
@@ -18,6 +20,8 @@ export interface FakeState {
   credentials: Credential[];
   taskFamilies: TaskFamily[];
   tasks: AdminTask[];
+  classes: AdminClass[];
+  launches: RunLaunchInput[];
   /** Raw upload bodies that were committed (the fake's "MinIO"). */
   stored: string[];
   /** Every key ever sent to POST/PUT credentials. Tests assert it never renders. */
@@ -87,6 +91,17 @@ export function sampleTask(over: Partial<AdminTask> = {}): AdminTask {
   };
 }
 
+export function sampleUnit(over: Partial<AdminUnit> = {}): AdminUnit {
+  return { id: "u1", course: "MIS 200", key: "intro", n: 1, title: "Introduction", covers: [], blurb: "", source: null, caveat: null, families: [], version: 1, ...over };
+}
+
+export function sampleClass(over: Partial<AdminClass> = {}): AdminClass {
+  return {
+    course: "MIS 200", major_id: "mis", unassigned_reason: null, title: null, resolved_title: "Intro to MIS", credit_hours: 3, position: 1,
+    task_families: [], units: [], version: 1, ...over,
+  };
+}
+
 export function createFakeAdminApi(seed: Partial<FakeState> = {}) {
   const state: FakeState = {
     models: seed.models ?? [sampleModel()],
@@ -95,6 +110,8 @@ export function createFakeAdminApi(seed: Partial<FakeState> = {}) {
     taskFamilies: seed.taskFamilies ?? [sampleTaskFamily()],
     tasks: seed.tasks ?? [sampleTask()],
     stored: [],
+    classes: seed.classes ?? [],
+    launches: [],
     receivedSecrets: [],
   };
   const calls: FakeCall[] = [];
@@ -286,7 +303,52 @@ export function createFakeAdminApi(seed: Partial<FakeState> = {}) {
       if (method === "DELETE") return bump({ ...t.document, samples: t.document.samples.filter((s) => s.id !== sampleId) });
     }
 
+    if (resource === "runs" && id === "estimate" && method === "POST") {
+      const input = body as RunLaunchInput;
+      return json(200, estimateFor(input));
+    }
+    if (resource === "runs" && !id && method === "POST") {
+      const input = body as RunLaunchInput;
+      const est = estimateFor(input);
+      if (est.runs > est.caps.max_runs) return problem(422, "cap_exceeded", "Too many runs for one launch.");
+      if (est.needs_confirmation && !((input.confirm_spend_usd ?? 0) >= est.est_usd_high)) {
+        return problem(409, "spend_confirmation_required", "Confirm the spend.", { current: est });
+      }
+      state.launches.push(input);
+      return json(202, { queued: est.runs, runs: [], sweep_id: "sweep-1", estimate: est });
+    }
+
+    if (resource === "classes" && sub === "task-families" && method === "PUT") {
+      const families = (body as { families: string[] }).families;
+      const klass = state.classes.find((c) => c.course === id);
+      if (!klass) return problem(404, "not_found", "No such class.");
+      const stale = checkVersion(ifMatch, klass);
+      if (stale) return stale;
+      const claimed = klass.units.find((u) => u.families.some((f) => !families.includes(f)));
+      if (claimed) return problem(409, "conflict", `Unit ${claimed.n} (${claimed.title}) still uses a family you removed.`);
+      return json(200, Object.assign(klass, { task_families: families, version: klass.version + 1 }));
+    }
+    if (resource === "classes" && sub === "units" && method === "POST") {
+      const input = body as AdminUnit;
+      const clash = state.classes.flatMap((c) => c.units).find((u) => u.families.some((f) => input.families.includes(f)));
+      if (clash) return problem(422, "validation_failed", "Unit failed validation", { issues: [{ path: "families", message: `already in unit ${clash.key}`, severity: "error" }] });
+      const unit = { ...input, id: `u${Date.now()}`, course: id!, version: 1 };
+      state.classes.find((c) => c.course === id)?.units.push(unit);
+      return json(201, unit);
+    }
+
     return problem(501, "not_implemented", "Not in the fake.");
+  }
+
+  /** $0.40 per (model, family) pair; testing-only models or > $25 need confirmation; > 50 runs is over the cap. */
+  function estimateFor(input: RunLaunchInput): RunEstimate {
+    const pairs = input.model_keys.flatMap((m) => (input.family_keys ?? []).map((f) => ({ task_id: `${f}/t`, model_key: m, samples: 5, est_usd_high: m === "pricey" ? 30 : 0.4, basis: "ceiling" as const })));
+    const est = pairs.reduce((a, p) => a + p.est_usd_high, 0);
+    const testing = input.model_keys.some((k) => state.models.find((m) => m.key === k)?.tags.includes("testing-only"));
+    return {
+      runs: pairs.length * (input.model_keys.includes("huge") ? 100 : 1), samples: pairs.length * 5, est_usd_high: est, includes_judge: false, pairs, warnings: [],
+      caps: { max_runs: 50, max_samples: 2000, max_estimated_usd: 25 }, needs_confirmation: est > 25 || testing,
+    };
   }
 
   async function upload(form: FormData): Promise<Response> {

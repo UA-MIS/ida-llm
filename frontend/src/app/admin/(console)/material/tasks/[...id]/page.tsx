@@ -3,19 +3,12 @@ import Link from "next/link";
 import { LoadError } from "@/components/admin/load-error";
 import { TaskEditor } from "@/components/admin/task-editor";
 import { adminGet } from "@/lib/admin/api";
+import { safeDecode } from "@/lib/admin/format";
 import { getActor, requireAdmin } from "@/lib/admin/session";
 import { taskPath } from "@/lib/admin/tasks";
 import type { AdminTask } from "@/lib/admin/types";
 
 export const dynamic = "force-dynamic";
-
-function safeDecode(segment: string): string {
-  try {
-    return decodeURIComponent(segment);
-  } catch {
-    return segment;
-  }
-}
 
 /**
  * ⚠ UNREDACTED: prompts, correct answers and rubrics are shown here. That is
