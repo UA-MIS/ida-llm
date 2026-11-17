@@ -279,6 +279,13 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Test
+        # Until the admin console arrived, nothing ran the frontend's vitest
+        # suite in CI (`make test-frontend` did, locally). The admin isolation,
+        # session and BFF tests are security gates, and the no-qa-exposure
+        # suite is the public site's: a gate that never runs is documentation.
+        run: npm test
+
       - name: Build
         run: npm run build
 
